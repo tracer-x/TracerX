@@ -150,6 +150,69 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
   stream << "]\n";
 }
 
+TransferRelationEntry::TransferRelationEntry(ref<Expr> _leftExpr, ref<Expr> _rightExpr, ExpressionType _exprType,
+													ref<Expr> _relationFrom, ref<Expr> _relationTo, bool _isAdded):
+	leftExpr(_leftExpr),
+	rightExpr(_rightExpr),
+	exprType(_exprType),
+	relationFrom(_relationFrom),
+	relationTo(_relationTo),
+	isAdded(_isAdded){}
+
+void TransferRelationEntry::setIsAdded(bool _isAdded){
+	this->isAdded = _isAdded;
+}
+
+bool TransferRelationEntry::getIsAdded() const{
+	return this->isAdded;
+}
+
+ref<Expr> TransferRelationEntry::getLeftExpr() const{
+	return this->leftExpr;
+}
+
+ref<Expr> TransferRelationEntry::getRightExpr() const{
+	return this->rightExpr;
+}
+
+ExpressionType TransferRelationEntry::getExpressionType() const{
+	return this->exprType;
+}
+
+ref<Expr> TransferRelationEntry::getRelationTo() const{
+	return this->relationTo;
+}
+
+Interpolant::Interpolant():
+	status(NoInterpolant){}
+
+
+Interpolant::Interpolant(ref<Expr> _interpolant, ref<Expr> _fromLoc, ref<Expr> _destLoc, InterpolantStatus _status):
+	interpolant(_interpolant),
+	fromLoc(_fromLoc),
+	destLoc(_destLoc),
+	status(_status){}
+
+void Interpolant::setInterpolant(ref<Expr> _interpolant){
+	this->interpolant = _interpolant;
+}
+
+ref<Expr> Interpolant::getInterpolant() const{
+	return this->interpolant;
+}
+
+ref<Expr> Interpolant::getFromLoc() const{
+	return this->fromLoc;
+}
+
+ref<Expr> Interpolant::getDestLoc() const{
+	return this->destLoc;
+}
+
+InterpolantStatus Interpolant::getInterpolantStatus () const{
+	return this->status;
+}
+
 ITree::ITree(ExecutionState* _root) :
     currentINode(0),
     root(new ITreeNode(0, _root)) {}
@@ -289,7 +352,8 @@ ITreeNode::ITreeNode(ITreeNode *_parent,
   right(0),
   nodeId(0),
   isSubsumed(false),
-  data(_data) {
+  data(_data),
+  interpolant(){
 
   pathCondition = (_parent != 0) ? _parent->pathCondition : 0;
 
@@ -311,8 +375,38 @@ unsigned int ITreeNode::getNodeId() {
   return nodeId;
 }
 
+void ITreeNode::setInterpolant(Interpolant * _interpolant){
+  this->interpolant = _interpolant;
+}
+
 std::vector< ref<Expr> > ITreeNode::getInterpolant() const {
   return this->pathCondition->packInterpolant();
+}
+
+Interpolant * ITreeNode::getNewInterpolant(){
+	return this->interpolant;
+}
+
+ITreeNode * ITreeNode::getParent(){
+	return this->parent;
+}
+
+void ITreeNode::addRelation(ref<Expr> _leftExpr, ref<Expr> _rightExpr, ExpressionType exprType, ref<Expr> _relationFrom,
+													ref<Expr> _relationTo, bool _isAdded){
+	this->packRelation.push_back(TransferRelationEntry(_leftExpr, _rightExpr, exprType, _relationFrom, _relationTo, true));
+}
+
+void ITreeNode::addPackRelation(std::vector< TransferRelationEntry > packRelation){
+
+    for (std::vector< TransferRelationEntry >::iterator it = packRelation.begin() ;
+    		it != packRelation.end(); ++it){
+    	it->setIsAdded(false);
+    	this->packRelation.push_back(*it);
+    }
+}
+
+std::vector<TransferRelationEntry> ITreeNode::getPackRelation() const{
+	return packRelation;
 }
 
 void ITreeNode::setNodeLocation(unsigned int programPoint) {
@@ -325,6 +419,9 @@ void ITreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
   assert (left == 0 && right == 0);
   leftData->itreeNode = left = new ITreeNode(this, leftData);
   rightData->itreeNode = right = new ITreeNode(this, rightData);
+
+  left->addPackRelation(left->parent->getPackRelation());
+  right->addPackRelation(right->parent->getPackRelation());
 }
 
 std::map< ref<Expr>, PathConditionMarker *> ITreeNode::makeMarkerMap() {
@@ -383,6 +480,5 @@ void ITreeNode::print(llvm::raw_ostream &stream, const unsigned int tab_num) con
       stream << "\n";
   }
 }
-
 
 

@@ -59,6 +59,9 @@
 
 using namespace llvm;
 
+enum InterpolantStatus { NoInterpolant, PartialInterpolant, FullInterpolant};
+enum ExpressionType { Add, Sub, Mul, UDiv, SDiv, URem, SRem, And, Or, Xor, Shl, LShr, AShr};
+
 namespace klee {
   class ExecutionState;
 
@@ -126,6 +129,54 @@ namespace klee {
     void print(llvm::raw_ostream &stream) const;
   };
 
+  class TransferRelationEntry{
+	  ref<Expr> leftExpr;
+	  ref<Expr> rightExpr;
+	  ExpressionType exprType;
+	  ref<Expr> relationFrom;
+	  ref<Expr> relationTo;
+	  bool isAdded;
+
+  public:
+	  TransferRelationEntry(ref<Expr> _leftExpr, ref<Expr> _rightExpr, ExpressionType exprType,
+			  	  	  	  	  ref<Expr> relationFrom, ref<Expr> relationTo, bool isAdded);
+
+	  bool getIsAdded() const;
+
+	  void setIsAdded(bool isAdded);
+
+	  ref<Expr> getLeftExpr() const;
+
+	  ref<Expr> getRightExpr() const;
+
+	  ref<Expr> getRelationTo() const;
+
+	  ExpressionType getExpressionType() const;
+
+  };
+
+  class Interpolant{
+	  ref<Expr> interpolant;
+	  ref<Expr> fromLoc;
+	  ref<Expr> destLoc;
+	  InterpolantStatus status;
+
+  public:
+	  Interpolant();
+
+	  Interpolant(ref<Expr> interpolant, ref<Expr> fromLoc, ref<Expr> destLoc, InterpolantStatus status);
+
+	  void setInterpolant(ref<Expr> Interpolant);
+
+	  ref<Expr> getInterpolant() const;
+
+	  ref<Expr> getFromLoc() const;
+
+	  ref<Expr> getDestLoc() const;
+
+	  InterpolantStatus getInterpolantStatus () const;
+  };
+
   class ITree{
     typedef std::vector< ref<Expr> > ExprList;
     typedef ExprList::iterator iterator;
@@ -175,13 +226,28 @@ namespace klee {
     ITreeNode *parent, *left, *right;
     unsigned int nodeId;
     bool isSubsumed;
+    std::vector< TransferRelationEntry > packRelation;
+    Interpolant * interpolant;
 
   public:
     ExecutionState *data;
 
     unsigned int getNodeId();
 
+    ITreeNode * getParent();
+
     std::vector< ref<Expr> > getInterpolant() const;
+
+    Interpolant * getNewInterpolant();
+
+    void setInterpolant(Interpolant * interpolant);
+
+    void addRelation(ref<Expr> _leftExpr, ref<Expr> _rightExpr, ExpressionType exprType, ref<Expr> _relationFrom,
+			ref<Expr> _relationTo, bool _isAdded);
+
+    void addPackRelation(std::vector< TransferRelationEntry > packRelation);
+
+    std::vector<TransferRelationEntry> getPackRelation() const;
 
     void setNodeLocation(unsigned int programPoint);
 

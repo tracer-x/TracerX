@@ -283,6 +283,8 @@ Executor::Executor(const InterpreterOptions &opts,
     specialFunctionHandler(0),
     processTree(0),
     interpTree(0), 
+    relationFrom(0),
+    relationTo(0),
     replayOut(0),
     replayPath(0),    
     usingSeeds(0),
@@ -861,6 +863,15 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
     }
   }
 
+  // safe condition is a "ideal" formula that produced at terminal node, in which does not produce bug
+  ref<Expr> safeCondition;
+  if(res == Solver::True ){
+	  safeCondition = condition;
+  }
+  else if (res == Solver::False ){
+	  safeCondition = Expr::createIsZero(condition);
+  }
+
   // XXX - even if the constraint is provable one way or the other we
   // can probably benefit by adding this constraint and allowing it to
   // reduce the other constraints. For example, if we do a binary
@@ -879,6 +890,9 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
     /// We then extract the unsatisfiability core of antecedent and not
     /// consequent as the Craig interpolant.
     interpTree->markPathCondition(solver->getUnsatCore());
+    if(setNodeInterpolant(current, safeCondition, relationFrom, relationTo)){
+    	propagateInterpolant(current.itreeNode);
+    }
 
     return StatePair(&current, 0);
   } else if (res==Solver::False) {
@@ -887,17 +901,16 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
         current.pathOS << "0";
       }
     }
-
     /// Falsity proof succeeded of a query: antecedent -> consequent,
     /// which means that antecedent -> not(consequent) is valid. In this
     /// case also we extract the unsat core of the proof
     interpTree->markPathCondition(solver->getUnsatCore());
+    setNodeInterpolant(current, safeCondition, relationFrom, relationTo);
 
     return StatePair(0, &current);
   } else {
     TimerStatIncrementer timer(stats::forkTime);
     ExecutionState *falseState, *trueState = &current;
-
     ++stats::forks;
 
     falseState = trueState->branch();
@@ -974,6 +987,88 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
 
     return StatePair(trueState, falseState);
   }
+}
+
+bool Executor::setNodeInterpolant(ExecutionState& current, ref<Expr>& safeCondition, ref<Expr> fromLocation, ref<Expr> toLocation){
+	if(safeCondition->getNumKids() < 2) // when the interpolant is only either true or false
+		return false;
+
+	klee_warning("safe condition");
+	safeCondition->dump();
+
+	//update the right value of current safe condition
+	ref<Expr> rightValue = safeCondition->getKid(1);
+	std::vector<TransferRelationEntry> packRelation = current.itreeNode->getPackRelation();
+	for (std::vector<TransferRelationEntry>::iterator it = packRelation.begin();
+				it != packRelation.end(); ++it) {
+
+			// match the operation type and variable location
+			if (it->getExpressionType() == Add && it->getRelationTo() == toLocation) {
+				rightValue = AddExpr::create(rightValue, it->getRightExpr());
+			}
+	}
+
+	//reconstruct the new formula of interpolant
+	//by combine updated right value with existed left value and the operator
+	ref<Expr> interpolant;
+	if (safeCondition->getKind() == Expr::Sle) {
+		interpolant = SleExpr::create(safeCondition->getKid(0), rightValue);
+	}
+	current.itreeNode->setInterpolant(new Interpolant(interpolant, fromLocation, toLocation, FullInterpolant));
+
+	klee_warning("interpolant");
+	interpolant->dump();
+
+	return true;
+}
+
+bool Executor::propagateInterpolant(ITreeNode * currentNode) {
+
+	Interpolant * currInterpolant = currentNode->getNewInterpolant();
+
+	if(currInterpolant->getInterpolantStatus() != FullInterpolant){
+		return false;
+	}
+
+	ITreeNode * currPredecessorNode = currentNode->getParent();
+	ITreeNode * currChildNode = currentNode;
+	ref<Expr> currPredecessorInterpolant;
+
+	klee_warning("start propagate");
+	while(currPredecessorNode != NULL){
+
+		//Backward: update the left value of current predecessor interpolant
+		Interpolant * currentChildInterpolant = currChildNode->getNewInterpolant();
+		ref<Expr> leftValue =currentChildInterpolant->getInterpolant()->getKid(0);
+		std::vector<TransferRelationEntry> packRelation = currChildNode->getPackRelation();
+
+		for (std::vector<TransferRelationEntry>::iterator it = packRelation.begin();
+					it != packRelation.end(); ++it) {
+
+				// match the operation type and variable location
+				if (it->getExpressionType() == Add && it->getRelationTo() == currentChildInterpolant->getDestLoc() && it->getIsAdded()) {
+					leftValue = AddExpr::create(leftValue, it->getRightExpr());
+				}
+		}
+
+		if (currInterpolant->getInterpolant()->getKind() == Expr::Sle) {
+			currPredecessorInterpolant = SleExpr::create(leftValue, currentChildInterpolant->getInterpolant()->getKid(1));
+		}
+
+		if(currPredecessorNode->getNewInterpolant() == NULL){
+			currPredecessorNode->setInterpolant(new Interpolant(currPredecessorInterpolant, currInterpolant->getFromLoc(), currInterpolant->getDestLoc(), PartialInterpolant));
+		}
+		else{
+			klee_warning("modify the current interpolant value");
+		}
+
+		klee_warning("current predecessor interpolant");
+		currPredecessorInterpolant->dump();
+		currChildNode = currPredecessorNode;
+		currPredecessorNode = currPredecessorNode->getParent();
+	}
+
+	return true;
 }
 
 void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
@@ -1805,6 +1900,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     bindLocal(ki, state, AddExpr::create(left, right));
+
+    state.itreeNode->addRelation(left, right, Add, relationFrom, relationTo, true);
+
     break;
   }
 
@@ -2013,6 +2111,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
   case Instruction::Load: {
     ref<Expr> base = eval(ki, 0, state).value;
+    relationFrom = base;
+    relationTo = base;
     executeMemoryOperation(state, false, base, 0, ki);
     break;
   }
@@ -2621,7 +2721,7 @@ void Executor::run(ExecutionState &initialState) {
   searcher->update(0, states, std::set<ExecutionState*>());
 
   while (!states.empty() && !haltExecution) {
-    ExecutionState &state = searcher->selectState();
+	ExecutionState &state = searcher->selectState();
 
     /// We synchronize the node id to that of the state. The node id
     /// is the address of the first instruction in the node.

@@ -118,8 +118,8 @@ private:
   std::vector<TimerInfo*> timers;
   PTree *processTree;
   ITree *interpTree; 
-  ref<Expr> latestBaseLeft;
-  ref<Expr> latestBaseRight;
+  ref<Expr> relationFrom;
+  ref<Expr> relationTo;
   /// Used to track states that have been added during the current
   /// instructions step. 
   /// \invariant \ref addedStates is a subset of \ref states. 
@@ -401,7 +401,9 @@ private:
   void initTimers();
   void processTimers(ExecutionState *current,
                      double maxInstTime);
- ref<Expr> makeComparison(ref<Expr> exprKind, ref<Expr> leftValue, const ref<Expr>& rightValue);
+  bool setNodeInterpolant(ExecutionState& current, ref<Expr>& safeCondition, ref<Expr> fromLocation, ref<Expr> toLocation);
+  bool propagateInterpolant(ITreeNode * currentNode);
+  ref<Expr> makeComparison(ref<Expr> exprKind, ref<Expr> leftValue, const ref<Expr>& rightValue);
 
 public:
   Executor(const InterpreterOptions &opts, InterpreterHandler *ie);
