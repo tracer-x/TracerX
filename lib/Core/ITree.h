@@ -59,7 +59,7 @@
 
 using namespace llvm;
 
-enum InterpolantStatus { NoInterpolant, PartialInterpolant, FullInterpolant};
+enum InterpolantStatus { NoInterpolant, HalfInterpolant, FullInterpolant};
 enum ExpressionType { Add, Sub, Mul, UDiv, SDiv, URem, SRem, And, Or, Xor, Shl, LShr, AShr};
 
 namespace klee {
@@ -155,6 +155,21 @@ namespace klee {
 
   };
 
+  class PostCondition{
+
+	  ref<Expr> base;
+	  ref<Expr> value;
+
+  public:
+	  PostCondition(ref<Expr> _base, ref<Expr> _value);
+
+	  ref<Expr> getBase() const;
+
+	  ref<Expr> getValue() const;
+
+	  void setValue(ref<Expr> _value);
+  };
+
   class Interpolant{
 	  ref<Expr> interpolant;
 	  ref<Expr> fromLoc;
@@ -175,6 +190,36 @@ namespace klee {
 	  ref<Expr> getDestLoc() const;
 
 	  InterpolantStatus getInterpolantStatus () const;
+
+	  void setInterpolantStatus(InterpolantStatus _interpolant);
+  };
+
+  class RelationInterPath{
+	  typedef std::vector< std::pair<unsigned int, unsigned int> > RelationNodeList;
+
+	  ref<Expr> valueExpr;
+
+	  ref<Expr> relationFrom;
+
+	  ref<Expr> relationDest;
+
+	  ExpressionType expressionType;
+
+	  RelationNodeList relationNodeList;
+
+
+  public:
+	  RelationInterPath(unsigned int _nodeId, unsigned int _nodeDest, ref<Expr> valueExpr, ref<Expr> relationFrom, ref<Expr> relationDest, ExpressionType expressionType);
+
+	  ref<Expr> getValueExpr() const;
+
+	  ref<Expr> getRelationFrom() const;
+
+	  ref<Expr> getRelationDest() const;
+
+	  ExpressionType getExpressionType() const;
+
+	  void addRelationNodeList(std::pair<unsigned int, unsigned int>);
   };
 
   class ITree{
@@ -185,6 +230,8 @@ namespace klee {
     ITreeNode *currentINode;
 
     std::vector<SubsumptionTableEntry> subsumptionTable;
+
+    std::vector<RelationInterPath> relationTable;
 
     BlockTable blockTable;
 
@@ -209,6 +256,8 @@ namespace klee {
 
     void markPathCondition(std::vector< ref<Expr> > unsat_core);
 
+    bool checkUpdateRelationTable(unsigned int nodeId, unsigned int nodeDest, ref<Expr> valueExpr, ref<Expr> relationFrom, ref<Expr> relationDest, ExpressionType expressionType);
+
     void print(llvm::raw_ostream &stream);
 
     void dump();
@@ -228,6 +277,7 @@ namespace klee {
     bool isSubsumed;
     std::vector< TransferRelationEntry > packRelation;
     Interpolant * interpolant;
+    std::vector< PostCondition > postConditions;
 
   public:
     ExecutionState *data;
@@ -236,7 +286,13 @@ namespace klee {
 
     ITreeNode * getParent();
 
+    ITreeNode * getLeft();
+
+    ITreeNode * getRight();
+
     std::vector< ref<Expr> > getInterpolant() const;
+
+    bool IsUpdatePostConditions(ref<Expr> base, ref<Expr> value);
 
     Interpolant * getNewInterpolant();
 

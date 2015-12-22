@@ -1056,10 +1056,21 @@ bool Executor::propagateInterpolant(ITreeNode * currentNode) {
 		}
 
 		if(currPredecessorNode->getNewInterpolant() == NULL){
-			currPredecessorNode->setInterpolant(new Interpolant(currPredecessorInterpolant, currInterpolant->getFromLoc(), currInterpolant->getDestLoc(), PartialInterpolant));
+			currPredecessorNode->setInterpolant(new Interpolant(currPredecessorInterpolant, currInterpolant->getFromLoc(), currInterpolant->getDestLoc(), HalfInterpolant));
 		}
 		else{
 			klee_warning("modify the current interpolant value");
+		}
+
+		//update the interpolant status
+		if(currPredecessorNode->getLeft() != NULL && currPredecessorNode->getRight() != NULL){
+			if(currPredecessorNode->getLeft()->getNewInterpolant() != NULL && currPredecessorNode->getRight()->getNewInterpolant() != NULL){
+				if(currPredecessorNode->getLeft()->getNewInterpolant()->getInterpolantStatus() == FullInterpolant
+						&& currPredecessorNode->getRight()->getNewInterpolant()->getInterpolantStatus() == FullInterpolant)
+				{
+					currPredecessorNode->getNewInterpolant()->setInterpolantStatus(FullInterpolant);
+				}
+			}
 		}
 
 		klee_warning("current predecessor interpolant");
@@ -1900,6 +1911,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     bindLocal(ki, state, AddExpr::create(left, right));
+//    klee_warning("instr:add");
+//    klee_warning("left");
+//    left->dump();
+//    klee_warning("right");
+//    right->dump();
 
     state.itreeNode->addRelation(left, right, Add, relationFrom, relationTo, true);
 
@@ -2119,6 +2135,12 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   case Instruction::Store: {
     ref<Expr> base = eval(ki, 1, state).value;
     ref<Expr> value = eval(ki, 0, state).value;
+//    klee_warning("inst:store");
+//    klee_warning("base");
+//    base->dump();
+//    klee_warning("value");
+//    value->dump();
+    state.itreeNode->IsUpdatePostConditions(base, value);
     executeMemoryOperation(state, true, base, value, 0);
     break;
   }

@@ -213,6 +213,58 @@ InterpolantStatus Interpolant::getInterpolantStatus () const{
 	return this->status;
 }
 
+void Interpolant::setInterpolantStatus (InterpolantStatus _interpolantStatus){
+	this->status = _interpolantStatus;
+}
+
+RelationInterPath::RelationInterPath(unsigned int _nodeId, unsigned int _nodeDest, ref<Expr> _valueExpr, ref<Expr> _relationFrom,
+		ref<Expr> _relationDest, ExpressionType _expressionType):
+		valueExpr(_valueExpr),
+		relationFrom(_relationFrom),
+		relationDest(_relationDest),
+		expressionType(_expressionType){
+
+		relationNodeList.push_back(std::make_pair(_nodeId, _nodeDest));
+}
+
+ref<Expr> RelationInterPath::getValueExpr() const{
+	return this->valueExpr;
+}
+
+ref<Expr> RelationInterPath::getRelationFrom() const{
+	return this->relationFrom;
+}
+
+ref<Expr> RelationInterPath::getRelationDest() const{
+	return this->relationDest;
+}
+
+ExpressionType RelationInterPath::getExpressionType() const{
+	return this->expressionType;
+}
+
+void RelationInterPath::addRelationNodeList(std::pair<unsigned int, unsigned int> _pairNodeID){
+	this->relationNodeList.push_back(_pairNodeID);
+}
+
+
+PostCondition::PostCondition(ref<Expr> _base, ref<Expr> _value):
+	base(_base),
+	value(_value){}
+
+ref<Expr> PostCondition::getBase() const{
+	return this->base;
+}
+
+ref<Expr> PostCondition::getValue() const{
+	return this->value;
+}
+
+void PostCondition::setValue(ref<Expr> _value){
+	this->value = _value;
+}
+
+
 ITree::ITree(ExecutionState* _root) :
     currentINode(0),
     root(new ITreeNode(0, _root)) {}
@@ -298,6 +350,24 @@ void ITree::markPathCondition(std::vector< ref<Expr> > unsat_core) {
 	  if (pc == 0) break;
       }
   }
+}
+
+bool ITree::checkUpdateRelationTable(unsigned int _nodeId, unsigned int _nodeDest, ref<Expr> _valueExpr, ref<Expr> _relationFrom, ref<Expr> _relationDest, ExpressionType _expressionType){
+
+	//update existing record in the table
+	for(std::vector<RelationInterPath>::iterator it = relationTable.begin(); it != relationTable.end(); it++){
+
+		if(it->getValueExpr() == _valueExpr && it->getRelationFrom() == _relationFrom
+				&& it->getRelationDest() == _relationDest && it->getExpressionType() == _expressionType){
+
+				it->addRelationNodeList(std::make_pair(_nodeId, _nodeDest));
+				return false;
+		}
+	}
+
+	//add new record in the table
+	relationTable.push_back(RelationInterPath(_nodeId, _nodeDest, _valueExpr, _relationFrom, _relationDest, _expressionType));
+
 }
 
 void ITree::recordBlock(Instruction *inst) {
@@ -391,6 +461,30 @@ ITreeNode * ITreeNode::getParent(){
 	return this->parent;
 }
 
+ITreeNode * ITreeNode::getLeft(){
+	return this->left;
+}
+
+ITreeNode * ITreeNode::getRight(){
+	return this->right;
+}
+
+bool ITreeNode::IsUpdatePostConditions(ref<Expr> _base, ref<Expr> _value){
+
+	for(std::vector< PostCondition >::iterator it = postConditions.begin(); it != postConditions.end(); ++it){
+		if(it->getBase() == _base){
+			it->setValue(_value);
+			return true;
+		}
+	}
+
+	PostCondition newEntry(_base, _value);
+	postConditions.push_back(newEntry);
+
+	return false;
+}
+
+
 void ITreeNode::addRelation(ref<Expr> _leftExpr, ref<Expr> _rightExpr, ExpressionType exprType, ref<Expr> _relationFrom,
 													ref<Expr> _relationTo, bool _isAdded){
 	this->packRelation.push_back(TransferRelationEntry(_leftExpr, _rightExpr, exprType, _relationFrom, _relationTo, true));
@@ -422,6 +516,25 @@ void ITreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
 
   left->addPackRelation(left->parent->getPackRelation());
   right->addPackRelation(right->parent->getPackRelation());
+
+//  llvm::errs() <<"when split, print the postcondition \n";
+//  for(std::vector< PostCondition >::iterator it = postConditions.begin(); it != postConditions.end(); ++it){
+//	llvm::errs() << "base \n";
+//    it->getBase()->dump();
+//    llvm::errs() << "value \n";
+//    it->getValue()->dump();
+//    for(unsigned int i = 0; i < it->getValue()->getNumKids(); i++){
+//        llvm::errs() << "kids: \n";
+//		it->getValue()->getKid(i)->dump();
+//    }
+//    if(it->getValue()->getKind() == Expr::Add){
+//    	llvm::errs() << "add expr \n";
+//
+//    }
+//
+//
+//  }
+
 }
 
 std::map< ref<Expr>, PathConditionMarker *> ITreeNode::makeMarkerMap() {
