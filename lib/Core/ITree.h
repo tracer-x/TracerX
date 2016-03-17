@@ -57,6 +57,9 @@ struct InterpolationOption {
 
   /// @brief Output the tree tree.dot in .dot file format
   static bool outputTree;
+
+  /// @brief To display running time statistics of interpolation methods
+  static bool timeStat;
 };
 
 /// Storage of search tree for displaying
@@ -314,8 +317,14 @@ public:
 };
 
 class SubsumptionTableEntry {
-  ///@brief Statistics for actual solver call time in subsumption check
+  /// @brief Statistics for actual solver call time in subsumption check
   static TimeStat actualSolverCallTime;
+
+  /// @brief The number of solver calls for subsumption checks
+  static unsigned long checkSolverCount;
+
+  /// @brief The number of failed solver calls for subsumption checks
+  static unsigned long checkSolverFailureCount;
 
   uintptr_t nodeId;
 
@@ -374,7 +383,7 @@ public:
 
   void print(llvm::raw_ostream &stream) const;
 
-  static void dumpTimeStat() { printTimeStat(llvm::errs()); }
+  static void dumpTimeStat();
 };
 
 class ITree {
@@ -436,7 +445,7 @@ public:
 
   void dump();
 
-  static void dumpTimeStat() { printTimeStat(llvm::errs()); }
+  static void dumpTimeStat();
 };
 
 class ITreeNode {
@@ -534,7 +543,7 @@ public:
 
   void print(llvm::raw_ostream &stream) const;
 
-  static void dumpTimeStat() { printTimeStat(llvm::errs()); }
+  static void dumpTimeStat();
 
 private:
   ITreeNode(ITreeNode *_parent);
