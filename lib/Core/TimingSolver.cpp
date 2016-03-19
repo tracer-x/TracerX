@@ -24,6 +24,42 @@ using namespace llvm;
 
 /***/
 
+void TimingSolver::buildCachedUnsatCore(const ExecutionState &state) {
+  std::vector<ref<Expr> > simplificationCore;
+  buildCachedUnsatCore(state, simplificationCore);
+}
+
+void TimingSolver::buildCachedUnsatCore(
+    const ExecutionState &state, std::vector<ref<Expr> > &simplificationCore) {
+  cachedUnsatCore.clear();
+  std::vector<ref<Expr> > unsatCore = solver->getUnsatCore();
+  if (!simplificationCore.empty()) {
+    if (!unsatCore.empty()) {
+      std::vector<ref<Expr> >::iterator simplificationIt =
+          simplificationCore.begin();
+      std::vector<ref<Expr> >::iterator unsatIt = unsatCore.begin();
+      for (ConstraintManager::const_iterator it = state.constraints.begin(),
+                                             itEnd = state.constraints.end();
+           it != itEnd; ++it) {
+        if (*it == *simplificationIt) {
+          ++simplificationIt;
+          if (*it == *unsatIt) {
+            ++unsatIt;
+          }
+          cachedUnsatCore.push_back(*it);
+        } else if (*it == *unsatIt) {
+          ++unsatIt;
+          cachedUnsatCore.push_back(*it);
+        }
+      }
+    } else {
+      cachedUnsatCore = simplificationCore;
+    }
+  } else {
+    cachedUnsatCore = unsatCore;
+  }
+}
+
 bool TimingSolver::evaluate(const ExecutionState& state, ref<Expr> expr,
                             Solver::Validity &result) {
   // Fast path, to avoid timer and OS overhead.
@@ -34,10 +70,12 @@ bool TimingSolver::evaluate(const ExecutionState& state, ref<Expr> expr,
 
   sys::TimeValue now = util::getWallTimeVal();
 
+  std::vector<ref<Expr> > simplificationCore;
   if (simplifyExprs)
-    expr = state.constraints.simplifyExpr(expr);
+    expr = state.constraints.simplifyExpr(expr, simplificationCore);
 
   bool success = solver->evaluate(Query(state.constraints, expr), result);
+  buildCachedUnsatCore(state, simplificationCore);
 
   sys::TimeValue delta = util::getWallTimeVal();
   delta -= now;
@@ -57,10 +95,12 @@ bool TimingSolver::mustBeTrue(const ExecutionState& state, ref<Expr> expr,
 
   sys::TimeValue now = util::getWallTimeVal();
 
+  std::vector<ref<Expr> > simplificationCore;
   if (simplifyExprs)
-    expr = state.constraints.simplifyExpr(expr);
+    expr = state.constraints.simplifyExpr(expr, simplificationCore);
 
   bool success = solver->mustBeTrue(Query(state.constraints, expr), result);
+  buildCachedUnsatCore(state, simplificationCore);
 
   sys::TimeValue delta = util::getWallTimeVal();
   delta -= now;
@@ -103,10 +143,12 @@ bool TimingSolver::getValue(const ExecutionState& state, ref<Expr> expr,
   
   sys::TimeValue now = util::getWallTimeVal();
 
+  std::vector<ref<Expr> > simplificationCore;
   if (simplifyExprs)
-    expr = state.constraints.simplifyExpr(expr);
+    expr = state.constraints.simplifyExpr(expr, simplificationCore);
 
   bool success = solver->getValue(Query(state.constraints, expr), result);
+  buildCachedUnsatCore(state, simplificationCore);
 
   sys::TimeValue delta = util::getWallTimeVal();
   delta -= now;
@@ -130,7 +172,8 @@ TimingSolver::getInitialValues(const ExecutionState& state,
   bool success = solver->getInitialValues(Query(state.constraints,
                                                 ConstantExpr::alloc(0, Expr::Bool)), 
                                           objects, result);
-  
+  buildCachedUnsatCore(state);
+
   sys::TimeValue delta = util::getWallTimeVal();
   delta -= now;
   stats::solverTime += delta.usec();
@@ -141,9 +184,10 @@ TimingSolver::getInitialValues(const ExecutionState& state,
 
 std::pair< ref<Expr>, ref<Expr> >
 TimingSolver::getRange(const ExecutionState& state, ref<Expr> expr) {
-  return solver->getRange(Query(state.constraints, expr));
+  std::pair<ref<Expr>, ref<Expr> > ret =
+      solver->getRange(Query(state.constraints, expr));
+  buildCachedUnsatCore(state);
+  return ret;
 }
 
-std::vector<ref<Expr> > &TimingSolver::getUnsatCore() {
-  return solver->getUnsatCore();
-}
+std::vector<ref<Expr> > &TimingSolver::getUnsatCore() { return cachedUnsatCore; }

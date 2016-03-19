@@ -22,6 +22,13 @@ namespace klee {
   /// TimingSolver - A simple class which wraps a solver and handles
   /// tracking the statistics that we care about.
   class TimingSolver {
+    std::vector<ref<Expr> > cachedUnsatCore;
+
+    void buildCachedUnsatCore(const ExecutionState &state);
+
+    void buildCachedUnsatCore(const ExecutionState &state,
+                              std::vector<ref<Expr> > &simplificationCore);
+
   public:
     Solver *solver;
     bool simplifyExprs;
