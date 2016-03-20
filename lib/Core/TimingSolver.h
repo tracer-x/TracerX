@@ -27,7 +27,7 @@ namespace klee {
     void buildCachedUnsatCore(const ExecutionState &state);
 
     void buildCachedUnsatCore(const ExecutionState &state,
-                              std::vector<ref<Expr> > &simplificationCore);
+                              std::vector<unsigned> &simplificationCore);
 
   public:
     Solver *solver;

@@ -25,28 +25,30 @@ using namespace llvm;
 /***/
 
 void TimingSolver::buildCachedUnsatCore(const ExecutionState &state) {
-  std::vector<ref<Expr> > simplificationCore;
+  std::vector<unsigned> simplificationCore;
   buildCachedUnsatCore(state, simplificationCore);
 }
 
-void TimingSolver::buildCachedUnsatCore(
-    const ExecutionState &state, std::vector<ref<Expr> > &simplificationCore) {
+void
+TimingSolver::buildCachedUnsatCore(const ExecutionState &state,
+                                   std::vector<unsigned> &simplificationCore) {
   cachedUnsatCore.clear();
   std::vector<ref<Expr> > unsatCore = solver->getUnsatCore();
   if (!simplificationCore.empty()) {
     if (!unsatCore.empty()) {
-      std::vector<ref<Expr> >::iterator simplificationIt =
+      std::vector<unsigned>::iterator simplificationIt =
           simplificationCore.begin();
-      std::vector<ref<Expr> >::iterator simplificationItEnd =
+      std::vector<unsigned>::iterator simplificationItEnd =
           simplificationCore.end();
       std::vector<ref<Expr> >::iterator unsatIt = unsatCore.begin();
       std::vector<ref<Expr> >::iterator unsatItEnd = unsatCore.end();
 
+      unsigned constraintIndex = 0;
       for (ConstraintManager::const_iterator it = state.constraints.begin(),
                                              itEnd = state.constraints.end();
            it != itEnd; ++it) {
         if (simplificationIt != simplificationItEnd) {
-          if (*it == *simplificationIt) {
+          if (constraintIndex == *simplificationIt) {
             ++simplificationIt;
             if (unsatIt != unsatItEnd && *it == *unsatIt) {
               ++unsatIt;
@@ -62,9 +64,14 @@ void TimingSolver::buildCachedUnsatCore(
           ++unsatIt;
           cachedUnsatCore.push_back(*it);
         }
+        ++constraintIndex;
       }
     } else {
-      cachedUnsatCore = simplificationCore;
+      for (std::vector<unsigned>::iterator it = simplificationCore.begin(),
+                                           itEnd = simplificationCore.end();
+           it != itEnd; ++it) {
+        cachedUnsatCore.push_back(state.constraints.getConstraints().at(*it));
+      }
     }
   } else {
     cachedUnsatCore = unsatCore;
@@ -81,7 +88,7 @@ bool TimingSolver::evaluate(const ExecutionState& state, ref<Expr> expr,
 
   sys::TimeValue now = util::getWallTimeVal();
 
-  std::vector<ref<Expr> > simplificationCore;
+  std::vector<unsigned> simplificationCore;
   if (simplifyExprs)
     expr = state.constraints.simplifyExpr(expr, simplificationCore);
 
@@ -106,7 +113,7 @@ bool TimingSolver::mustBeTrue(const ExecutionState& state, ref<Expr> expr,
 
   sys::TimeValue now = util::getWallTimeVal();
 
-  std::vector<ref<Expr> > simplificationCore;
+  std::vector<unsigned> simplificationCore;
   if (simplifyExprs)
     expr = state.constraints.simplifyExpr(expr, simplificationCore);
 
@@ -154,7 +161,7 @@ bool TimingSolver::getValue(const ExecutionState& state, ref<Expr> expr,
   
   sys::TimeValue now = util::getWallTimeVal();
 
-  std::vector<ref<Expr> > simplificationCore;
+  std::vector<unsigned> simplificationCore;
   if (simplifyExprs)
     expr = state.constraints.simplifyExpr(expr, simplificationCore);
 
