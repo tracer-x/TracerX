@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "klee/Constraints.h"
+#include "klee/CommandLine.h"
 
 #include "klee/util/ExprPPrinter.h"
 #include "klee/util/ExprVisitor.h"
@@ -142,7 +143,14 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e,
 
   ExprReplaceVisitor2 visitor(equalities);
   ref<Expr> ret = visitor.visit(e);
+#ifdef SUPPORT_Z3
+#ifdef SUPPORT_STP
+  if (SelectSolver == SOLVER_Z3)
+    visitor.getCore(core);
+#else
   visitor.getCore(core);
+#endif
+#endif
   return ret;
 }
 

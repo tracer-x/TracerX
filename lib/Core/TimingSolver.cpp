@@ -9,6 +9,7 @@
 
 #include "TimingSolver.h"
 
+#include "klee/CommandLine.h"
 #include "klee/Config/Version.h"
 #include "klee/ExecutionState.h"
 #include "klee/Solver.h"
@@ -93,7 +94,14 @@ bool TimingSolver::evaluate(const ExecutionState& state, ref<Expr> expr,
     expr = state.constraints.simplifyExpr(expr, simplificationCore);
 
   bool success = solver->evaluate(Query(state.constraints, expr), result);
+#ifdef SUPPORT_Z3
+#ifdef SUPPORT_STP
+  if (SelectSolver == SOLVER_Z3)
+    buildCachedUnsatCore(state, simplificationCore);
+#else
   buildCachedUnsatCore(state, simplificationCore);
+#endif
+#endif
 
   sys::TimeValue delta = util::getWallTimeVal();
   delta -= now;
@@ -118,7 +126,13 @@ bool TimingSolver::mustBeTrue(const ExecutionState& state, ref<Expr> expr,
     expr = state.constraints.simplifyExpr(expr, simplificationCore);
 
   bool success = solver->mustBeTrue(Query(state.constraints, expr), result);
+#ifdef SUPPORT_Z3
+#ifdef SUPPORT_STP
+  if (SelectSolver == SOLVER_Z3)
+    buildCachedUnsatCore(state, simplificationCore);
+#endif
   buildCachedUnsatCore(state, simplificationCore);
+#endif
 
   sys::TimeValue delta = util::getWallTimeVal();
   delta -= now;
@@ -166,7 +180,13 @@ bool TimingSolver::getValue(const ExecutionState& state, ref<Expr> expr,
     expr = state.constraints.simplifyExpr(expr, simplificationCore);
 
   bool success = solver->getValue(Query(state.constraints, expr), result);
+#ifdef SUPPORT_Z3
+#ifdef SUPPORT_STP
+  if (SelectSolver == SOLVER_Z3)
+    buildCachedUnsatCore(state, simplificationCore);
+#endif
   buildCachedUnsatCore(state, simplificationCore);
+#endif
 
   sys::TimeValue delta = util::getWallTimeVal();
   delta -= now;
@@ -190,7 +210,13 @@ TimingSolver::getInitialValues(const ExecutionState& state,
   bool success = solver->getInitialValues(Query(state.constraints,
                                                 ConstantExpr::alloc(0, Expr::Bool)), 
                                           objects, result);
+#ifdef SUPPORT_Z3
+#ifdef SUPPORT_STP
+  if (SelectSolver == SOLVER_Z3)
+    buildCachedUnsatCore(state);
+#endif
   buildCachedUnsatCore(state);
+#endif
 
   sys::TimeValue delta = util::getWallTimeVal();
   delta -= now;
@@ -204,7 +230,13 @@ std::pair< ref<Expr>, ref<Expr> >
 TimingSolver::getRange(const ExecutionState& state, ref<Expr> expr) {
   std::pair<ref<Expr>, ref<Expr> > ret =
       solver->getRange(Query(state.constraints, expr));
+#ifdef SUPPORT_Z3
+#ifdef SUPPORT_STP
+  if (SelectSolver == SOLVER_Z3)
+    buildCachedUnsatCore(state);
+#endif
   buildCachedUnsatCore(state);
+#endif
   return ret;
 }
 
