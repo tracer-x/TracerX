@@ -37,17 +37,28 @@ void TimingSolver::buildCachedUnsatCore(
     if (!unsatCore.empty()) {
       std::vector<ref<Expr> >::iterator simplificationIt =
           simplificationCore.begin();
+      std::vector<ref<Expr> >::iterator simplificationItEnd =
+          simplificationCore.end();
       std::vector<ref<Expr> >::iterator unsatIt = unsatCore.begin();
+      std::vector<ref<Expr> >::iterator unsatItEnd = unsatCore.end();
+
       for (ConstraintManager::const_iterator it = state.constraints.begin(),
                                              itEnd = state.constraints.end();
            it != itEnd; ++it) {
-        if (*it == *simplificationIt) {
-          ++simplificationIt;
-          if (*it == *unsatIt) {
-            ++unsatIt;
+        if (simplificationIt != simplificationItEnd) {
+          if (*it == *simplificationIt) {
+            ++simplificationIt;
+            if (unsatIt != unsatItEnd && *it == *unsatIt) {
+              ++unsatIt;
+            }
+            cachedUnsatCore.push_back(*it);
+            continue;
           }
-          cachedUnsatCore.push_back(*it);
-        } else if (*it == *unsatIt) {
+        } else if (unsatIt == unsatItEnd) {
+          break;
+        }
+
+        if (*it == *unsatIt) {
           ++unsatIt;
           cachedUnsatCore.push_back(*it);
         }
