@@ -87,22 +87,24 @@ public:
   void mayIncludeInInterpolant();
 };
 
-class InequalityExpr{
-  std::map<ref<Expr>, int64_t > left;
-  std::map<ref<Expr>, int64_t > right;
+class InequalityExpr {
+  std::map<ref<Expr>, int64_t> left;
+  std::map<ref<Expr>, int64_t> right;
   Expr::Kind kind;
   ref<Expr> originalExpr;
+
 public:
-  InequalityExpr(std::map<ref<Expr>, int64_t > left, std::map<ref<Expr>, int64_t > right, Expr::Kind _kind, ref<Expr> originalExpr);
+  InequalityExpr(std::map<ref<Expr>, int64_t> left,
+                 std::map<ref<Expr>, int64_t> right, Expr::Kind _kind,
+                 ref<Expr> originalExpr);
   ~InequalityExpr();
-  std::map<ref<Expr>, int64_t > getLeft();
-  std::map<ref<Expr>, int64_t > getRight();
+  std::map<ref<Expr>, int64_t> getLeft();
+  std::map<ref<Expr>, int64_t> getRight();
   ref<Expr> getOriginalExpr();
   Expr::Kind getKind();
-  void updateLeft(std::map<ref<Expr>, int64_t > newLeft);
-  void updateRight(std::map<ref<Expr>, int64_t > newRight);
+  void updateLeft(std::map<ref<Expr>, int64_t> newLeft);
+  void updateRight(std::map<ref<Expr>, int64_t> newRight);
 };
-
 
 class SubsumptionTableEntry {
   uintptr_t nodeId;
@@ -125,28 +127,44 @@ class SubsumptionTableEntry {
   static ref<Expr> createBinaryOfSameKind(ref<Expr> originalExpr,
                                           ref<Expr> newLhs, ref<Expr> newRhs);
 
-  static ref<Expr> createBinaryExpr( Expr::Kind kind,
-                                          ref<Expr> newLhs, ref<Expr> newRhs);
+  static ref<Expr> createBinaryExpr(Expr::Kind kind, ref<Expr> newLhs,
+                                    ref<Expr> newRhs);
 
   static bool containShadowExpr(ref<Expr> expr, ref<Expr> shadowExpr);
 
-  static std::map<ref<Expr>, int64_t > getCoefficient(ref<Expr> expr);
+  static std::map<ref<Expr>, int64_t> getCoefficient(ref<Expr> expr);
 
-  static std::map<ref<Expr>, int64_t > coefficientOperation(Expr::Kind kind, std::map<ref<Expr>, int64_t > map1, std::map<ref<Expr>, int64_t > map2);
+  static std::map<ref<Expr>, int64_t>
+  coefficientOperation(Expr::Kind kind, std::map<ref<Expr>, int64_t> map1,
+                       std::map<ref<Expr>, int64_t> map2);
 
-  static void normalization(const Array *onFocusExistential, Expr::Kind kind, std::map<ref<Expr>, int64_t > &left, std::map<ref<Expr>, int64_t > &right);
+  static void normalization(const Array *onFocusExistential, Expr::Kind kind,
+                            std::map<ref<Expr>, int64_t> &left,
+                            std::map<ref<Expr>, int64_t> &right,
+                            bool &isOnFocusVarOnLeft);
 
-  static void classification(const Array *onFocusExistential, InequalityExpr * inequalityExpr, std::vector<InequalityExpr *> &lessThanPack, std::vector<InequalityExpr *> &greaterThanPack, std::vector<InequalityExpr *> &nonePack);
+  static void classification(const Array *onFocusExistential,
+                             InequalityExpr *inequalityExpr,
+                             std::vector<InequalityExpr *> &lessThanPack,
+                             std::vector<InequalityExpr *> &greaterThanPack,
+                             std::vector<InequalityExpr *> &nonePack,
+                             bool isOnFocusVarOnLeft);
+
+  static ref<Expr> getReadExprFromConcatExpr(ref<Expr> expr);
 
   static ref<Expr> simplifyConcatExpr(ref<Expr> expr);
 
-  static std::vector<InequalityExpr *> matching(std::vector<InequalityExpr *> lessThanPack, std::vector<InequalityExpr *> greaterThanPack);
+  static std::vector<InequalityExpr *>
+  matching(std::vector<InequalityExpr *> lessThanPack,
+           std::vector<InequalityExpr *> greaterThanPack);
 
-  static void simplifyMatching(std::map<ref<Expr>, int64_t > &left, std::map<ref<Expr>, int64_t > &right);
+  static void simplifyMatching(std::map<ref<Expr>, int64_t> &left,
+                               std::map<ref<Expr>, int64_t> &right);
 
   static ref<Expr> reconstructExpr(std::vector<InequalityExpr *> pack);
 
-  static ref<Expr> replaceExpr(ref<Expr> originalExpr, ref<Expr> replacedExpr, ref<Expr> withExpr);
+  static ref<Expr> replaceExpr(ref<Expr> originalExpr, ref<Expr> replacedExpr,
+                               ref<Expr> withExpr);
 
   static ref<Expr>
   simplifyInterpolantExpr(std::vector<ref<Expr> > &interpolantPack,
@@ -157,13 +175,15 @@ class SubsumptionTableEntry {
 
   static ref<Expr> simplifyWithFourierMotzkin(ref<Expr> existsExpr);
 
-  static void convertExpression(ref<Expr> expr, std::map<ref<Expr>, ref<Expr> > &map);
+  static void convertExpression(ref<Expr> expr,
+                                std::map<ref<Expr>, ref<Expr> > &map);
 
   static ref<Expr> simplifyExistsExpr(ref<Expr> existsExpr);
 
   static ref<Expr> simplifyArithmeticBody(ref<Expr> existsExpr);
 
-  static void normalizeExpr(std::vector<ref <Expr> > equalityPack, std::vector<ref <Expr> > &inequalityPack);
+  static void normalizeExpr(std::vector<ref<Expr> > equalityPack,
+                            std::vector<ref<Expr> > &inequalityPack);
 
   bool empty() {
     return !interpolant.get() && singletonStoreKeys.empty() &&

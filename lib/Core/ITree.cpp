@@ -169,327 +169,367 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
     return existsExpr;
   equalityPack.clear();
   ref<Expr> fullEqualityConstraint =
-    simplifyEqualityExpr(equalityPack, body->getKid(1));
+      simplifyEqualityExpr(equalityPack, body->getKid(1));
 
   interpolantPack.clear();
   ref<Expr> simplifiedInterpolant =
-    simplifyInterpolantExpr(interpolantPack, body->getKid(0));
+      simplifyInterpolantExpr(interpolantPack, body->getKid(0));
   if (llvm::isa<ConstantExpr>(simplifiedInterpolant))
     return fullEqualityConstraint;
 
   std::vector<InequalityExpr *> inequalityPack;
 
   // STEP 1a: represent Klee expression in equality pack
-  // into InequalityExpr data structure that enable us to do arithmetic operation
+  // into InequalityExpr data structure that enable us to do arithmetic
+  // operation
   for (std::vector<ref<Expr> >::iterator it = equalityPack.begin(),
-  		                                itEnd = equalityPack.end();
+                                         itEnd = equalityPack.end();
+       it != itEnd; ++it) {
 
-	       it != itEnd; ++it) {
-      ref<Expr> currExpr = *it;
-      std::map<ref<Expr>, int64_t > left = getCoefficient(currExpr->getKid(0));
-	  std::map<ref<Expr>, int64_t > right =getCoefficient(currExpr->getKid(1));
+    ref<Expr> currExpr = *it;
+    std::map<ref<Expr>, int64_t> left = getCoefficient(currExpr->getKid(0));
+    std::map<ref<Expr>, int64_t> right = getCoefficient(currExpr->getKid(1));
 
-      InequalityExpr *ineq1 = new InequalityExpr(left, right, Expr::Sle, currExpr);
-      InequalityExpr *ineq2 = new InequalityExpr(left, right, Expr::Sge, currExpr);
+    InequalityExpr *ineq1 =
+        new InequalityExpr(left, right, Expr::Sle, currExpr);
+    InequalityExpr *ineq2 =
+        new InequalityExpr(left, right, Expr::Sge, currExpr);
 
-      inequalityPack.push_back(ineq1);
-      inequalityPack.push_back(ineq2);
+    inequalityPack.push_back(ineq1);
+    inequalityPack.push_back(ineq2);
   }
 
   // STEP 1b: represent Klee expression in interpolant pack
-  // into InequalityExpr data structure that enable us to do arithmetic operation
+  // into InequalityExpr data structure that enable us to do arithmetic
+  // operation
   for (std::vector<ref<Expr> >::iterator it = interpolantPack.begin(),
-		                                itEnd = interpolantPack.end();
-	       it != itEnd; ++it) {
+                                         itEnd = interpolantPack.end();
+       it != itEnd; ++it) {
 
-     ref<Expr> currExpr = *it;
-	 std::map<ref<Expr>, int64_t > left = getCoefficient(currExpr->getKid(0));
-	 std::map<ref<Expr>, int64_t > right = getCoefficient(currExpr->getKid(1));
-     InequalityExpr *ineq = new InequalityExpr(left, right, currExpr->getKind(), currExpr);
-     inequalityPack.push_back(ineq);
+    ref<Expr> currExpr = *it;
+    std::map<ref<Expr>, int64_t> left = getCoefficient(currExpr->getKid(0));
+    std::map<ref<Expr>, int64_t> right = getCoefficient(currExpr->getKid(1));
+    InequalityExpr *ineq =
+        new InequalityExpr(left, right, currExpr->getKind(), currExpr);
+    inequalityPack.push_back(ineq);
   }
 
-  //STEP 2: core of fourier-montzkin algorithm
+  // STEP 2: core of fourier-montzkin algorithm
   for (std::vector<const Array *>::iterator xit = boundVariables.begin(),
-     	                xitEnd = boundVariables.end();
-		  	  	  	  	xit != xitEnd; ++xit) {
-	  const Array * currExistVar = *xit;
+                                            xitEnd = boundVariables.end();
+       xit != xitEnd; ++xit) {
+    const Array *currExistVar = *xit;
 
-	  std::vector<InequalityExpr *> lessThanPack;
-	  std::vector<InequalityExpr *> greaterThanPack;
-	  std::vector<InequalityExpr *> nonePack;
+    std::vector<InequalityExpr *> lessThanPack;
+    std::vector<InequalityExpr *> greaterThanPack;
+    std::vector<InequalityExpr *> nonePack;
 
-	  //STEP 2a: normalized the inequality expression into the
-	  //form such that exist variables are located on the left hand side
-	  for(std::vector<InequalityExpr *>::iterator inqt = inequalityPack.begin(),
-		  	  	  	  	inqtEnd = inequalityPack.end();
-			  	  	  	inqt != inqtEnd; ++inqt){
+    // STEP 2a: normalized the inequality expression into the
+    // form such that exist variables are located on the left hand side
+    for (std::vector<InequalityExpr *>::iterator inqt = inequalityPack.begin(),
+                                                 inqtEnd = inequalityPack.end();
+         inqt != inqtEnd; ++inqt) {
 
-		  InequalityExpr * currIneq = *inqt;
-		  std::map<ref<Expr>, int64_t > newLeft = currIneq->getLeft();
-		  std::map<ref<Expr>, int64_t > newRight = currIneq->getRight();
+      InequalityExpr *currIneq = *inqt;
+      std::map<ref<Expr>, int64_t> newLeft = currIneq->getLeft();
+      std::map<ref<Expr>, int64_t> newRight = currIneq->getRight();
 
-		  normalization(currExistVar, currIneq->getKind(), newLeft, newRight);
+      bool isOnFocusVarOnLeft = false;
+      normalization(currExistVar, currIneq->getKind(), newLeft, newRight,
+                    isOnFocusVarOnLeft);
 
-		  currIneq->updateLeft(newLeft);
-		  currIneq->updateRight(newRight);
-
-		  //STEP 2b: divide the inequalityPack into 3 separated pack
-		  //based on its operator existVar <= (lessThanPack), existVar >= (greaterThanPack),
-		  //or (nonePack) if there's no on focus exist variable in the equation.
-		  classification(currExistVar, currIneq, lessThanPack, greaterThanPack, nonePack);
+      if (newLeft.size() > 0 && newRight.size() > 0) {
+        currIneq->updateLeft(newLeft);
+        currIneq->updateRight(newRight);
       }
 
-	  //STEP 3: matching between inequality
-	  std::vector<InequalityExpr *> resultPack;
-	  resultPack = matching(lessThanPack, greaterThanPack);
-	  inequalityPack.clear();
-	  inequalityPack.insert(inequalityPack.end(), resultPack.begin(), resultPack.end());
-	  inequalityPack.insert(inequalityPack.end(), nonePack.begin(), nonePack.end());
+      // STEP 2b: divide the inequalityPack into 3 separated pack
+      // based on its operator existVar <= (lessThanPack), existVar >=
+      // (greaterThanPack),
+      // or (nonePack) if there's no on focus exist variable in the equation.
+      classification(currExistVar, currIneq, lessThanPack, greaterThanPack,
+                     nonePack, isOnFocusVarOnLeft);
+    }
+
+    // STEP 3: matching between inequality
+    std::vector<InequalityExpr *> resultPack;
+    resultPack = matching(lessThanPack, greaterThanPack);
+    inequalityPack.clear();
+    inequalityPack.insert(inequalityPack.end(), resultPack.begin(),
+                          resultPack.end());
+    inequalityPack.insert(inequalityPack.end(), nonePack.begin(),
+                          nonePack.end());
   }
 
-  //STEP 4: reconstruct the result back to Klee Expr
-  if(inequalityPack.size() ==0 )
-	  return existsExpr;
+  // STEP 4: reconstruct the result back to Klee Expr
+  if (inequalityPack.size() == 0)
+    return existsExpr;
+
   ref<Expr> result = reconstructExpr(inequalityPack);
   return result;
 }
 
-ref<Expr> SubsumptionTableEntry::reconstructExpr(std::vector<InequalityExpr *> inequalityPack){
-	ref<Expr> result;
+ref<Expr> SubsumptionTableEntry::reconstructExpr(
+    std::vector<InequalityExpr *> inequalityPack) {
+  ref<Expr> result;
 
-	for (std::vector<InequalityExpr *>::iterator it1 = inequalityPack.begin(),
-		 		                                it1End = inequalityPack.end();
-		 	       it1 != it1End; ++it1) {
+  for (std::vector<InequalityExpr *>::iterator it1 = inequalityPack.begin(),
+                                               it1End = inequalityPack.end();
+       it1 != it1End; ++it1) {
 
-		InequalityExpr * currInequality = *it1;
-		ref<Expr> temp;
-		ref<Expr> leftExpr;
-		ref<Expr> rightExpr;
+    InequalityExpr *currInequality = *it1;
+    ref<Expr> temp;
+    ref<Expr> leftExpr;
+    ref<Expr> rightExpr;
 
-		for (std::map<ref<Expr>, int64_t >::iterator l = currInequality->getLeft().begin(),
-				 		                                lEnd = currInequality->getLeft().end();
-						l != lEnd; ++l) {
+    for (std::map<ref<Expr>, int64_t>::iterator
+             l = currInequality->getLeft().begin(),
+             lEnd = currInequality->getLeft().end();
+         l != lEnd; ++l) {
 
-			ref<Expr> tempLeft;
-			if(llvm::isa<ConstantExpr>(l->first)){
-				tempLeft = ConstantExpr::create(l->second, l->first->getWidth());
-			}else{
-				tempLeft = l->first;
-				if(l->second > 1){
-					tempLeft = MulExpr::create(tempLeft, ConstantExpr::create(l->second, l->first->getWidth()));
-				}
-			}
+      ref<Expr> tempLeft;
 
-			if(leftExpr.get()){
-				leftExpr = AddExpr::create(leftExpr, tempLeft);
-			}else{
-				leftExpr = tempLeft;
-			}
-		}
+      if (llvm::isa<ConstantExpr>(l->first)) {
+        tempLeft = ConstantExpr::create(l->second, l->first->getWidth());
+      } else {
+        tempLeft = l->first;
+        if (l->second > 1) {
+          tempLeft = MulExpr::create(
+              tempLeft, ConstantExpr::create(l->second, l->first->getWidth()));
+        }
+      }
 
-		for (std::map<ref<Expr>, int64_t >::iterator r = currInequality->getRight().begin(),
-				 		                                rEnd = currInequality->getRight().end();
-						r != rEnd; ++r) {
+      if (leftExpr.get()) {
+        leftExpr = AddExpr::create(leftExpr, tempLeft);
+      } else {
+        leftExpr = tempLeft;
+      }
+    }
 
-			ref<Expr> currExpr = r->first;
-			ref<Expr> tempRight;
-			if(llvm::isa<ConstantExpr>(r->first)){
-				tempRight = ConstantExpr::create(r->second, r->first->getWidth());
-			}else{
-				tempRight = r->first;
-				if(r->second > 1){
-					tempRight = MulExpr::create(tempRight, ConstantExpr::create(r->second, r->first->getWidth()));
-				}
-			}
+    for (std::map<ref<Expr>, int64_t>::iterator
+             r = currInequality->getRight().begin(),
+             rEnd = currInequality->getRight().end();
+         r != rEnd; ++r) {
 
-			if(rightExpr.get()){
-				rightExpr = AddExpr::create(rightExpr, tempRight);
-			}else{
-				rightExpr = tempRight;
-			}
-		}
-		temp = createBinaryExpr(currInequality->getKind(), leftExpr, rightExpr);
+      ref<Expr> currExpr = r->first;
+      ref<Expr> tempRight;
+      if (llvm::isa<ConstantExpr>(r->first)) {
+        tempRight = ConstantExpr::create(r->second, r->first->getWidth());
+      } else {
+        tempRight = r->first;
+        if (r->second > 1) {
+          tempRight = MulExpr::create(
+              tempRight, ConstantExpr::create(r->second, r->first->getWidth()));
+        }
+      }
 
-		if(result.get()){
-			result = AndExpr::alloc(result, temp);
-		}
-		else{
-			result = temp;
-		}
-	}
-	return result;
-}
+      if (rightExpr.get()) {
+        rightExpr = AddExpr::create(rightExpr, tempRight);
+      } else {
+        rightExpr = tempRight;
+      }
+    }
+    temp = createBinaryExpr(currInequality->getKind(), leftExpr, rightExpr);
 
-void SubsumptionTableEntry::classification(const Array *onFocusExistential, InequalityExpr * currIneq, std::vector<InequalityExpr *> &lessThanPack,
-		std::vector<InequalityExpr *> &greaterThanPack, std::vector<InequalityExpr *> &nonePack){
-  if(currIneq->getLeft().size() == 1){
-	  if(currIneq->getKind() ==  Expr::Sle)
-		  lessThanPack.push_back(currIneq);
-	  else if(currIneq->getKind() ==  Expr::Sge)
-		  greaterThanPack.push_back(currIneq);
-  }else{
-	  nonePack.push_back(currIneq);
+    if (result.get()) {
+      result = AndExpr::alloc(result, temp);
+    } else {
+      result = temp;
+    }
   }
-
+  return result;
 }
-// assume lessThanPack: (shadow_expr <= a) and greaterThanPack: (shadow_expr >= b), it would be b <= a
+
+void SubsumptionTableEntry::classification(
+    const Array *onFocusExistential, InequalityExpr *currIneq,
+    std::vector<InequalityExpr *> &lessThanPack,
+    std::vector<InequalityExpr *> &greaterThanPack,
+    std::vector<InequalityExpr *> &nonePack, bool isOnFocusVarOnLeft) {
+  if (!isOnFocusVarOnLeft) {
+    nonePack.push_back(currIneq);
+  } else {
+    if (currIneq->getLeft().size() == 1) {
+      if (currIneq->getKind() == Expr::Sle)
+        lessThanPack.push_back(currIneq);
+      else if (currIneq->getKind() == Expr::Sge)
+        greaterThanPack.push_back(currIneq);
+    } else {
+      nonePack.push_back(currIneq);
+    }
+  }
+}
+// assume lessThanPack: (shadow_expr <= a) and greaterThanPack: (shadow_expr >=
+// b), it would be b <= a
 // greaterThanPack.right <= lessThanPack.right
-std::vector<InequalityExpr *> SubsumptionTableEntry::matching(std::vector<InequalityExpr *> lessThanPack, std::vector<InequalityExpr *> greaterThanPack){
-	std::vector<InequalityExpr *> result;
+std::vector<InequalityExpr *>
+SubsumptionTableEntry::matching(std::vector<InequalityExpr *> lessThanPack,
+                                std::vector<InequalityExpr *> greaterThanPack) {
+  std::vector<InequalityExpr *> result;
 
-	for (std::vector<InequalityExpr *>::iterator it1 = lessThanPack.begin(),
-	 		                                it1End = lessThanPack.end();
-	 	       it1 != it1End; ++it1) {
-		  InequalityExpr * currLT = *it1;
-		  std::map<ref<Expr>, int64_t > right = currLT->getRight();
+  for (std::vector<InequalityExpr *>::iterator it1 = lessThanPack.begin(),
+                                               it1End = lessThanPack.end();
+       it1 != it1End; ++it1) {
+    InequalityExpr *currLT = *it1;
+    std::map<ref<Expr>, int64_t> right = currLT->getRight();
 
-		  for (std::vector<InequalityExpr *>::iterator it2 = greaterThanPack.begin(),
-		   		                                it2End = greaterThanPack.end();
-		   	       it2 != it2End; ++it2) {
-			  InequalityExpr * currGT = *it2;
-			  std::map<ref<Expr>, int64_t > left = currGT->getRight();
-			  simplifyMatching(left, right);
-			  if(left.size() > 0 && right.size() > 0){
-				  InequalityExpr *ineq = new InequalityExpr(left, right, Expr::Sle, NULL);
-				  result.push_back(ineq);
-			  }
-		  }
-	}
-	return result;
+    for (std::vector<InequalityExpr *>::iterator it2 = greaterThanPack.begin(),
+                                                 it2End = greaterThanPack.end();
+         it2 != it2End; ++it2) {
+      InequalityExpr *currGT = *it2;
+      std::map<ref<Expr>, int64_t> left = currGT->getRight();
+      simplifyMatching(left, right);
+      if (left.size() > 0 && right.size() > 0) {
+        InequalityExpr *ineq = new InequalityExpr(left, right, Expr::Sle, NULL);
+        result.push_back(ineq);
+      }
+    }
+  }
+  return result;
 }
 
-void SubsumptionTableEntry::simplifyMatching(std::map<ref<Expr>, int64_t > &left, std::map<ref<Expr>, int64_t > &right){
-	for (std::map<ref<Expr>, int64_t >::iterator l = left.begin(),
-		 		                                lEnd = left.end();
-				l != lEnd; ++l) {
+void
+SubsumptionTableEntry::simplifyMatching(std::map<ref<Expr>, int64_t> &left,
+                                        std::map<ref<Expr>, int64_t> &right) {
+  for (std::map<ref<Expr>, int64_t>::iterator l = left.begin(),
+                                              lEnd = left.end();
+       l != lEnd; ++l) {
 
-		for (std::map<ref<Expr>, int64_t >::iterator r = right.begin(),
-					 		                        rEnd = right.end();
-							r != rEnd; ++r) {
+    for (std::map<ref<Expr>, int64_t>::iterator r = right.begin(),
+                                                rEnd = right.end();
+         r != rEnd; ++r) {
 
-		    if(r->first.operator ==(l->first)){
-				if(l->second > r->second){
-					l->second = l->second - r->second;
-					r->second = 0;
-				}
-				else if(l->second < r->second){
-					r->second = r->second - l->second;
-					l->second = 0;
-				}
-				else if(l->second == r->second){
-					l->second = 0;
-					r->second = 0;
-				}
-		  }
-	  }
+      if (r->first.operator==(l->first)) {
+        if (l->second > r->second) {
+          l->second = l->second - r->second;
+          r->second = 0;
+        } else if (l->second < r->second) {
+          r->second = r->second - l->second;
+          l->second = 0;
+        } else if (l->second == r->second) {
+          l->second = 0;
+          r->second = 0;
+        }
+      }
+    }
   }
 
-  std::map<ref<Expr>, int64_t >::iterator itLeft = left.begin();
-  while(itLeft != left.end()) {
-	  if(itLeft->second == 0)
-		  left.erase(itLeft++);
-	  else
-		  ++itLeft;
+  std::map<ref<Expr>, int64_t>::iterator itLeft = left.begin();
+  while (itLeft != left.end()) {
+    if (itLeft->second == 0)
+      left.erase(itLeft++);
+    else
+      ++itLeft;
   }
 
-  std::map<ref<Expr>, int64_t >::iterator itRight = right.begin();
-    while(itRight != right.end()) {
-  	  if(itRight->second == 0)
-  		right.erase(itRight++);
-  	  else
-  		  ++itRight;
-   }
+  std::map<ref<Expr>, int64_t>::iterator itRight = right.begin();
+  while (itRight != right.end()) {
+    if (itRight->second == 0)
+      right.erase(itRight++);
+    else
+      ++itRight;
+  }
 }
 
-void SubsumptionTableEntry::normalization(const Array *onFocusExistential, Expr::Kind kind, std::map<ref<Expr>, int64_t > &left, std::map<ref<Expr>, int64_t > &right){
+void SubsumptionTableEntry::normalization(const Array *onFocusExistential,
+                                          Expr::Kind kind,
+                                          std::map<ref<Expr>, int64_t> &left,
+                                          std::map<ref<Expr>, int64_t> &right,
+                                          bool &isOnFocusVarOnLeft) {
 
-	std::map<ref<Expr>, int64_t >::iterator itLeft = left.begin();
+  std::map<ref<Expr>, int64_t>::iterator itLeft = left.begin();
 
-	while(itLeft != left.end()) {
+  while (itLeft != left.end()) {
 
-		if(llvm::isa<ReadExpr>(itLeft->first)){
-			ReadExpr *readExpr = llvm::dyn_cast<ReadExpr>(itLeft->first.get());
-		    const Array *array = (readExpr->updates).root;
+    ref<Expr> currExpr = itLeft->first;
+    int64_t currCoefficient = itLeft->second;
 
-		    // move variable other than on focus existential variable to the right hand side
-		    // then, delete it from left map
-		    if(array != onFocusExistential){
-		    	itLeft->second = itLeft->second * -1;
-				ref<Expr> tempFirst = itLeft->first;
-				int64_t tempSecond = itLeft->second;
+    if (llvm::isa<ConcatExpr>(currExpr)) {
+      currExpr = getReadExprFromConcatExpr(currExpr);
+    }
 
-				if(right.count(tempFirst) > 0){ // contains
-					right.at(tempFirst) = right.at(tempFirst) + tempSecond;
-				}
-				else{
-					right.insert(std::make_pair(tempFirst, tempSecond));
-				}
-		    	left.erase(itLeft++);
+    if (llvm::isa<ReadExpr>(currExpr)) {
+      ReadExpr *readExpr = llvm::dyn_cast<ReadExpr>(currExpr.get());
+      const Array *array = (readExpr->updates).root;
 
-		    }
-		    else{
-		    	++itLeft;
-		    }
-		}
-		else if(llvm::isa<ConstantExpr>(itLeft->first)){
-			itLeft->second = itLeft->second * -1;
-			ref<Expr> tempFirst = itLeft->first;
-			int64_t tempSecond = itLeft->second;
+      // move variable other than on focus existential variable to the right
+      // hand side
+      // then, delete it from left map
+      if (array == onFocusExistential) {
+        ++itLeft;
+        isOnFocusVarOnLeft = true;
+      } else {
+        currCoefficient = currCoefficient * -1;
 
-			if(right.count(tempFirst) > 0){
-				right.at(tempFirst) = right.at(tempFirst) + tempSecond;
-			}
-			else{
-				right.insert(std::make_pair(tempFirst, tempSecond));
-			}
-			left.erase(itLeft++);
-		}
-		else{
-			++itLeft;
-		}
-
-	}
-
-	//if we find on focus exist variable on the right hand side,
-	//move it to the left hand side
-	std::map<ref<Expr>, int64_t >::iterator itRight = right.begin();
-	while(itRight != right.end()) {
-		if(llvm::isa<ReadExpr>(itRight->first)){
-		  ReadExpr *readExpr = llvm::dyn_cast<ReadExpr>(itRight->first.get());
-		  const Array *array = (readExpr->updates).root;
-
-		  if(array == onFocusExistential){
-		    itRight->second = itRight->second * -1;
-			//left.insert(*itRight);
-			ref<Expr> tempFirst = itRight->first;
-			int64_t tempSecond = itRight->second;
-			if(left.count(tempFirst) >  0){
-				left.at(tempFirst) = left.at(tempFirst) + tempSecond;
-			}
-			else{
-				left.insert(std::make_pair(tempFirst, tempSecond));
-			}
-			right.erase(itRight++);
-		  }
-		}
-		else{
-			++itRight;
-		}
-	}
-}
-
-std::map<ref<Expr>, int64_t > SubsumptionTableEntry::getCoefficient(ref<Expr> expr){
-  std::map<ref<Expr>, int64_t > map;
-  if(expr->getNumKids() == 2 && !llvm::isa<ConcatExpr>(expr)){
-    return coefficientOperation(expr->getKind(),getCoefficient(expr->getKid(0)), getCoefficient(expr->getKid(1)));
+        if (right.count(itLeft->first) > 0) { // contains
+          right.at(itLeft->first) = right.at(itLeft->first) + currCoefficient;
+        } else {
+          right.insert(std::make_pair(itLeft->first, currCoefficient));
+        }
+        left.erase(itLeft++);
+      }
+    } else if (llvm::isa<ConstantExpr>(itLeft->first)) {
+      currCoefficient = currCoefficient * -1;
+      if (right.count(itLeft->first) > 0) {
+        right.at(itLeft->first) = right.at(itLeft->first) + currCoefficient;
+      } else {
+        right.insert(std::make_pair(itLeft->first, currCoefficient));
+      }
+      left.erase(itLeft++);
+    } else {
+      ++itLeft;
+    }
   }
 
-  if(expr->getNumKids() < 2 || llvm::isa<ConcatExpr>(expr)){
-    if(llvm::isa<ConstantExpr>(expr))
+  // if we find on focus exist variable on the right hand side,
+  // move it to the left hand side
+  std::map<ref<Expr>, int64_t>::iterator itRight = right.begin();
+  while (itRight != right.end()) {
+
+    ref<Expr> currExpr = itRight->first;
+    int64_t currCoefficient = itRight->second;
+
+    if (llvm::isa<ConcatExpr>(currExpr)) {
+      currExpr = getReadExprFromConcatExpr(currExpr);
+    }
+
+    if (llvm::isa<ReadExpr>(currExpr)) {
+      ReadExpr *readExpr = llvm::dyn_cast<ReadExpr>(currExpr.get());
+      const Array *array = (readExpr->updates).root;
+
+      if (array == onFocusExistential) {
+        currCoefficient = currCoefficient * -1;
+        if (left.count(itRight->first) > 0) {
+          left.at(itRight->first) = left.at(itRight->first) + currCoefficient;
+        } else {
+          left.insert(std::make_pair(itRight->first, currCoefficient));
+        }
+        right.erase(itRight++);
+        isOnFocusVarOnLeft = true;
+      } else {
+        ++itRight;
+      }
+    } else {
+      ++itRight;
+    }
+  }
+}
+
+std::map<ref<Expr>, int64_t>
+SubsumptionTableEntry::getCoefficient(ref<Expr> expr) {
+  std::map<ref<Expr>, int64_t> map;
+  if (expr->getNumKids() == 2 && !llvm::isa<ConcatExpr>(expr)) {
+    return coefficientOperation(expr->getKind(),
+                                getCoefficient(expr->getKid(0)),
+                                getCoefficient(expr->getKid(1)));
+  }
+
+  if (expr->getNumKids() < 2 || llvm::isa<ConcatExpr>(expr)) {
+    if (llvm::isa<ConstantExpr>(expr))
       map.insert(std::make_pair(ConstantExpr::alloc(0, expr->getWidth()),
-    		                  llvm::dyn_cast<ConstantExpr>(expr.get())->getAPValue().getSExtValue()));
-    else{
+                                llvm::dyn_cast<ConstantExpr>(expr.get())
+                                    ->getAPValue()
+                                    .getSExtValue()));
+    else {
       int64_t count = 1;
       map.insert(std::make_pair(expr, count));
     }
@@ -498,55 +538,69 @@ std::map<ref<Expr>, int64_t > SubsumptionTableEntry::getCoefficient(ref<Expr> ex
   return map;
 }
 
-std::map<ref<Expr>, int64_t > SubsumptionTableEntry::coefficientOperation(Expr::Kind kind, std::map<ref<Expr>, int64_t > map1, std::map<ref<Expr>, int64_t > map2){
+ref<Expr> SubsumptionTableEntry::getReadExprFromConcatExpr(ref<Expr> expr) {
+  if (llvm::isa<ReadExpr>(expr))
+    return expr;
 
-  for (std::map<ref<Expr>, int64_t >::iterator it1 = map1.begin(),
- 		                                it1End = map1.end();
- 	       it1 != it1End; ++it1) {
+  return getReadExprFromConcatExpr(expr->getKid(1));
+}
 
-	  ref<Expr> expr1 = it1->first;
-	  bool isFound = false;
-	  for (std::map<ref<Expr>, int64_t >::iterator it2 = map2.begin(),
-	   		                                it2End = map2.end();
-	   	       it2 != it2End; ++it2) {
+std::map<ref<Expr>, int64_t>
+SubsumptionTableEntry::coefficientOperation(Expr::Kind kind,
+                                            std::map<ref<Expr>, int64_t> map1,
+                                            std::map<ref<Expr>, int64_t> map2) {
 
-		  ref<Expr> expr2 = it2->first;
-		  if(expr1.operator ==(expr2)){
-              if(kind == Expr::Add){
-                it2->second = it1->second + it2->second;
-              }
-              else if(kind == Expr::Sub){
-            	it2->second = it1->second - it2->second;
-              }
-              isFound = true;
-			  break;
-		  }
-	  }
+  for (std::map<ref<Expr>, int64_t>::iterator it1 = map1.begin(),
+                                              it1End = map1.end();
+       it1 != it1End; ++it1) {
 
-	  if(!isFound){
-		  map2.insert(std::make_pair(it1->first, it1->second));
-	  }
+    ref<Expr> expr1 = it1->first;
+    bool isFound = false;
+    for (std::map<ref<Expr>, int64_t>::iterator it2 = map2.begin(),
+                                                it2End = map2.end();
+         it2 != it2End; ++it2) {
+
+      ref<Expr> expr2 = it2->first;
+      if (expr1.operator==(expr2)) {
+        if (kind == Expr::Add) {
+          it2->second = it1->second + it2->second;
+        } else if (kind == Expr::Sub) {
+          it2->second = it1->second - it2->second;
+        }
+        isFound = true;
+        break;
+      }
+    }
+
+    if (!isFound) {
+      map2.insert(std::make_pair(it1->first, it1->second));
+    }
   }
 
   return map2;
 }
 
-void SubsumptionTableEntry::normalizeExpr(std::vector<ref <Expr> > equalityPack, std::vector<ref <Expr> > &inequalityPack){
+void
+SubsumptionTableEntry::normalizeExpr(std::vector<ref<Expr> > equalityPack,
+                                     std::vector<ref<Expr> > &inequalityPack) {
   for (std::vector<ref<Expr> >::iterator it = equalityPack.begin(),
-		                                itEnd = equalityPack.end();
-	       it != itEnd; ++it) {
+                                         itEnd = equalityPack.end();
+       it != itEnd; ++it) {
 
-     ref<Expr> equalityConstraint = *it;
+    ref<Expr> equalityConstraint = *it;
 
-     inequalityPack.push_back(createBinaryExpr(Expr::Sle, equalityConstraint->getKid(0), equalityConstraint->getKid(1)));
-     inequalityPack.push_back(createBinaryExpr(Expr::Sle, equalityConstraint->getKid(1), equalityConstraint->getKid(0)));
-
-   }
+    inequalityPack.push_back(createBinaryExpr(Expr::Sle,
+                                              equalityConstraint->getKid(0),
+                                              equalityConstraint->getKid(1)));
+    inequalityPack.push_back(createBinaryExpr(Expr::Sle,
+                                              equalityConstraint->getKid(1),
+                                              equalityConstraint->getKid(0)));
+  }
 }
 
 ref<Expr> SubsumptionTableEntry::createBinaryExpr(Expr::Kind kind,
-													ref<Expr> lhs,
-												    ref<Expr> rhs) {
+                                                  ref<Expr> lhs,
+                                                  ref<Expr> rhs) {
   std::vector<Expr::CreateArg> exprs;
   Expr::CreateArg arg1(lhs);
   Expr::CreateArg arg2(rhs);
@@ -645,7 +699,7 @@ ref<Expr> SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr) {
         // Here we perform substitution, where given
         // an interpolant atom and an equality constraint,
         // we try to find a subexpression in the equality constraint
-    	// that matches the lhs expression of the interpolant atom.
+        // that matches the lhs expression of the interpolant atom.
 
         // Here we assume that the equality constraint is A == B and the
         // interpolant atom is C cmp D.
@@ -661,7 +715,9 @@ ref<Expr> SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr) {
         else {
           // newIntpRight is A, but with every occurrence of C replaced with D
           // i.e., newIntpRight == A[D/C]
-          newIntpRight = replaceExpr(equalityConstraintLeft, interpolantAtom->getKid(0), interpolantAtom->getKid(1));
+          newIntpRight =
+              replaceExpr(equalityConstraintLeft, interpolantAtom->getKid(0),
+                          interpolantAtom->getKid(1));
         }
 
         interpolantAtom =
@@ -696,7 +752,8 @@ ref<Expr> SubsumptionTableEntry::replaceExpr(ref<Expr> originalExpr,
                                              ref<Expr> replacedExpr,
                                              ref<Expr> substituteExpr) {
   // We only handle binary expressions
-  if (!llvm::isa<BinaryExpr>(originalExpr) || llvm::isa<ConcatExpr>(originalExpr))
+  if (!llvm::isa<BinaryExpr>(originalExpr) ||
+      llvm::isa<ConcatExpr>(originalExpr))
     return originalExpr;
 
   if (originalExpr->getKid(0) == replacedExpr)
@@ -957,8 +1014,8 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
   // We call the solver only when the simplified query is
   // not a constant.
   if (!llvm::isa<ConstantExpr>(query)) {
-//     llvm::errs() << "Querying for subsumption check:\n";
-//     ExprPPrinter::printQuery(llvm::errs(), state.constraints, query);
+    //     llvm::errs() << "Querying for subsumption check:\n";
+    //     ExprPPrinter::printQuery(llvm::errs(), state.constraints, query);
 
     if (!existentials.empty() && llvm::isa<ExistsExpr>(query)) {
       // llvm::errs() << "Existentials not empty\n";
@@ -992,7 +1049,7 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
   }
 
   if (success && result == Solver::True) {
-//     llvm::errs() << "Solver decided validity\n";
+    //     llvm::errs() << "Solver decided validity\n";
     std::vector<ref<Expr> > unsatCore;
     if (z3solver) {
       unsatCore = z3solver->getUnsatCore();
@@ -1008,10 +1065,10 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
 
   } else {
     if (result != Solver::False)
-//      llvm::errs() << "Solver could not decide (in-)validity\n";
+      //      llvm::errs() << "Solver could not decide (in-)validity\n";
 
-    if (z3solver)
-      delete z3solver;
+      if (z3solver)
+        delete z3solver;
 
     return false;
   }
@@ -1109,29 +1166,27 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
 
 /**/
 
-InequalityExpr::InequalityExpr(std::map<ref<Expr>, int64_t > left, std::map<ref<Expr>,
-		int64_t > right, Expr::Kind kind, ref<Expr> originalExpr):
-	     left(left),
-		 right(right),
-		 kind(kind),
-		 originalExpr(originalExpr){}
+InequalityExpr::InequalityExpr(std::map<ref<Expr>, int64_t> left,
+                               std::map<ref<Expr>, int64_t> right,
+                               Expr::Kind kind, ref<Expr> originalExpr)
+    : left(left), right(right), kind(kind), originalExpr(originalExpr) {}
 
 InequalityExpr::~InequalityExpr() {}
 
-std::map<ref<Expr>, int64_t > InequalityExpr::getLeft() { return left; }
+std::map<ref<Expr>, int64_t> InequalityExpr::getLeft() { return left; }
 
-std::map<ref<Expr>, int64_t > InequalityExpr::getRight() { return right; }
+std::map<ref<Expr>, int64_t> InequalityExpr::getRight() { return right; }
 
 Expr::Kind InequalityExpr::getKind() { return kind; }
 
 ref<Expr> InequalityExpr::getOriginalExpr() { return originalExpr; }
 
-void InequalityExpr::updateLeft(std::map<ref<Expr>, int64_t > newLeft){
-	left = newLeft;
+void InequalityExpr::updateLeft(std::map<ref<Expr>, int64_t> newLeft) {
+  left = newLeft;
 }
 
-void InequalityExpr::updateRight(std::map<ref<Expr>, int64_t > newRight){
-	right = newRight;
+void InequalityExpr::updateRight(std::map<ref<Expr>, int64_t> newRight) {
+  right = newRight;
 }
 
 /**/
