@@ -1,23 +1,726 @@
-/*
- * ITree.cpp
- *
- *  Created on: Oct 15, 2015
- *      Author: felicia
- */
+//===-- ITree.cpp - Interpolation tree --------------------------*- C++ -*-===//
+//
+//               The Tracer-X KLEE Symbolic Virtual Machine
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the implementations of the classes for
+/// interpolation and subsumption checks for search-space reduction.
+///
+//===----------------------------------------------------------------------===//
 
 #include "ITree.h"
-#include "TimingSolver.h"
 #include "Dependency.h"
+#include "TimingSolver.h"
 
+#include <klee/CommandLine.h>
 #include <klee/Expr.h>
 #include <klee/Solver.h>
 #include <klee/util/ExprPPrinter.h>
+#include <fstream>
 #include <vector>
 
 using namespace klee;
 
-// Interpolation is enabled by default
-bool InterpolationOption::interpolation = true;
+/**/
+
+std::string SearchTree::PrettyExpressionBuilder::bvConst32(uint32_t value) {
+  std::ostringstream stream;
+  stream << value;
+  return stream.str();
+}
+std::string SearchTree::PrettyExpressionBuilder::bvConst64(uint64_t value) {
+  std::ostringstream stream;
+  stream << value;
+  return stream.str();
+}
+std::string SearchTree::PrettyExpressionBuilder::bvZExtConst(uint64_t value) {
+  return bvConst64(value);
+}
+std::string SearchTree::PrettyExpressionBuilder::bvSExtConst(uint64_t value) {
+  return bvConst64(value);
+}
+std::string SearchTree::PrettyExpressionBuilder::bvBoolExtract(std::string expr,
+                                                               int bit) {
+  std::ostringstream stream;
+  stream << expr << "[" << bit << "]";
+  return stream.str();
+}
+std::string SearchTree::PrettyExpressionBuilder::bvExtract(std::string expr,
+                                                           unsigned top,
+                                                           unsigned bottom) {
+  std::ostringstream stream;
+  stream << expr << "[" << top << "," << bottom << "]";
+  return stream.str();
+}
+std::string SearchTree::PrettyExpressionBuilder::eqExpr(std::string a,
+                                                        std::string b) {
+  if (a == "false")
+    return "!" + b;
+  return "(" + a + " = " + b + ")";
+}
+
+// logical left and right shift (not arithmetic)
+std::string SearchTree::PrettyExpressionBuilder::bvLeftShift(std::string expr,
+                                                             unsigned shift) {
+  std::ostringstream stream;
+  stream << "(" << expr << " \\<\\< " << shift << ")";
+  return stream.str();
+}
+std::string SearchTree::PrettyExpressionBuilder::bvRightShift(std::string expr,
+                                                              unsigned shift) {
+  std::ostringstream stream;
+  stream << "(" << expr << " \\>\\> " << shift << ")";
+  return stream.str();
+}
+std::string
+SearchTree::PrettyExpressionBuilder::bvVarLeftShift(std::string expr,
+                                                    std::string shift) {
+  return "(" + expr + " \\<\\< " + shift + ")";
+}
+std::string
+SearchTree::PrettyExpressionBuilder::bvVarRightShift(std::string expr,
+                                                     std::string shift) {
+  return "(" + expr + " \\>\\> " + shift + ")";
+}
+std::string
+SearchTree::PrettyExpressionBuilder::bvVarArithRightShift(std::string expr,
+                                                          std::string shift) {
+  return bvVarRightShift(expr, shift);
+}
+
+// Some STP-style bitvector arithmetic
+std::string
+SearchTree::PrettyExpressionBuilder::bvMinusExpr(std::string minuend,
+                                                 std::string subtrahend) {
+  return "(" + minuend + " - " + subtrahend + ")";
+}
+std::string
+SearchTree::PrettyExpressionBuilder::bvPlusExpr(std::string augend,
+                                                std::string addend) {
+  return "(" + augend + " + " + addend + ")";
+}
+std::string
+SearchTree::PrettyExpressionBuilder::bvMultExpr(std::string multiplacand,
+                                                std::string multiplier) {
+  return "(" + multiplacand + " * " + multiplier + ")";
+}
+std::string
+SearchTree::PrettyExpressionBuilder::bvDivExpr(std::string dividend,
+                                               std::string divisor) {
+  return "(" + dividend + " / " + divisor + ")";
+}
+std::string
+SearchTree::PrettyExpressionBuilder::sbvDivExpr(std::string dividend,
+                                                std::string divisor) {
+  return "(" + dividend + " / " + divisor + ")";
+}
+std::string
+SearchTree::PrettyExpressionBuilder::bvModExpr(std::string dividend,
+                                               std::string divisor) {
+  return "(" + dividend + " % " + divisor + ")";
+}
+std::string
+SearchTree::PrettyExpressionBuilder::sbvModExpr(std::string dividend,
+                                                std::string divisor) {
+  return "(" + dividend + " % " + divisor + ")";
+}
+std::string SearchTree::PrettyExpressionBuilder::notExpr(std::string expr) {
+  return "!(" + expr + ")";
+}
+std::string SearchTree::PrettyExpressionBuilder::bvAndExpr(std::string lhs,
+                                                           std::string rhs) {
+  return "(" + lhs + " & " + rhs + ")";
+}
+std::string SearchTree::PrettyExpressionBuilder::bvOrExpr(std::string lhs,
+                                                          std::string rhs) {
+  return "(" + lhs + " | " + rhs + ")";
+}
+std::string SearchTree::PrettyExpressionBuilder::iffExpr(std::string lhs,
+                                                         std::string rhs) {
+  return "(" + lhs + " \\<=\\> " + rhs + ")";
+}
+std::string SearchTree::PrettyExpressionBuilder::bvXorExpr(std::string lhs,
+                                                           std::string rhs) {
+  return "(" + lhs + " xor " + rhs + ")";
+}
+std::string SearchTree::PrettyExpressionBuilder::bvSignExtend(std::string src) {
+  return src;
+}
+
+// Some STP-style array domain interface
+std::string SearchTree::PrettyExpressionBuilder::writeExpr(std::string array,
+                                                           std::string index,
+                                                           std::string value) {
+  return "update(" + array + "," + index + "," + value + ")";
+}
+std::string SearchTree::PrettyExpressionBuilder::readExpr(std::string array,
+                                                          std::string index) {
+  return array + "[" + index + "]";
+}
+
+// ITE-expression constructor
+std::string SearchTree::PrettyExpressionBuilder::iteExpr(
+    std::string condition, std::string whenTrue, std::string whenFalse) {
+  return "ite(" + condition + "," + whenTrue + "," + whenFalse + ")";
+}
+
+// Bitvector comparison
+std::string SearchTree::PrettyExpressionBuilder::bvLtExpr(std::string lhs,
+                                                          std::string rhs) {
+  return "(" + lhs + " \\< " + rhs + ")";
+}
+std::string SearchTree::PrettyExpressionBuilder::bvLeExpr(std::string lhs,
+                                                          std::string rhs) {
+  return "(" + lhs + " \\<= " + rhs + ")";
+}
+std::string SearchTree::PrettyExpressionBuilder::sbvLtExpr(std::string lhs,
+                                                           std::string rhs) {
+  return "(" + lhs + " \\< " + rhs + ")";
+}
+std::string SearchTree::PrettyExpressionBuilder::sbvLeExpr(std::string lhs,
+                                                           std::string rhs) {
+  return "(" + lhs + " \\<= " + rhs + ")";
+}
+
+std::string SearchTree::PrettyExpressionBuilder::constructAShrByConstant(
+    std::string expr, unsigned shift, std::string isSigned) {
+  return bvRightShift(expr, shift);
+}
+std::string
+SearchTree::PrettyExpressionBuilder::constructMulByConstant(std::string expr,
+                                                            uint64_t x) {
+  std::ostringstream stream;
+  stream << "(" << expr << " * " << x << ")";
+  return stream.str();
+}
+std::string
+SearchTree::PrettyExpressionBuilder::constructUDivByConstant(std::string expr_n,
+                                                             uint64_t d) {
+  std::ostringstream stream;
+  stream << "(" << expr_n << " / " << d << ")";
+  return stream.str();
+}
+std::string
+SearchTree::PrettyExpressionBuilder::constructSDivByConstant(std::string expr_n,
+                                                             uint64_t d) {
+  std::ostringstream stream;
+  stream << "(" << expr_n << " / " << d << ")";
+  return stream.str();
+}
+
+std::string
+SearchTree::PrettyExpressionBuilder::getInitialArray(const Array *root) {
+  std::string array_expr =
+      buildArray(root->name.c_str(), root->getDomain(), root->getRange());
+
+  if (root->isConstantArray()) {
+    for (unsigned i = 0, e = root->size; i != e; ++i) {
+      std::string prev = array_expr;
+      array_expr = writeExpr(
+          prev, constructActual(ConstantExpr::alloc(i, root->getDomain())),
+          constructActual(root->constantValues[i]));
+    }
+  }
+  return array_expr;
+}
+std::string
+SearchTree::PrettyExpressionBuilder::getArrayForUpdate(const Array *root,
+                                                       const UpdateNode *un) {
+  if (!un) {
+    return (getInitialArray(root));
+  }
+  return writeExpr(getArrayForUpdate(root, un->next),
+                   constructActual(un->index), constructActual(un->value));
+}
+
+std::string SearchTree::PrettyExpressionBuilder::constructActual(ref<Expr> e) {
+  switch (e->getKind()) {
+  case Expr::Constant: {
+    ConstantExpr *CE = cast<ConstantExpr>(e);
+    int width = CE->getWidth();
+
+    // Coerce to bool if necessary.
+    if (width == 1)
+      return CE->isTrue() ? getTrue() : getFalse();
+
+    // Fast path.
+    if (width <= 32)
+      return bvConst32(CE->getZExtValue(32));
+    if (width <= 64)
+      return bvConst64(CE->getZExtValue());
+
+    ref<ConstantExpr> Tmp = CE;
+    return bvConst64(Tmp->Extract(0, 64)->getZExtValue());
+  }
+
+  // Special
+  case Expr::NotOptimized: {
+    NotOptimizedExpr *noe = cast<NotOptimizedExpr>(e);
+    return constructActual(noe->src);
+  }
+
+  case Expr::Read: {
+    ReadExpr *re = cast<ReadExpr>(e);
+    assert(re && re->updates.root);
+    return readExpr(getArrayForUpdate(re->updates.root, re->updates.head),
+                    constructActual(re->index));
+  }
+
+  case Expr::Select: {
+    SelectExpr *se = cast<SelectExpr>(e);
+    std::string cond = constructActual(se->cond);
+    std::string tExpr = constructActual(se->trueExpr);
+    std::string fExpr = constructActual(se->falseExpr);
+    return iteExpr(cond, tExpr, fExpr);
+  }
+
+  case Expr::Concat: {
+    ConcatExpr *ce = cast<ConcatExpr>(e);
+    unsigned numKids = ce->getNumKids();
+    std::string res = constructActual(ce->getKid(numKids - 1));
+    for (int i = numKids - 2; i >= 0; i--) {
+      res = "concat(" + constructActual(ce->getKid(i)) + "," + res + ")";
+    }
+    return res;
+  }
+
+  case Expr::Extract: {
+    ExtractExpr *ee = cast<ExtractExpr>(e);
+    std::string src = constructActual(ee->expr);
+    int width = ee->getWidth();
+    if (width == 1) {
+      return bvBoolExtract(src, ee->offset);
+    } else {
+      return bvExtract(src, ee->offset + width - 1, ee->offset);
+    }
+  }
+
+  // Casting
+  case Expr::ZExt: {
+    CastExpr *ce = cast<CastExpr>(e);
+    std::string src = constructActual(ce->src);
+    int width = ce->getWidth();
+    if (width == 1) {
+      return iteExpr(src, bvOne(), bvZero());
+    } else {
+      return src;
+    }
+  }
+
+  case Expr::SExt: {
+    CastExpr *ce = cast<CastExpr>(e);
+    std::string src = constructActual(ce->src);
+    return bvSignExtend(src);
+  }
+
+  // Arithmetic
+  case Expr::Add: {
+    AddExpr *ae = cast<AddExpr>(e);
+    std::string left = constructActual(ae->left);
+    std::string right = constructActual(ae->right);
+    return bvPlusExpr(left, right);
+  }
+
+  case Expr::Sub: {
+    SubExpr *se = cast<SubExpr>(e);
+    std::string left = constructActual(se->left);
+    std::string right = constructActual(se->right);
+    return bvMinusExpr(left, right);
+  }
+
+  case Expr::Mul: {
+    MulExpr *me = cast<MulExpr>(e);
+    std::string right = constructActual(me->right);
+    if (ConstantExpr *CE = dyn_cast<ConstantExpr>(me->left))
+      if (CE->getWidth() <= 64)
+        return constructMulByConstant(right, CE->getZExtValue());
+
+    std::string left = constructActual(me->left);
+    return bvMultExpr(left, right);
+  }
+
+  case Expr::UDiv: {
+    UDivExpr *de = cast<UDivExpr>(e);
+    std::string left = constructActual(de->left);
+
+    if (ConstantExpr *CE = dyn_cast<ConstantExpr>(de->right)) {
+      if (CE->getWidth() <= 64) {
+        uint64_t divisor = CE->getZExtValue();
+
+        if (bits64::isPowerOfTwo(divisor)) {
+          return bvRightShift(left, bits64::indexOfSingleBit(divisor));
+        }
+      }
+    }
+
+    std::string right = constructActual(de->right);
+    return bvDivExpr(left, right);
+  }
+
+  case Expr::SDiv: {
+    SDivExpr *de = cast<SDivExpr>(e);
+    std::string left = constructActual(de->left);
+    std::string right = constructActual(de->right);
+    return sbvDivExpr(left, right);
+  }
+
+  case Expr::URem: {
+    URemExpr *de = cast<URemExpr>(e);
+    std::string left = constructActual(de->left);
+
+    if (ConstantExpr *CE = dyn_cast<ConstantExpr>(de->right)) {
+      if (CE->getWidth() <= 64) {
+        uint64_t divisor = CE->getZExtValue();
+
+        if (bits64::isPowerOfTwo(divisor)) {
+          unsigned bits = bits64::indexOfSingleBit(divisor);
+
+          // special case for modding by 1 or else we bvExtract -1:0
+          if (bits == 0) {
+            return bvZero();
+          } else {
+            return bvExtract(left, bits - 1, 0);
+          }
+        }
+      }
+    }
+
+    std::string right = constructActual(de->right);
+    return bvModExpr(left, right);
+  }
+
+  case Expr::SRem: {
+    SRemExpr *de = cast<SRemExpr>(e);
+    std::string left = constructActual(de->left);
+    std::string right = constructActual(de->right);
+    return sbvModExpr(left, right);
+  }
+
+  // Bitwise
+  case Expr::Not: {
+    NotExpr *ne = cast<NotExpr>(e);
+    std::string expr = constructActual(ne->expr);
+    return notExpr(expr);
+  }
+
+  case Expr::And: {
+    AndExpr *ae = cast<AndExpr>(e);
+    std::string left = constructActual(ae->left);
+    std::string right = constructActual(ae->right);
+    return bvAndExpr(left, right);
+  }
+
+  case Expr::Or: {
+    OrExpr *oe = cast<OrExpr>(e);
+    std::string left = constructActual(oe->left);
+    std::string right = constructActual(oe->right);
+    return bvOrExpr(left, right);
+  }
+
+  case Expr::Xor: {
+    XorExpr *xe = cast<XorExpr>(e);
+    std::string left = constructActual(xe->left);
+    std::string right = constructActual(xe->right);
+    return bvXorExpr(left, right);
+  }
+
+  case Expr::Shl: {
+    ShlExpr *se = cast<ShlExpr>(e);
+    std::string left = constructActual(se->left);
+    if (ConstantExpr *CE = dyn_cast<ConstantExpr>(se->right)) {
+      return bvLeftShift(left, (unsigned)CE->getLimitedValue());
+    } else {
+      std::string amount = constructActual(se->right);
+      return bvVarLeftShift(left, amount);
+    }
+  }
+
+  case Expr::LShr: {
+    LShrExpr *lse = cast<LShrExpr>(e);
+    std::string left = constructActual(lse->left);
+    if (ConstantExpr *CE = dyn_cast<ConstantExpr>(lse->right)) {
+      return bvRightShift(left, (unsigned)CE->getLimitedValue());
+    } else {
+      std::string amount = constructActual(lse->right);
+      return bvVarRightShift(left, amount);
+    }
+  }
+
+  case Expr::AShr: {
+    AShrExpr *ase = cast<AShrExpr>(e);
+    std::string left = constructActual(ase->left);
+    std::string amount = constructActual(ase->right);
+    return bvVarArithRightShift(left, amount);
+  }
+
+  // Comparison
+  case Expr::Eq: {
+    EqExpr *ee = cast<EqExpr>(e);
+    std::string left = constructActual(ee->left);
+    std::string right = constructActual(ee->right);
+    return eqExpr(left, right);
+  }
+
+  case Expr::Ult: {
+    UltExpr *ue = cast<UltExpr>(e);
+    std::string left = constructActual(ue->left);
+    std::string right = constructActual(ue->right);
+    return bvLtExpr(left, right);
+  }
+
+  case Expr::Ule: {
+    UleExpr *ue = cast<UleExpr>(e);
+    std::string left = constructActual(ue->left);
+    std::string right = constructActual(ue->right);
+    return bvLeExpr(left, right);
+  }
+
+  case Expr::Slt: {
+    SltExpr *se = cast<SltExpr>(e);
+    std::string left = constructActual(se->left);
+    std::string right = constructActual(se->right);
+    return sbvLtExpr(left, right);
+  }
+
+  case Expr::Sle: {
+    SleExpr *se = cast<SleExpr>(e);
+    std::string left = constructActual(se->left);
+    std::string right = constructActual(se->right);
+    return sbvLeExpr(left, right);
+  }
+
+  case Expr::Exists: {
+    ExistsExpr *xe = cast<ExistsExpr>(e);
+    std::string existentials;
+
+    for (std::vector<const Array *>::iterator it = xe->variables.begin(),
+                                              itEnd = xe->variables.end();
+         it != itEnd; ++it) {
+      existentials += (*it)->name;
+      if (it != itEnd)
+        existentials += ",";
+    }
+
+    return "(exists (" + existentials + ") " + constructActual(xe->body) + ")";
+  }
+
+  default:
+    assert(0 && "unhandled Expr type");
+    return getTrue();
+  }
+}
+std::string SearchTree::PrettyExpressionBuilder::construct(ref<Expr> e) {
+  PrettyExpressionBuilder *instance = new PrettyExpressionBuilder();
+  std::string ret = instance->constructActual(e);
+  delete instance;
+  return ret;
+}
+
+std::string SearchTree::PrettyExpressionBuilder::buildArray(
+    const char *name, unsigned indexWidth, unsigned valueWidth) {
+  return name;
+}
+
+std::string SearchTree::PrettyExpressionBuilder::getTrue() { return "true"; }
+std::string SearchTree::PrettyExpressionBuilder::getFalse() { return "false"; }
+std::string
+SearchTree::PrettyExpressionBuilder::getInitialRead(const Array *root,
+                                                    unsigned index) {
+  return readExpr(getInitialArray(root), bvConst32(index));
+}
+
+SearchTree::PrettyExpressionBuilder::PrettyExpressionBuilder() {}
+
+SearchTree::PrettyExpressionBuilder::~PrettyExpressionBuilder() {}
+
+/**/
+
+unsigned long SearchTree::nextNodeId = 1;
+
+SearchTree *SearchTree::instance = 0;
+
+std::string SearchTree::recurseRender(const SearchTree::Node *node) {
+  std::ostringstream stream;
+
+  stream << "Node" << node->nodeId;
+  std::string sourceNodeName = stream.str();
+
+  stream << " [shape=record,label=\"{" << node->nodeId << ": " << node->name
+         << "\\l";
+  for (std::map<PathCondition *, std::pair<std::string, bool> >::const_iterator
+           it = node->pathConditionTable.begin(),
+           itEnd = node->pathConditionTable.end();
+       it != itEnd; ++it) {
+    stream << (it->second.first);
+    if (it->second.second)
+      stream << " ITP";
+    stream << "\\l";
+  }
+  if (node->subsumed) {
+    stream << "(subsumed)\\l";
+  }
+  if (node->falseTarget || node->trueTarget)
+    stream << "|{<s0>F|<s1>T}";
+  stream << "}\"];\n";
+
+  if (node->falseTarget) {
+    stream << sourceNodeName << ":s0 -> Node" << node->falseTarget->nodeId
+           << ";\n";
+  }
+  if (node->trueTarget) {
+    stream << sourceNodeName + ":s1 -> Node" << node->trueTarget->nodeId
+           << ";\n";
+  }
+  if (node->falseTarget) {
+    stream << recurseRender(node->falseTarget);
+  }
+  if (node->trueTarget) {
+    stream << recurseRender(node->trueTarget);
+  }
+  return stream.str();
+}
+
+std::string SearchTree::render() {
+  std::string res("");
+
+  // Simply return empty string when root is undefined
+  if (!root)
+    return res;
+
+  std::ostringstream stream;
+  for (std::map<SearchTree::Node *, SearchTree::Node *>::iterator
+           it = subsumptionEdges.begin(),
+           itEnd = subsumptionEdges.end();
+       it != itEnd; ++it) {
+    stream << "Node" << it->first->nodeId << " -> Node" << it->second->nodeId
+           << " [style=dashed];\n";
+  }
+
+  res = "digraph search_tree {\n";
+  res += recurseRender(root);
+  res += stream.str();
+  res += "}\n";
+  return res;
+}
+
+SearchTree::SearchTree(ITreeNode *_root) {
+  root = SearchTree::Node::createNode(_root->getNodeId());
+  itreeNodeMap[_root] = root;
+}
+
+SearchTree::~SearchTree() {
+  if (root)
+    delete root;
+
+  itreeNodeMap.clear();
+}
+
+void SearchTree::addChildren(ITreeNode *parent, ITreeNode *falseChild,
+                             ITreeNode *trueChild) {
+  if (!OUTPUT_INTERPOLATION_TREE)
+    return;
+
+  assert(SearchTree::instance && "Search tree graph not initialized");
+
+  SearchTree::Node *parentNode = instance->itreeNodeMap[parent];
+  parentNode->falseTarget =
+      SearchTree::Node::createNode(falseChild->getNodeId());
+  parentNode->trueTarget = SearchTree::Node::createNode(trueChild->getNodeId());
+  instance->itreeNodeMap[falseChild] = parentNode->falseTarget;
+  instance->itreeNodeMap[trueChild] = parentNode->trueTarget;
+}
+
+void SearchTree::setCurrentNode(ExecutionState &state,
+                                const uintptr_t programPoint) {
+  if (!OUTPUT_INTERPOLATION_TREE)
+    return;
+
+  assert(SearchTree::instance && "Search tree graph not initialized");
+
+  ITreeNode *iTreeNode = state.itreeNode;
+  SearchTree::Node *node = instance->itreeNodeMap[iTreeNode];
+  if (!node->nodeId) {
+    std::string functionName(
+        state.pc->inst->getParent()->getParent()->getName().str());
+    node->name = functionName + "\\l";
+    llvm::raw_string_ostream out(node->name);
+    state.pc->inst->print(out);
+    node->name = out.str();
+
+    node->iTreeNodeId = programPoint;
+    node->nodeId = nextNodeId++;
+  }
+}
+
+void SearchTree::markAsSubsumed(ITreeNode *iTreeNode,
+                                SubsumptionTableEntry *entry) {
+  if (!OUTPUT_INTERPOLATION_TREE)
+    return;
+
+  assert(SearchTree::instance && "Search tree graph not initialized");
+
+  SearchTree::Node *node = instance->itreeNodeMap[iTreeNode];
+  node->subsumed = true;
+  SearchTree::Node *subsuming = instance->tableEntryMap[entry];
+  instance->subsumptionEdges[node] = subsuming;
+}
+
+void SearchTree::addPathCondition(ITreeNode *iTreeNode,
+                                  PathCondition *pathCondition,
+                                  ref<Expr> condition) {
+  if (!OUTPUT_INTERPOLATION_TREE)
+    return;
+
+  assert(SearchTree::instance && "Search tree graph not initialized");
+
+  SearchTree::Node *node = instance->itreeNodeMap[iTreeNode];
+
+  std::string s = PrettyExpressionBuilder::construct(condition);
+
+  std::pair<std::string, bool> p(s, false);
+  node->pathConditionTable[pathCondition] = p;
+  instance->pathConditionMap[pathCondition] = node;
+}
+
+void SearchTree::addTableEntryMapping(ITreeNode *iTreeNode,
+                                      SubsumptionTableEntry *entry) {
+  if (!OUTPUT_INTERPOLATION_TREE)
+    return;
+
+  assert(SearchTree::instance && "Search tree graph not initialized");
+
+  SearchTree::Node *node = instance->itreeNodeMap[iTreeNode];
+  instance->tableEntryMap[entry] = node;
+}
+
+void SearchTree::includeInInterpolant(PathCondition *pathCondition) {
+  if (!OUTPUT_INTERPOLATION_TREE)
+    return;
+
+  assert(SearchTree::instance && "Search tree graph not initialized");
+
+  instance->pathConditionMap[pathCondition]->pathConditionTable[pathCondition].second = true;
+}
+
+/// @brief Save the graph
+void SearchTree::save(std::string dotFileName) {
+  if (!OUTPUT_INTERPOLATION_TREE)
+    return;
+
+  assert(SearchTree::instance && "Search tree graph not initialized");
+
+  std::string g(instance->render());
+  std::ofstream out(dotFileName.c_str());
+  if (!out.fail()) {
+    out << g;
+    out.close();
+  }
+}
 
 /**/
 
@@ -58,6 +761,9 @@ void PathCondition::includeInInterpolant(AllocationGraph *g) {
 
   // We mark this constraint itself as in the interpolant
   inInterpolant = true;
+
+  // We mark constraint as in interpolant in the search tree graph as well.
+  SearchTree::includeInInterpolant(this);
 }
 
 bool PathCondition::carInInterpolant() const { return inInterpolant; }
@@ -101,6 +807,12 @@ void PathCondition::print(llvm::raw_ostream &stream) {
 
 /**/
 
+StatTimer SubsumptionTableEntry::actualSolverCallTimer;
+
+unsigned long SubsumptionTableEntry::checkSolverCount = 0;
+
+unsigned long SubsumptionTableEntry::checkSolverFailureCount = 0;
+
 SubsumptionTableEntry::SubsumptionTableEntry(ITreeNode *node)
     : nodeId(node->getNodeId()) {
   std::vector<const Array *> replacements;
@@ -108,6 +820,7 @@ SubsumptionTableEntry::SubsumptionTableEntry(ITreeNode *node)
   interpolant = node->getInterpolant(replacements);
 
   singletonStore = node->getLatestInterpolantCoreExpressions(replacements);
+
   for (std::map<llvm::Value *, ref<Expr> >::iterator
            it = singletonStore.begin(),
            itEnd = singletonStore.end();
@@ -657,13 +1370,19 @@ ref<Expr> SubsumptionTableEntry::createBinaryExpr(Expr::Kind kind,
   return Expr::createFromKind(kind, exprs);
 }
 
-ref<Expr> SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr) {
+ref<Expr>
+SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
+                                              bool &hasExistentialsOnly) {
   assert(llvm::isa<ExistsExpr>(existsExpr));
 
   std::vector<ref<Expr> > interpolantPack;
   std::vector<ref<Expr> > equalityPack;
 
   ExistsExpr *expr = static_cast<ExistsExpr *>(existsExpr.get());
+
+  // Assume the we shall return general ExistsExpr that does not contain
+  // only existential variables.
+  hasExistentialsOnly = false;
 
   std::vector<const Array *> boundVariables = expr->variables;
   // We assume that the body is always a conjunction of interpolant in terms of
@@ -700,15 +1419,22 @@ ref<Expr> SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr) {
       simplifyEqualityExpr(equalityPack, body->getKid(1));
 
   // Try to simplify the interpolant. If the resulting simplification
-  // was a constant (true), then the equality constraints would contain
+  // was the constant true, then the equality constraints would contain
   // equality with constants only and no equality with shadow (existential)
   // variables, hence it should be safe to simply return the equality
   // constraint.
   interpolantPack.clear();
   ref<Expr> simplifiedInterpolant =
       simplifyInterpolantExpr(interpolantPack, body->getKid(0));
-  if (llvm::isa<ConstantExpr>(simplifiedInterpolant))
+  if (simplifiedInterpolant->isTrue())
     return fullEqualityConstraint;
+
+  if (fullEqualityConstraint->isTrue()) {
+    // This is the case when the result is still an existentially-quantified
+    // formula, but one that does not contain free variables.
+    hasExistentialsOnly = true;
+    return existsExpr->rebuild(&simplifiedInterpolant);
+  }
 
   ref<Expr> newInterpolant;
 
@@ -768,8 +1494,8 @@ ref<Expr> SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr) {
                           interpolantAtom->getKid(1));
         }
 
-        interpolantAtom =
-            createBinaryOfSameKind(interpolantAtom, newIntpLeft, newIntpRight);
+        interpolantAtom = ShadowArray::createBinaryOfSameKind(
+            interpolantAtom, newIntpLeft, newIntpRight);
       }
     }
 
@@ -805,14 +1531,14 @@ ref<Expr> SubsumptionTableEntry::replaceExpr(ref<Expr> originalExpr,
     return originalExpr;
 
   if (originalExpr->getKid(0) == replacedExpr)
-    return createBinaryOfSameKind(originalExpr, substituteExpr,
-                                  originalExpr->getKid(1));
+    return ShadowArray::createBinaryOfSameKind(originalExpr, substituteExpr,
+                                               originalExpr->getKid(1));
 
   if (originalExpr->getKid(1) == replacedExpr)
-    return createBinaryOfSameKind(originalExpr, originalExpr->getKid(0),
-                                  substituteExpr);
+    return ShadowArray::createBinaryOfSameKind(
+        originalExpr, originalExpr->getKid(0), substituteExpr);
 
-  return createBinaryOfSameKind(
+  return ShadowArray::createBinaryOfSameKind(
       originalExpr,
       replaceExpr(originalExpr->getKid(0), replacedExpr, substituteExpr),
       replaceExpr(originalExpr->getKid(1), replacedExpr, substituteExpr));
@@ -827,17 +1553,6 @@ bool SubsumptionTableEntry::containShadowExpr(ref<Expr> expr,
 
   return containShadowExpr(expr->getKid(0), shadowExpr) ||
          containShadowExpr(expr->getKid(1), shadowExpr);
-}
-
-ref<Expr> SubsumptionTableEntry::createBinaryOfSameKind(ref<Expr> originalExpr,
-                                                        ref<Expr> newLhs,
-                                                        ref<Expr> newRhs) {
-  std::vector<Expr::CreateArg> exprs;
-  Expr::CreateArg arg1(newLhs);
-  Expr::CreateArg arg2(newRhs);
-  exprs.push_back(arg1);
-  exprs.push_back(arg2);
-  return Expr::createFromKind(originalExpr->getKind(), exprs);
 }
 
 ref<Expr> SubsumptionTableEntry::simplifyInterpolantExpr(
@@ -865,7 +1580,8 @@ ref<Expr> SubsumptionTableEntry::simplifyInterpolantExpr(
 
     // If the current expression has a form like (Eq false P), where P is some
     // comparison, we change it into the negation of P.
-    if (llvm::isa<EqExpr>(expr) && expr->getKid(0)->isFalse()) {
+    if (llvm::isa<EqExpr>(expr) && expr->getKid(0)->getWidth() == Expr::Bool &&
+        expr->getKid(0)->isFalse()) {
       if (llvm::isa<SltExpr>(rhs)) {
         expr = SgeExpr::create(rhs->getKid(0), rhs->getKid(1));
       } else if (llvm::isa<SgeExpr>(rhs)) {
@@ -885,8 +1601,21 @@ ref<Expr> SubsumptionTableEntry::simplifyInterpolantExpr(
     return expr;
   }
 
-  return AndExpr::alloc(simplifyInterpolantExpr(interpolantPack, lhs),
-                        simplifyInterpolantExpr(interpolantPack, rhs));
+  ref<Expr> simplifiedLhs = simplifyInterpolantExpr(interpolantPack, lhs);
+  if (simplifiedLhs->isFalse())
+    return simplifiedLhs;
+
+  ref<Expr> simplifiedRhs = simplifyInterpolantExpr(interpolantPack, rhs);
+  if (simplifiedRhs->isFalse())
+    return simplifiedRhs;
+
+  if (simplifiedLhs->isTrue())
+    return simplifiedRhs;
+
+  if (simplifiedRhs->isTrue())
+    return simplifiedLhs;
+
+  return AndExpr::alloc(simplifiedLhs, simplifiedRhs);
 }
 
 ref<Expr> SubsumptionTableEntry::simplifyEqualityExpr(
@@ -950,23 +1679,17 @@ ref<Expr> SubsumptionTableEntry::simplifyEqualityExpr(
   assert(!"Invalid expression type.");
 }
 
-ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr) {
+ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
+                                                    bool &hasExistentialsOnly) {
   assert(llvm::isa<ExistsExpr>(existsExpr));
 
   ref<Expr> ret = simplifyWithFourierMotzkin(existsExpr);
-  if (llvm::isa<ExistsExpr>(ret))
-    return ret;
 
   return ret;
 }
 
 bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
                                      ExecutionState &state, double timeout) {
-  // Check if we are at the right program point
-  if (state.itreeNode == 0 || reinterpret_cast<uintptr_t>(state.pc->inst) !=
-                                  state.itreeNode->getNodeId() ||
-      state.itreeNode->getNodeId() != nodeId)
-    return false;
 
   // Quick check for subsumption in case the interpolant is empty
   if (empty())
@@ -978,16 +1701,22 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
       state.itreeNode->getCompositeCoreExpressions();
 
   ref<Expr> stateEqualityConstraints;
-  for (std::vector<llvm::Value *>::iterator
-           itBegin = singletonStoreKeys.begin(),
-           itEnd = singletonStoreKeys.end(), it = itBegin;
+  for (std::vector<llvm::Value *>::iterator it = singletonStoreKeys.begin(),
+                                            itEnd = singletonStoreKeys.end();
        it != itEnd; ++it) {
-    const ref<Expr> lhs = singletonStore[*it];
-    const ref<Expr> rhs = stateSingletonStore[*it];
-    stateEqualityConstraints =
-        (it == itBegin ? EqExpr::alloc(lhs, rhs)
-                       : AndExpr::alloc(EqExpr::alloc(lhs, rhs),
-                                        stateEqualityConstraints));
+      const ref<Expr> lhs = singletonStore[*it];
+      const ref<Expr> rhs = stateSingletonStore[*it];
+
+      // If the current state does not constrain the same
+      // allocation, subsumption fails.
+      if (!rhs.get())
+        return false;
+
+      stateEqualityConstraints =
+          (!stateEqualityConstraints.get()
+               ? EqExpr::alloc(lhs, rhs)
+               : AndExpr::alloc(EqExpr::alloc(lhs, rhs),
+                                stateEqualityConstraints));
   }
 
   for (std::vector<llvm::Value *>::iterator it = compositeStoreKeys.begin(),
@@ -995,6 +1724,11 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
        it != itEnd; ++it) {
     std::vector<ref<Expr> > lhsList = compositeStore[*it];
     std::vector<ref<Expr> > rhsList = stateCompositeStore[*it];
+
+    // If the current state does not constrain the same
+    // allocation, subsumption fails.
+    if (rhsList.empty())
+      return false;
 
     ref<Expr> auxDisjuncts;
     bool auxDisjunctsEmpty = true;
@@ -1026,7 +1760,7 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
   }
 
   // We create path condition needed constraints marking structure
-  std::map<ref<Expr>, PathConditionMarker *> markerMap =
+  std::map<Expr *, PathConditionMarker *> markerMap =
       state.itreeNode->makeMarkerMap();
 
   Solver::Validity result;
@@ -1048,11 +1782,13 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
     return true;
   }
 
+  bool queryHasNoFreeVariables = false;
+
   if (!existentials.empty()) {
     ref<Expr> existsExpr = ExistsExpr::create(existentials, query);
     // llvm::errs() << "Before simplification:\n";
     // ExprPPrinter::printQuery(llvm::errs(), state.constraints, existsExpr);
-    query = simplifyExistsExpr(existsExpr);
+    query = simplifyExistsExpr(existsExpr, queryHasNoFreeVariables);
   }
 
   bool success = false;
@@ -1064,7 +1800,7 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
   if (!llvm::isa<ConstantExpr>(query)) {
     //     llvm::errs() << "Querying for subsumption check:\n";
     //     ExprPPrinter::printQuery(llvm::errs(), state.constraints, query);
-
+    ++checkSolverCount;
     if (!existentials.empty() && llvm::isa<ExistsExpr>(query)) {
       // llvm::errs() << "Existentials not empty\n";
 
@@ -1078,16 +1814,49 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
 
       z3solver->setCoreSolverTimeout(timeout);
 
-      success = z3solver->directComputeValidity(Query(state.constraints, query),
-                                                result);
+      if (queryHasNoFreeVariables) {
+        // In case the query has no free variables, we reformulate
+        // the solver call as satisfiability check of the body of
+        // the query.
+        ConstraintManager constraints;
+        ref<ConstantExpr> tmpExpr;
+
+        ref<Expr> falseExpr = ConstantExpr::alloc(0, Expr::Bool);
+        constraints.addConstraint(EqExpr::alloc(falseExpr, query->getKid(0)));
+
+        // llvm::errs() << "Querying for satisfiability check:\n";
+        // ExprPPrinter::printQuery(llvm::errs(), constraints, falseExpr);
+
+        actualSolverCallTimer.start();
+        success = z3solver->getValue(Query(constraints, falseExpr), tmpExpr);
+        actualSolverCallTimer.stop();
+
+        result = success ? Solver::True : Solver::Unknown;
+
+      } else {
+        // llvm::errs() << "Querying for subsumption check:\n";
+        // ExprPPrinter::printQuery(llvm::errs(), state.constraints, query);
+
+        actualSolverCallTimer.start();
+        success = z3solver->directComputeValidity(
+            Query(state.constraints, query), result);
+        actualSolverCallTimer.stop();
+      }
+
       z3solver->setCoreSolverTimeout(0);
+
     } else {
       // llvm::errs() << "No existential\n";
+
+      // llvm::errs() << "Querying for subsumption check:\n";
+      // ExprPPrinter::printQuery(llvm::errs(), state.constraints, query);
 
       // We call the solver in the standard way if the
       // formula is unquantified.
       solver->setTimeout(timeout);
+      actualSolverCallTimer.start();
       success = solver->evaluate(state, query, result);
+      actualSolverCallTimer.stop();
       solver->setTimeout(0);
     }
   } else {
@@ -1108,15 +1877,25 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
 
     for (std::vector<ref<Expr> >::iterator it1 = unsatCore.begin();
          it1 != unsatCore.end(); it1++) {
-      markerMap[*it1]->mayIncludeInInterpolant();
+      // FIXME: Sometimes some constraints are not in the PC. This is
+      // because constraints are not properly added at state merge.
+      PathConditionMarker *marker = markerMap[it1->get()];
+      if (marker)
+        marker->mayIncludeInInterpolant();
     }
 
   } else {
-    if (result != Solver::False)
-      //      llvm::errs() << "Solver could not decide (in-)validity\n";
+    // Here the solver could not decide that the subsumption is valid.
+    // It may have decided invalidity, however,
+    // CexCachingSolver::computeValidity,
+    // which was eventually called from solver->evaluate
+    // is conservative, where it returns Solver::Unknown even in case when
+    // invalidity is established by the solver.
+    // llvm::errs() << "Solver did not decide validity\n";
 
-      if (z3solver)
-        delete z3solver;
+    ++checkSolverFailureCount;
+    if (z3solver)
+      delete z3solver;
 
     return false;
   }
@@ -1124,14 +1903,16 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
   // State subsumed, we mark needed constraints on the
   // path condition.
   AllocationGraph *g = new AllocationGraph();
-  for (std::map<ref<Expr>, PathConditionMarker *>::iterator
+  for (std::map<Expr *, PathConditionMarker *>::iterator
            it = markerMap.begin(),
            itEnd = markerMap.end();
        it != itEnd; it++) {
-    it->second->includeInInterpolant(g);
+    // FIXME: Sometimes some constraints are not in the PC. This is
+    // because constraints are not properly added at state merge.
+    if (it->second)
+      it->second->includeInInterpolant(g);
   }
   ITreeNode::deleteMarkerMap(markerMap);
-
   // llvm::errs() << "AllocationGraph\n";
   // g->dump();
 
@@ -1212,6 +1993,14 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
   }
 }
 
+void SubsumptionTableEntry::printStat(llvm::raw_ostream &stream) {
+  stream << "KLEE: done:     Time for actual solver calls in subsumption check "
+            "(ms) = " << actualSolverCallTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     Number of solver calls for subsumption check "
+            "(failed) = " << checkSolverCount << " (" << checkSolverFailureCount
+         << ")\n";
+}
+
 /**/
 
 InequalityExpr::InequalityExpr(std::map<ref<Expr>, int64_t> left,
@@ -1239,6 +2028,64 @@ void InequalityExpr::updateRight(std::map<ref<Expr>, int64_t> newRight) {
 
 /**/
 
+StatTimer ITree::setCurrentINodeTimer;
+StatTimer ITree::removeTimer;
+StatTimer ITree::checkCurrentStateSubsumptionTimer;
+StatTimer ITree::markPathConditionTimer;
+StatTimer ITree::splitTimer;
+StatTimer ITree::executeAbstractBinaryDependencyTimer;
+StatTimer ITree::executeAbstractMemoryDependencyTimer;
+StatTimer ITree::executeAbstractDependencyTimer;
+
+void ITree::printTimeStat(llvm::raw_ostream &stream) {
+  stream << "KLEE: done:     setCurrentINode = " << setCurrentINodeTimer.get() *
+                                                        1000 << "\n";
+  stream << "KLEE: done:     remove = " << removeTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     checkCurrentStateSubsumption = "
+         << checkCurrentStateSubsumptionTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     markPathCondition = "
+         << markPathConditionTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     split = " << splitTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     executeAbstractBinaryDependency = "
+         << executeAbstractBinaryDependencyTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     executeAbstractMemoryDependency = "
+         << executeAbstractMemoryDependencyTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     executeAbstractDependency = "
+         << executeAbstractDependencyTimer.get() * 1000 << "\n";
+}
+
+void ITree::printTableStat(llvm::raw_ostream &stream) {
+  double programPointNumber = 0.0, entryNumber = 0.0;
+  for (std::map<uintptr_t, std::vector<SubsumptionTableEntry *> >::iterator
+           it = subsumptionTable.begin(),
+           itEnd = subsumptionTable.end();
+       it != itEnd; ++it) {
+    if (!it->second.empty()) {
+      entryNumber += it->second.size();
+      ++programPointNumber;
+    }
+  }
+  stream << "KLEE: done:     Table entry per checkpoint instruction = "
+         << (entryNumber / programPointNumber) << "\n";
+  SubsumptionTableEntry::printStat(stream);
+}
+
+void ITree::dumpInterpolationStat() {
+  bool useColors = llvm::errs().is_displayed();
+  if (useColors)
+    llvm::errs().changeColor(llvm::raw_ostream::GREEN,
+                             /*bold=*/true,
+                             /*bg=*/false);
+  llvm::errs() << "\nKLEE: done: Subsumption statistics\n";
+  printTableStat(llvm::errs());
+  llvm::errs() << "KLEE: done: ITree method execution times (ms):\n";
+  printTimeStat(llvm::errs());
+  llvm::errs() << "KLEE: done: ITreeNode method execution times (ms):\n";
+  ITreeNode::printTimeStat(llvm::errs());
+  if (useColors)
+    llvm::errs().resetColor();
+}
+
 ITree::ITree(ExecutionState *_root) {
   currentINode = 0;
   if (!_root->itreeNode) {
@@ -1247,41 +2094,76 @@ ITree::ITree(ExecutionState *_root) {
   root = currentINode;
 }
 
-ITree::~ITree() {}
+ITree::~ITree() {
+  for (std::map<uintptr_t, std::vector<SubsumptionTableEntry *> >::iterator
+           it = subsumptionTable.begin(),
+           itEnd = subsumptionTable.end();
+       it != itEnd; ++it) {
+    for (std::vector<SubsumptionTableEntry *>::iterator
+             it1 = it->second.begin(),
+             it1End = it->second.end();
+         it1 != it1End; ++it1) {
+      delete *it1;
+    }
+    it->second.clear();
+  }
+  subsumptionTable.clear();
+}
 
 bool ITree::checkCurrentStateSubsumption(TimingSolver *solver,
                                          ExecutionState &state,
                                          double timeout) {
   assert(state.itreeNode == currentINode);
 
-  for (std::vector<SubsumptionTableEntry>::iterator it =
-           subsumptionTable.begin();
-       it != subsumptionTable.end(); it++) {
+  // Immediately return if the state's instruction is not the
+  // the interpolation node id. The interpolation node id is the
+  // first instruction executed of the sequence executed for a state
+  // node, typically this the first instruction of a basic block.
+  // Subsumption check only matches against this first instruction.
+  if (!state.itreeNode || reinterpret_cast<uintptr_t>(state.pc->inst) !=
+                              state.itreeNode->getNodeId())
+    return false;
 
-    if (it->subsumed(solver, state, timeout)) {
+  checkCurrentStateSubsumptionTimer.start();
+  std::vector<SubsumptionTableEntry *> entryList =
+      subsumptionTable[state.itreeNode->getNodeId()];
 
+  if (entryList.empty())
+    return false;
+
+  for (std::vector<SubsumptionTableEntry *>::iterator it = entryList.begin(),
+                                                      itEnd = entryList.end();
+       it != itEnd; ++it) {
+    if ((*it)->subsumed(solver, state, timeout)) {
       // We mark as subsumed such that the node will not be
       // stored into table (the table already contains a more
       // general entry).
       currentINode->isSubsumed = true;
 
+      // Mark the node as subsumed, and create a subsumption edge
+      SearchTree::markAsSubsumed(currentINode, (*it));
+      checkCurrentStateSubsumptionTimer.stop();
       return true;
     }
   }
+  checkCurrentStateSubsumptionTimer.stop();
   return false;
 }
 
-std::vector<SubsumptionTableEntry> ITree::getStore() {
-  return subsumptionTable;
+void ITree::store(SubsumptionTableEntry *subItem) {
+  subsumptionTable[subItem->nodeId].push_back(subItem);
 }
 
-void ITree::store(SubsumptionTableEntry subItem) {
-  subsumptionTable.push_back(subItem);
+void ITree::setCurrentINode(ExecutionState &state, uintptr_t programPoint) {
+  setCurrentINodeTimer.start();
+  currentINode = state.itreeNode;
+  currentINode->setNodeLocation(programPoint);
+  SearchTree::setCurrentNode(state, programPoint);
+  setCurrentINodeTimer.stop();
 }
-
-void ITree::setCurrentINode(ITreeNode *node) { currentINode = node; }
 
 void ITree::remove(ITreeNode *node) {
+  removeTimer.start();
   assert(!node->left && !node->right);
   do {
     ITreeNode *p = node->parent;
@@ -1289,8 +2171,9 @@ void ITree::remove(ITreeNode *node) {
     // As the node is about to be deleted, it must have been completely
     // traversed, hence the correct time to table the interpolant.
     if (!node->isSubsumed) {
-      SubsumptionTableEntry entry(node);
+      SubsumptionTableEntry *entry = new SubsumptionTableEntry(node);
       store(entry);
+      SearchTree::addTableEntryMapping(node, entry);
     }
 
     delete node;
@@ -1304,15 +2187,21 @@ void ITree::remove(ITreeNode *node) {
     }
     node = p;
   } while (node && !node->left && !node->right);
+  removeTimer.stop();
 }
 
 std::pair<ITreeNode *, ITreeNode *>
 ITree::split(ITreeNode *parent, ExecutionState *left, ExecutionState *right) {
+  splitTimer.start();
   parent->split(left, right);
-  return std::pair<ITreeNode *, ITreeNode *>(parent->left, parent->right);
+  SearchTree::addChildren(parent, parent->left, parent->right);
+  std::pair<ITreeNode *, ITreeNode *> ret(parent->left, parent->right);
+  splitTimer.stop();
+  return ret;
 }
 
 void ITree::markPathCondition(ExecutionState &state, TimingSolver *solver) {
+  markPathConditionTimer.start();
   std::vector<ref<Expr> > unsatCore = solver->getUnsatCore();
 
   AllocationGraph *g = new AllocationGraph();
@@ -1326,18 +2215,16 @@ void ITree::markPathCondition(ExecutionState &state, TimingSolver *solver) {
   PathCondition *pc = currentINode->pathCondition;
 
   if (pc != 0) {
-    for (std::vector<ref<Expr> >::reverse_iterator it = unsatCore.rbegin();
-         it != unsatCore.rend(); it++) {
-      while (pc != 0) {
+    for (std::vector<ref<Expr> >::iterator it = unsatCore.begin(),
+                                           itEnd = unsatCore.end();
+         it != itEnd; ++it) {
+      for (; pc != 0; pc = pc->cdr()) {
         if (pc->car().compare(it->get()) == 0) {
           pc->includeInInterpolant(g);
           pc = pc->cdr();
           break;
         }
-        pc = pc->cdr();
       }
-      if (pc == 0)
-        break;
     }
   }
 
@@ -1348,23 +2235,30 @@ void ITree::markPathCondition(ExecutionState &state, TimingSolver *solver) {
   currentINode->computeInterpolantAllocations(g);
 
   delete g; // Delete the AllocationGraph object
+  markPathConditionTimer.stop();
 }
 
 void ITree::executeAbstractBinaryDependency(llvm::Instruction *instr,
                                             ref<Expr> valueExpr,
                                             ref<Expr> tExpr, ref<Expr> fExpr) {
+  executeAbstractBinaryDependencyTimer.start();
   currentINode->executeBinaryDependency(instr, valueExpr, tExpr, fExpr);
+  executeAbstractBinaryDependencyTimer.stop();
 }
 
 void ITree::executeAbstractMemoryDependency(llvm::Instruction *instr,
                                             ref<Expr> value,
                                             ref<Expr> address) {
+  executeAbstractMemoryDependencyTimer.start();
   currentINode->executeAbstractMemoryDependency(instr, value, address);
+  executeAbstractMemoryDependencyTimer.stop();
 }
 
 void ITree::executeAbstractDependency(llvm::Instruction *instr,
                                       ref<Expr> value) {
+  executeAbstractDependencyTimer.start();
   currentINode->executeAbstractDependency(instr, value);
+  executeAbstractDependencyTimer.stop();
 }
 
 void ITree::printNode(llvm::raw_ostream &stream, ITreeNode *n,
@@ -1401,11 +2295,16 @@ void ITree::print(llvm::raw_ostream &stream) {
   this->printNode(stream, this->root, "");
   stream << "\n------------------------- Subsumption Table "
             "-------------------------\n";
-  for (std::vector<SubsumptionTableEntry>::iterator
+  for (std::map<uintptr_t, std::vector<SubsumptionTableEntry *> >::iterator
            it = subsumptionTable.begin(),
            itEnd = subsumptionTable.end();
        it != itEnd; ++it) {
-    (*it).print(stream);
+    for (std::vector<SubsumptionTableEntry *>::iterator
+             it1 = it->second.begin(),
+             it1End = it->second.end();
+         it1 != it1End; ++it1) {
+      (*it1)->print(stream);
+    }
   }
 }
 
@@ -1413,8 +2312,58 @@ void ITree::dump() { this->print(llvm::errs()); }
 
 /**/
 
+// Statistics
+StatTimer ITreeNode::getInterpolantTimer;
+StatTimer ITreeNode::addConstraintTimer;
+StatTimer ITreeNode::splitTimer;
+StatTimer ITreeNode::makeMarkerMapTimer;
+StatTimer ITreeNode::deleteMarkerMapTimer;
+StatTimer ITreeNode::executeBinaryDependencyTimer;
+StatTimer ITreeNode::executeAbstractMemoryDependencyTimer;
+StatTimer ITreeNode::executeAbstractDependencyTimer;
+StatTimer ITreeNode::bindCallArgumentsTimer;
+StatTimer ITreeNode::popAbstractDependencyFrameTimer;
+StatTimer ITreeNode::getLatestCoreExpressionsTimer;
+StatTimer ITreeNode::getCompositeCoreExpressionsTimer;
+StatTimer ITreeNode::getLatestInterpolantCoreExpressionsTimer;
+StatTimer ITreeNode::getCompositeInterpolantCoreExpressionsTimer;
+StatTimer ITreeNode::computeInterpolantAllocationsTimer;
+
+void ITreeNode::printTimeStat(llvm::raw_ostream &stream) {
+  stream << "KLEE: done:     getInterpolant = " << getInterpolantTimer.get() *
+                                                       1000 << "\n";
+  stream << "KLEE: done:     addConstraintTime = " << addConstraintTimer.get() *
+                                                          1000 << "\n";
+  stream << "KLEE: done:     splitTime = " << splitTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     makeMarkerMap = " << makeMarkerMapTimer.get() *
+                                                      1000 << "\n";
+  stream << "KLEE: done:     deleteMarkerMap = " << deleteMarkerMapTimer.get() *
+                                                        1000 << "\n";
+  stream << "KLEE: done:     executeBinaryDependency = "
+         << executeBinaryDependencyTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     executeAbstractMemoryDependency = "
+         << executeAbstractMemoryDependencyTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     executeAbstractDependency = "
+         << executeAbstractDependencyTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     bindCallArguments = "
+         << bindCallArgumentsTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     popAbstractDependencyFrame = "
+         << popAbstractDependencyFrameTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     getLatestCoreExpressions = "
+         << getLatestCoreExpressionsTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     getCompositeCoreExpressions = "
+         << getCompositeCoreExpressionsTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     getLatestInterpolantCoreExpressions = "
+         << getLatestCoreExpressionsTimer.get() << "\n";
+  stream << "KLEE: done:     getCompositeInterpolantCoreExpressions = "
+         << getCompositeInterpolantCoreExpressionsTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     computeInterpolantAllocations = "
+         << computeInterpolantAllocationsTimer.get() * 1000 << "\n";
+}
+
 ITreeNode::ITreeNode(ITreeNode *_parent)
-    : parent(_parent), left(0), right(0), nodeId(0), isSubsumed(false) {
+    : parent(_parent), left(0), right(0), nodeId(0), isSubsumed(false),
+      graph(_parent ? _parent->graph : 0) {
 
   pathCondition = (_parent != 0) ? _parent->pathCondition : 0;
 
@@ -1442,65 +2391,89 @@ uintptr_t ITreeNode::getNodeId() { return nodeId; }
 
 ref<Expr>
 ITreeNode::getInterpolant(std::vector<const Array *> &replacements) const {
-  return this->pathCondition->packInterpolant(replacements);
-}
-
-void ITreeNode::setNodeLocation(uintptr_t programPoint) {
-  if (!nodeId)
-    nodeId = programPoint;
+  ITreeNode::getInterpolantTimer.start();
+  ref<Expr> expr = this->pathCondition->packInterpolant(replacements);
+  ITreeNode::getInterpolantTimer.stop();
+  return expr;
 }
 
 void ITreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
+  ITreeNode::getInterpolantTimer.start();
   pathCondition =
       new PathCondition(constraint, dependency, condition, pathCondition);
+  graph->addPathCondition(this, pathCondition, constraint);
+  ITreeNode::getInterpolantTimer.stop();
 }
 
 void ITreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
+  ITreeNode::splitTimer.start();
   assert(left == 0 && right == 0);
   leftData->itreeNode = left = new ITreeNode(this);
   rightData->itreeNode = right = new ITreeNode(this);
+  ITreeNode::splitTimer.stop();
 }
 
-std::map<ref<Expr>, PathConditionMarker *> ITreeNode::makeMarkerMap() const {
-  std::map<ref<Expr>, PathConditionMarker *> result;
+std::map<Expr *, PathConditionMarker *> ITreeNode::makeMarkerMap() const {
+  ITreeNode::makeMarkerMapTimer.start();
+  std::map<Expr *, PathConditionMarker *> result;
   for (PathCondition *it = pathCondition; it != 0; it = it->cdr()) {
-    result.insert(std::pair<ref<Expr>, PathConditionMarker *>(
-        it->car(), new PathConditionMarker(it)));
+    PathConditionMarker *marker = new PathConditionMarker(it);
+    if (llvm::isa<OrExpr>(it->car().get())) {
+      // FIXME: Break up disjunction into its components, because each disjunct
+      // is solved separately. The or constraint was due to state merge.
+      // Hence, the following is just a makeshift for when state merge is
+      // properly implemented.
+      result[it->car()->getKid(0).get()] = new PathConditionMarker(it);
+      result[it->car()->getKid(1).get()] = new PathConditionMarker(it);
+    }
+    result[it->car().get()] = marker;
   }
+  ITreeNode::makeMarkerMapTimer.stop();
   return result;
 }
 
-void ITreeNode::deleteMarkerMap(
-    std::map<ref<Expr>, PathConditionMarker *> &markerMap) {
-  for (std::map<ref<Expr>, PathConditionMarker *>::iterator
+void
+ITreeNode::deleteMarkerMap(std::map<Expr *, PathConditionMarker *> &markerMap) {
+  ITreeNode::deleteMarkerMapTimer.start();
+  for (std::map<Expr *, PathConditionMarker *>::iterator
            it = markerMap.begin(),
            itEnd = markerMap.end();
        it != itEnd; ++it) {
-    delete it->second;
+    if (it->second)
+      delete it->second;
   }
   markerMap.clear();
+  ITreeNode::deleteMarkerMapTimer.stop();
 }
 
 void ITreeNode::executeBinaryDependency(llvm::Instruction *i,
                                         ref<Expr> valueExpr, ref<Expr> tExpr,
                                         ref<Expr> fExpr) {
+  ITreeNode::executeBinaryDependencyTimer.start();
   dependency->executeBinary(i, valueExpr, tExpr, fExpr);
+  ITreeNode::executeBinaryDependencyTimer.stop();
 }
 
 void ITreeNode::executeAbstractMemoryDependency(llvm::Instruction *instr,
                                                 ref<Expr> value,
                                                 ref<Expr> address) {
+  ITreeNode::executeAbstractMemoryDependencyTimer.start();
   dependency->executeMemoryOperation(instr, value, address);
+  ITreeNode::executeAbstractMemoryDependencyTimer.stop();
 }
 
 void ITreeNode::executeAbstractDependency(llvm::Instruction *instr,
                                           ref<Expr> value) {
+  ITreeNode::executeAbstractDependencyTimer.start();
   dependency->execute(instr, value);
+  ITreeNode::executeAbstractDependencyTimer.stop();
 }
 
 void ITreeNode::bindCallArguments(llvm::Instruction *site,
                                   std::vector<ref<Expr> > &arguments) {
+  ITreeNode::bindCallArgumentsTimer.start();
   dependency->bindCallArguments(site, arguments);
+  ITreeNode::bindCallArgumentsTimer.stop();
 }
 
 void ITreeNode::popAbstractDependencyFrame(llvm::CallInst *site,
@@ -1508,12 +2481,14 @@ void ITreeNode::popAbstractDependencyFrame(llvm::CallInst *site,
                                            ref<Expr> returnValue) {
   // TODO: This is probably where we should simplify
   // the dependency graph by removing callee values.
-
+  ITreeNode::popAbstractDependencyFrameTimer.start();
   dependency->bindReturnValue(site, inst, returnValue);
+  ITreeNode::popAbstractDependencyFrameTimer.stop();
 }
 
 std::map<llvm::Value *, ref<Expr> >
 ITreeNode::getLatestCoreExpressions() const {
+  ITreeNode::getLatestCoreExpressionsTimer.start();
   std::map<llvm::Value *, ref<Expr> > ret;
   std::vector<const Array *> dummyReplacements;
 
@@ -1523,11 +2498,13 @@ ITreeNode::getLatestCoreExpressions() const {
   if (parent)
     ret =
         parent->dependency->getLatestCoreExpressions(dummyReplacements, false);
+  ITreeNode::getLatestCoreExpressionsTimer.stop();
   return ret;
 }
 
 std::map<llvm::Value *, std::vector<ref<Expr> > >
 ITreeNode::getCompositeCoreExpressions() const {
+  ITreeNode::getCompositeCoreExpressionsTimer.start();
   std::map<llvm::Value *, std::vector<ref<Expr> > > ret;
   std::vector<const Array *> dummyReplacements;
 
@@ -1537,12 +2514,14 @@ ITreeNode::getCompositeCoreExpressions() const {
   if (parent)
     ret = parent->dependency->getCompositeCoreExpressions(dummyReplacements,
                                                           false);
+  ITreeNode::getCompositeCoreExpressionsTimer.stop();
   return ret;
 }
 
 std::map<llvm::Value *, ref<Expr> >
 ITreeNode::getLatestInterpolantCoreExpressions(
     std::vector<const Array *> &replacements) const {
+  ITreeNode::getLatestInterpolantCoreExpressionsTimer.start();
   std::map<llvm::Value *, ref<Expr> > ret;
 
   // Since a program point index is a first statement in a basic block,
@@ -1550,12 +2529,14 @@ ITreeNode::getLatestInterpolantCoreExpressions(
   // from the parent node.
   if (parent)
     ret = parent->dependency->getLatestCoreExpressions(replacements, true);
+  ITreeNode::getLatestInterpolantCoreExpressionsTimer.stop();
   return ret;
 }
 
 std::map<llvm::Value *, std::vector<ref<Expr> > >
 ITreeNode::getCompositeInterpolantCoreExpressions(
     std::vector<const Array *> &replacements) const {
+  ITreeNode::getCompositeInterpolantCoreExpressionsTimer.start();
   std::map<llvm::Value *, std::vector<ref<Expr> > > ret;
 
   // Since a program point index is a first statement in a basic block,
@@ -1563,11 +2544,14 @@ ITreeNode::getCompositeInterpolantCoreExpressions(
   // from the parent node.
   if (parent)
     ret = parent->dependency->getCompositeCoreExpressions(replacements, true);
+  ITreeNode::getCompositeInterpolantCoreExpressionsTimer.stop();
   return ret;
 }
 
 void ITreeNode::computeInterpolantAllocations(AllocationGraph *g) {
+  ITreeNode::computeInterpolantAllocationsTimer.start();
   dependency->computeInterpolantAllocations(g);
+  ITreeNode::computeInterpolantAllocationsTimer.stop();
 }
 
 void ITreeNode::dump() const {

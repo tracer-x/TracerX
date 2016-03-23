@@ -82,6 +82,27 @@ SelectSolver("select-solver",
                               clEnumValEnd));
 #endif
 
+// We should compile in this option even when SUPPORT_Z3
+// was undefined to avoid regression test failure.
+llvm::cl::opt<bool> NoInterpolation(
+    "no-interpolation",
+    llvm::cl::desc("Disable interpolation for search space reduction. "
+                   "Interpolation is enabled by default when Z3 was the solver "
+                   "used. This option has no effect when Z3 was not used."));
+
+#ifdef SUPPORT_Z3
+llvm::cl::opt<bool> OutputTree(
+    "output-tree",
+    llvm::cl::desc("Outputs tree.dot: the execution tree in .dot file "
+                   "format. At present, this feature is only available when "
+                   "Z3 is compiled in and interpolation is enabled."));
+
+llvm::cl::opt<bool> InterpolationStat(
+    "interpolation-stat",
+    llvm::cl::desc(
+        "Displays an execution profile of the interpolation routines."));
+#endif
+
 #ifdef SUPPORT_METASMT
 
 llvm::cl::opt<klee::MetaSMTBackendType>
