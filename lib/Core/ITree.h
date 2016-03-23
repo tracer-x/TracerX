@@ -143,12 +143,15 @@ class SubsumptionTableEntry {
                             std::map<ref<Expr>, int64_t> &right,
                             bool &isOnFocusVarOnLeft);
 
-  static void classification(const Array *onFocusExistential,
-                             InequalityExpr *inequalityExpr,
-                             std::vector<InequalityExpr *> &lessThanPack,
-                             std::vector<InequalityExpr *> &greaterThanPack,
-                             std::vector<InequalityExpr *> &nonePack,
-                             bool isOnFocusVarOnLeft);
+  static void
+  classification(const Array *onFocusExistential,
+                 InequalityExpr *inequalityExpr,
+                 std::vector<InequalityExpr *> &lessThanPack,
+                 std::vector<InequalityExpr *> &greaterThanPack,
+                 std::vector<InequalityExpr *> &nonePack,
+                 std::vector<InequalityExpr *> &strictLessThanPack,
+                 std::vector<InequalityExpr *> &strictGreaterThanPack,
+                 bool isOnFocusVarOnLeft);
 
   static ref<Expr> getReadExprFromConcatExpr(ref<Expr> expr);
 
@@ -156,10 +159,16 @@ class SubsumptionTableEntry {
 
   static std::vector<InequalityExpr *>
   matching(std::vector<InequalityExpr *> lessThanPack,
-           std::vector<InequalityExpr *> greaterThanPack);
+           std::vector<InequalityExpr *> greaterThanPack,
+           std::vector<InequalityExpr *> strictLessThanPack,
+           std::vector<InequalityExpr *> strictGreaterThanPack);
 
-  static void simplifyMatching(std::map<ref<Expr>, int64_t> &left,
-                               std::map<ref<Expr>, int64_t> &right);
+  static void matchingLoop(Expr::Kind, std::vector<InequalityExpr *> pack1,
+                           std::vector<InequalityExpr *> pack2,
+                           std::vector<InequalityExpr *> &result);
+
+  static void simplifyMatching(std::map<ref<Expr>, int64_t> &leftResult,
+                               std::map<ref<Expr>, int64_t> &rightResult);
 
   static ref<Expr> reconstructExpr(std::vector<InequalityExpr *> pack);
 

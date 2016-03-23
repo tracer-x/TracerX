@@ -222,6 +222,8 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
 
     std::vector<InequalityExpr *> lessThanPack;
     std::vector<InequalityExpr *> greaterThanPack;
+    std::vector<InequalityExpr *> strictLessThanPack;
+    std::vector<InequalityExpr *> strictGreaterThanPack;
     std::vector<InequalityExpr *> nonePack;
 
     // STEP 2a: normalized the inequality expression into the
@@ -243,17 +245,20 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
         currIneq->updateRight(newRight);
       }
 
-      // STEP 2b: divide the inequalityPack into 3 separated pack
+      // STEP 2b: divide the inequalityPack into separated packs
       // based on its operator existVar <= (lessThanPack), existVar >=
-      // (greaterThanPack),
+      // (greaterThanPack), existVar < (strictLessThanPack), existVar >
+      // (strictGreaterThanPack)
       // or (nonePack) if there's no on focus exist variable in the equation.
       classification(currExistVar, currIneq, lessThanPack, greaterThanPack,
-                     nonePack, isOnFocusVarOnLeft);
+                     strictLessThanPack, strictGreaterThanPack, nonePack,
+                     isOnFocusVarOnLeft);
     }
 
     // STEP 3: matching between inequality
     std::vector<InequalityExpr *> resultPack;
-    resultPack = matching(lessThanPack, greaterThanPack);
+    resultPack = matching(lessThanPack, greaterThanPack, strictLessThanPack,
+                          strictGreaterThanPack);
     inequalityPack.clear();
     inequalityPack.insert(inequalityPack.end(), resultPack.begin(),
                           resultPack.end());
@@ -344,6 +349,8 @@ void SubsumptionTableEntry::classification(
     const Array *onFocusExistential, InequalityExpr *currIneq,
     std::vector<InequalityExpr *> &lessThanPack,
     std::vector<InequalityExpr *> &greaterThanPack,
+    std::vector<InequalityExpr *> &strictLessThanPack,
+    std::vector<InequalityExpr *> &strictGreaterThanPack,
     std::vector<InequalityExpr *> &nonePack, bool isOnFocusVarOnLeft) {
   if (!isOnFocusVarOnLeft) {
     nonePack.push_back(currIneq);
@@ -353,38 +360,68 @@ void SubsumptionTableEntry::classification(
         lessThanPack.push_back(currIneq);
       else if (currIneq->getKind() == Expr::Sge)
         greaterThanPack.push_back(currIneq);
+      else if (currIneq->getKind() == Expr::Slt)
+        strictLessThanPack.push_back(currIneq);
+      else if (currIneq->getKind() == Expr::Sgt)
+        strictGreaterThanPack.push_back(currIneq);
     } else {
       nonePack.push_back(currIneq);
     }
   }
 }
-// assume lessThanPack: (shadow_expr <= a) and greaterThanPack: (shadow_expr >=
-// b), it would be b <= a
-// greaterThanPack.right <= lessThanPack.right
-std::vector<InequalityExpr *>
-SubsumptionTableEntry::matching(std::vector<InequalityExpr *> lessThanPack,
-                                std::vector<InequalityExpr *> greaterThanPack) {
+
+std::vector<InequalityExpr *> SubsumptionTableEntry::matching(
+    std::vector<InequalityExpr *> lessThanPack,
+    std::vector<InequalityExpr *> greaterThanPack,
+    std::vector<InequalityExpr *> strictLessThanPack,
+    std::vector<InequalityExpr *> strictGreaterThanPack) {
+
   std::vector<InequalityExpr *> result;
 
-  for (std::vector<InequalityExpr *>::iterator it1 = lessThanPack.begin(),
-                                               it1End = lessThanPack.end();
-       it1 != it1End; ++it1) {
-    InequalityExpr *currLT = *it1;
-    std::map<ref<Expr>, int64_t> right = currLT->getRight();
+  // Given x <= expr1 and x >= expr2, we eliminate x with introducing the
+  // constraint expr2 <= expr1.
+  matchingLoop(Expr::Sle, greaterThanPack, lessThanPack, result);
 
-    for (std::vector<InequalityExpr *>::iterator it2 = greaterThanPack.begin(),
-                                                 it2End = greaterThanPack.end();
+  // Given x <= expr1 and x > expr2, we eliminate x with introducing the
+  // constraint expr2 < expr1.
+  matchingLoop(Expr::Slt, strictGreaterThanPack, lessThanPack, result);
+
+  // Given x < expr1 and x >= expr2, we eliminate x with introducing the
+  // constraint expr2 < expr1.
+  matchingLoop(Expr::Slt, greaterThanPack, strictLessThanPack, result);
+
+  // Given x < expr1 and x > expr2 , we eliminate x with introducing the
+  // constraint expr2 < expr1.
+  matchingLoop(Expr::Slt, strictGreaterThanPack, strictLessThanPack, result);
+
+  return result;
+}
+
+void
+SubsumptionTableEntry::matchingLoop(Expr::Kind kind,
+                                    std::vector<InequalityExpr *> pack1,
+                                    std::vector<InequalityExpr *> pack2,
+                                    std::vector<InequalityExpr *> &result) {
+
+  for (std::vector<InequalityExpr *>::iterator it1 = pack1.begin(),
+                                               it1End = pack1.end();
+       it1 != it1End; ++it1) {
+    InequalityExpr *curr1 = *it1;
+
+    for (std::vector<InequalityExpr *>::iterator it2 = pack2.begin(),
+                                                 it2End = pack2.end();
          it2 != it2End; ++it2) {
-      InequalityExpr *currGT = *it2;
-      std::map<ref<Expr>, int64_t> left = currGT->getRight();
+      InequalityExpr *curr2 = *it2;
+
+      std::map<ref<Expr>, int64_t> left = curr1->getRight();
+      std::map<ref<Expr>, int64_t> right = curr2->getRight();
       simplifyMatching(left, right);
       if (left.size() > 0 && right.size() > 0) {
-        InequalityExpr *ineq = new InequalityExpr(left, right, Expr::Sle, NULL);
+        InequalityExpr *ineq = new InequalityExpr(left, right, kind, NULL);
         result.push_back(ineq);
       }
     }
   }
-  return result;
 }
 
 void
@@ -569,6 +606,17 @@ SubsumptionTableEntry::coefficientOperation(Expr::Kind kind,
         }
         isFound = true;
         break;
+      }
+
+      if (kind == Expr::Mul) {
+        it2->second = it1->second * it2->second;
+        isFound = true;
+      } else if (kind == Expr::SDiv || kind == Expr::UDiv) {
+        it2->second = it1->second / it2->second;
+        isFound = true;
+      } else if (kind == Expr::SRem || kind == Expr::URem) {
+        it2->second = it1->second % it2->second;
+        isFound = true;
       }
     }
 
