@@ -329,6 +329,7 @@ public:
   Expr::Kind getKind();
   void updateLeft(std::map<ref<Expr>, int64_t> newLeft);
   void updateRight(std::map<ref<Expr>, int64_t> newRight);
+  void updateKind(Expr::Kind newKind);
 };
 
 class SubsumptionTableEntry {
@@ -369,9 +370,8 @@ class SubsumptionTableEntry {
   coefficientOperation(Expr::Kind kind, std::map<ref<Expr>, int64_t> map1,
                        std::map<ref<Expr>, int64_t> map2);
 
-  static void normalization(const Array *onFocusExistential, Expr::Kind kind,
-                            std::map<ref<Expr>, int64_t> &left,
-                            std::map<ref<Expr>, int64_t> &right,
+  static void normalization(const Array *onFocusExistential,
+		  	  	  	  	  	InequalityExpr * inequalityExpr,
                             bool &isOnFocusVarOnLeft);
 
   static void
@@ -403,7 +403,9 @@ class SubsumptionTableEntry {
 
   static ref<Expr> reconstructExpr(std::vector<InequalityExpr *> pack);
 
-   static ref<Expr> replaceExpr(ref<Expr> originalExpr, ref<Expr> replacedExpr,
+  static bool containsNonConstantExpr(std::map<ref<Expr>, int64_t> map);
+
+  static ref<Expr> replaceExpr(ref<Expr> originalExpr, ref<Expr> replacedExpr,
                                ref<Expr> withExpr);
 
   static ref<Expr>

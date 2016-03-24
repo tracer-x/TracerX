@@ -946,17 +946,9 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
          inqt != inqtEnd; ++inqt) {
 
       InequalityExpr *currIneq = *inqt;
-      std::map<ref<Expr>, int64_t> newLeft = currIneq->getLeft();
-      std::map<ref<Expr>, int64_t> newRight = currIneq->getRight();
-
       bool isOnFocusVarOnLeft = false;
-      normalization(currExistVar, currIneq->getKind(), newLeft, newRight,
-                    isOnFocusVarOnLeft);
 
-      if (newLeft.size() > 0 && newRight.size() > 0) {
-        currIneq->updateLeft(newLeft);
-        currIneq->updateRight(newRight);
-      }
+      normalization(currExistVar, currIneq, isOnFocusVarOnLeft);
 
       // STEP 2b: divide the inequalityPack into separated packs
       // based on its operator existVar <= (lessThanPack), existVar >=
@@ -1178,14 +1170,33 @@ SubsumptionTableEntry::simplifyMatching(std::map<ref<Expr>, int64_t> &left,
     else
       ++itRight;
   }
+
+//  if(left.size() >= 1 && containsNonConstantExpr(left) && right.size() == 0){
+//	  right.insert(std::make_pair(ConstantExpr::alloc(0, left.begin()->first->getWidth()), 0));
+//  }
+//  else if(right.size() >= 1 && containsNonConstantExpr(right) && left.size() == 0){
+//	  left.insert(std::make_pair(ConstantExpr::alloc(0, right.begin()->first->getWidth()), 0));
+//  }
+}
+
+bool SubsumptionTableEntry::containsNonConstantExpr(std::map<ref<Expr>, int64_t> map){
+	for (std::map<ref<Expr>, int64_t>::iterator mIt = map.begin(),
+	                                              mEnd = map.end();
+			mIt != mEnd; ++mIt) {
+	  if(!llvm::isa<ConstantExpr>(mIt->first))
+		  return true;
+	}
+	return false;
 }
 
 void SubsumptionTableEntry::normalization(const Array *onFocusExistential,
-                                          Expr::Kind kind,
-                                          std::map<ref<Expr>, int64_t> &left,
-                                          std::map<ref<Expr>, int64_t> &right,
+                                          InequalityExpr * inequalityExpr,
                                           bool &isOnFocusVarOnLeft) {
 
+  std::map<ref<Expr>, int64_t> left = inequalityExpr->getLeft();
+  std::map<ref<Expr>, int64_t> right = inequalityExpr->getRight();
+
+  int64_t onFocusVarCoefficient = 0;
   std::map<ref<Expr>, int64_t>::iterator itLeft = left.begin();
 
   while (itLeft != left.end()) {
@@ -1205,8 +1216,9 @@ void SubsumptionTableEntry::normalization(const Array *onFocusExistential,
       // hand side
       // then, delete it from left map
       if (array == onFocusExistential) {
+    	onFocusVarCoefficient = itLeft->second;
+	    isOnFocusVarOnLeft = true;
         ++itLeft;
-        isOnFocusVarOnLeft = true;
       } else {
         currCoefficient = currCoefficient * -1;
 
@@ -1253,8 +1265,9 @@ void SubsumptionTableEntry::normalization(const Array *onFocusExistential,
         } else {
           left.insert(std::make_pair(itRight->first, currCoefficient));
         }
-        right.erase(itRight++);
+    	onFocusVarCoefficient = itRight->second;
         isOnFocusVarOnLeft = true;
+        right.erase(itRight++);
       } else {
         ++itRight;
       }
@@ -1262,6 +1275,46 @@ void SubsumptionTableEntry::normalization(const Array *onFocusExistential,
       ++itRight;
     }
   }
+
+  // divide both sides with onFocusVariable coefficient.
+  if(onFocusExistential && (onFocusVarCoefficient != 1 && onFocusVarCoefficient != 0)){
+    std::map<ref<Expr>, int64_t>::iterator itLeft = left.begin();
+	while (itLeft != left.end()) {
+	  itLeft->second = itLeft->second / onFocusVarCoefficient;
+	  ++itLeft;
+	}
+
+	std::map<ref<Expr>, int64_t>::iterator itRight = right.begin();
+	while (itRight != right.end()) {
+	  itRight->second = itRight->second / onFocusVarCoefficient;
+	  ++itRight;
+	}
+
+	// if we divide with negative values, the Kind Expression would be reversed
+	if(onFocusVarCoefficient < 0){
+	  if(inequalityExpr->getKind() == Expr::Sle)
+	    inequalityExpr->updateKind(Expr::Sgt);
+	  else if(inequalityExpr->getKind() == Expr::Sge)
+		inequalityExpr->updateKind(Expr::Slt);
+	  else if(inequalityExpr->getKind() == Expr::Slt)
+		inequalityExpr->updateKind(Expr::Sge);
+	  else if(inequalityExpr->getKind() == Expr::Sgt)
+		inequalityExpr->updateKind(Expr::Sle);
+	}
+  }
+
+  if(left.size() >= 1 && containsNonConstantExpr(left) && right.size() == 0){
+    right.insert(std::make_pair(ConstantExpr::alloc(0, left.begin()->first->getWidth()), 0));
+  }
+  else if(right.size() >= 1 && containsNonConstantExpr(right) && left.size() == 0){
+  	left.insert(std::make_pair(ConstantExpr::alloc(0, right.begin()->first->getWidth()), 0));
+  }
+
+  if (left.size() > 0 && right.size() > 0) {
+    inequalityExpr->updateLeft(left);
+	inequalityExpr->updateRight(right);
+  }
+
 }
 
 std::map<ref<Expr>, int64_t>
@@ -1786,8 +1839,8 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
 
   if (!existentials.empty()) {
     ref<Expr> existsExpr = ExistsExpr::create(existentials, query);
-    // llvm::errs() << "Before simplification:\n";
-    // ExprPPrinter::printQuery(llvm::errs(), state.constraints, existsExpr);
+//     llvm::errs() << "Before simplification:\n";
+//     ExprPPrinter::printQuery(llvm::errs(), state.constraints, existsExpr);
     query = simplifyExistsExpr(existsExpr, queryHasNoFreeVariables);
   }
 
@@ -1798,8 +1851,8 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
   // We call the solver only when the simplified query is
   // not a constant.
   if (!llvm::isa<ConstantExpr>(query)) {
-    //     llvm::errs() << "Querying for subsumption check:\n";
-    //     ExprPPrinter::printQuery(llvm::errs(), state.constraints, query);
+//    llvm::errs() << "Querying for subsumption check:\n";
+//    ExprPPrinter::printQuery(llvm::errs(), state.constraints, query);
     ++checkSolverCount;
     if (!existentials.empty() && llvm::isa<ExistsExpr>(query)) {
       // llvm::errs() << "Existentials not empty\n";
@@ -1866,7 +1919,7 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
   }
 
   if (success && result == Solver::True) {
-    //     llvm::errs() << "Solver decided validity\n";
+//         llvm::errs() << "Solver decided validity\n";
     std::vector<ref<Expr> > unsatCore;
     if (z3solver) {
       unsatCore = z3solver->getUnsatCore();
@@ -2024,6 +2077,10 @@ void InequalityExpr::updateLeft(std::map<ref<Expr>, int64_t> newLeft) {
 
 void InequalityExpr::updateRight(std::map<ref<Expr>, int64_t> newRight) {
   right = newRight;
+}
+
+void InequalityExpr::updateKind(Expr::Kind newKind) {
+  kind = newKind;
 }
 
 /**/
