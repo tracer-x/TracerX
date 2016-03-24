@@ -57,7 +57,6 @@ public:
   double get() { return (amount / (double)CLOCKS_PER_SEC); }
 };
 
-
 /// Storage of search tree for displaying
 class SearchTree {
 
@@ -371,7 +370,7 @@ class SubsumptionTableEntry {
                        std::map<ref<Expr>, int64_t> map2);
 
   static void normalization(const Array *onFocusExistential,
-		  	  	  	  	  	InequalityExpr * inequalityExpr,
+                            InequalityExpr *inequalityExpr,
                             bool &isOnFocusVarOnLeft);
 
   static void
@@ -449,7 +448,6 @@ public:
   void dump() const;
 
   void print(llvm::raw_ostream &stream) const;
-
 };
 
 class ITree {
