@@ -367,27 +367,6 @@ std::vector<Allocation *> AllocationGraph::getSinksWithAllocations(
   return sinkAllocations;
 }
 
-void AllocationGraph::consumeNodesWithAllocations(
-    std::vector<Allocation *> versionedAllocations,
-    std::vector<Allocation *> compositeAllocations) {
-  std::vector<Allocation *> sinkAllocs(
-      getSinksWithAllocations(versionedAllocations));
-  std::vector<Allocation *> tmp(getSinksWithAllocations(compositeAllocations));
-  sinkAllocs.insert(sinkAllocs.begin(), tmp.begin(), tmp.end());
-
-  if (sinkAllocs.empty())
-    return;
-
-  for (std::vector<Allocation *>::iterator it = sinkAllocs.begin(),
-                                           itEnd = sinkAllocs.end();
-       it != itEnd; ++it) {
-    consumeSinkNode((*it));
-  }
-
-  // Recurse until fixpoint
-  consumeNodesWithAllocations(versionedAllocations, compositeAllocations);
-}
-
 void AllocationGraph::print(llvm::raw_ostream &stream) const {
   std::vector<AllocationNode *> printed;
   print(stream, sinks, printed, 0);
@@ -479,10 +458,7 @@ Dependency::getLatestCoreExpressions(std::vector<const Array *> &replacements,
   for (std::vector<Allocation *>::iterator allocIter = allAlloc.begin(),
                                            allocIterEnd = allAlloc.end();
        allocIter != allocIterEnd; ++allocIter) {
-
-    if (interpolantValueOnly &&
-        std::find(interpolantAllocations.begin(), interpolantAllocations.end(),
-                  *allocIter) == interpolantAllocations.end())
+    if (interpolantValueOnly && !(*allocIter)->isCore())
       continue;
 
     std::vector<VersionedValue *> stored = stores(*allocIter);
@@ -527,9 +503,7 @@ Dependency::getCompositeCoreExpressions(
                                            allocIterEnd = allAlloc.end();
        allocIter != allocIterEnd; ++allocIter) {
 
-    if (interpolantValueOnly &&
-        std::find(interpolantAllocations.begin(), interpolantAllocations.end(),
-                  *allocIter) == interpolantAllocations.end())
+    if (interpolantValueOnly && (*allocIter)->isCore())
       continue;
 
     std::vector<VersionedValue *> stored = stores(*allocIter);
@@ -916,9 +890,24 @@ Dependency *Dependency::cdr() const { return parentDependency; }
 void Dependency::execute(llvm::Instruction *instr,
                          std::vector<ref<Expr> > &args) {
   switch (args.size()) {
-  case 0:
+  case 0: {
+    switch (instr->getOpcode()) {
+    case llvm::Instruction::Br: {
+      llvm::BranchInst *binst = llvm::dyn_cast<llvm::BranchInst>(instr);
+      if (binst && binst->isConditional()) {
+        AllocationGraph *g = new AllocationGraph();
+        markAllValues(g, binst->getCondition());
+        delete g;
+      }
+      break;
+    }
+    default:
+      break;
+    }
+
     updateIncomingBlock(instr);
     return;
+  }
   case 1: {
     ref<Expr> argExpr = args.at(0);
 
@@ -1222,16 +1211,6 @@ void Dependency::markAllValues(AllocationGraph *g, llvm::Value *val) {
                                                itEnd = allSources.end();
        it != itEnd; ++it) {
     (*it)->includeInInterpolant();
-  }
-}
-
-void Dependency::computeInterpolantAllocations(AllocationGraph *g) {
-  interpolantAllocations = g->getSinkAllocations();
-
-  if (parentDependency) {
-    g->consumeNodesWithAllocations(versionedAllocationsList,
-                                   compositeAllocationsList);
-    parentDependency->computeInterpolantAllocations(g);
   }
 }
 

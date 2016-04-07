@@ -461,7 +461,6 @@ class ITreeNode {
   static StatTimer getCompositeCoreExpressionsTimer;
   static StatTimer getLatestInterpolantCoreExpressionsTimer;
   static StatTimer getCompositeInterpolantCoreExpressionsTimer;
-  static StatTimer computeInterpolantAllocationsTimer;
 
 private:
   typedef ref<Expr> expression_type;
@@ -524,8 +523,6 @@ public:
   std::map<llvm::Value *, std::vector<ref<Expr> > >
   getCompositeInterpolantCoreExpressions(
       std::vector<const Array *> &replacements) const;
-
-  void computeInterpolantAllocations(AllocationGraph *g);
 
   void dump() const;
 
