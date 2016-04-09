@@ -351,10 +351,6 @@ class Allocation {
     std::vector<Allocation *>
     getSinksWithAllocations(std::vector<Allocation *> valuesList) const;
 
-    void
-    consumeNodesWithAllocations(std::vector<Allocation *> versionedAllocations,
-                                std::vector<Allocation *> compositeAllocations);
-
     void dump() const {
       this->print(llvm::errs());
       llvm::errs() << "\n";
@@ -570,10 +566,6 @@ class Allocation {
 
     std::vector<Allocation *> compositeAllocationsList;
 
-    /// @brief allocations of this node and its ancestors
-    /// that are needed for the core and dominates other allocations.
-    std::vector<Allocation *> interpolantAllocations;
-
     /// @brief the basic block of the last-executed instruction
     llvm::BasicBlock *incomingBlock;
 
@@ -685,8 +677,6 @@ class Allocation {
     void markAllValues(AllocationGraph *g, VersionedValue *value);
 
     void markAllValues(AllocationGraph *g, llvm::Value *value);
-
-    void computeInterpolantAllocations(AllocationGraph *g);
 
     void dump() const {
       this->print(llvm::errs());

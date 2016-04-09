@@ -1412,9 +1412,6 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
   // llvm::errs() << "AllocationGraph\n";
   // g->dump();
 
-  // We mark memory allocations needed for the unsatisfiabilty core
-  state.itreeNode->computeInterpolantAllocations(g);
-
   delete g; // Delete the AllocationGraph object
   return true;
 }
@@ -1695,9 +1692,6 @@ void ITree::markPathCondition(ExecutionState &state, TimingSolver *solver) {
   // llvm::errs() << "AllocationGraph\n";
   // g->dump();
 
-  // Compute memory allocations needed by the unsatisfiability core
-  currentINode->computeInterpolantAllocations(g);
-
   delete g; // Delete the AllocationGraph object
   markPathConditionTimer.stop();
 }
@@ -1801,7 +1795,6 @@ StatTimer ITreeNode::getLatestCoreExpressionsTimer;
 StatTimer ITreeNode::getCompositeCoreExpressionsTimer;
 StatTimer ITreeNode::getLatestInterpolantCoreExpressionsTimer;
 StatTimer ITreeNode::getCompositeInterpolantCoreExpressionsTimer;
-StatTimer ITreeNode::computeInterpolantAllocationsTimer;
 
 void ITreeNode::printTimeStat(llvm::raw_ostream &stream) {
   stream << "KLEE: done:     getInterpolant = " << getInterpolantTimer.get() *
@@ -1826,8 +1819,6 @@ void ITreeNode::printTimeStat(llvm::raw_ostream &stream) {
          << getLatestCoreExpressionsTimer.get() << "\n";
   stream << "KLEE: done:     getCompositeInterpolantCoreExpressions = "
          << getCompositeInterpolantCoreExpressionsTimer.get() * 1000 << "\n";
-  stream << "KLEE: done:     computeInterpolantAllocations = "
-         << computeInterpolantAllocationsTimer.get() * 1000 << "\n";
 }
 
 ITreeNode::ITreeNode(ITreeNode *_parent)
@@ -1999,12 +1990,6 @@ ITreeNode::getCompositeInterpolantCoreExpressions(
     ret = parent->dependency->getCompositeCoreExpressions(replacements, true);
   ITreeNode::getCompositeInterpolantCoreExpressionsTimer.stop();
   return ret;
-}
-
-void ITreeNode::computeInterpolantAllocations(AllocationGraph *g) {
-  ITreeNode::computeInterpolantAllocationsTimer.start();
-  dependency->computeInterpolantAllocations(g);
-  ITreeNode::computeInterpolantAllocationsTimer.stop();
 }
 
 void ITreeNode::dump() const {
