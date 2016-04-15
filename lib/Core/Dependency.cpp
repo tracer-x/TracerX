@@ -718,8 +718,17 @@ void Dependency::addPointerEquality(const VersionedValue *value,
   equalityList.push_back(new PointerEquality(value, allocation));
 }
 
-void Dependency::updateStore(Allocation *allocation, VersionedValue *value) {
-  storesList.push_back(new StorageCell(allocation, value));
+void Dependency::updateStore(Allocation *allocation, VersionedValue * value) {
+  std::map<Allocation*,std::vector<VersionedValue*> >::iterator it=storesList.find(allocation);
+  if(it != storesList.end()){
+	  it->second.push_back(value);
+  }else{
+	  std::vector<VersionedValue *> listVersionedValue;
+	  listVersionedValue.push_back(value);
+	  std::pair<Allocation *, std::vector<VersionedValue *> > pair;
+	  storesList.insert(pair);
+  }
+  //storesList.push_back(new StorageCell(allocation, value));
 }
 
 void Dependency::addDependency(VersionedValue *source, VersionedValue *target) {
@@ -738,14 +747,18 @@ std::vector<VersionedValue *> Dependency::stores(Allocation *allocation) const {
   if (allocation->isComposite()) {
     // In case of composite allocation, we return all possible stores
     // due to field-insensitivity of the dependency relation
-    for (std::vector<StorageCell *>::const_iterator it = storesList.begin(),
-                                                    itEnd = storesList.end();
-         it != itEnd; ++it) {
-      VersionedValue *value = (*it)->stores(allocation);
-      if (value) {
-        ret.push_back(value);
-      }
-    }
+	std::map<Allocation*,std::vector<VersionedValue*> >::const_iterator it=storesList.find(allocation);
+	if(it != storesList.end()){
+		ret = it->second;
+	}
+//    for (std::vector<StorageCell *>::const_iterator it = storesList.begin(),
+//                                                    itEnd = storesList.end();
+//         it != itEnd; ++it) {
+//      VersionedValue *value = (*it)->stores(allocation);
+//      if (value) {
+//        ret.push_back(value);
+//      }
+//    }
 
     if (parentDependency) {
       std::vector<VersionedValue *> parentStoredValues =
@@ -755,16 +768,21 @@ std::vector<VersionedValue *> Dependency::stores(Allocation *allocation) const {
     }
     return ret;
   }
-
-  for (std::vector<StorageCell *>::const_iterator it = storesList.begin(),
-                                                  itEnd = storesList.end();
-       it != itEnd; ++it) {
-    VersionedValue *value = (*it)->stores(allocation);
-    if (value) {
-      ret.push_back(value);
-      return ret;
-    }
+  std::map<Allocation*,std::vector<VersionedValue*> >::const_iterator it2=storesList.find(allocation);
+  if(it2 != storesList.end()){
+    ret.push_back(it2->second[0]);
+    return ret;
   }
+//  for (std::vector<StorageCell *>::const_iterator it = storesList.begin(),
+//                                                  itEnd = storesList.end();
+//       it != itEnd; ++it) {
+//    VersionedValue *value = (*it)->stores(allocation);
+//    if (value) {
+//      ret.push_back(value);
+//      return ret;
+//    }
+//  }
+
   if (parentDependency)
     return parentDependency->stores(allocation);
   return ret;
@@ -912,7 +930,7 @@ Dependency::Dependency(Dependency *prev)
 Dependency::~Dependency() {
   // Delete the locally-constructed relations
   Util::deletePointerVector(equalityList);
-  Util::deletePointerVector(storesList);
+ // Util::deletePointerMap(storesList);
   Util::deletePointerVector(flowsToList);
 
   // Delete the locally-constructed objects
@@ -1333,16 +1351,26 @@ Dependency::directLocalAllocationSources(VersionedValue *target) const {
 
   if (ret.empty()) {
     // We try to find allocation in the local store instead
-    for (std::vector<StorageCell *>::const_iterator it = storesList.begin(),
-                                                    itEnd = storesList.end();
-         it != itEnd; ++it) {
-      if (Allocation *alloc = (*it)->storageOf(target)) {
-        // It is possible that the first component was nil, as
-        // in this case there was no source value
-        ret[0] = alloc;
-        break;
-      }
-    }
+//    for (std::vector<StorageCell *>::const_iterator it = storesList.begin(),
+//                                                    itEnd = storesList.end();
+//         it != itEnd; ++it) {
+//      if (Allocation *alloc = (*it)->storageOf(target)) {
+//        // It is possible that the first component was nil, as
+//        // in this case there was no source value
+//        ret[0] = alloc;
+//        break;
+//      }
+//    }
+	  std::map<Allocation*,std::vector<VersionedValue*> >::const_iterator it;
+	  for(it = storesList.begin(); it != storesList.end(); ++it){
+		  std::vector<VersionedValue *> list = it->second;
+		  for(unsigned int i = 0; i < list.size(); i++){
+			  if(list[i] == target){
+				  ret[0] = it->first;
+				  break;
+			  }
+		  }
+	  }
   }
 
   return ret;
@@ -1439,8 +1467,8 @@ void Dependency::print(llvm::raw_ostream &stream, const unsigned tabNum) const {
   stream << tabs << "EQUALITIES:";
   std::vector<PointerEquality *>::const_iterator equalityListBegin =
       equalityList.begin();
-  std::vector<StorageCell *>::const_iterator storesListBegin =
-      storesList.begin();
+//  std::vector<StorageCell *>::const_iterator storesListBegin =
+//      storesList.begin();
   std::vector<FlowsTo *>::const_iterator flowsToListBegin = flowsToList.begin();
   for (std::vector<PointerEquality *>::const_iterator
            it = equalityListBegin,
@@ -1451,15 +1479,15 @@ void Dependency::print(llvm::raw_ostream &stream, const unsigned tabNum) const {
     (*it)->print(stream);
   }
   stream << "\n";
-  stream << tabs << "STORAGE:";
-  for (std::vector<StorageCell *>::const_iterator it = storesList.begin(),
-                                                  itEnd = storesList.end();
-       it != itEnd; ++it) {
-    if (it != storesListBegin)
-      stream << ",";
-    (*it)->print(stream);
-  }
-  stream << "\n";
+//  stream << tabs << "STORAGE:";
+//  for (std::vector<StorageCell *>::const_iterator it = storesList.begin(),
+//                                                  itEnd = storesList.end();
+//       it != itEnd; ++it) {
+//    if (it != storesListBegin)
+//      stream << ",";
+//    (*it)->print(stream);
+//  }
+//  stream << "\n";
   stream << tabs << "FLOWDEPENDENCY:";
   for (std::vector<FlowsTo *>::const_iterator it = flowsToList.begin(),
                                               itEnd = flowsToList.end();
@@ -1476,6 +1504,16 @@ void Dependency::print(llvm::raw_ostream &stream, const unsigned tabNum) const {
 }
 
 /**/
+
+template <typename T>
+void Dependency::Util::deletePointerMap(std::map<T *, std::vector<T *> > &maps) {
+  typedef typename std::map<T *, T *>::iterator IteratorType;
+
+  for (IteratorType it = maps.begin(), itEnd = maps.end(); it != itEnd; ++it) {
+    delete *it;
+  }
+  maps.clear();
+}
 
 template <typename T>
 void Dependency::Util::deletePointerVector(std::vector<T *> &list) {

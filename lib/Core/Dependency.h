@@ -541,6 +541,9 @@ class Allocation {
       template <typename T>
       static void deletePointerVector(std::vector<T *> &list);
 
+      template <typename T>
+      static void deletePointerMap(std::map<T *, std::vector<T *> > &map);
+
       static bool isCompositeAllocation(llvm::Value *site);
 
       static bool isEnvironmentAllocation(llvm::Value *site);
@@ -560,7 +563,7 @@ class Allocation {
     std::vector< PointerEquality *> equalityList;
 
     /// @brief The mapping of allocations/addresses to stored value
-    std::vector< StorageCell *> storesList;
+    std::map< Allocation *, std::vector<VersionedValue*> > storesList;
 
     /// @brief Flow relations from one value to another
     std::vector<FlowsTo *> flowsToList;
