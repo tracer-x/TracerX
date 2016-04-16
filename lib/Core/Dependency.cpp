@@ -726,6 +726,7 @@ void Dependency::updateStore(Allocation *allocation, VersionedValue * value) {
 	  std::vector<VersionedValue *> listVersionedValue;
 	  listVersionedValue.push_back(value);
 	  std::pair<Allocation *, std::vector<VersionedValue *> > pair;
+	  pair = std::make_pair(allocation, listVersionedValue);
 	  storesList.insert(pair);
   }
   //storesList.push_back(new StorageCell(allocation, value));
