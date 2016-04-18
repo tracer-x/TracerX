@@ -20,6 +20,7 @@
 #include "klee/CommandLine.h"
 #include "klee/Config/Version.h"
 #include "klee/ExecutionState.h"
+#include "klee/util/ExprVisitor.h"
 
 #include "Dependency.h"
 
@@ -49,9 +50,11 @@ public:
       lastRecorded = clock();
   }
 
-  void stop() {
-    amount += (clock() - lastRecorded);
+  double stop() {
+    double elapsed = clock() - lastRecorded;
+    amount += elapsed;
     lastRecorded = 0.0;
+    return elapsed;
   }
 
   double get() { return (amount / (double)CLOCKS_PER_SEC); }
@@ -240,7 +243,7 @@ public:
   static void addTableEntryMapping(ITreeNode *iTreeNode,
                                    SubsumptionTableEntry *entry);
 
-  static void includeInInterpolant(PathCondition *pathCondition);
+  static void setAsCore(PathCondition *pathCondition);
 
   /// @brief Save the graph
   static void save(std::string dotFileName);
@@ -270,7 +273,7 @@ class PathCondition {
 
   /// @brief When true, indicates that the constraint should be included
   /// in the interpolant
-  bool inInterpolant;
+  bool core;
 
   /// @brief Previous path condition
   PathCondition *tail;
@@ -285,9 +288,9 @@ public:
 
   PathCondition *cdr() const;
 
-  void includeInInterpolant(AllocationGraph *g);
+  void setAsCore(AllocationGraph *g);
 
-  bool carInInterpolant() const;
+  bool isCore() const;
 
   ref<Expr> packInterpolant(std::vector<const Array *> &replacements);
 
@@ -297,7 +300,7 @@ public:
 };
 
 class PathConditionMarker {
-  bool mayBeInInterpolant;
+  bool maybeCore;
 
   PathCondition *pathCondition;
 
@@ -306,9 +309,9 @@ public:
 
   ~PathConditionMarker();
 
-  void includeInInterpolant(AllocationGraph *g);
+  void setAsCore(AllocationGraph *g);
 
-  void mayIncludeInInterpolant();
+  void setAsMaybeCore();
 };
 
 class InequalityExpr {
@@ -334,6 +337,26 @@ public:
 class SubsumptionTableEntry {
   friend class ITree;
 
+  class ApplySubstitutionVisitor : public ExprVisitor {
+  private:
+    const std::map<ref<Expr>, ref<Expr> > &replacements;
+
+  public:
+    ApplySubstitutionVisitor(
+        const std::map<ref<Expr>, ref<Expr> > &_replacements)
+        : ExprVisitor(true), replacements(_replacements) {}
+
+    Action visitExprPost(const Expr &e) {
+      std::map<ref<Expr>, ref<Expr> >::const_iterator it =
+          replacements.find(ref<Expr>(const_cast<Expr *>(&e)));
+      if (it != replacements.end()) {
+        return Action::changeTo(it->second);
+      } else {
+        return Action::doChildren();
+      }
+    }
+  };
+
   /// @brief Statistics for actual solver call time in subsumption check
   static StatTimer actualSolverCallTimer;
 
@@ -357,6 +380,8 @@ class SubsumptionTableEntry {
 
   static bool hasExistentials(std::vector<const Array *> &existentials,
                               ref<Expr> expr);
+
+  static bool hasFree(std::vector<const Array *> &existentials, ref<Expr> expr);
 
   static ref<Expr> createBinaryExpr(Expr::Kind kind, ref<Expr> newLhs,
                                     ref<Expr> newRhs);
@@ -407,10 +432,14 @@ class SubsumptionTableEntry {
   static ref<Expr> replaceExpr(ref<Expr> originalExpr, ref<Expr> replacedExpr,
                                ref<Expr> withExpr);
 
+  /// @brief Simplifies the interpolant condition in subsumption check
+  /// whenever it contains constant equalities or disequalities.
   static ref<Expr>
   simplifyInterpolantExpr(std::vector<ref<Expr> > &interpolantPack,
                           ref<Expr> expr);
 
+  /// @brief Simplifies the equality conditions in subsumption check
+  /// whenever it contains constant equalities.
   static ref<Expr> simplifyEqualityExpr(std::vector<ref<Expr> > &equalityPack,
                                         ref<Expr> expr);
 
@@ -427,6 +456,9 @@ class SubsumptionTableEntry {
 
   static void normalizeExpr(std::vector<ref<Expr> > equalityPack,
                             std::vector<ref<Expr> > &inequalityPack);
+
+  static ref<Expr> getSubstitution(ref<Expr> equalities,
+                                   std::map<ref<Expr>, ref<Expr> > &map);
 
   bool empty() {
     return !interpolant.get() && singletonStoreKeys.empty() &&
@@ -460,9 +492,7 @@ class ITree {
   static StatTimer checkCurrentStateSubsumptionTimer;
   static StatTimer markPathConditionTimer;
   static StatTimer splitTimer;
-  static StatTimer executeAbstractBinaryDependencyTimer;
-  static StatTimer executeAbstractMemoryDependencyTimer;
-  static StatTimer executeAbstractDependencyTimer;
+  static StatTimer executeOnNodeTimer;
 
   ITreeNode *currentINode;
 
@@ -497,14 +527,19 @@ public:
   std::pair<ITreeNode *, ITreeNode *>
   split(ITreeNode *parent, ExecutionState *left, ExecutionState *right);
 
-  void executeAbstractBinaryDependency(llvm::Instruction *i,
-                                       ref<Expr> valueExpr, ref<Expr> tExpr,
-                                       ref<Expr> fExpr);
+  void execute(llvm::Instruction *instr);
 
-  void executeAbstractMemoryDependency(llvm::Instruction *instr,
-                                       ref<Expr> value, ref<Expr> address);
+  void execute(llvm::Instruction *instr, ref<Expr> arg1);
 
-  void executeAbstractDependency(llvm::Instruction *instr, ref<Expr> value);
+  void execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2);
+
+  void execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2,
+               ref<Expr> arg3);
+
+  void execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args);
+
+  static void executeOnNode(ITreeNode *node, llvm::Instruction *instr,
+                            std::vector<ref<Expr> > &args);
 
   void print(llvm::raw_ostream &stream);
 
@@ -524,16 +559,14 @@ class ITreeNode {
   static StatTimer splitTimer;
   static StatTimer makeMarkerMapTimer;
   static StatTimer deleteMarkerMapTimer;
-  static StatTimer executeBinaryDependencyTimer;
-  static StatTimer executeAbstractMemoryDependencyTimer;
-  static StatTimer executeAbstractDependencyTimer;
+  static StatTimer executeTimer;
   static StatTimer bindCallArgumentsTimer;
   static StatTimer popAbstractDependencyFrameTimer;
-  static StatTimer getLatestCoreExpressionsTimer;
+  static StatTimer getSingletonExpressionsTimer;
+  static StatTimer getCompositeExpressionsTimer;
+  static StatTimer getSingletonCoreExpressionsTimer;
   static StatTimer getCompositeCoreExpressionsTimer;
-  static StatTimer getLatestInterpolantCoreExpressionsTimer;
-  static StatTimer getCompositeInterpolantCoreExpressionsTimer;
-  static StatTimer computeInterpolantAllocationsTimer;
+  static StatTimer computeCoreAllocationsTimer;
 
 private:
   typedef ref<Expr> expression_type;
@@ -563,6 +596,8 @@ private:
   /// @brief for printing method running time statistics
   static void printTimeStat(llvm::raw_ostream &stream);
 
+  void execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args);
+
 public:
   uintptr_t getNodeId();
 
@@ -577,33 +612,24 @@ public:
   static void
   deleteMarkerMap(std::map<Expr *, PathConditionMarker *> &markerMap);
 
-  void executeBinaryDependency(llvm::Instruction *i, ref<Expr> valueExpr,
-                               ref<Expr> tExpr, ref<Expr> fExpr);
-
-  void executeAbstractMemoryDependency(llvm::Instruction *instr,
-                                       ref<Expr> value, ref<Expr> address);
-
-  void executeAbstractDependency(llvm::Instruction *instr, ref<Expr> value);
-
   void bindCallArguments(llvm::Instruction *site,
                          std::vector<ref<Expr> > &arguments);
 
   void popAbstractDependencyFrame(llvm::CallInst *site, llvm::Instruction *inst,
                                   ref<Expr> returnValue);
 
-  std::map<llvm::Value *, ref<Expr> > getLatestCoreExpressions() const;
+  std::map<llvm::Value *, ref<Expr> > getSingletonExpressions() const;
 
   std::map<llvm::Value *, std::vector<ref<Expr> > >
-  getCompositeCoreExpressions() const;
+  getCompositeExpressions() const;
 
-  std::map<llvm::Value *, ref<Expr> > getLatestInterpolantCoreExpressions(
-      std::vector<const Array *> &replacements) const;
+  std::map<llvm::Value *, ref<Expr> >
+  getSingletonCoreExpressions(std::vector<const Array *> &replacements) const;
 
   std::map<llvm::Value *, std::vector<ref<Expr> > >
-  getCompositeInterpolantCoreExpressions(
-      std::vector<const Array *> &replacements) const;
+  getCompositeCoreExpressions(std::vector<const Array *> &replacements) const;
 
-  void computeInterpolantAllocations(AllocationGraph *g);
+  void computeCoreAllocations(AllocationGraph *g);
 
   void dump() const;
 

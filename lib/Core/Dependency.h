@@ -175,16 +175,17 @@ class Allocation {
 
   class VersionedValue {
 
-    const llvm::Value *value;
+    llvm::Value *value;
 
     const ref<Expr> valueExpr;
 
     /// @brief to indicate if any unsatisfiability core
     /// depends on this value
-    bool inInterpolant;
+    bool core;
+
   public:
     VersionedValue(llvm::Value *value, ref<Expr> valueExpr)
-        : value(value), valueExpr(valueExpr), inInterpolant(false) {}
+        : value(value), valueExpr(valueExpr), core(false) {}
 
     ~VersionedValue() {}
 
@@ -192,9 +193,11 @@ class Allocation {
 
     ref<Expr> getExpression() const { return valueExpr; }
 
-    void includeInInterpolant() { inInterpolant = true; }
+    void setAsCore() { core = true; }
 
-    bool valueInInterpolant() const { return inInterpolant; }
+    bool isCore() const { return core; }
+
+    llvm::Value *getValue() const { return value; }
 
     void print(llvm::raw_ostream& stream) const;
 
@@ -541,6 +544,9 @@ class Allocation {
       static bool isCompositeAllocation(llvm::Value *site);
 
       static bool isEnvironmentAllocation(llvm::Value *site);
+
+      /// @brief Tests if an allocation site is main function's argument
+      static bool isMainArgument(llvm::Value *site);
     };
 
   private:
@@ -550,10 +556,13 @@ class Allocation {
     /// @brief Argument values to be passed onto callee
     std::vector<VersionedValue *> argumentValuesList;
 
+    /// @brief Equality of value to address
     std::vector< PointerEquality *> equalityList;
 
+    /// @brief The mapping of allocations/addresses to stored value
     std::vector< StorageCell *> storesList;
 
+    /// @brief Flow relations from one value to another
     std::vector<FlowsTo *> flowsToList;
 
     std::vector< VersionedValue *> valuesList;
@@ -564,10 +573,10 @@ class Allocation {
 
     /// @brief allocations of this node and its ancestors
     /// that are needed for the core and dominates other allocations.
-    std::vector<Allocation *> interpolantAllocations;
+    std::vector<Allocation *> coreAllocations;
 
     /// @brief the basic block of the last-executed instruction
-    llvm::BasicBlock *lastBasicBlock;
+    llvm::BasicBlock *incomingBlock;
 
     VersionedValue *getNewVersionedValue(llvm::Value *value,
                                          ref<Expr> valueExpr);
@@ -599,10 +608,10 @@ class Allocation {
     void addDependencyViaAllocation(VersionedValue *source,
                                     VersionedValue *target, Allocation *via);
 
-    Allocation *resolveAllocation(VersionedValue *value) const;
+    Allocation *resolveAllocation(VersionedValue *value);
 
     std::vector<Allocation *>
-    resolveAllocationTransitively(VersionedValue *value) const;
+    resolveAllocationTransitively(VersionedValue *value);
 
     std::vector<VersionedValue *> stores(Allocation *allocation) const;
 
@@ -644,6 +653,10 @@ class Allocation {
     /// @brief Builds dependency graph between memory allocations
     void buildAllocationGraph(AllocationGraph *g, VersionedValue *value) const;
 
+    /// @brief Implements the condition to update incoming basic block for phi
+    /// nodes
+    void updateIncomingBlock(llvm::Instruction *inst);
+
   public:
     Dependency(Dependency *prev);
 
@@ -651,23 +664,18 @@ class Allocation {
 
     Dependency *cdr() const;
 
-    void execute(llvm::Instruction *instr, ref<Expr> valueExpr);
-
-    void executeMemoryOperation(llvm::Instruction *i, ref<Expr> valueExpr,
-                                ref<Expr> address);
-
-    void executeBinary(llvm::Instruction *i, ref<Expr> valueExpr,
-                       ref<Expr> tExpr, ref<Expr> fExpr);
-
     VersionedValue *getLatestValue(llvm::Value *value, ref<Expr> valueExpr);
 
+    /// @brief Abstract dependency state transition with argument(s)
+    void execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args);
+
     std::map<llvm::Value *, ref<Expr> >
-    getLatestCoreExpressions(std::vector<const Array *> &replacements,
-                             bool interpolantValueOnly) const;
+    getSingletonExpressions(std::vector<const Array *> &replacements,
+                            bool coreOnly) const;
 
     std::map<llvm::Value *, std::vector<ref<Expr> > >
-    getCompositeCoreExpressions(std::vector<const Array *> &replacements,
-                                bool interpolantValueOnly) const;
+    getCompositeExpressions(std::vector<const Array *> &replacements,
+                            bool coreOnly) const;
 
     void bindCallArguments(llvm::Instruction *instr,
                            std::vector<ref<Expr> > &arguments);
@@ -679,7 +687,7 @@ class Allocation {
 
     void markAllValues(AllocationGraph *g, llvm::Value *value);
 
-    void computeInterpolantAllocations(AllocationGraph *g);
+    void computeCoreAllocations(AllocationGraph *g);
 
     void dump() const {
       this->print(llvm::errs());

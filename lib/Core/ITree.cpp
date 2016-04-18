@@ -284,7 +284,7 @@ std::string SearchTree::PrettyExpressionBuilder::constructActual(ref<Expr> e) {
     unsigned numKids = ce->getNumKids();
     std::string res = constructActual(ce->getKid(numKids - 1));
     for (int i = numKids - 2; i >= 0; i--) {
-      res = "concat(" + constructActual(ce->getKid(i)) + "," + res + ")";
+      res = constructActual(ce->getKid(i)) + "." + res;
     }
     return res;
   }
@@ -698,7 +698,7 @@ void SearchTree::addTableEntryMapping(ITreeNode *iTreeNode,
   instance->tableEntryMap[entry] = node;
 }
 
-void SearchTree::includeInInterpolant(PathCondition *pathCondition) {
+void SearchTree::setAsCore(PathCondition *pathCondition) {
   if (!OUTPUT_INTERPOLATION_TREE)
     return;
 
@@ -727,17 +727,15 @@ void SearchTree::save(std::string dotFileName) {
 /**/
 
 PathConditionMarker::PathConditionMarker(PathCondition *pathCondition)
-    : mayBeInInterpolant(false), pathCondition(pathCondition) {}
+    : maybeCore(false), pathCondition(pathCondition) {}
 
 PathConditionMarker::~PathConditionMarker() {}
 
-void PathConditionMarker::mayIncludeInInterpolant() {
-  mayBeInInterpolant = true;
-}
+void PathConditionMarker::setAsMaybeCore() { maybeCore = true; }
 
-void PathConditionMarker::includeInInterpolant(AllocationGraph *g) {
-  if (mayBeInInterpolant) {
-    pathCondition->includeInInterpolant(g);
+void PathConditionMarker::setAsCore(AllocationGraph *g) {
+  if (maybeCore) {
+    pathCondition->setAsCore(g);
   }
 }
 
@@ -749,7 +747,7 @@ PathCondition::PathCondition(ref<Expr> &constraint, Dependency *dependency,
       dependency(dependency),
       condition(dependency ? dependency->getLatestValue(condition, constraint)
                            : 0),
-      inInterpolant(false), tail(prev) {}
+      core(false), tail(prev) {}
 
 PathCondition::~PathCondition() {}
 
@@ -757,24 +755,24 @@ ref<Expr> PathCondition::car() const { return constraint; }
 
 PathCondition *PathCondition::cdr() const { return tail; }
 
-void PathCondition::includeInInterpolant(AllocationGraph *g) {
+void PathCondition::setAsCore(AllocationGraph *g) {
   // We mark all values to which this constraint depends
   dependency->markAllValues(g, condition);
 
-  // We mark this constraint itself as in the interpolant
-  inInterpolant = true;
+  // We mark this constraint itself as core
+  core = true;
 
-  // We mark constraint as in interpolant in the search tree graph as well.
-  SearchTree::includeInInterpolant(this);
+  // We mark constraint as core in the search tree graph as well.
+  SearchTree::setAsCore(this);
 }
 
-bool PathCondition::carInInterpolant() const { return inInterpolant; }
+bool PathCondition::isCore() const { return core; }
 
 ref<Expr>
 PathCondition::packInterpolant(std::vector<const Array *> &replacements) {
   ref<Expr> res;
   for (PathCondition *it = this; it != 0; it = it->tail) {
-    if (it->inInterpolant) {
+    if (it->core) {
       if (!it->shadowed) {
         it->shadowConstraint =
             ShadowArray::getShadowExpression(it->constraint, replacements);
@@ -799,8 +797,7 @@ void PathCondition::print(llvm::raw_ostream &stream) {
   stream << "[";
   for (PathCondition *it = this; it != 0; it = it->tail) {
     it->constraint->print(stream);
-    stream << ": " << (it->inInterpolant ? "interpolant constraint"
-                                         : "non-interpolant constraint");
+    stream << ": " << (it->core ? "core" : "non-core");
     if (it->tail != 0)
       stream << ",";
   }
@@ -821,7 +818,7 @@ SubsumptionTableEntry::SubsumptionTableEntry(ITreeNode *node)
 
   interpolant = node->getInterpolant(replacements);
 
-  singletonStore = node->getLatestInterpolantCoreExpressions(replacements);
+  singletonStore = node->getSingletonCoreExpressions(replacements);
 
   for (std::map<llvm::Value *, ref<Expr> >::iterator
            it = singletonStore.begin(),
@@ -830,7 +827,7 @@ SubsumptionTableEntry::SubsumptionTableEntry(ITreeNode *node)
     singletonStoreKeys.push_back(it->first);
   }
 
-  compositeStore = node->getCompositeInterpolantCoreExpressions(replacements);
+  compositeStore = node->getCompositeCoreExpressions(replacements);
   for (std::map<llvm::Value *, std::vector<ref<Expr> > >::iterator
            it = compositeStore.begin(),
            itEnd = compositeStore.end();
@@ -862,9 +859,31 @@ SubsumptionTableEntry::hasExistentials(std::vector<const Array *> &existentials,
   return false;
 }
 
+bool SubsumptionTableEntry::hasFree(std::vector<const Array *> &existentials,
+                                    ref<Expr> expr) {
+  for (int i = 0, numKids = expr->getNumKids(); i < numKids; ++i) {
+    if (llvm::isa<ReadExpr>(expr)) {
+      ReadExpr *readExpr = llvm::dyn_cast<ReadExpr>(expr.get());
+      const Array *array = (readExpr->updates).root;
+      for (std::vector<const Array *>::iterator it = existentials.begin(),
+                                                itEnd = existentials.end();
+           it != itEnd; ++it) {
+        if ((*it) == array)
+          return false;
+      }
+      return true;
+    } else if (hasFree(existentials, expr->getKid(i)))
+      return true;
+  }
+  return false;
+}
+
 ref<Expr>
 SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
-  ExistsExpr *expr = static_cast<ExistsExpr *>(existsExpr.get());
+  ExistsExpr *expr = llvm::dyn_cast<ExistsExpr>(existsExpr.get());
+  if (!expr)
+    return existsExpr;
+
   std::vector<const Array *> boundVariables = expr->variables;
   ref<Expr> body = expr->body;
   std::vector<ref<Expr> > interpolantPack;
@@ -1478,6 +1497,9 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
   ref<Expr> fullEqualityConstraint =
       simplifyEqualityExpr(equalityPack, body->getKid(1));
 
+  if (fullEqualityConstraint->isFalse())
+    return fullEqualityConstraint;
+
   // Try to simplify the interpolant. If the resulting simplification
   // was the constant true, then the equality constraints would contain
   // equality with constants only and no equality with shadow (existential)
@@ -1492,8 +1514,10 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
   if (fullEqualityConstraint->isTrue()) {
     // This is the case when the result is still an existentially-quantified
     // formula, but one that does not contain free variables.
-    hasExistentialsOnly = true;
-    return existsExpr->rebuild(&simplifiedInterpolant);
+    hasExistentialsOnly = !hasFree(expr->variables, simplifiedInterpolant);
+    if (hasExistentialsOnly) {
+      return existsExpr->rebuild(&simplifiedInterpolant);
+    }
   }
 
   ref<Expr> newInterpolant;
@@ -1739,12 +1763,50 @@ ref<Expr> SubsumptionTableEntry::simplifyEqualityExpr(
   assert(!"Invalid expression type.");
 }
 
+ref<Expr>
+SubsumptionTableEntry::getSubstitution(ref<Expr> equalities,
+                                       std::map<ref<Expr>, ref<Expr> > &map) {
+  if (llvm::isa<EqExpr>(equalities.get())) {
+    ref<Expr> lhs = equalities->getKid(0);
+    if (llvm::isa<ReadExpr>(lhs.get()) || llvm::isa<ConcatExpr>(lhs.get())) {
+      map[lhs] = equalities->getKid(1);
+      return ConstantExpr::alloc(1, Expr::Bool);
+    }
+    return equalities;
+  }
+
+  if (llvm::isa<AndExpr>(equalities.get())) {
+    ref<Expr> lhs = getSubstitution(equalities->getKid(0), map);
+    ref<Expr> rhs = getSubstitution(equalities->getKid(1), map);
+    if (lhs->isTrue()) {
+      if (rhs->isTrue()) {
+        return ConstantExpr::alloc(1, Expr::Bool);
+      }
+      return rhs;
+    } else {
+      if (rhs->isTrue()) {
+        return lhs;
+      }
+      return AndExpr::alloc(lhs, rhs);
+    }
+  }
+  return equalities;
+}
+
 ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
                                                     bool &hasExistentialsOnly) {
-  assert(llvm::isa<ExistsExpr>(existsExpr));
+  assert(llvm::isa<ExistsExpr>(existsExpr.get()));
 
-  ref<Expr> ret = simplifyWithFourierMotzkin(existsExpr);
+  ref<Expr> body = llvm::dyn_cast<ExistsExpr>(existsExpr.get())->body;
+  assert(llvm::isa<AndExpr>(body.get()));
 
+  std::map<ref<Expr>, ref<Expr> > substitution;
+  ref<Expr> equalities = getSubstitution(body->getKid(1), substitution);
+  ref<Expr> interpolant =
+      ApplySubstitutionVisitor(substitution).visit(body->getKid(0));
+  ref<Expr> newBody = AndExpr::alloc(interpolant, equalities);
+  ref<Expr> ret = simplifyArithmeticBody(existsExpr->rebuild(&newBody),
+                                         hasExistentialsOnly);
   return ret;
 }
 
@@ -1756,9 +1818,9 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
     return true;
 
   std::map<llvm::Value *, ref<Expr> > stateSingletonStore =
-      state.itreeNode->getLatestCoreExpressions();
+      state.itreeNode->getSingletonExpressions();
   std::map<llvm::Value *, std::vector<ref<Expr> > > stateCompositeStore =
-      state.itreeNode->getCompositeCoreExpressions();
+      state.itreeNode->getCompositeExpressions();
 
   ref<Expr> stateEqualityConstraints;
   for (std::vector<llvm::Value *>::iterator it = singletonStoreKeys.begin(),
@@ -1795,11 +1857,32 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
     for (std::vector<ref<Expr> >::iterator lhsIter = lhsList.begin(),
                                            lhsIterEnd = lhsList.end();
          lhsIter != lhsIterEnd; ++lhsIter) {
+
       for (std::vector<ref<Expr> >::iterator rhsIter = rhsList.begin(),
                                              rhsIterEnd = rhsList.end();
            rhsIter != rhsIterEnd; ++rhsIter) {
-        const ref<Expr> lhs = *lhsIter;
-        const ref<Expr> rhs = *rhsIter;
+
+        ref<Expr> lhs = *lhsIter;
+        ref<Expr> rhs = *rhsIter;
+
+        // FIXME: This is a quick hack that was temporarily required due
+        // to field insensitivity of the dependency analysis, such that
+        // allocations are matched if they had the same base address even
+        // though they point to different locations in the composite.
+        if (lhs->getWidth() > rhs->getWidth()) {
+          rhs = ZExtExpr::alloc(rhs, lhs->getWidth());
+        } else if (lhs->getWidth() < rhs->getWidth()) {
+          lhs = ZExtExpr::alloc(lhs, rhs->getWidth());
+        }
+
+        if (llvm::isa<ConstantExpr>(lhs) && llvm::isa<ConstantExpr>(rhs)) {
+          if (lhs.operator==(rhs)) {
+            // Because if the disjunct is TRUE, then the disjunction is true
+            auxDisjuncts = ConstantExpr::alloc(1, Expr::Bool);
+            // To break from outer loop as well
+            goto end_loop;
+          }
+        }
 
         if (auxDisjunctsEmpty) {
           auxDisjuncts = EqExpr::alloc(lhs, rhs);
@@ -1809,6 +1892,7 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
         }
       }
     }
+  end_loop:
 
     if (!auxDisjunctsEmpty) {
       stateEqualityConstraints =
@@ -1851,6 +1935,11 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
     query = simplifyExistsExpr(existsExpr, queryHasNoFreeVariables);
   }
 
+  // If query simplification result was false, we quickly fail without calling
+  // the solver
+  if (query->isFalse())
+    return false;
+
   bool success = false;
 
   Z3Solver *z3solver = 0;
@@ -1889,6 +1978,7 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
 
         actualSolverCallTimer.start();
         success = z3solver->getValue(Query(constraints, falseExpr), tmpExpr);
+        // double elapsedTime =
         actualSolverCallTimer.stop();
 
         result = success ? Solver::True : Solver::Unknown;
@@ -1900,7 +1990,13 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
         actualSolverCallTimer.start();
         success = z3solver->directComputeValidity(
             Query(state.constraints, query), result);
+        // double elapsedTime =
         actualSolverCallTimer.stop();
+
+        //        if (elapsedTime > expectedMaxElapsedTime) {
+        //            llvm::errs() << "LONG QUERY 2:" << "\n";
+        //            Query(state.constraints, query).dump();
+        //        }
       }
 
       z3solver->setCoreSolverTimeout(0);
@@ -1916,7 +2012,14 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
       solver->setTimeout(timeout);
       actualSolverCallTimer.start();
       success = solver->evaluate(state, query, result);
+      // double elapsedTime =
       actualSolverCallTimer.stop();
+
+      //      if (elapsedTime > expectedMaxElapsedTime) {
+      //          llvm::errs() << "LONG QUERY 3:" << "\n";
+      //          Query(state.constraints, query).dump();
+      //      }
+
       solver->setTimeout(0);
     }
   } else {
@@ -1941,7 +2044,7 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
       // because constraints are not properly added at state merge.
       PathConditionMarker *marker = markerMap[it1->get()];
       if (marker)
-        marker->mayIncludeInInterpolant();
+        marker->setAsMaybeCore();
     }
 
   } else {
@@ -1970,14 +2073,14 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
     // FIXME: Sometimes some constraints are not in the PC. This is
     // because constraints are not properly added at state merge.
     if (it->second)
-      it->second->includeInInterpolant(g);
+      it->second->setAsCore(g);
   }
   ITreeNode::deleteMarkerMap(markerMap);
   // llvm::errs() << "AllocationGraph\n";
   // g->dump();
 
   // We mark memory allocations needed for the unsatisfiabilty core
-  state.itreeNode->computeInterpolantAllocations(g);
+  state.itreeNode->computeCoreAllocations(g);
 
   delete g; // Delete the AllocationGraph object
   return true;
@@ -2095,9 +2198,7 @@ StatTimer ITree::removeTimer;
 StatTimer ITree::checkCurrentStateSubsumptionTimer;
 StatTimer ITree::markPathConditionTimer;
 StatTimer ITree::splitTimer;
-StatTimer ITree::executeAbstractBinaryDependencyTimer;
-StatTimer ITree::executeAbstractMemoryDependencyTimer;
-StatTimer ITree::executeAbstractDependencyTimer;
+StatTimer ITree::executeOnNodeTimer;
 
 void ITree::printTimeStat(llvm::raw_ostream &stream) {
   stream << "KLEE: done:     setCurrentINode = " << setCurrentINodeTimer.get() *
@@ -2108,12 +2209,8 @@ void ITree::printTimeStat(llvm::raw_ostream &stream) {
   stream << "KLEE: done:     markPathCondition = "
          << markPathConditionTimer.get() * 1000 << "\n";
   stream << "KLEE: done:     split = " << splitTimer.get() * 1000 << "\n";
-  stream << "KLEE: done:     executeAbstractBinaryDependency = "
-         << executeAbstractBinaryDependencyTimer.get() * 1000 << "\n";
-  stream << "KLEE: done:     executeAbstractMemoryDependency = "
-         << executeAbstractMemoryDependencyTimer.get() * 1000 << "\n";
-  stream << "KLEE: done:     executeAbstractDependency = "
-         << executeAbstractDependencyTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     executeOnNode = " << executeOnNodeTimer.get() *
+                                                      1000 << "\n";
 }
 
 void ITree::printTableStat(llvm::raw_ostream &stream) {
@@ -2282,7 +2379,7 @@ void ITree::markPathCondition(ExecutionState &state, TimingSolver *solver) {
          it != itEnd; ++it) {
       for (; pc != 0; pc = pc->cdr()) {
         if (pc->car().compare(it->get()) == 0) {
-          pc->includeInInterpolant(g);
+          pc->setAsCore(g);
           pc = pc->cdr();
           break;
         }
@@ -2294,33 +2391,48 @@ void ITree::markPathCondition(ExecutionState &state, TimingSolver *solver) {
   // g->dump();
 
   // Compute memory allocations needed by the unsatisfiability core
-  currentINode->computeInterpolantAllocations(g);
+  currentINode->computeCoreAllocations(g);
 
   delete g; // Delete the AllocationGraph object
   markPathConditionTimer.stop();
 }
 
-void ITree::executeAbstractBinaryDependency(llvm::Instruction *instr,
-                                            ref<Expr> valueExpr,
-                                            ref<Expr> tExpr, ref<Expr> fExpr) {
-  executeAbstractBinaryDependencyTimer.start();
-  currentINode->executeBinaryDependency(instr, valueExpr, tExpr, fExpr);
-  executeAbstractBinaryDependencyTimer.stop();
+void ITree::execute(llvm::Instruction *instr) {
+  std::vector<ref<Expr> > dummyArgs;
+  executeOnNode(currentINode, instr, dummyArgs);
 }
 
-void ITree::executeAbstractMemoryDependency(llvm::Instruction *instr,
-                                            ref<Expr> value,
-                                            ref<Expr> address) {
-  executeAbstractMemoryDependencyTimer.start();
-  currentINode->executeAbstractMemoryDependency(instr, value, address);
-  executeAbstractMemoryDependencyTimer.stop();
+void ITree::execute(llvm::Instruction *instr, ref<Expr> arg1) {
+  std::vector<ref<Expr> > args;
+  args.push_back(arg1);
+  executeOnNode(currentINode, instr, args);
 }
 
-void ITree::executeAbstractDependency(llvm::Instruction *instr,
-                                      ref<Expr> value) {
-  executeAbstractDependencyTimer.start();
-  currentINode->executeAbstractDependency(instr, value);
-  executeAbstractDependencyTimer.stop();
+void ITree::execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2) {
+  std::vector<ref<Expr> > args;
+  args.push_back(arg1);
+  args.push_back(arg2);
+  executeOnNode(currentINode, instr, args);
+}
+
+void ITree::execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2,
+                    ref<Expr> arg3) {
+  std::vector<ref<Expr> > args;
+  args.push_back(arg1);
+  args.push_back(arg2);
+  args.push_back(arg3);
+  executeOnNode(currentINode, instr, args);
+}
+
+void ITree::execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args) {
+  executeOnNode(currentINode, instr, args);
+}
+
+void ITree::executeOnNode(ITreeNode *node, llvm::Instruction *instr,
+                          std::vector<ref<Expr> > &args) {
+  executeOnNodeTimer.start();
+  node->execute(instr, args);
+  executeOnNodeTimer.stop();
 }
 
 void ITree::printNode(llvm::raw_ostream &stream, ITreeNode *n,
@@ -2380,16 +2492,14 @@ StatTimer ITreeNode::addConstraintTimer;
 StatTimer ITreeNode::splitTimer;
 StatTimer ITreeNode::makeMarkerMapTimer;
 StatTimer ITreeNode::deleteMarkerMapTimer;
-StatTimer ITreeNode::executeBinaryDependencyTimer;
-StatTimer ITreeNode::executeAbstractMemoryDependencyTimer;
-StatTimer ITreeNode::executeAbstractDependencyTimer;
+StatTimer ITreeNode::executeTimer;
 StatTimer ITreeNode::bindCallArgumentsTimer;
 StatTimer ITreeNode::popAbstractDependencyFrameTimer;
-StatTimer ITreeNode::getLatestCoreExpressionsTimer;
+StatTimer ITreeNode::getSingletonExpressionsTimer;
+StatTimer ITreeNode::getCompositeExpressionsTimer;
+StatTimer ITreeNode::getSingletonCoreExpressionsTimer;
 StatTimer ITreeNode::getCompositeCoreExpressionsTimer;
-StatTimer ITreeNode::getLatestInterpolantCoreExpressionsTimer;
-StatTimer ITreeNode::getCompositeInterpolantCoreExpressionsTimer;
-StatTimer ITreeNode::computeInterpolantAllocationsTimer;
+StatTimer ITreeNode::computeCoreAllocationsTimer;
 
 void ITreeNode::printTimeStat(llvm::raw_ostream &stream) {
   stream << "KLEE: done:     getInterpolant = " << getInterpolantTimer.get() *
@@ -2401,26 +2511,21 @@ void ITreeNode::printTimeStat(llvm::raw_ostream &stream) {
                                                       1000 << "\n";
   stream << "KLEE: done:     deleteMarkerMap = " << deleteMarkerMapTimer.get() *
                                                         1000 << "\n";
-  stream << "KLEE: done:     executeBinaryDependency = "
-         << executeBinaryDependencyTimer.get() * 1000 << "\n";
-  stream << "KLEE: done:     executeAbstractMemoryDependency = "
-         << executeAbstractMemoryDependencyTimer.get() * 1000 << "\n";
-  stream << "KLEE: done:     executeAbstractDependency = "
-         << executeAbstractDependencyTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     execute = " << executeTimer.get() * 1000 << "\n";
   stream << "KLEE: done:     bindCallArguments = "
          << bindCallArgumentsTimer.get() * 1000 << "\n";
   stream << "KLEE: done:     popAbstractDependencyFrame = "
          << popAbstractDependencyFrameTimer.get() * 1000 << "\n";
-  stream << "KLEE: done:     getLatestCoreExpressions = "
-         << getLatestCoreExpressionsTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     getSingletonExpressions = "
+         << getSingletonExpressionsTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     getCompositeExpressions = "
+         << getCompositeExpressionsTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     getSingletonCoreCoreExpressions = "
+         << getSingletonCoreExpressionsTimer.get() << "\n";
   stream << "KLEE: done:     getCompositeCoreExpressions = "
          << getCompositeCoreExpressionsTimer.get() * 1000 << "\n";
-  stream << "KLEE: done:     getLatestInterpolantCoreExpressions = "
-         << getLatestCoreExpressionsTimer.get() << "\n";
-  stream << "KLEE: done:     getCompositeInterpolantCoreExpressions = "
-         << getCompositeInterpolantCoreExpressionsTimer.get() * 1000 << "\n";
-  stream << "KLEE: done:     computeInterpolantAllocations = "
-         << computeInterpolantAllocationsTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     computeCoreAllocations = "
+         << computeCoreAllocationsTimer.get() * 1000 << "\n";
 }
 
 ITreeNode::ITreeNode(ITreeNode *_parent)
@@ -2460,11 +2565,11 @@ ITreeNode::getInterpolant(std::vector<const Array *> &replacements) const {
 }
 
 void ITreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
-  ITreeNode::getInterpolantTimer.start();
+  ITreeNode::addConstraintTimer.start();
   pathCondition =
       new PathCondition(constraint, dependency, condition, pathCondition);
   graph->addPathCondition(this, pathCondition, constraint);
-  ITreeNode::getInterpolantTimer.stop();
+  ITreeNode::addConstraintTimer.stop();
 }
 
 void ITreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
@@ -2508,27 +2613,11 @@ ITreeNode::deleteMarkerMap(std::map<Expr *, PathConditionMarker *> &markerMap) {
   ITreeNode::deleteMarkerMapTimer.stop();
 }
 
-void ITreeNode::executeBinaryDependency(llvm::Instruction *i,
-                                        ref<Expr> valueExpr, ref<Expr> tExpr,
-                                        ref<Expr> fExpr) {
-  ITreeNode::executeBinaryDependencyTimer.start();
-  dependency->executeBinary(i, valueExpr, tExpr, fExpr);
-  ITreeNode::executeBinaryDependencyTimer.stop();
-}
-
-void ITreeNode::executeAbstractMemoryDependency(llvm::Instruction *instr,
-                                                ref<Expr> value,
-                                                ref<Expr> address) {
-  ITreeNode::executeAbstractMemoryDependencyTimer.start();
-  dependency->executeMemoryOperation(instr, value, address);
-  ITreeNode::executeAbstractMemoryDependencyTimer.stop();
-}
-
-void ITreeNode::executeAbstractDependency(llvm::Instruction *instr,
-                                          ref<Expr> value) {
-  ITreeNode::executeAbstractDependencyTimer.start();
-  dependency->execute(instr, value);
-  ITreeNode::executeAbstractDependencyTimer.stop();
+void ITreeNode::execute(llvm::Instruction *instr,
+                        std::vector<ref<Expr> > &args) {
+  executeTimer.start();
+  dependency->execute(instr, args);
+  executeTimer.stop();
 }
 
 void ITreeNode::bindCallArguments(llvm::Instruction *site,
@@ -2548,9 +2637,8 @@ void ITreeNode::popAbstractDependencyFrame(llvm::CallInst *site,
   ITreeNode::popAbstractDependencyFrameTimer.stop();
 }
 
-std::map<llvm::Value *, ref<Expr> >
-ITreeNode::getLatestCoreExpressions() const {
-  ITreeNode::getLatestCoreExpressionsTimer.start();
+std::map<llvm::Value *, ref<Expr> > ITreeNode::getSingletonExpressions() const {
+  ITreeNode::getSingletonExpressionsTimer.start();
   std::map<llvm::Value *, ref<Expr> > ret;
   std::vector<const Array *> dummyReplacements;
 
@@ -2558,15 +2646,14 @@ ITreeNode::getLatestCoreExpressions() const {
   // the allocations to be stored in subsumption table should be obtained
   // from the parent node.
   if (parent)
-    ret =
-        parent->dependency->getLatestCoreExpressions(dummyReplacements, false);
-  ITreeNode::getLatestCoreExpressionsTimer.stop();
+    ret = parent->dependency->getSingletonExpressions(dummyReplacements, false);
+  ITreeNode::getSingletonExpressionsTimer.stop();
   return ret;
 }
 
 std::map<llvm::Value *, std::vector<ref<Expr> > >
-ITreeNode::getCompositeCoreExpressions() const {
-  ITreeNode::getCompositeCoreExpressionsTimer.start();
+ITreeNode::getCompositeExpressions() const {
+  ITreeNode::getCompositeExpressionsTimer.start();
   std::map<llvm::Value *, std::vector<ref<Expr> > > ret;
   std::vector<const Array *> dummyReplacements;
 
@@ -2574,46 +2661,44 @@ ITreeNode::getCompositeCoreExpressions() const {
   // the allocations to be stored in subsumption table should be obtained
   // from the parent node.
   if (parent)
-    ret = parent->dependency->getCompositeCoreExpressions(dummyReplacements,
-                                                          false);
+    ret = parent->dependency->getCompositeExpressions(dummyReplacements, false);
+  ITreeNode::getCompositeExpressionsTimer.stop();
+  return ret;
+}
+
+std::map<llvm::Value *, ref<Expr> > ITreeNode::getSingletonCoreExpressions(
+    std::vector<const Array *> &replacements) const {
+  ITreeNode::getSingletonCoreExpressionsTimer.start();
+  std::map<llvm::Value *, ref<Expr> > ret;
+
+  // Since a program point index is a first statement in a basic block,
+  // the allocations to be stored in subsumption table should be obtained
+  // from the parent node.
+  if (parent)
+    ret = parent->dependency->getSingletonExpressions(replacements, true);
+  ITreeNode::getSingletonCoreExpressionsTimer.stop();
+  return ret;
+}
+
+std::map<llvm::Value *, std::vector<ref<Expr> > >
+ITreeNode::getCompositeCoreExpressions(std::vector<const Array *> &replacements)
+    const {
+  ITreeNode::getCompositeCoreExpressionsTimer.start();
+  std::map<llvm::Value *, std::vector<ref<Expr> > > ret;
+
+  // Since a program point index is a first statement in a basic block,
+  // the allocations to be stored in subsumption table should be obtained
+  // from the parent node.
+  if (parent)
+    ret = parent->dependency->getCompositeExpressions(replacements, true);
   ITreeNode::getCompositeCoreExpressionsTimer.stop();
   return ret;
 }
 
-std::map<llvm::Value *, ref<Expr> >
-ITreeNode::getLatestInterpolantCoreExpressions(
-    std::vector<const Array *> &replacements) const {
-  ITreeNode::getLatestInterpolantCoreExpressionsTimer.start();
-  std::map<llvm::Value *, ref<Expr> > ret;
-
-  // Since a program point index is a first statement in a basic block,
-  // the allocations to be stored in subsumption table should be obtained
-  // from the parent node.
-  if (parent)
-    ret = parent->dependency->getLatestCoreExpressions(replacements, true);
-  ITreeNode::getLatestInterpolantCoreExpressionsTimer.stop();
-  return ret;
-}
-
-std::map<llvm::Value *, std::vector<ref<Expr> > >
-ITreeNode::getCompositeInterpolantCoreExpressions(
-    std::vector<const Array *> &replacements) const {
-  ITreeNode::getCompositeInterpolantCoreExpressionsTimer.start();
-  std::map<llvm::Value *, std::vector<ref<Expr> > > ret;
-
-  // Since a program point index is a first statement in a basic block,
-  // the allocations to be stored in subsumption table should be obtained
-  // from the parent node.
-  if (parent)
-    ret = parent->dependency->getCompositeCoreExpressions(replacements, true);
-  ITreeNode::getCompositeInterpolantCoreExpressionsTimer.stop();
-  return ret;
-}
-
-void ITreeNode::computeInterpolantAllocations(AllocationGraph *g) {
-  ITreeNode::computeInterpolantAllocationsTimer.start();
-  dependency->computeInterpolantAllocations(g);
-  ITreeNode::computeInterpolantAllocationsTimer.stop();
+void ITreeNode::computeCoreAllocations(AllocationGraph *g) {
+  ITreeNode::computeCoreAllocationsTimer.start();
+  dependency->computeCoreAllocations(g);
+  ITreeNode::computeCoreAllocationsTimer.stop();
 }
 
 void ITreeNode::dump() const {
