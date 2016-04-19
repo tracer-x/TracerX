@@ -788,14 +788,14 @@ PathCondition::packInterpolant(std::vector<const Array *> &replacements) {
   return res;
 }
 
-void PathCondition::dump() {
+void PathCondition::dump() const {
   this->print(llvm::errs());
   llvm::errs() << "\n";
 }
 
-void PathCondition::print(llvm::raw_ostream &stream) {
+void PathCondition::print(llvm::raw_ostream &stream) const {
   stream << "[";
-  for (PathCondition *it = this; it != 0; it = it->tail) {
+  for (const PathCondition *it = this; it != 0; it = it->tail) {
     it->constraint->print(stream);
     stream << ": " << (it->core ? "core" : "non-core");
     if (it->tail != 0)
@@ -884,6 +884,9 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
   if (!expr)
     return existsExpr;
 
+  llvm::errs() << "Simplifying with Fourier-Motzkin:\n";
+  expr->dump();
+
   std::vector<const Array *> boundVariables = expr->variables;
   ref<Expr> body = expr->body;
   std::vector<ref<Expr> > interpolantPack;
@@ -913,7 +916,7 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
 
   std::vector<InequalityExpr *> inequalityPack;
 
-  // STEP 1a: represent Klee expression in equality pack
+  // STEP 1a: represent KLEE expression in equality pack
   // into InequalityExpr data structure that enable us to do arithmetic
   // operation
   for (std::vector<ref<Expr> >::iterator it = equalityPack.begin(),
@@ -933,7 +936,7 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
     inequalityPack.push_back(ineq2);
   }
 
-  // STEP 1b: represent Klee expression in interpolant pack
+  // STEP 1b: represent KLEE expression in interpolant pack
   // into InequalityExpr data structure that enable us to do arithmetic
   // operation
   for (std::vector<ref<Expr> >::iterator it = interpolantPack.begin(),
@@ -997,6 +1000,8 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
     return existsExpr;
 
   ref<Expr> result = reconstructExpr(inequalityPack);
+  llvm::errs() << "RESULT: ";
+  result->dump();
   return result;
 }
 
@@ -1012,6 +1017,9 @@ ref<Expr> SubsumptionTableEntry::reconstructExpr(
     ref<Expr> temp;
     ref<Expr> leftExpr;
     ref<Expr> rightExpr;
+
+    llvm::errs() << "PROCESSING INEQUALITY: ";
+    currInequality->dump();
 
     for (std::map<ref<Expr>, int64_t>::iterator
              l = currInequality->getLeft().begin(),
@@ -1060,6 +1068,10 @@ ref<Expr> SubsumptionTableEntry::reconstructExpr(
         rightExpr = tempRight;
       }
     }
+    llvm::errs() << "LEFT EXPR: ";
+    leftExpr->dump();
+    llvm::errs() << "RIGHT EXPR: ";
+    rightExpr->dump();
     temp = createBinaryExpr(currInequality->getKind(), leftExpr, rightExpr);
 
     if (result.get()) {
@@ -2191,6 +2203,30 @@ void InequalityExpr::updateRight(std::map<ref<Expr>, int64_t> newRight) {
 
 void InequalityExpr::updateKind(Expr::Kind newKind) { kind = newKind; }
 
+void InequalityExpr::print(llvm::raw_ostream &stream) const {
+  stream << "(" << kind << " (";
+  for (std::map<ref<Expr>, int64_t>::const_iterator it = left.begin(),
+                                                    itEnd = left.end();
+       it != itEnd; ++it) {
+    stream << "(" << it->second << ") ";
+    it->first->print(stream);
+    if (it != --left.end()) {
+      stream << " + ";
+    }
+  }
+  stream << ") (";
+  for (std::map<ref<Expr>, int64_t>::const_iterator it = right.begin(),
+                                                    itEnd = right.end();
+       it != itEnd; ++it) {
+    stream << "(" << it->second << ") ";
+    it->first->print(stream);
+    if (it != --right.end()) {
+      stream << " + ";
+    }
+  }
+  stream << "))";
+}
+
 /**/
 
 StatTimer ITree::setCurrentINodeTimer;
@@ -2213,9 +2249,10 @@ void ITree::printTimeStat(llvm::raw_ostream &stream) {
                                                       1000 << "\n";
 }
 
-void ITree::printTableStat(llvm::raw_ostream &stream) {
+void ITree::printTableStat(llvm::raw_ostream &stream) const {
   double programPointNumber = 0.0, entryNumber = 0.0;
-  for (std::map<uintptr_t, std::vector<SubsumptionTableEntry *> >::iterator
+  for (std::map<uintptr_t,
+                std::vector<SubsumptionTableEntry *> >::const_iterator
            it = subsumptionTable.begin(),
            itEnd = subsumptionTable.end();
        it != itEnd; ++it) {
@@ -2436,7 +2473,7 @@ void ITree::executeOnNode(ITreeNode *node, llvm::Instruction *instr,
 }
 
 void ITree::printNode(llvm::raw_ostream &stream, ITreeNode *n,
-                      std::string edges) {
+                      std::string edges) const {
   if (n->left != 0) {
     stream << "\n";
     stream << edges << "+-- L:" << n->left->nodeId;
@@ -2459,7 +2496,7 @@ void ITree::printNode(llvm::raw_ostream &stream, ITreeNode *n,
   }
 }
 
-void ITree::print(llvm::raw_ostream &stream) {
+void ITree::print(llvm::raw_ostream &stream) const {
   stream << "------------------------- ITree Structure "
             "---------------------------\n";
   stream << this->root->nodeId;
@@ -2469,11 +2506,12 @@ void ITree::print(llvm::raw_ostream &stream) {
   this->printNode(stream, this->root, "");
   stream << "\n------------------------- Subsumption Table "
             "-------------------------\n";
-  for (std::map<uintptr_t, std::vector<SubsumptionTableEntry *> >::iterator
+  for (std::map<uintptr_t,
+                std::vector<SubsumptionTableEntry *> >::const_iterator
            it = subsumptionTable.begin(),
            itEnd = subsumptionTable.end();
        it != itEnd; ++it) {
-    for (std::vector<SubsumptionTableEntry *>::iterator
+    for (std::vector<SubsumptionTableEntry *>::const_iterator
              it1 = it->second.begin(),
              it1End = it->second.end();
          it1 != it1End; ++it1) {
@@ -2482,7 +2520,7 @@ void ITree::print(llvm::raw_ostream &stream) {
   }
 }
 
-void ITree::dump() { this->print(llvm::errs()); }
+void ITree::dump() const { this->print(llvm::errs()); }
 
 /**/
 

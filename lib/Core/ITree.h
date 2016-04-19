@@ -294,9 +294,9 @@ public:
 
   ref<Expr> packInterpolant(std::vector<const Array *> &replacements);
 
-  void dump();
+  void dump() const;
 
-  void print(llvm::raw_ostream &stream);
+  void print(llvm::raw_ostream &stream) const;
 };
 
 class PathConditionMarker {
@@ -324,14 +324,29 @@ public:
   InequalityExpr(std::map<ref<Expr>, int64_t> left,
                  std::map<ref<Expr>, int64_t> right, Expr::Kind _kind,
                  ref<Expr> originalExpr);
+
   ~InequalityExpr();
+
   std::map<ref<Expr>, int64_t> getLeft();
+
   std::map<ref<Expr>, int64_t> getRight();
+
   ref<Expr> getOriginalExpr();
+
   Expr::Kind getKind();
+
   void updateLeft(std::map<ref<Expr>, int64_t> newLeft);
+
   void updateRight(std::map<ref<Expr>, int64_t> newRight);
+
   void updateKind(Expr::Kind newKind);
+
+  void dump() const {
+    this->print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+
+  void print(llvm::raw_ostream &stream) const;
 };
 
 class SubsumptionTableEntry {
@@ -498,13 +513,14 @@ class ITree {
 
   std::map<uintptr_t, std::vector<SubsumptionTableEntry *> > subsumptionTable;
 
-  void printNode(llvm::raw_ostream &stream, ITreeNode *n, std::string edges);
+  void printNode(llvm::raw_ostream &stream, ITreeNode *n,
+                 std::string edges) const;
 
   /// @brief Displays method running time statistics
   static void printTimeStat(llvm::raw_ostream &stream);
 
   /// @brief Displays subsumption table statistics
-  void printTableStat(llvm::raw_ostream &stream);
+  void printTableStat(llvm::raw_ostream &stream) const;
 
 public:
   ITreeNode *root;
@@ -541,9 +557,9 @@ public:
   static void executeOnNode(ITreeNode *node, llvm::Instruction *instr,
                             std::vector<ref<Expr> > &args);
 
-  void print(llvm::raw_ostream &stream);
+  void print(llvm::raw_ostream &stream) const;
 
-  void dump();
+  void dump() const;
 
   /// @brief Outputs interpolation statistics to standard error.
   void dumpInterpolationStat();
