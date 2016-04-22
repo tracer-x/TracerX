@@ -1121,7 +1121,7 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
 }
 
 ref<Expr> SubsumptionTableEntry::reconstructExpr(
-    std::vector<InequalityExpr *> inequalityPack) {
+    std::vector<InequalityExpr *> &inequalityPack) {
   ref<Expr> result;
 
   for (std::vector<InequalityExpr *>::iterator
@@ -1141,12 +1141,18 @@ ref<Expr> SubsumptionTableEntry::reconstructExpr(
              lhsTermsIter = currInequality->getLhs().begin(),
              lhsTermsIterEnd = currInequality->getLhs().end();
          lhsTermsIter != lhsTermsIterEnd; ++lhsTermsIter) {
+      if (lhsTermsIter == lhsTermsIterEnd) {
+        llvm::errs() << "YYY\n";
+      }
       llvm::errs() << "X\n";
+      lhsTermsIter->first->dump();
+      llvm::errs() << "XX: " << lhsTermsIter->second << "\n";
       ref<Expr> tmp;
 
       if (!lhsTermsIter->first.get()) {
         llvm::errs() << "NULL FOUND\n";
       }
+
       if (llvm::isa<ConstantExpr>(lhsTermsIter->first)) {
         llvm::errs() << "FOUND CONSTANT: ";
         lhsTermsIter->first->dump();
@@ -1163,7 +1169,7 @@ ref<Expr> SubsumptionTableEntry::reconstructExpr(
       }
 
       if (lhsExpr.get()) {
-        lhsExpr = AddExpr::create(lhsExpr, tmp);
+        lhsExpr = AddExpr::alloc(lhsExpr, tmp);
       } else {
         lhsExpr = tmp;
       }

@@ -438,7 +438,7 @@ class SubsumptionTableEntry {
   static void simplifyMatching(std::map<ref<Expr>, int64_t> &leftResult,
                                std::map<ref<Expr>, int64_t> &rightResult);
 
-  static ref<Expr> reconstructExpr(std::vector<InequalityExpr *> pack);
+  static ref<Expr> reconstructExpr(std::vector<InequalityExpr *> &pack);
 
   static bool containsNonConstantExpr(std::map<ref<Expr>, int64_t> map);
 
