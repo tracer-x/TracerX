@@ -327,19 +327,19 @@ public:
 
   ~InequalityExpr();
 
-  std::map<ref<Expr>, int64_t> getLeft();
+  std::map<ref<Expr>, int64_t> getLhs();
 
-  std::map<ref<Expr>, int64_t> getRight();
+  std::map<ref<Expr>, int64_t> getRhs();
 
   ref<Expr> getOriginalExpr();
 
   Expr::Kind getKind();
 
-  void updateLeft(std::map<ref<Expr>, int64_t> newLeft);
+  void replaceLhs(std::map<ref<Expr>, int64_t> newLeft);
 
-  void updateRight(std::map<ref<Expr>, int64_t> newRight);
+  void replaceRhs(std::map<ref<Expr>, int64_t> newRight);
 
-  void updateKind(Expr::Kind newKind);
+  void replaceKind(Expr::Kind newKind);
 
   void dump() const {
     this->print(llvm::errs());
@@ -409,29 +409,27 @@ class SubsumptionTableEntry {
   coefficientOperation(Expr::Kind kind, std::map<ref<Expr>, int64_t> map1,
                        std::map<ref<Expr>, int64_t> map2);
 
-  static void normalization(const Array *onFocusExistential,
-                            InequalityExpr *inequalityExpr,
-                            bool &isOnFocusVarOnLeft);
+  static bool normalize(const Array *onFocusExistential,
+                        InequalityExpr *inequalityExpr);
 
-  static void
-  classification(const Array *onFocusExistential,
-                 InequalityExpr *inequalityExpr,
-                 std::vector<InequalityExpr *> &lessThanPack,
-                 std::vector<InequalityExpr *> &greaterThanPack,
-                 std::vector<InequalityExpr *> &nonePack,
-                 std::vector<InequalityExpr *> &strictLessThanPack,
-                 std::vector<InequalityExpr *> &strictGreaterThanPack,
-                 bool isOnFocusVarOnLeft);
+  static void classify(const Array *onFocusExistential,
+                       InequalityExpr *inequalityExpr,
+                       std::vector<InequalityExpr *> &lessThanPack,
+                       std::vector<InequalityExpr *> &greaterThanPack,
+                       std::vector<InequalityExpr *> &nonePack,
+                       std::vector<InequalityExpr *> &strictLessThanPack,
+                       std::vector<InequalityExpr *> &strictGreaterThanPack,
+                       bool isOnFocusVarOnLeft);
 
-  static ref<Expr> getReadExprFromConcatExpr(ref<Expr> expr);
+  static const Array *getArrayFromConcatExpr(ref<Expr> expr);
 
   static ref<Expr> simplifyConcatExpr(ref<Expr> expr);
 
   static std::vector<InequalityExpr *>
-  matching(std::vector<InequalityExpr *> lessThanPack,
-           std::vector<InequalityExpr *> greaterThanPack,
-           std::vector<InequalityExpr *> strictLessThanPack,
-           std::vector<InequalityExpr *> strictGreaterThanPack);
+  match(std::vector<InequalityExpr *> lessThanPack,
+        std::vector<InequalityExpr *> greaterThanPack,
+        std::vector<InequalityExpr *> strictLessThanPack,
+        std::vector<InequalityExpr *> strictGreaterThanPack);
 
   static void matchingLoop(Expr::Kind, std::vector<InequalityExpr *> pack1,
                            std::vector<InequalityExpr *> pack2,
@@ -457,6 +455,17 @@ class SubsumptionTableEntry {
   /// whenever it contains constant equalities.
   static ref<Expr> simplifyEqualityExpr(std::vector<ref<Expr> > &equalityPack,
                                         ref<Expr> expr);
+
+  /// Get simplifiable conjuncts from a possible conjunction.
+  ///
+  /// \param conjunction The conjunction from which we extract simplifiable
+  ///        conjuncts.
+  /// \return A pair consisting of a list of simplifiable conjuncts and the new
+  ///         expression from which the simplifiable conjuncts have been
+  /// removed.
+  ///         Here all equalities have been converted to pairs of inequalities.
+  static std::pair<std::vector<ref<Expr> >, ref<Expr> >
+  getSimplifiableConjunctsForFourierMotzkin(ref<Expr> conjunction);
 
   static ref<Expr> simplifyWithFourierMotzkin(ref<Expr> existsExpr);
 
