@@ -462,10 +462,22 @@ class SubsumptionTableEntry {
   ///        conjuncts.
   /// \return A pair consisting of a list of simplifiable conjuncts and the new
   ///         expression from which the simplifiable conjuncts have been
-  /// removed.
-  ///         Here all equalities have been converted to pairs of inequalities.
+  ///         removed. Here all equalities have been converted to pairs of
+  ///         inequalities.
   static std::pair<std::vector<ref<Expr> >, ref<Expr> >
   getSimplifiableConjunctsForFourierMotzkin(ref<Expr> conjunction);
+
+  /// Tests if the argument is a variable. A variable here is defined to be
+  /// either a symbolic concatenation or a symbolic read. A concatenation in
+  /// KLEE concatenates reads, and hence can be considered to be a symbolic
+  /// read.
+  ///
+  /// \param A KLEE expression.
+  /// \return true if the parameter is either a concatenation or a read,
+  ///         otherwise, return false.
+  static bool isVariable(ref<Expr> expr) {
+    return llvm::isa<ConcatExpr>(expr.get()) || llvm::isa<ReadExpr>(expr.get());
+  }
 
   static ref<Expr> simplifyWithFourierMotzkin(ref<Expr> existsExpr);
 

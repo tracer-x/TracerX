@@ -1369,7 +1369,7 @@ bool SubsumptionTableEntry::normalize(const Array *onFocusExistential,
     ref<Expr> currExpr = lhsTermsIter->first;
     int64_t currCoefficient = lhsTermsIter->second;
 
-    if (llvm::isa<ConcatExpr>(currExpr)) {
+    if (isVariable(currExpr)) {
       if (getArrayFromConcatExpr(currExpr) == onFocusExistential) {
         // The variable of the current term is the focus variable.
         onFocusVarCoefficient = lhsTermsIter->second;
@@ -1417,7 +1417,7 @@ bool SubsumptionTableEntry::normalize(const Array *onFocusExistential,
     ref<Expr> currExpr = rhsTermsIter->first;
     int64_t currCoefficient = rhsTermsIter->second;
 
-    if (llvm::isa<ConcatExpr>(currExpr)) {
+    if (isVariable(currExpr)) {
       if (getArrayFromConcatExpr(currExpr) == onFocusExistential) {
         if (lhs.count(rhsTermsIter->first) > 0) {
           lhs.at(rhsTermsIter->first) =
@@ -1488,7 +1488,7 @@ bool SubsumptionTableEntry::normalize(const Array *onFocusExistential,
 std::map<ref<Expr>, int64_t>
 SubsumptionTableEntry::getCoefficient(ref<Expr> expr) {
   std::map<ref<Expr>, int64_t> map;
-  if (expr->getNumKids() == 2 && !llvm::isa<ConcatExpr>(expr)) {
+  if (expr->getNumKids() == 2 && !isVariable(expr)) {
     llvm::errs() << "CASE A: ";
     expr->dump();
     return coefficientOperation(expr->getKind(),
@@ -1496,7 +1496,7 @@ SubsumptionTableEntry::getCoefficient(ref<Expr> expr) {
                                 getCoefficient(expr->getKid(1)));
   }
 
-  if (expr->getNumKids() < 2 || llvm::isa<ConcatExpr>(expr)) {
+  if (expr->getNumKids() < 2 || isVariable(expr)) {
     llvm::errs() << "CASE B: ";
     expr->dump();
     if (llvm::isa<ConstantExpr>(expr)) {
@@ -1916,7 +1916,7 @@ SubsumptionTableEntry::getSubstitution(ref<Expr> equalities,
                                        std::map<ref<Expr>, ref<Expr> > &map) {
   if (llvm::isa<EqExpr>(equalities.get())) {
     ref<Expr> lhs = equalities->getKid(0);
-    if (llvm::isa<ReadExpr>(lhs.get()) || llvm::isa<ConcatExpr>(lhs.get())) {
+    if (isVariable(lhs)) {
       map[lhs] = equalities->getKid(1);
       return ConstantExpr::alloc(1, Expr::Bool);
     }
