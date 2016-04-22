@@ -1038,7 +1038,6 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
            boundVariablesIt = boundVariables.begin(),
            boundVariablesItEnd = boundVariables.end();
        boundVariablesIt != boundVariablesItEnd; ++boundVariablesIt) {
-    llvm::errs() << "\n>";
     const Array *currExistVar = *boundVariablesIt;
 
     std::vector<InequalityExpr *> lessThanPack;
@@ -1052,10 +1051,9 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
     for (std::vector<InequalityExpr *>::iterator inqt = inequalityPack.begin(),
                                                  inqtEnd = inequalityPack.end();
          inqt != inqtEnd; ++inqt) {
-      llvm::errs() << ".";
       InequalityExpr *currIneq = *inqt;
 
-      llvm::errs() << "PROCESSING INEQ 1: ";
+      llvm::errs() << "BEFORE NORMALIZATION: ";
       currIneq->dump();
 
       // Normalize the current inequality, by moving the on-focus
@@ -1066,9 +1064,8 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
         llvm::errs() << "FOCUS VAR LEFT\n";
       }
 
-      llvm::errs() << "NORMALIZATION RESULT: ";
+      llvm::errs() << "AFTER NORMALIZATION: ";
       currIneq->dump();
-      llvm::errs() << ":";
 
       // STEP 2b: divide the inequalityPack into separated packs
       // based on its operator existVar <= (lessThanPack), existVar >=
@@ -1080,9 +1077,8 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
                isOnFocusVarOnLeft);
     }
 
-    llvm::errs() << "=";
-
     // STEP 3: matching between inequality
+    llvm::errs() << "STEP 3\n";
     std::vector<InequalityExpr *> resultPack;
     resultPack =
         InequalityExpr::match(lessThanPack, greaterThanPack, strictLessThanPack,
@@ -1095,6 +1091,7 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
   }
 
   // STEP 4: reconstruct the result back to KLEE expression
+  llvm::errs() << "STEP 4\n";
   if (inequalityPack.size() == 0)
     return existsExpr;
 
@@ -1960,14 +1957,25 @@ void SubsumptionTableEntry::printStat(llvm::raw_ostream &stream) {
 
 /**/
 
-InequalityExpr::InequalityExpr(ref<Expr> _originalExpr)
-    : originalExpr(_originalExpr) {
-  left = getLinearTerms(_originalExpr->getKid(0));
-  right = getLinearTerms(_originalExpr->getKid(1));
-  kind = _originalExpr->getKind();
+InequalityExpr::InequalityExpr(Expr::Kind _kind,
+                               std::map<ref<Expr>, int64_t> _lhs,
+                               std::map<ref<Expr>, int64_t> _rhs) {
+  init(_kind, _lhs, _rhs);
+}
+
+InequalityExpr::InequalityExpr(ref<Expr> expr) {
+  init(expr->getKind(), getLinearTerms(expr->getKid(0)),
+       getLinearTerms(expr->getKid(1)));
 }
 
 InequalityExpr::~InequalityExpr() {}
+
+void InequalityExpr::init(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
+                          std::map<ref<Expr>, int64_t> _rhs) {
+  kind = _kind;
+  lhs = _lhs;
+  rhs = _rhs;
+}
 
 bool InequalityExpr::containsNonConstantExpr(
     std::map<ref<Expr>, int64_t> termsList) {
@@ -2034,9 +2042,7 @@ void InequalityExpr::matchingLoop(Expr::Kind kind,
       std::map<ref<Expr>, int64_t> right = curr2->getRhs();
       simplifyMatching(left, right);
       if (left.size() > 0 && right.size() > 0) {
-        llvm::errs() << "!!!!NULL INSERTION!!!!\n";
-        InequalityExpr *ineq = new InequalityExpr(NULL);
-        result.push_back(ineq);
+        result.push_back(new InequalityExpr(kind, left, right));
       }
     }
   }
@@ -2095,16 +2101,12 @@ void InequalityExpr::simplifyMatching(std::map<ref<Expr>, int64_t> &lhs,
 std::map<ref<Expr>, int64_t> InequalityExpr::getLinearTerms(ref<Expr> expr) {
   std::map<ref<Expr>, int64_t> map;
   if (expr->getNumKids() == 2 && !SubsumptionTableEntry::isVariable(expr)) {
-    llvm::errs() << "CASE A: ";
-    expr->dump();
     return coefficientOperation(expr->getKind(),
                                 getLinearTerms(expr->getKid(0)),
                                 getLinearTerms(expr->getKid(1)));
   }
 
   if (expr->getNumKids() < 2 || SubsumptionTableEntry::isVariable(expr)) {
-    llvm::errs() << "CASE B: ";
-    expr->dump();
     if (llvm::isa<ConstantExpr>(expr)) {
       // We adopt the convention that the expression of a constant
       // is the constant 0;
@@ -2299,42 +2301,40 @@ bool InequalityExpr::normalize(const Array *onFocusExistential) {
   return false;
 }
 
-std::map<ref<Expr>, int64_t> InequalityExpr::getLhs() { return left; }
+std::map<ref<Expr>, int64_t> InequalityExpr::getLhs() { return lhs; }
 
-std::map<ref<Expr>, int64_t> InequalityExpr::getRhs() { return right; }
+std::map<ref<Expr>, int64_t> InequalityExpr::getRhs() { return rhs; }
 
 Expr::Kind InequalityExpr::getKind() { return kind; }
 
-ref<Expr> InequalityExpr::getOriginalExpr() { return originalExpr; }
-
 void InequalityExpr::replaceLhs(std::map<ref<Expr>, int64_t> newLhs) {
-  left = newLhs;
+  lhs = newLhs;
 }
 
 void InequalityExpr::replaceRhs(std::map<ref<Expr>, int64_t> newRhs) {
-  right = newRhs;
+  rhs = newRhs;
 }
 
 void InequalityExpr::replaceKind(Expr::Kind newKind) { kind = newKind; }
 
 void InequalityExpr::print(llvm::raw_ostream &stream) const {
   stream << "(" << kind << " (";
-  for (std::map<ref<Expr>, int64_t>::const_iterator it = left.begin(),
-                                                    itEnd = left.end();
+  for (std::map<ref<Expr>, int64_t>::const_iterator it = lhs.begin(),
+                                                    itEnd = lhs.end();
        it != itEnd; ++it) {
     stream << "(" << it->second << ") ";
     it->first->print(stream);
-    if (it != --left.end()) {
+    if (it != --lhs.end()) {
       stream << " + ";
     }
   }
   stream << ") (";
-  for (std::map<ref<Expr>, int64_t>::const_iterator it = right.begin(),
-                                                    itEnd = right.end();
+  for (std::map<ref<Expr>, int64_t>::const_iterator it = rhs.begin(),
+                                                    itEnd = rhs.end();
        it != itEnd; ++it) {
     stream << "(" << it->second << ") ";
     it->first->print(stream);
-    if (it != --right.end()) {
+    if (it != --rhs.end()) {
       stream << " + ";
     }
   }

@@ -315,10 +315,15 @@ public:
 };
 
 class InequalityExpr {
-  std::map<ref<Expr>, int64_t> left;
-  std::map<ref<Expr>, int64_t> right;
+  std::map<ref<Expr>, int64_t> lhs;
+  std::map<ref<Expr>, int64_t> rhs;
   Expr::Kind kind;
-  ref<Expr> originalExpr;
+
+  InequalityExpr(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
+                 std::map<ref<Expr>, int64_t> _rhs);
+
+  void init(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
+            std::map<ref<Expr>, int64_t> _rhs);
 
   static std::map<ref<Expr>, int64_t> getLinearTerms(ref<Expr> expr);
 
@@ -338,7 +343,7 @@ class InequalityExpr {
   static bool containsNonConstantExpr(std::map<ref<Expr>, int64_t> map);
 
 public:
-  InequalityExpr(ref<Expr> originalExpr);
+  InequalityExpr(ref<Expr> expr);
 
   ~InequalityExpr();
 
