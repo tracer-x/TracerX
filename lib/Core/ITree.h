@@ -403,7 +403,7 @@ class SubsumptionTableEntry {
 
   static bool containShadowExpr(ref<Expr> expr, ref<Expr> shadowExpr);
 
-  static std::map<ref<Expr>, int64_t> getCoefficient(ref<Expr> expr);
+  static std::map<ref<Expr>, int64_t> getLinearTerms(ref<Expr> expr);
 
   static std::map<ref<Expr>, int64_t>
   coefficientOperation(Expr::Kind kind, std::map<ref<Expr>, int64_t> map1,

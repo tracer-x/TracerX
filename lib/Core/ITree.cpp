@@ -1013,8 +1013,8 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
        it != itEnd; ++it) {
     ref<Expr> currExpr = *it;
 
-    std::map<ref<Expr>, int64_t> left = getCoefficient(currExpr->getKid(0));
-    std::map<ref<Expr>, int64_t> right = getCoefficient(currExpr->getKid(1));
+    std::map<ref<Expr>, int64_t> left = getLinearTerms(currExpr->getKid(0));
+    std::map<ref<Expr>, int64_t> right = getLinearTerms(currExpr->getKid(1));
     inequalityPack.push_back(
         new InequalityExpr(left, right, currExpr->getKind(), currExpr));
   }
@@ -1028,8 +1028,8 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
        it != itEnd; ++it) {
     ref<Expr> currExpr = *it;
 
-    std::map<ref<Expr>, int64_t> left = getCoefficient(currExpr->getKid(0));
-    std::map<ref<Expr>, int64_t> right = getCoefficient(currExpr->getKid(1));
+    std::map<ref<Expr>, int64_t> left = getLinearTerms(currExpr->getKid(0));
+    std::map<ref<Expr>, int64_t> right = getLinearTerms(currExpr->getKid(1));
     inequalityPack.push_back(
         new InequalityExpr(left, right, currExpr->getKind(), currExpr));
   }
@@ -1492,14 +1492,14 @@ bool SubsumptionTableEntry::normalize(const Array *onFocusExistential,
 }
 
 std::map<ref<Expr>, int64_t>
-SubsumptionTableEntry::getCoefficient(ref<Expr> expr) {
+SubsumptionTableEntry::getLinearTerms(ref<Expr> expr) {
   std::map<ref<Expr>, int64_t> map;
   if (expr->getNumKids() == 2 && !isVariable(expr)) {
     llvm::errs() << "CASE A: ";
     expr->dump();
     return coefficientOperation(expr->getKind(),
-                                getCoefficient(expr->getKid(0)),
-                                getCoefficient(expr->getKid(1)));
+                                getLinearTerms(expr->getKid(0)),
+                                getLinearTerms(expr->getKid(1)));
   }
 
   if (expr->getNumKids() < 2 || isVariable(expr)) {
