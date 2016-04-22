@@ -1060,12 +1060,11 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
       // variable to the lhs, and the other terms to the rhs.
       bool isOnFocusVarOnLeft = currIneq->normalize(currExistVar);
 
+      llvm::errs() << "AFTER NORMALIZATION: ";
+      currIneq->dump();
       if (isOnFocusVarOnLeft) {
         llvm::errs() << "FOCUS VAR LEFT\n";
       }
-
-      llvm::errs() << "AFTER NORMALIZATION: ";
-      currIneq->dump();
 
       // STEP 2b: divide the inequalityPack into separated packs
       // based on its operator existVar <= (lessThanPack), existVar >=
@@ -2169,16 +2168,15 @@ InequalityExpr::coefficientOperation(Expr::Kind kind,
 }
 
 bool InequalityExpr::normalize(const Array *onFocusExistential) {
-  InequalityExpr *inequalityExpr = this;
   bool isOnFocusVarOnLeft = false;
 
-  std::map<ref<Expr>, int64_t> lhs = inequalityExpr->getLhs();
-  std::map<ref<Expr>, int64_t> rhs = inequalityExpr->getRhs();
+  std::map<ref<Expr>, int64_t> localLhs(lhs);
+  std::map<ref<Expr>, int64_t> localRhs(rhs);
 
   int64_t onFocusVarCoefficient = 0;
 
-  for (std::map<ref<Expr>, int64_t>::iterator lhsTermsIter = lhs.begin(),
-                                              lhsTermsIterEnd = lhs.end();
+  for (std::map<ref<Expr>, int64_t>::iterator lhsTermsIter = localLhs.begin(),
+                                              lhsTermsIterEnd = localLhs.end();
        lhsTermsIter != lhsTermsIterEnd; ++lhsTermsIter) {
 
     ref<Expr> currExpr = lhsTermsIter->first;
@@ -2192,40 +2190,41 @@ bool InequalityExpr::normalize(const Array *onFocusExistential) {
       } else {
         // Move variable other than on focus existential variable to the right
         // hand side then, delete it from left map
-        if (rhs.count(lhsTermsIter->first) > 0) {
+        if (localRhs.count(lhsTermsIter->first) > 0) {
           // The rhs already contains the lhs term's variable, subtract the
           // term's coefficient with the lhs term's coefficient.
-          rhs.at(lhsTermsIter->first) =
-              rhs.at(lhsTermsIter->first) - currCoefficient;
+          localRhs.at(lhsTermsIter->first) =
+              localRhs.at(lhsTermsIter->first) - currCoefficient;
         } else {
           // The rhs does not contain the lhs term's variable, add the term
           // to the rhs
-          rhs.insert(
+          localRhs.insert(
               std::make_pair(lhsTermsIter->first, currCoefficient * (-1)));
         }
-        lhs.erase(lhsTermsIter);
+        localLhs.erase(lhsTermsIter);
       }
     } else if (llvm::isa<ConstantExpr>(lhsTermsIter->first)) {
       // Move variable other than on focus existential variable to the right
       // hand side then, delete it from left map
-      if (rhs.count(lhsTermsIter->first) > 0) {
+      if (localRhs.count(lhsTermsIter->first) > 0) {
         // The rhs already contains the lhs term's variable, subtract the term's
         // coefficient with the lhs term's coefficient.
-        rhs.at(lhsTermsIter->first) =
-            rhs.at(lhsTermsIter->first) - currCoefficient;
+        localRhs.at(lhsTermsIter->first) =
+            localRhs.at(lhsTermsIter->first) - currCoefficient;
       } else {
         // The rhs does not contain the lhs term's variable, add the term
         // to the rhs
-        rhs.insert(std::make_pair(lhsTermsIter->first, currCoefficient * (-1)));
+        localRhs.insert(
+            std::make_pair(lhsTermsIter->first, currCoefficient * (-1)));
       }
-      lhs.erase(lhsTermsIter);
+      localLhs.erase(lhsTermsIter);
     }
   }
 
   // If we find on focus exist variable on the right hand side,
   // move it to the left hand side
-  for (std::map<ref<Expr>, int64_t>::iterator rhsTermsIter = rhs.begin(),
-                                              rhsTermsIterEnd = rhs.end();
+  for (std::map<ref<Expr>, int64_t>::iterator rhsTermsIter = localRhs.begin(),
+                                              rhsTermsIterEnd = localRhs.end();
        rhsTermsIter != rhsTermsIterEnd; ++rhsTermsIter) {
 
     ref<Expr> currExpr = rhsTermsIter->first;
@@ -2233,55 +2232,57 @@ bool InequalityExpr::normalize(const Array *onFocusExistential) {
 
     if (SubsumptionTableEntry::isVariable(currExpr)) {
       if (getArrayFromConcatExpr(currExpr) == onFocusExistential) {
-        if (lhs.count(rhsTermsIter->first) > 0) {
-          lhs.at(rhsTermsIter->first) =
-              lhs.at(rhsTermsIter->first) - currCoefficient;
+        if (localLhs.count(rhsTermsIter->first) > 0) {
+          localLhs.at(rhsTermsIter->first) =
+              localLhs.at(rhsTermsIter->first) - currCoefficient;
         } else {
-          lhs.insert(
+          localLhs.insert(
               std::make_pair(rhsTermsIter->first, currCoefficient * (-1)));
         }
-        onFocusVarCoefficient = lhs.at(rhsTermsIter->first);
+        onFocusVarCoefficient = localLhs.at(rhsTermsIter->first);
         isOnFocusVarOnLeft = true;
-        rhs.erase(rhsTermsIter);
+        localRhs.erase(rhsTermsIter);
       }
     }
   }
 
-  Expr::Kind kind = inequalityExpr->getKind();
+  Expr::Kind localKind(kind);
 
   // Divide both sides with onFocusVariable coefficient.
   if (onFocusExistential &&
       (onFocusVarCoefficient != 1 && onFocusVarCoefficient != 0)) {
 
-    for (std::map<ref<Expr>, int64_t>::iterator lhsTermsIter = lhs.begin(),
-                                                lhsTermsIterEnd = lhs.end();
+    for (std::map<ref<Expr>, int64_t>::iterator
+             lhsTermsIter = localLhs.begin(),
+             lhsTermsIterEnd = localLhs.end();
          lhsTermsIter != lhsTermsIterEnd; ++lhsTermsIter) {
       lhsTermsIter->second = lhsTermsIter->second / onFocusVarCoefficient;
     }
 
-    for (std::map<ref<Expr>, int64_t>::iterator rhsTermsIter = rhs.begin(),
-                                                rhsTermsIterEnd = rhs.end();
+    for (std::map<ref<Expr>, int64_t>::iterator
+             rhsTermsIter = localRhs.begin(),
+             rhsTermsIterEnd = localRhs.end();
          rhsTermsIter != rhsTermsIterEnd; ++rhsTermsIter) {
       rhsTermsIter->second = rhsTermsIter->second / onFocusVarCoefficient;
     }
 
     // If we divide with negative values, the expression's Kind will be reversed
     if (onFocusVarCoefficient < 0) {
-      switch (kind) {
+      switch (localKind) {
       case Expr::Sle: {
-        kind = Expr::Sge;
+        localKind = Expr::Sge;
         break;
       }
       case Expr::Sge: {
-        kind = Expr::Sle;
+        localKind = Expr::Sle;
         break;
       }
       case Expr::Slt: {
-        kind = Expr::Sgt;
+        localKind = Expr::Sgt;
         break;
       }
       case Expr::Sgt: {
-        kind = Expr::Slt;
+        localKind = Expr::Slt;
         break;
       }
       default:
@@ -2290,41 +2291,32 @@ bool InequalityExpr::normalize(const Array *onFocusExistential) {
     }
   }
 
-  if (lhs.size() >= 1 && containsNonConstantExpr(lhs) && rhs.size() == 0) {
-    rhs.insert(std::make_pair(
-        ConstantExpr::alloc(0, lhs.begin()->first->getWidth()), 0));
-  } else if (rhs.size() >= 1 && containsNonConstantExpr(rhs) &&
-             lhs.size() == 0) {
-    lhs.insert(std::make_pair(
-        ConstantExpr::alloc(0, rhs.begin()->first->getWidth()), 0));
+  if (localLhs.size() >= 1 && containsNonConstantExpr(localLhs) &&
+      localRhs.size() == 0) {
+    localRhs.insert(std::make_pair(
+        ConstantExpr::alloc(0, localLhs.begin()->first->getWidth()), 0));
+  } else if (localRhs.size() >= 1 && containsNonConstantExpr(localRhs) &&
+             localLhs.size() == 0) {
+    localLhs.insert(std::make_pair(
+        ConstantExpr::alloc(0, localRhs.begin()->first->getWidth()), 0));
   }
 
-  if (lhs.size() > 0 && rhs.size() > 0) {
+  if (localLhs.size() > 0 && localRhs.size() > 0) {
     // We do the actual normalization here
-    inequalityExpr->replaceLhs(lhs);
-    inequalityExpr->replaceRhs(rhs);
-    inequalityExpr->replaceKind(kind);
+    lhs = localLhs;
+    rhs = localRhs;
+    kind = localKind;
     return isOnFocusVarOnLeft;
   }
 
   return false;
 }
 
-std::map<ref<Expr>, int64_t> InequalityExpr::getLhs() { return lhs; }
+std::map<ref<Expr>, int64_t> InequalityExpr::getLhs() const { return lhs; }
 
-std::map<ref<Expr>, int64_t> InequalityExpr::getRhs() { return rhs; }
+std::map<ref<Expr>, int64_t> InequalityExpr::getRhs() const { return rhs; }
 
-Expr::Kind InequalityExpr::getKind() { return kind; }
-
-void InequalityExpr::replaceLhs(std::map<ref<Expr>, int64_t> newLhs) {
-  lhs = newLhs;
-}
-
-void InequalityExpr::replaceRhs(std::map<ref<Expr>, int64_t> newRhs) {
-  rhs = newRhs;
-}
-
-void InequalityExpr::replaceKind(Expr::Kind newKind) { kind = newKind; }
+Expr::Kind InequalityExpr::getKind() const { return kind; }
 
 void InequalityExpr::print(llvm::raw_ostream &stream) const {
   stream << "(" << kind << " (";

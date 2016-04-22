@@ -349,19 +349,11 @@ public:
 
   bool normalize(const Array *onFocusExistential);
 
-  std::map<ref<Expr>, int64_t> getLhs();
+  std::map<ref<Expr>, int64_t> getLhs() const;
 
-  std::map<ref<Expr>, int64_t> getRhs();
+  std::map<ref<Expr>, int64_t> getRhs() const;
 
-  ref<Expr> getOriginalExpr();
-
-  Expr::Kind getKind();
-
-  void replaceLhs(std::map<ref<Expr>, int64_t> newLeft);
-
-  void replaceRhs(std::map<ref<Expr>, int64_t> newRight);
-
-  void replaceKind(Expr::Kind newKind);
+  Expr::Kind getKind() const;
 
   static std::vector<InequalityExpr *>
   match(std::vector<InequalityExpr *> lessThanPack,
