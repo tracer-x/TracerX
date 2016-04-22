@@ -314,13 +314,13 @@ public:
   void setAsMaybeCore();
 };
 
-class InequalityExpr {
+class Inequality {
   std::map<ref<Expr>, int64_t> lhs;
   std::map<ref<Expr>, int64_t> rhs;
   Expr::Kind kind;
 
-  InequalityExpr(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
-                 std::map<ref<Expr>, int64_t> _rhs);
+  Inequality(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
+             std::map<ref<Expr>, int64_t> _rhs);
 
   void init(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
             std::map<ref<Expr>, int64_t> _rhs);
@@ -333,9 +333,9 @@ class InequalityExpr {
 
   static const Array *getArrayFromConcatExpr(ref<Expr> expr);
 
-  static void matchingLoop(Expr::Kind, std::vector<InequalityExpr *> pack1,
-                           std::vector<InequalityExpr *> pack2,
-                           std::vector<InequalityExpr *> &result);
+  static void matchingLoop(Expr::Kind, std::vector<Inequality *> pack1,
+                           std::vector<Inequality *> pack2,
+                           std::vector<Inequality *> &result);
 
   static void simplifyMatching(std::map<ref<Expr>, int64_t> &leftResult,
                                std::map<ref<Expr>, int64_t> &rightResult);
@@ -343,9 +343,9 @@ class InequalityExpr {
   static bool containsNonConstantExpr(std::map<ref<Expr>, int64_t> map);
 
 public:
-  InequalityExpr(ref<Expr> expr);
+  Inequality(ref<Expr> expr);
 
-  ~InequalityExpr();
+  ~Inequality();
 
   bool normalize(const Array *onFocusExistential);
 
@@ -355,11 +355,11 @@ public:
 
   Expr::Kind getKind() const;
 
-  static std::vector<InequalityExpr *>
-  match(std::vector<InequalityExpr *> lessThanPack,
-        std::vector<InequalityExpr *> greaterThanPack,
-        std::vector<InequalityExpr *> strictLessThanPack,
-        std::vector<InequalityExpr *> strictGreaterThanPack);
+  static std::vector<Inequality *>
+  match(std::vector<Inequality *> lessThanPack,
+        std::vector<Inequality *> greaterThanPack,
+        std::vector<Inequality *> strictLessThanPack,
+        std::vector<Inequality *> strictGreaterThanPack);
 
   void dump() const {
     this->print(llvm::errs());
@@ -424,17 +424,17 @@ class SubsumptionTableEntry {
   static bool containShadowExpr(ref<Expr> expr, ref<Expr> shadowExpr);
 
   static void classify(const Array *onFocusExistential,
-                       InequalityExpr *inequalityExpr,
-                       std::vector<InequalityExpr *> &lessThanPack,
-                       std::vector<InequalityExpr *> &greaterThanPack,
-                       std::vector<InequalityExpr *> &nonePack,
-                       std::vector<InequalityExpr *> &strictLessThanPack,
-                       std::vector<InequalityExpr *> &strictGreaterThanPack,
+                       Inequality *inequalityExpr,
+                       std::vector<Inequality *> &lessThanPack,
+                       std::vector<Inequality *> &greaterThanPack,
+                       std::vector<Inequality *> &nonePack,
+                       std::vector<Inequality *> &strictLessThanPack,
+                       std::vector<Inequality *> &strictGreaterThanPack,
                        bool isOnFocusVarOnLeft);
 
   static ref<Expr> simplifyConcatExpr(ref<Expr> expr);
 
-  static ref<Expr> reconstructExpr(std::vector<InequalityExpr *> &pack);
+  static ref<Expr> reconstructExpr(std::vector<Inequality *> &pack);
 
   static ref<Expr> replaceExpr(ref<Expr> originalExpr, ref<Expr> replacedExpr,
                                ref<Expr> withExpr);
