@@ -1084,7 +1084,6 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
         InequalityExpr::match(lessThanPack, greaterThanPack, strictLessThanPack,
                               strictGreaterThanPack);
 
-    llvm::errs() << "-";
     inequalityPack = resultPack;
     inequalityPack.insert(inequalityPack.end(), nonePack.begin(),
                           nonePack.end());
@@ -2195,8 +2194,7 @@ bool InequalityExpr::normalize(const Array *onFocusExistential) {
         // hand side then, delete it from left map
         if (rhs.count(lhsTermsIter->first) > 0) {
           // The rhs already contains the lhs term's variable, subtract the
-          // term's
-          // coefficient with the lhs term's coefficient.
+          // term's coefficient with the lhs term's coefficient.
           rhs.at(lhsTermsIter->first) =
               rhs.at(lhsTermsIter->first) - currCoefficient;
         } else {
@@ -2269,14 +2267,26 @@ bool InequalityExpr::normalize(const Array *onFocusExistential) {
 
     // If we divide with negative values, the expression's Kind will be reversed
     if (onFocusVarCoefficient < 0) {
-      if (inequalityExpr->getKind() == Expr::Sle)
-        kind = Expr::Sgt;
-      else if (inequalityExpr->getKind() == Expr::Sge)
-        kind = Expr::Slt;
-      else if (inequalityExpr->getKind() == Expr::Slt)
+      switch (kind) {
+      case Expr::Sle: {
         kind = Expr::Sge;
-      else if (inequalityExpr->getKind() == Expr::Sgt)
+        break;
+      }
+      case Expr::Sge: {
         kind = Expr::Sle;
+        break;
+      }
+      case Expr::Slt: {
+        kind = Expr::Sgt;
+        break;
+      }
+      case Expr::Sgt: {
+        kind = Expr::Slt;
+        break;
+      }
+      default:
+        break;
+      }
     }
   }
 
@@ -2285,7 +2295,6 @@ bool InequalityExpr::normalize(const Array *onFocusExistential) {
         ConstantExpr::alloc(0, lhs.begin()->first->getWidth()), 0));
   } else if (rhs.size() >= 1 && containsNonConstantExpr(rhs) &&
              lhs.size() == 0) {
-    llvm::errs() << "LHS SIZE IS 0\n";
     lhs.insert(std::make_pair(
         ConstantExpr::alloc(0, rhs.begin()->first->getWidth()), 0));
   }
