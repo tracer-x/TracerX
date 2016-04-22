@@ -320,12 +320,29 @@ class InequalityExpr {
   Expr::Kind kind;
   ref<Expr> originalExpr;
 
+  static std::map<ref<Expr>, int64_t> getLinearTerms(ref<Expr> expr);
+
+  static std::map<ref<Expr>, int64_t>
+  coefficientOperation(Expr::Kind kind, std::map<ref<Expr>, int64_t> map1,
+                       std::map<ref<Expr>, int64_t> map2);
+
+  static const Array *getArrayFromConcatExpr(ref<Expr> expr);
+
+  static void matchingLoop(Expr::Kind, std::vector<InequalityExpr *> pack1,
+                           std::vector<InequalityExpr *> pack2,
+                           std::vector<InequalityExpr *> &result);
+
+  static void simplifyMatching(std::map<ref<Expr>, int64_t> &leftResult,
+                               std::map<ref<Expr>, int64_t> &rightResult);
+
+  static bool containsNonConstantExpr(std::map<ref<Expr>, int64_t> map);
+
 public:
-  InequalityExpr(std::map<ref<Expr>, int64_t> left,
-                 std::map<ref<Expr>, int64_t> right, Expr::Kind _kind,
-                 ref<Expr> originalExpr);
+  InequalityExpr(ref<Expr> originalExpr);
 
   ~InequalityExpr();
+
+  bool normalize(const Array *onFocusExistential);
 
   std::map<ref<Expr>, int64_t> getLhs();
 
@@ -340,6 +357,12 @@ public:
   void replaceRhs(std::map<ref<Expr>, int64_t> newRight);
 
   void replaceKind(Expr::Kind newKind);
+
+  static std::vector<InequalityExpr *>
+  match(std::vector<InequalityExpr *> lessThanPack,
+        std::vector<InequalityExpr *> greaterThanPack,
+        std::vector<InequalityExpr *> strictLessThanPack,
+        std::vector<InequalityExpr *> strictGreaterThanPack);
 
   void dump() const {
     this->print(llvm::errs());
@@ -403,15 +426,6 @@ class SubsumptionTableEntry {
 
   static bool containShadowExpr(ref<Expr> expr, ref<Expr> shadowExpr);
 
-  static std::map<ref<Expr>, int64_t> getLinearTerms(ref<Expr> expr);
-
-  static std::map<ref<Expr>, int64_t>
-  coefficientOperation(Expr::Kind kind, std::map<ref<Expr>, int64_t> map1,
-                       std::map<ref<Expr>, int64_t> map2);
-
-  static bool normalize(const Array *onFocusExistential,
-                        InequalityExpr *inequalityExpr);
-
   static void classify(const Array *onFocusExistential,
                        InequalityExpr *inequalityExpr,
                        std::vector<InequalityExpr *> &lessThanPack,
@@ -421,26 +435,9 @@ class SubsumptionTableEntry {
                        std::vector<InequalityExpr *> &strictGreaterThanPack,
                        bool isOnFocusVarOnLeft);
 
-  static const Array *getArrayFromConcatExpr(ref<Expr> expr);
-
   static ref<Expr> simplifyConcatExpr(ref<Expr> expr);
 
-  static std::vector<InequalityExpr *>
-  match(std::vector<InequalityExpr *> lessThanPack,
-        std::vector<InequalityExpr *> greaterThanPack,
-        std::vector<InequalityExpr *> strictLessThanPack,
-        std::vector<InequalityExpr *> strictGreaterThanPack);
-
-  static void matchingLoop(Expr::Kind, std::vector<InequalityExpr *> pack1,
-                           std::vector<InequalityExpr *> pack2,
-                           std::vector<InequalityExpr *> &result);
-
-  static void simplifyMatching(std::map<ref<Expr>, int64_t> &leftResult,
-                               std::map<ref<Expr>, int64_t> &rightResult);
-
   static ref<Expr> reconstructExpr(std::vector<InequalityExpr *> &pack);
-
-  static bool containsNonConstantExpr(std::map<ref<Expr>, int64_t> map);
 
   static ref<Expr> replaceExpr(ref<Expr> originalExpr, ref<Expr> replacedExpr,
                                ref<Expr> withExpr);
@@ -467,18 +464,6 @@ class SubsumptionTableEntry {
   static std::pair<std::vector<ref<Expr> >, ref<Expr> >
   getSimplifiableConjunctsForFourierMotzkin(ref<Expr> conjunction);
 
-  /// Tests if the argument is a variable. A variable here is defined to be
-  /// either a symbolic concatenation or a symbolic read. A concatenation in
-  /// KLEE concatenates reads, and hence can be considered to be a symbolic
-  /// read.
-  ///
-  /// \param A KLEE expression.
-  /// \return true if the parameter is either a concatenation or a read,
-  ///         otherwise, return false.
-  static bool isVariable(ref<Expr> expr) {
-    return llvm::isa<ConcatExpr>(expr.get()) || llvm::isa<ReadExpr>(expr.get());
-  }
-
   static ref<Expr> simplifyWithFourierMotzkin(ref<Expr> existsExpr);
 
   static void convertExpression(ref<Expr> expr,
@@ -489,9 +474,6 @@ class SubsumptionTableEntry {
 
   static ref<Expr> simplifyArithmeticBody(ref<Expr> existsExpr,
                                           bool &hasExistentialsOnly);
-
-  static void normalizeExpr(std::vector<ref<Expr> > equalityPack,
-                            std::vector<ref<Expr> > &inequalityPack);
 
   static ref<Expr> getSubstitution(ref<Expr> equalities,
                                    std::map<ref<Expr>, ref<Expr> > &map);
@@ -512,6 +494,18 @@ public:
   ~SubsumptionTableEntry();
 
   bool subsumed(TimingSolver *solver, ExecutionState &state, double timeout);
+
+  /// Tests if the argument is a variable. A variable here is defined to be
+  /// either a symbolic concatenation or a symbolic read. A concatenation in
+  /// KLEE concatenates reads, and hence can be considered to be a symbolic
+  /// read.
+  ///
+  /// \param A KLEE expression.
+  /// \return true if the parameter is either a concatenation or a read,
+  ///         otherwise, return false.
+  static bool isVariable(ref<Expr> expr) {
+    return llvm::isa<ConcatExpr>(expr.get()) || llvm::isa<ReadExpr>(expr.get());
+  }
 
   void dump() const;
 
