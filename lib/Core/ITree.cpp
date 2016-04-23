@@ -1952,21 +1952,22 @@ void SubsumptionTableEntry::printStat(llvm::raw_ostream &stream) {
 
 Inequality::Inequality(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
                        std::map<ref<Expr>, int64_t> _rhs) {
-  init(_kind, _lhs, _rhs);
+  init(_kind, _lhs, _rhs, false);
 }
 
 Inequality::Inequality(ref<Expr> expr) {
   init(expr->getKind(), getLinearTerms(expr->getKid(0)),
-       getLinearTerms(expr->getKid(1)));
+       getLinearTerms(expr->getKid(1)), false);
 }
 
 Inequality::~Inequality() {}
 
 void Inequality::init(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
-                      std::map<ref<Expr>, int64_t> _rhs) {
+                      std::map<ref<Expr>, int64_t> _rhs, bool _eliminated) {
   kind = _kind;
   lhs = _lhs;
   rhs = _rhs;
+  eliminated = _eliminated;
 }
 
 bool
@@ -1988,11 +1989,23 @@ const Array *Inequality::getArrayFromConcatExpr(ref<Expr> expr) {
   return getArrayFromConcatExpr(expr->getKid(1));
 }
 
+void Inequality::removeEliminated(std::vector<Inequality *> &inequalityList,
+                                  std::vector<Inequality *> &result) {
+  for (std::vector<Inequality *>::iterator it = inequalityList.begin(),
+                                           itEnd = inequalityList.end();
+       it != itEnd; ++it) {
+    if (!(*it)->isEliminated())
+      result.push_back(*it);
+    else
+      delete *it;
+  }
+  inequalityList.clear();
+}
+
 std::vector<Inequality *> Inequality::match(std::vector<Inequality *> lePack,
                                             std::vector<Inequality *> gePack,
                                             std::vector<Inequality *> ltPack,
                                             std::vector<Inequality *> gtPack) {
-
   std::vector<Inequality *> result;
 
   // Given x <= expr1 and x >= expr2, we eliminate x with introducing the
@@ -2011,6 +2024,11 @@ std::vector<Inequality *> Inequality::match(std::vector<Inequality *> lePack,
   // constraint expr2 < expr1.
   matchingLoop(Expr::Slt, gtPack, ltPack, result);
 
+  removeEliminated(lePack, result);
+  removeEliminated(gePack, result);
+  removeEliminated(ltPack, result);
+  removeEliminated(gtPack, result);
+
   return result;
 }
 
@@ -2028,9 +2046,12 @@ void Inequality::matchingLoop(Expr::Kind kind, std::vector<Inequality *> pack1,
          it2 != it2End; ++it2) {
       Inequality *inequality2 = *it2;
 
-      std::map<ref<Expr>, int64_t> left = inequality1->getRhs();
-      std::map<ref<Expr>, int64_t> right = inequality2->getRhs();
-      result.push_back(new Inequality(kind, left, right));
+      std::map<ref<Expr>, int64_t> lhs = inequality1->getRhs();
+      std::map<ref<Expr>, int64_t> rhs = inequality2->getRhs();
+      result.push_back(new Inequality(kind, lhs, rhs));
+
+      inequality1->setEliminated();
+      inequality2->setEliminated();
     }
   }
 }

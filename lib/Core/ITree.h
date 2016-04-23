@@ -318,12 +318,13 @@ class Inequality {
   std::map<ref<Expr>, int64_t> lhs;
   std::map<ref<Expr>, int64_t> rhs;
   Expr::Kind kind;
+  bool eliminated;
 
   Inequality(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
              std::map<ref<Expr>, int64_t> _rhs);
 
   void init(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
-            std::map<ref<Expr>, int64_t> _rhs);
+            std::map<ref<Expr>, int64_t> _rhs, bool _eliminated);
 
   static std::map<ref<Expr>, int64_t> getLinearTerms(ref<Expr> expr);
 
@@ -353,6 +354,9 @@ class Inequality {
     }
   }
 
+  static void removeEliminated(std::vector<Inequality *> &inequalityList,
+                               std::vector<Inequality *> &result);
+
 public:
   Inequality(ref<Expr> expr);
 
@@ -362,10 +366,20 @@ public:
   /// variable to the lhs and the rest of the expressions to the rhs.
   ///
   /// \param The focus variable (a KLEE array).
-  /// \return Success status, where true means that the operation the
-  ///        the procedure successfully brought the term with focus
-  ///        variable to the rhs of the inequality.
+  /// \return Success status, where true means that the procedure
+  ///         successfully brought the term with focus variable to the
+  //          rhs of the inequality.
   bool normalize(const Array *onFocusExistential);
+
+  /// This operation sets the elimination status bit to true
+  /// indicating that the inequality is eliminated.
+  void setEliminated() { eliminated = true; }
+
+  /// Query the elimination status of this inequality.
+  ///
+  /// \return The status bit on whether this inequality is
+  ///         eliminated or not.
+  bool isEliminated() const { return eliminated; }
 
   std::map<ref<Expr>, int64_t> getLhs() const;
 
