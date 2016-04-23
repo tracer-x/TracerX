@@ -339,6 +339,20 @@ class Inequality {
 
   static bool containsNonConstantExpr(std::map<ref<Expr>, int64_t> map);
 
+  static void
+  mergeTermToLinearExpression(std::map<ref<Expr>, int64_t> &linearExpr,
+                              ref<Expr> &expr, int64_t coefficient) {
+    if (linearExpr.count(expr) > 0) {
+      // The linear expression already contains the term's variable, add the
+      // term's coefficient with the linear expression term's coefficient.
+      linearExpr[expr] = linearExpr[expr] + coefficient;
+    } else {
+      // The linear expression does not contain the term's variable, add the
+      // term to it.
+      linearExpr[expr] = coefficient;
+    }
+  }
+
 public:
   Inequality(ref<Expr> expr);
 

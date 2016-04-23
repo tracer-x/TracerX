@@ -2124,39 +2124,15 @@ bool Inequality::normalize(const Array *focusVariable) {
     ref<Expr> currExpr = lhsTermsIter->first;
     int64_t currCoefficient = lhsTermsIter->second;
 
-    if (SubsumptionTableEntry::isVariable(currExpr)) {
-      if (getArrayFromConcatExpr(currExpr) == focusVariable) {
-        // The variable of the current term is the focus variable.
-        if (newLhs.count(currExpr) > 0) {
-          newLhs[currExpr] = newLhs[currExpr] + currCoefficient;
-        } else {
-          newLhs[currExpr] = currCoefficient;
-        }
-        onFocusVarCoefficient = lhsTermsIter->second;
-        isOnFocusVarOnLeft = true;
-      } else {
-        // Move variable other than on focus existential variable to the rhs.
-        if (newRhs.count(currExpr) > 0) {
-          // The rhs already contains the lhs term's variable, subtract the
-          // term's coefficient with the lhs term's coefficient.
-          newRhs[currExpr] = newRhs[currExpr] - currCoefficient;
-        } else {
-          // The rhs does not contain the lhs term's variable, add the term
-          // to the rhs
-          newRhs[currExpr] = 0 - currCoefficient;
-        }
-      }
+    if (SubsumptionTableEntry::isVariable(currExpr) &&
+        getArrayFromConcatExpr(currExpr) == focusVariable) {
+      // The variable of the current term is the focus variable.
+      mergeTermToLinearExpression(newLhs, currExpr, currCoefficient);
+      onFocusVarCoefficient = lhsTermsIter->second;
+      isOnFocusVarOnLeft = true;
     } else {
-      // Move terms other than on focus existential variable to the rhs
-      if (newRhs.count(currExpr) > 0) {
-        // The rhs already contains the lhs term's variable, subtract the term's
-        // coefficient with the lhs term's coefficient.
-        newRhs[currExpr] = newRhs[currExpr] - currCoefficient;
-      } else {
-        // The rhs does not contain the lhs term's variable, add the term
-        // to the rhs
-        newRhs[currExpr] = 0 - currCoefficient;
-      }
+      // Move variable other than on focus existential variable to the rhs.
+      mergeTermToLinearExpression(newRhs, currExpr, 0 - currCoefficient);
     }
   }
 
@@ -2167,30 +2143,15 @@ bool Inequality::normalize(const Array *focusVariable) {
     ref<Expr> currExpr = rhsTermsIter->first;
     int64_t currCoefficient = rhsTermsIter->second;
 
-    if (SubsumptionTableEntry::isVariable(currExpr)) {
+    if (SubsumptionTableEntry::isVariable(currExpr) &&
+        getArrayFromConcatExpr(currExpr) == focusVariable) {
       // If we find on focus exist variable on the right hand side,
       // move it to the left hand side
-      if (getArrayFromConcatExpr(currExpr) == focusVariable) {
-        if (newLhs.count(currExpr) > 0) {
-          newLhs[currExpr] = newLhs[currExpr] - currCoefficient;
-        } else {
-          newLhs[currExpr] = 0 - currCoefficient;
-        }
-        onFocusVarCoefficient = newLhs[currExpr];
-        isOnFocusVarOnLeft = true;
-      } else {
-        if (newRhs.count(currExpr) > 0) {
-          newRhs[currExpr] = newRhs[currExpr] - currCoefficient;
-        } else {
-          newRhs[currExpr] = 0 - currCoefficient;
-        }
-      }
+      mergeTermToLinearExpression(newLhs, currExpr, 0 - currCoefficient);
+      onFocusVarCoefficient = newLhs[currExpr];
+      isOnFocusVarOnLeft = true;
     } else {
-      if (newRhs.count(currExpr) > 0) {
-        newRhs[currExpr] = newRhs[currExpr] - currCoefficient;
-      } else {
-        newRhs[currExpr] = 0 - currCoefficient;
-      }
+      mergeTermToLinearExpression(newRhs, currExpr, currCoefficient);
     }
   }
 
