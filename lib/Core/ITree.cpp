@@ -1040,10 +1040,10 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
        boundVariablesIt != boundVariablesItEnd; ++boundVariablesIt) {
     const Array *currExistVar = *boundVariablesIt;
 
-    std::vector<Inequality *> lessThanPack;
-    std::vector<Inequality *> greaterThanPack;
-    std::vector<Inequality *> strictLessThanPack;
-    std::vector<Inequality *> strictGreaterThanPack;
+    std::vector<Inequality *> lePack;
+    std::vector<Inequality *> gePack;
+    std::vector<Inequality *> ltPack;
+    std::vector<Inequality *> gtPack;
     std::vector<Inequality *> nonePack;
 
     // STEP 2a: normalized the inequality expression into the
@@ -1071,16 +1071,14 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
       // (greaterThanPack), existVar < (strictLessThanPack), existVar >
       // (strictGreaterThanPack) or (nonePack) if there's no on focus exist
       // variable in the equation.
-      classify(currExistVar, currIneq, lessThanPack, greaterThanPack,
-               strictLessThanPack, strictGreaterThanPack, nonePack,
+      classify(currExistVar, currIneq, lePack, gePack, ltPack, gtPack, nonePack,
                isOnFocusVarOnLeft);
     }
 
     // STEP 3: matching between inequality
     llvm::errs() << "STEP 3\n";
     std::vector<Inequality *> resultPack;
-    resultPack = Inequality::match(lessThanPack, greaterThanPack,
-                                   strictLessThanPack, strictGreaterThanPack);
+    resultPack = Inequality::match(lePack, gePack, ltPack, gtPack);
 
     inequalityPack = resultPack;
     inequalityPack.insert(inequalityPack.end(), nonePack.begin(),
@@ -1203,23 +1201,21 @@ ref<Expr> SubsumptionTableEntry::reconstructExpr(
 
 void SubsumptionTableEntry::classify(
     const Array *onFocusExistential, Inequality *currIneq,
-    std::vector<Inequality *> &lessThanPack,
-    std::vector<Inequality *> &greaterThanPack,
-    std::vector<Inequality *> &strictLessThanPack,
-    std::vector<Inequality *> &strictGreaterThanPack,
+    std::vector<Inequality *> &lePack, std::vector<Inequality *> &gePack,
+    std::vector<Inequality *> &ltPack, std::vector<Inequality *> &gtPack,
     std::vector<Inequality *> &nonePack, bool isOnFocusVarOnLeft) {
   if (!isOnFocusVarOnLeft) {
     nonePack.push_back(currIneq);
   } else {
     if (currIneq->getLhs().size() == 1) {
       if (currIneq->getKind() == Expr::Sle)
-        lessThanPack.push_back(currIneq);
+        lePack.push_back(currIneq);
       else if (currIneq->getKind() == Expr::Sge)
-        greaterThanPack.push_back(currIneq);
+        gePack.push_back(currIneq);
       else if (currIneq->getKind() == Expr::Slt)
-        strictLessThanPack.push_back(currIneq);
+        ltPack.push_back(currIneq);
       else if (currIneq->getKind() == Expr::Sgt)
-        strictGreaterThanPack.push_back(currIneq);
+        gtPack.push_back(currIneq);
     } else {
       nonePack.push_back(currIneq);
     }
@@ -1992,29 +1988,28 @@ const Array *Inequality::getArrayFromConcatExpr(ref<Expr> expr) {
   return getArrayFromConcatExpr(expr->getKid(1));
 }
 
-std::vector<Inequality *>
-Inequality::match(std::vector<Inequality *> lessThanPack,
-                  std::vector<Inequality *> greaterThanPack,
-                  std::vector<Inequality *> strictLessThanPack,
-                  std::vector<Inequality *> strictGreaterThanPack) {
+std::vector<Inequality *> Inequality::match(std::vector<Inequality *> lePack,
+                                            std::vector<Inequality *> gePack,
+                                            std::vector<Inequality *> ltPack,
+                                            std::vector<Inequality *> gtPack) {
 
   std::vector<Inequality *> result;
 
   // Given x <= expr1 and x >= expr2, we eliminate x with introducing the
   // constraint expr2 <= expr1.
-  matchingLoop(Expr::Sle, greaterThanPack, lessThanPack, result);
+  matchingLoop(Expr::Sle, gePack, lePack, result);
 
   // Given x <= expr1 and x > expr2, we eliminate x with introducing the
   // constraint expr2 < expr1.
-  matchingLoop(Expr::Slt, strictGreaterThanPack, lessThanPack, result);
+  matchingLoop(Expr::Slt, gtPack, lePack, result);
 
   // Given x < expr1 and x >= expr2, we eliminate x with introducing the
   // constraint expr2 < expr1.
-  matchingLoop(Expr::Slt, greaterThanPack, strictLessThanPack, result);
+  matchingLoop(Expr::Slt, gePack, ltPack, result);
 
   // Given x < expr1 and x > expr2 , we eliminate x with introducing the
   // constraint expr2 < expr1.
-  matchingLoop(Expr::Slt, strictGreaterThanPack, strictLessThanPack, result);
+  matchingLoop(Expr::Slt, gtPack, ltPack, result);
 
   return result;
 }
@@ -2026,70 +2021,17 @@ void Inequality::matchingLoop(Expr::Kind kind, std::vector<Inequality *> pack1,
   for (std::vector<Inequality *>::iterator it1 = pack1.begin(),
                                            it1End = pack1.end();
        it1 != it1End; ++it1) {
-    Inequality *curr1 = *it1;
+    Inequality *inequality1 = *it1;
 
     for (std::vector<Inequality *>::iterator it2 = pack2.begin(),
                                              it2End = pack2.end();
          it2 != it2End; ++it2) {
-      Inequality *curr2 = *it2;
+      Inequality *inequality2 = *it2;
 
-      std::map<ref<Expr>, int64_t> left = curr1->getRhs();
-      std::map<ref<Expr>, int64_t> right = curr2->getRhs();
-      simplifyMatching(left, right);
-      if (left.size() > 0 && right.size() > 0) {
-        result.push_back(new Inequality(kind, left, right));
-      }
+      std::map<ref<Expr>, int64_t> left = inequality1->getRhs();
+      std::map<ref<Expr>, int64_t> right = inequality2->getRhs();
+      result.push_back(new Inequality(kind, left, right));
     }
-  }
-}
-
-void Inequality::simplifyMatching(std::map<ref<Expr>, int64_t> &lhs,
-                                  std::map<ref<Expr>, int64_t> &rhs) {
-  for (std::map<ref<Expr>, int64_t>::iterator l = lhs.begin(), lEnd = lhs.end();
-       l != lEnd; ++l) {
-
-    for (std::map<ref<Expr>, int64_t>::iterator r = rhs.begin(),
-                                                rEnd = rhs.end();
-         r != rEnd; ++r) {
-
-      if (r->first.operator==(l->first)) {
-        if (l->second > r->second) {
-          l->second = l->second - r->second;
-          r->second = 0;
-        } else if (l->second < r->second) {
-          r->second = r->second - l->second;
-          l->second = 0;
-        } else if (l->second == r->second) {
-          l->second = 0;
-          r->second = 0;
-        }
-      }
-    }
-  }
-
-  std::map<ref<Expr>, int64_t>::iterator itLeft = lhs.begin();
-  while (itLeft != lhs.end()) {
-    if (itLeft->second == 0)
-      lhs.erase(itLeft++);
-    else
-      ++itLeft;
-  }
-
-  std::map<ref<Expr>, int64_t>::iterator itRight = rhs.begin();
-  while (itRight != rhs.end()) {
-    if (itRight->second == 0)
-      rhs.erase(itRight++);
-    else
-      ++itRight;
-  }
-
-  if (lhs.size() >= 1 && containsNonConstantExpr(lhs) && rhs.size() == 0) {
-    rhs.insert(std::make_pair(
-        ConstantExpr::alloc(0, lhs.begin()->first->getWidth()), 0));
-  } else if (rhs.size() >= 1 && containsNonConstantExpr(rhs) &&
-             lhs.size() == 0) {
-    lhs.insert(std::make_pair(
-        ConstantExpr::alloc(0, rhs.begin()->first->getWidth()), 0));
   }
 }
 

@@ -337,9 +337,6 @@ class Inequality {
                            std::vector<Inequality *> pack2,
                            std::vector<Inequality *> &result);
 
-  static void simplifyMatching(std::map<ref<Expr>, int64_t> &leftResult,
-                               std::map<ref<Expr>, int64_t> &rightResult);
-
   static bool containsNonConstantExpr(std::map<ref<Expr>, int64_t> map);
 
 public:
