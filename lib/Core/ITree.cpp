@@ -2165,7 +2165,10 @@ Inequality::coefficientOperation(Expr::Kind kind,
 }
 
 bool Inequality::normalize(const Array *onFocusExistential) {
-  bool isOnFocusVarOnLeft = false;
+  bool isOnFocusVarOnLeft = false; // Denotes if the normalization successfully
+                                   // moved the focus variable to the lhs, such
+                                   // that the lhs only contains a term whose
+                                   // variable is the focus variable.
 
   std::map<ref<Expr>, int64_t> localLhs(lhs);
   std::map<ref<Expr>, int64_t> localRhs(rhs);

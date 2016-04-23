@@ -347,6 +347,13 @@ public:
 
   ~Inequality();
 
+  /// Normalize the current inequality by bringing the term with focus
+  /// variable to the lhs and the rest of the expressions to the rhs.
+  ///
+  /// \param The focus variable (a KLEE array).
+  /// \return Success status, where true means that the operation the
+  ///        the procedure successfully brought the term with focus
+  ///        variable to the rhs of the inequality.
   bool normalize(const Array *onFocusExistential);
 
   std::map<ref<Expr>, int64_t> getLhs() const;
