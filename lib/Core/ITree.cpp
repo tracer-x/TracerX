@@ -2164,125 +2164,129 @@ Inequality::coefficientOperation(Expr::Kind kind,
   return map2;
 }
 
-bool Inequality::normalize(const Array *onFocusExistential) {
+bool Inequality::normalize(const Array *focusVariable) {
   bool isOnFocusVarOnLeft = false; // Denotes if the normalization successfully
                                    // moved the focus variable to the lhs, such
                                    // that the lhs only contains a term whose
                                    // variable is the focus variable.
 
-  std::map<ref<Expr>, int64_t> localLhs(lhs);
-  std::map<ref<Expr>, int64_t> localRhs(rhs);
+  std::map<ref<Expr>, int64_t> newLhs;
+  std::map<ref<Expr>, int64_t> newRhs;
 
   int64_t onFocusVarCoefficient = 0;
 
-  for (std::map<ref<Expr>, int64_t>::iterator lhsTermsIter = localLhs.begin(),
-                                              lhsTermsIterEnd = localLhs.end();
+  for (std::map<ref<Expr>, int64_t>::iterator lhsTermsIter = lhs.begin(),
+                                              lhsTermsIterEnd = lhs.end();
        lhsTermsIter != lhsTermsIterEnd; ++lhsTermsIter) {
 
     ref<Expr> currExpr = lhsTermsIter->first;
     int64_t currCoefficient = lhsTermsIter->second;
 
     if (SubsumptionTableEntry::isVariable(currExpr)) {
-      if (getArrayFromConcatExpr(currExpr) == onFocusExistential) {
+      if (getArrayFromConcatExpr(currExpr) == focusVariable) {
         // The variable of the current term is the focus variable.
+        if (newLhs.count(currExpr) > 0) {
+          newLhs[currExpr] = newLhs[currExpr] + currCoefficient;
+        } else {
+          newLhs[currExpr] = currCoefficient;
+        }
         onFocusVarCoefficient = lhsTermsIter->second;
         isOnFocusVarOnLeft = true;
       } else {
-        // Move variable other than on focus existential variable to the right
-        // hand side then, delete it from left map
-        if (localRhs.count(lhsTermsIter->first) > 0) {
+        // Move variable other than on focus existential variable to the rhs.
+        if (newRhs.count(currExpr) > 0) {
           // The rhs already contains the lhs term's variable, subtract the
           // term's coefficient with the lhs term's coefficient.
-          localRhs.at(lhsTermsIter->first) =
-              localRhs.at(lhsTermsIter->first) - currCoefficient;
+          newRhs[currExpr] = newRhs[currExpr] - currCoefficient;
         } else {
           // The rhs does not contain the lhs term's variable, add the term
           // to the rhs
-          localRhs.insert(
-              std::make_pair(lhsTermsIter->first, currCoefficient * (-1)));
+          newRhs[currExpr] = 0 - currCoefficient;
         }
-        localLhs.erase(lhsTermsIter);
       }
-    } else if (llvm::isa<ConstantExpr>(lhsTermsIter->first)) {
-      // Move variable other than on focus existential variable to the right
-      // hand side then, delete it from left map
-      if (localRhs.count(lhsTermsIter->first) > 0) {
+    } else {
+      // Move terms other than on focus existential variable to the rhs
+      if (newRhs.count(currExpr) > 0) {
         // The rhs already contains the lhs term's variable, subtract the term's
         // coefficient with the lhs term's coefficient.
-        localRhs.at(lhsTermsIter->first) =
-            localRhs.at(lhsTermsIter->first) - currCoefficient;
+        newRhs[currExpr] = newRhs[currExpr] - currCoefficient;
       } else {
         // The rhs does not contain the lhs term's variable, add the term
         // to the rhs
-        localRhs.insert(
-            std::make_pair(lhsTermsIter->first, currCoefficient * (-1)));
+        newRhs[currExpr] = 0 - currCoefficient;
       }
-      localLhs.erase(lhsTermsIter);
     }
   }
 
-  // If we find on focus exist variable on the right hand side,
-  // move it to the left hand side
-  for (std::map<ref<Expr>, int64_t>::iterator rhsTermsIter = localRhs.begin(),
-                                              rhsTermsIterEnd = localRhs.end();
+  for (std::map<ref<Expr>, int64_t>::iterator rhsTermsIter = rhs.begin(),
+                                              rhsTermsIterEnd = rhs.end();
        rhsTermsIter != rhsTermsIterEnd; ++rhsTermsIter) {
 
     ref<Expr> currExpr = rhsTermsIter->first;
     int64_t currCoefficient = rhsTermsIter->second;
 
     if (SubsumptionTableEntry::isVariable(currExpr)) {
-      if (getArrayFromConcatExpr(currExpr) == onFocusExistential) {
-        if (localLhs.count(rhsTermsIter->first) > 0) {
-          localLhs.at(rhsTermsIter->first) =
-              localLhs.at(rhsTermsIter->first) - currCoefficient;
+      // If we find on focus exist variable on the right hand side,
+      // move it to the left hand side
+      if (getArrayFromConcatExpr(currExpr) == focusVariable) {
+        if (newLhs.count(currExpr) > 0) {
+          newLhs[currExpr] = newLhs[currExpr] - currCoefficient;
         } else {
-          localLhs.insert(
-              std::make_pair(rhsTermsIter->first, currCoefficient * (-1)));
+          newLhs[currExpr] = 0 - currCoefficient;
         }
-        onFocusVarCoefficient = localLhs.at(rhsTermsIter->first);
+        onFocusVarCoefficient = newLhs[currExpr];
         isOnFocusVarOnLeft = true;
-        localRhs.erase(rhsTermsIter);
+      } else {
+        if (newRhs.count(currExpr) > 0) {
+          newRhs[currExpr] = newRhs[currExpr] - currCoefficient;
+        } else {
+          newRhs[currExpr] = 0 - currCoefficient;
+        }
+      }
+    } else {
+      if (newRhs.count(currExpr) > 0) {
+        newRhs[currExpr] = newRhs[currExpr] - currCoefficient;
+      } else {
+        newRhs[currExpr] = 0 - currCoefficient;
       }
     }
   }
 
-  Expr::Kind localKind(kind);
+  Expr::Kind newKind(kind);
 
   // Divide both sides with onFocusVariable coefficient.
-  if (onFocusExistential &&
+  if (focusVariable &&
       (onFocusVarCoefficient != 1 && onFocusVarCoefficient != 0)) {
 
-    for (std::map<ref<Expr>, int64_t>::iterator
-             lhsTermsIter = localLhs.begin(),
-             lhsTermsIterEnd = localLhs.end();
+    for (std::map<ref<Expr>, int64_t>::iterator lhsTermsIter = newLhs.begin(),
+                                                lhsTermsIterEnd = newLhs.end();
          lhsTermsIter != lhsTermsIterEnd; ++lhsTermsIter) {
       lhsTermsIter->second = lhsTermsIter->second / onFocusVarCoefficient;
     }
 
-    for (std::map<ref<Expr>, int64_t>::iterator
-             rhsTermsIter = localRhs.begin(),
-             rhsTermsIterEnd = localRhs.end();
+    for (std::map<ref<Expr>, int64_t>::iterator rhsTermsIter = newRhs.begin(),
+                                                rhsTermsIterEnd = newRhs.end();
          rhsTermsIter != rhsTermsIterEnd; ++rhsTermsIter) {
       rhsTermsIter->second = rhsTermsIter->second / onFocusVarCoefficient;
     }
 
     // If we divide with negative values, the expression's Kind will be reversed
     if (onFocusVarCoefficient < 0) {
-      switch (localKind) {
+      switch (newKind) {
       case Expr::Sle: {
-        localKind = Expr::Sge;
+        newKind = Expr::Sge;
         break;
       }
       case Expr::Sge: {
-        localKind = Expr::Sle;
+        newKind = Expr::Sle;
         break;
       }
       case Expr::Slt: {
-        localKind = Expr::Sgt;
+        newKind = Expr::Sgt;
         break;
       }
       case Expr::Sgt: {
-        localKind = Expr::Slt;
+        newKind = Expr::Slt;
         break;
       }
       default:
@@ -2291,21 +2295,23 @@ bool Inequality::normalize(const Array *onFocusExistential) {
     }
   }
 
-  if (localLhs.size() >= 1 && containsNonConstantExpr(localLhs) &&
-      localRhs.size() == 0) {
-    localRhs.insert(std::make_pair(
-        ConstantExpr::alloc(0, localLhs.begin()->first->getWidth()), 0));
-  } else if (localRhs.size() >= 1 && containsNonConstantExpr(localRhs) &&
-             localLhs.size() == 0) {
-    localLhs.insert(std::make_pair(
-        ConstantExpr::alloc(0, localRhs.begin()->first->getWidth()), 0));
+  if (newLhs.size() >= 1 && containsNonConstantExpr(newLhs) &&
+      newRhs.size() == 0) {
+    ref<Expr> zero = ConstantExpr::alloc(0, newLhs.begin()->first->getWidth());
+    newRhs[zero] = 0;
+  } else if (newRhs.size() >= 1 && containsNonConstantExpr(newRhs) &&
+             newLhs.size() == 0) {
+    ref<Expr> zero = ConstantExpr::alloc(0, newRhs.begin()->first->getWidth());
+    newLhs[zero] = 0;
   }
 
-  if (localLhs.size() > 0 && localRhs.size() > 0) {
+  if (newLhs.size() > 0 && newRhs.size() > 0) {
     // We do the actual normalization here
-    lhs = localLhs;
-    rhs = localRhs;
-    kind = localKind;
+    lhs.clear();
+    lhs = newLhs;
+    rhs.clear();
+    rhs = newRhs;
+    kind = newKind;
     return isOnFocusVarOnLeft;
   }
 
