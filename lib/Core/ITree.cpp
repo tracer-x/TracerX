@@ -958,9 +958,6 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
   if (!expr)
     return existsExpr;
 
-  llvm::errs() << "Simplifying with Fourier-Motzkin:\n";
-  expr->dump();
-
   std::vector<const Array *> boundVariables = expr->variables;
   ref<Expr> body = expr->body;
 
@@ -984,30 +981,11 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
 
   std::vector<ref<Expr> > interpolantPack = simplifiable1.first;
   std::vector<ref<Expr> > equalityPack = simplifiable2.first;
-
-  llvm::errs() << "INTERPOLANT PACK:\n";
-  for (std::vector<ref<Expr> >::iterator it = interpolantPack.begin(),
-                                         itEnd = interpolantPack.end();
-       it != itEnd; ++it) {
-    (*it)->dump();
-  }
-
-  llvm::errs() << "INTERPOLANT PACK END\n";
-
-  llvm::errs() << "EQUALITY PACK:\n";
-  for (std::vector<ref<Expr> >::iterator it = equalityPack.begin(),
-                                         itEnd = equalityPack.end();
-       it != itEnd; ++it) {
-    (*it)->dump();
-  }
-  llvm::errs() << "EQUALITY PACK END\n";
-
   std::vector<Inequality *> inequalityPack;
 
   // STEP 1a: represent KLEE expression in equality pack
   // into InequalityExpr data structure that enable us to do arithmetic
   // operation
-  llvm::errs() << "STEP 1a\n";
   for (std::vector<ref<Expr> >::iterator it = equalityPack.begin(),
                                          itEnd = equalityPack.end();
        it != itEnd; ++it) {
@@ -1017,23 +995,13 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
   // STEP 1b: represent KLEE expression in interpolant pack
   // into InequalityExpr data structure that enable us to do arithmetic
   // operation
-  llvm::errs() << "STEP 1b\n";
   for (std::vector<ref<Expr> >::iterator it = interpolantPack.begin(),
                                          itEnd = interpolantPack.end();
        it != itEnd; ++it) {
     inequalityPack.push_back(new Inequality(*it));
   }
 
-  llvm::errs() << "INEQUALITY PACK A\n";
-  for (std::vector<Inequality *>::iterator it = inequalityPack.begin(),
-                                           itEnd = inequalityPack.end();
-       it != itEnd; ++it) {
-    (*it)->dump();
-  }
-  llvm::errs() << "INEQUALITY PACK A END\n";
-
   // STEP 2: core of Fourier-Motzkin algorithm
-  llvm::errs() << "STEP 2\n";
   for (std::vector<const Array *>::iterator
            boundVariablesIt = boundVariables.begin(),
            boundVariablesItEnd = boundVariables.end();
@@ -1053,15 +1021,10 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
          inqt != inqtEnd; ++inqt) {
       Inequality *currIneq = *inqt;
 
-      llvm::errs() << "BEFORE NORMALIZATION: ";
-      currIneq->dump();
-
       // Normalize the current inequality, by moving the on-focus
       // variable to the lhs, and the other terms to the rhs.
       if (currIneq->normalize(currExistVar)) {
         // Normalization resulted in useful inequality
-        llvm::errs() << "SUCCESSFUL NORMALIZATION: ";
-        currIneq->dump();
         if (Inequality::containsNonConstantExpr(currIneq->getLhs())) {
           // STEP 2b: divide the inequalityPack into separated packs
           // based on its operator existVar <= (lessThanPack), existVar >=
@@ -1073,13 +1036,10 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
         } else {
           nonePack.push_back(currIneq);
         }
-      } else {
-        llvm::errs() << "NORMALIZATION DID NOT RESULT IN USEFUL INEQUALITY\n";
       }
     }
 
     // STEP 3: matching between inequality
-    llvm::errs() << "STEP 3\n";
     std::vector<Inequality *> resultPack;
     resultPack = Inequality::match(lePack, gePack, ltPack, gtPack);
 
@@ -1089,20 +1049,20 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
   }
 
   // STEP 4: reconstruct the result back to KLEE expression
-  llvm::errs() << "STEP 4\n";
   if (inequalityPack.size() == 0)
     return existsExpr;
 
-  llvm::errs() << "INEQUALITY PACK X\n";
-  for (std::vector<Inequality *>::iterator it = inequalityPack.begin(),
-                                           itEnd = inequalityPack.end();
-       it != itEnd; ++it) {
-    (*it)->dump();
-  }
-  llvm::errs() << "INEQUALITY PACK X END\n";
   ref<Expr> result = reconstructExpr(inequalityPack);
-  llvm::errs() << "RESULT: ";
-  result->dump();
+  if (hasExistentials(expr->variables, result)) {
+    // Here we rebuild using original existentials, although
+    // some existentials may have been eliminated. In the
+    // future, we may be able to engineer hasExistentials
+    // to return the actual existentials used so that we
+    // can rebuild using those existentials only, which may
+    // help naive solvers to not enumerating solutions for
+    // the unused existentials.
+    result = expr->rebuild(&result);
+  }
   return result;
 }
 
@@ -1120,106 +1080,6 @@ ref<Expr> SubsumptionTableEntry::reconstructExpr(
   }
   return result;
 }
-
-// ref<Expr> SubsumptionTableEntry::reconstructExpr(
-//    std::vector<Inequality *> &inequalityPack) {
-//  ref<Expr> result;
-//
-//  for (std::vector<Inequality *>::iterator
-//           it1 = inequalityPack.begin(),
-//           it1End = inequalityPack.end();
-//       it1 != it1End; ++it1) {
-//
-//    Inequality *currInequality = *it1;
-//    ref<Expr> lhsExpr;
-//    ref<Expr> rhsExpr;
-//
-//    llvm::errs() << "PROCESSING INEQUALITY: ";
-//    currInequality->dump();
-//
-//    llvm::errs() << "LHS SIZE IS: " << currInequality->getLhs().size() <<
-// "\n";
-//    for (std::map<ref<Expr>, int64_t>::iterator
-//             it2 = currInequality->getLhs().begin(),
-//             it2End = currInequality->getLhs().end();
-//         it2 != it2End; ++it2) {
-//      if (it2 == it2End) {
-//        llvm::errs() << "YYY\n";
-//      }
-//      llvm::errs() << "X\n";
-//      it2->first->dump();
-//      llvm::errs() << "XX: " << it2->second << "\n";
-//      ref<Expr> tmp;
-//
-//      if (!it2->first.get()) {
-//        llvm::errs() << "NULL FOUND\n";
-//      }
-//
-//      if (llvm::isa<ConstantExpr>(it2->first)) {
-//        llvm::errs() << "FOUND CONSTANT: ";
-//        it2->first->dump();
-//        llvm::errs() << "VALUE = " << it2->second << "\n";
-//        tmp = ConstantExpr::create(it2->second,
-//                                   it2->first->getWidth());
-//      } else {
-//        tmp = it2->first;
-//        if (it2->second > 1) {
-//          tmp = MulExpr::create(
-//              tmp, ConstantExpr::create(it2->second,
-//                                        it2->first->getWidth()));
-//        }
-//      }
-//
-//      if (lhsExpr.get()) {
-//        lhsExpr = AddExpr::alloc(lhsExpr, tmp);
-//      } else {
-//        lhsExpr = tmp;
-//      }
-//
-//      llvm::errs() << "Y\n";
-//    }
-//
-//    llvm::errs() << "ZZZ\n";
-//
-//    for (std::map<ref<Expr>, int64_t>::iterator
-//             r = currInequality->getRhs().begin(),
-//             rEnd = currInequality->getRhs().end();
-//         r != rEnd; ++r) {
-//
-//      ref<Expr> currExpr = r->first;
-//      ref<Expr> tempRight;
-//      if (llvm::isa<ConstantExpr>(r->first)) {
-//        tempRight = ConstantExpr::create(r->second, r->first->getWidth());
-//      } else {
-//        tempRight = r->first;
-//        if (r->second > 1) {
-//          tempRight = MulExpr::create(
-//              tempRight, ConstantExpr::create(r->second,
-// r->first->getWidth()));
-//        }
-//      }
-//
-//      if (rhsExpr.get()) {
-//        rhsExpr = AddExpr::create(rhsExpr, tempRight);
-//      } else {
-//        rhsExpr = tempRight;
-//      }
-//    }
-//    llvm::errs() << "LEFT EXPR: ";
-//    lhsExpr->dump();
-//    llvm::errs() << "RIGHT EXPR: ";
-//    rhsExpr->dump();
-//
-//    ref<Expr> temp =
-//        createBinaryExpr(currInequality->getKind(), lhsExpr, rhsExpr);
-//    if (result.get()) {
-//      result = AndExpr::alloc(result, temp);
-//    } else {
-//      result = temp;
-//    }
-//  }
-//  return result;
-//}
 
 void SubsumptionTableEntry::classify(const Array *onFocusExistential,
                                      Inequality *currIneq,
@@ -2030,30 +1890,17 @@ ref<Expr> Inequality::reconstructLinearExpression(
            linearTermsIter = linearTerms.begin(),
            linearTermsIterEnd = linearTerms.end();
        linearTermsIter != linearTermsIterEnd; ++linearTermsIter) {
-    if (linearTermsIter == linearTermsIterEnd) {
-      llvm::errs() << "YYY\n";
-    }
-    llvm::errs() << "X\n";
-    linearTermsIter->first->dump();
-    llvm::errs() << "XX: " << linearTermsIter->second << "\n";
     ref<Expr> tmp;
 
-    if (!linearTermsIter->first.get()) {
-      llvm::errs() << "NULL FOUND\n";
-    }
-
     if (llvm::isa<ConstantExpr>(linearTermsIter->first)) {
-      llvm::errs() << "FOUND CONSTANT: ";
-      linearTermsIter->first->dump();
-      llvm::errs() << "VALUE = " << linearTermsIter->second << "\n";
-      tmp = ConstantExpr::create(linearTermsIter->second,
-                                 linearTermsIter->first->getWidth());
+      tmp = ConstantExpr::alloc((uint64_t)linearTermsIter->second,
+                                linearTermsIter->first->getWidth());
     } else {
       tmp = linearTermsIter->first;
       if (linearTermsIter->second > 1) {
         tmp = MulExpr::create(
-            tmp, ConstantExpr::create(linearTermsIter->second,
-                                      linearTermsIter->first->getWidth()));
+            tmp, ConstantExpr::alloc((uint64_t)linearTermsIter->second,
+                                     linearTermsIter->first->getWidth()));
       }
     }
 
@@ -2062,8 +1909,6 @@ ref<Expr> Inequality::reconstructLinearExpression(
     } else {
       result = tmp;
     }
-
-    llvm::errs() << "Y\n";
   }
 
   return result;
