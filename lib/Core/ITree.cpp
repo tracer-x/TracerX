@@ -1109,98 +1109,117 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
 ref<Expr> SubsumptionTableEntry::reconstructExpr(
     std::vector<Inequality *> &inequalityPack) {
   ref<Expr> result;
-
-  for (std::vector<Inequality *>::iterator
-           inequalityIter = inequalityPack.begin(),
-           inequalityIterEnd = inequalityPack.end();
-       inequalityIter != inequalityIterEnd; ++inequalityIter) {
-
-    Inequality *currInequality = *inequalityIter;
-    ref<Expr> lhsExpr;
-    ref<Expr> rhsExpr;
-
-    llvm::errs() << "PROCESSING INEQUALITY: ";
-    currInequality->dump();
-
-    llvm::errs() << "LHS SIZE IS: " << currInequality->getLhs().size() << "\n";
-    for (std::map<ref<Expr>, int64_t>::iterator
-             lhsTermsIter = currInequality->getLhs().begin(),
-             lhsTermsIterEnd = currInequality->getLhs().end();
-         lhsTermsIter != lhsTermsIterEnd; ++lhsTermsIter) {
-      if (lhsTermsIter == lhsTermsIterEnd) {
-        llvm::errs() << "YYY\n";
-      }
-      llvm::errs() << "X\n";
-      lhsTermsIter->first->dump();
-      llvm::errs() << "XX: " << lhsTermsIter->second << "\n";
-      ref<Expr> tmp;
-
-      if (!lhsTermsIter->first.get()) {
-        llvm::errs() << "NULL FOUND\n";
-      }
-
-      if (llvm::isa<ConstantExpr>(lhsTermsIter->first)) {
-        llvm::errs() << "FOUND CONSTANT: ";
-        lhsTermsIter->first->dump();
-        llvm::errs() << "VALUE = " << lhsTermsIter->second << "\n";
-        tmp = ConstantExpr::create(lhsTermsIter->second,
-                                   lhsTermsIter->first->getWidth());
-      } else {
-        tmp = lhsTermsIter->first;
-        if (lhsTermsIter->second > 1) {
-          tmp = MulExpr::create(
-              tmp, ConstantExpr::create(lhsTermsIter->second,
-                                        lhsTermsIter->first->getWidth()));
-        }
-      }
-
-      if (lhsExpr.get()) {
-        lhsExpr = AddExpr::alloc(lhsExpr, tmp);
-      } else {
-        lhsExpr = tmp;
-      }
-
-      llvm::errs() << "Y\n";
-    }
-
-    for (std::map<ref<Expr>, int64_t>::iterator
-             r = currInequality->getRhs().begin(),
-             rEnd = currInequality->getRhs().end();
-         r != rEnd; ++r) {
-
-      ref<Expr> currExpr = r->first;
-      ref<Expr> tempRight;
-      if (llvm::isa<ConstantExpr>(r->first)) {
-        tempRight = ConstantExpr::create(r->second, r->first->getWidth());
-      } else {
-        tempRight = r->first;
-        if (r->second > 1) {
-          tempRight = MulExpr::create(
-              tempRight, ConstantExpr::create(r->second, r->first->getWidth()));
-        }
-      }
-
-      if (rhsExpr.get()) {
-        rhsExpr = AddExpr::create(rhsExpr, tempRight);
-      } else {
-        rhsExpr = tempRight;
-      }
-    }
-    llvm::errs() << "LEFT EXPR: ";
-    lhsExpr->dump();
-    llvm::errs() << "RIGHT EXPR: ";
-    rhsExpr->dump();
-
-    ref<Expr> temp =
-        createBinaryExpr(currInequality->getKind(), lhsExpr, rhsExpr);
-    if (result.get()) {
-      result = AndExpr::alloc(result, temp);
-    } else {
-      result = temp;
-    }
+  for (std::vector<Inequality *>::iterator it = inequalityPack.begin(),
+                                           itEnd = inequalityPack.end();
+       it != itEnd; ++it) {
+    ref<Expr> reconstructedInequality((*it)->reconstructExpr());
+    if (result.get())
+      result = AndExpr::alloc(result, reconstructedInequality);
+    else
+      result = reconstructedInequality;
   }
   return result;
 }
+
+// ref<Expr> SubsumptionTableEntry::reconstructExpr(
+//    std::vector<Inequality *> &inequalityPack) {
+//  ref<Expr> result;
+//
+//  for (std::vector<Inequality *>::iterator
+//           it1 = inequalityPack.begin(),
+//           it1End = inequalityPack.end();
+//       it1 != it1End; ++it1) {
+//
+//    Inequality *currInequality = *it1;
+//    ref<Expr> lhsExpr;
+//    ref<Expr> rhsExpr;
+//
+//    llvm::errs() << "PROCESSING INEQUALITY: ";
+//    currInequality->dump();
+//
+//    llvm::errs() << "LHS SIZE IS: " << currInequality->getLhs().size() <<
+// "\n";
+//    for (std::map<ref<Expr>, int64_t>::iterator
+//             it2 = currInequality->getLhs().begin(),
+//             it2End = currInequality->getLhs().end();
+//         it2 != it2End; ++it2) {
+//      if (it2 == it2End) {
+//        llvm::errs() << "YYY\n";
+//      }
+//      llvm::errs() << "X\n";
+//      it2->first->dump();
+//      llvm::errs() << "XX: " << it2->second << "\n";
+//      ref<Expr> tmp;
+//
+//      if (!it2->first.get()) {
+//        llvm::errs() << "NULL FOUND\n";
+//      }
+//
+//      if (llvm::isa<ConstantExpr>(it2->first)) {
+//        llvm::errs() << "FOUND CONSTANT: ";
+//        it2->first->dump();
+//        llvm::errs() << "VALUE = " << it2->second << "\n";
+//        tmp = ConstantExpr::create(it2->second,
+//                                   it2->first->getWidth());
+//      } else {
+//        tmp = it2->first;
+//        if (it2->second > 1) {
+//          tmp = MulExpr::create(
+//              tmp, ConstantExpr::create(it2->second,
+//                                        it2->first->getWidth()));
+//        }
+//      }
+//
+//      if (lhsExpr.get()) {
+//        lhsExpr = AddExpr::alloc(lhsExpr, tmp);
+//      } else {
+//        lhsExpr = tmp;
+//      }
+//
+//      llvm::errs() << "Y\n";
+//    }
+//
+//    llvm::errs() << "ZZZ\n";
+//
+//    for (std::map<ref<Expr>, int64_t>::iterator
+//             r = currInequality->getRhs().begin(),
+//             rEnd = currInequality->getRhs().end();
+//         r != rEnd; ++r) {
+//
+//      ref<Expr> currExpr = r->first;
+//      ref<Expr> tempRight;
+//      if (llvm::isa<ConstantExpr>(r->first)) {
+//        tempRight = ConstantExpr::create(r->second, r->first->getWidth());
+//      } else {
+//        tempRight = r->first;
+//        if (r->second > 1) {
+//          tempRight = MulExpr::create(
+//              tempRight, ConstantExpr::create(r->second,
+// r->first->getWidth()));
+//        }
+//      }
+//
+//      if (rhsExpr.get()) {
+//        rhsExpr = AddExpr::create(rhsExpr, tempRight);
+//      } else {
+//        rhsExpr = tempRight;
+//      }
+//    }
+//    llvm::errs() << "LEFT EXPR: ";
+//    lhsExpr->dump();
+//    llvm::errs() << "RIGHT EXPR: ";
+//    rhsExpr->dump();
+//
+//    ref<Expr> temp =
+//        createBinaryExpr(currInequality->getKind(), lhsExpr, rhsExpr);
+//    if (result.get()) {
+//      result = AndExpr::alloc(result, temp);
+//    } else {
+//      result = temp;
+//    }
+//  }
+//  return result;
+//}
 
 void SubsumptionTableEntry::classify(const Array *onFocusExistential,
                                      Inequality *currIneq,
@@ -2003,6 +2022,53 @@ void Inequality::removeEliminated(std::vector<Inequality *> &inequalityList,
   inequalityList.clear();
 }
 
+ref<Expr> Inequality::reconstructLinearExpression(
+    std::map<ref<Expr>, int64_t> linearTerms) {
+  ref<Expr> result;
+
+  for (std::map<ref<Expr>, int64_t>::iterator
+           linearTermsIter = linearTerms.begin(),
+           linearTermsIterEnd = linearTerms.end();
+       linearTermsIter != linearTermsIterEnd; ++linearTermsIter) {
+    if (linearTermsIter == linearTermsIterEnd) {
+      llvm::errs() << "YYY\n";
+    }
+    llvm::errs() << "X\n";
+    linearTermsIter->first->dump();
+    llvm::errs() << "XX: " << linearTermsIter->second << "\n";
+    ref<Expr> tmp;
+
+    if (!linearTermsIter->first.get()) {
+      llvm::errs() << "NULL FOUND\n";
+    }
+
+    if (llvm::isa<ConstantExpr>(linearTermsIter->first)) {
+      llvm::errs() << "FOUND CONSTANT: ";
+      linearTermsIter->first->dump();
+      llvm::errs() << "VALUE = " << linearTermsIter->second << "\n";
+      tmp = ConstantExpr::create(linearTermsIter->second,
+                                 linearTermsIter->first->getWidth());
+    } else {
+      tmp = linearTermsIter->first;
+      if (linearTermsIter->second > 1) {
+        tmp = MulExpr::create(
+            tmp, ConstantExpr::create(linearTermsIter->second,
+                                      linearTermsIter->first->getWidth()));
+      }
+    }
+
+    if (result.get()) {
+      result = AddExpr::alloc(result, tmp);
+    } else {
+      result = tmp;
+    }
+
+    llvm::errs() << "Y\n";
+  }
+
+  return result;
+}
+
 std::vector<Inequality *> Inequality::match(std::vector<Inequality *> lePack,
                                             std::vector<Inequality *> gePack,
                                             std::vector<Inequality *> ltPack,
@@ -2080,6 +2146,11 @@ std::map<ref<Expr>, int64_t> Inequality::getLinearTerms(ref<Expr> expr) {
   }
 
   return map;
+}
+
+ref<Expr> Inequality::reconstructExpr() const {
+  return SubsumptionTableEntry::createBinaryExpr(
+      kind, reconstructLinearExpression(lhs), reconstructLinearExpression(rhs));
 }
 
 std::map<ref<Expr>, int64_t>

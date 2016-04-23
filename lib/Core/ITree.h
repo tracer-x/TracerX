@@ -359,6 +359,9 @@ class Inequality {
   static void removeEliminated(std::vector<Inequality *> &inequalityList,
                                std::vector<Inequality *> &result);
 
+  static ref<Expr>
+  reconstructLinearExpression(std::map<ref<Expr>, int64_t> linearTerms);
+
 public:
   Inequality(ref<Expr> expr);
 
@@ -398,6 +401,11 @@ public:
         std::vector<Inequality *> strictGreaterThanPack);
 
   static bool containsNonConstantExpr(std::map<ref<Expr>, int64_t> map);
+
+  /// Build KLEE expression from the current inequality
+  ///
+  /// \return The reconstructed expression
+  ref<Expr> reconstructExpr() const;
 
   void dump() const {
     this->print(llvm::errs());
@@ -455,9 +463,6 @@ class SubsumptionTableEntry {
                               ref<Expr> expr);
 
   static bool hasFree(std::vector<const Array *> &existentials, ref<Expr> expr);
-
-  static ref<Expr> createBinaryExpr(Expr::Kind kind, ref<Expr> newLhs,
-                                    ref<Expr> newRhs);
 
   static bool containShadowExpr(ref<Expr> expr, ref<Expr> shadowExpr);
 
@@ -540,6 +545,9 @@ public:
   static bool isVariable(ref<Expr> expr) {
     return llvm::isa<ConcatExpr>(expr.get()) || llvm::isa<ReadExpr>(expr.get());
   }
+
+  static ref<Expr> createBinaryExpr(Expr::Kind kind, ref<Expr> newLhs,
+                                    ref<Expr> newRhs);
 
   void dump() const;
 
