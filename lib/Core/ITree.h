@@ -338,11 +338,13 @@ class Inequality {
                            std::vector<Inequality *> pack2,
                            std::vector<Inequality *> &result);
 
-  static bool containsNonConstantExpr(std::map<ref<Expr>, int64_t> map);
-
   static void
   mergeTermToLinearExpression(std::map<ref<Expr>, int64_t> &linearExpr,
                               ref<Expr> &expr, int64_t coefficient) {
+    // Don't add anythingn whose coefficient is zero.
+    if (!coefficient)
+      return;
+
     if (linearExpr.count(expr) > 0) {
       // The linear expression already contains the term's variable, add the
       // term's coefficient with the linear expression term's coefficient.
@@ -364,11 +366,13 @@ public:
 
   /// Normalize the current inequality by bringing the term with focus
   /// variable to the lhs and the rest of the expressions to the rhs.
+  /// In case the focus variable is nonexistent, the lhs will contain
+  /// a single constant 0 term.
   ///
   /// \param The focus variable (a KLEE array).
   /// \return Success status, where true means that the procedure
-  ///         successfully brought the term with focus variable to the
-  //          rhs of the inequality.
+  ///         successfully resulted in informative normalized inequality,
+  //          where some terms are non-constant, and false otherwise.
   bool normalize(const Array *onFocusExistential);
 
   /// This operation sets the elimination status bit to true
@@ -392,6 +396,8 @@ public:
         std::vector<Inequality *> greaterThanPack,
         std::vector<Inequality *> strictLessThanPack,
         std::vector<Inequality *> strictGreaterThanPack);
+
+  static bool containsNonConstantExpr(std::map<ref<Expr>, int64_t> map);
 
   void dump() const {
     this->print(llvm::errs());
@@ -461,8 +467,7 @@ class SubsumptionTableEntry {
                        std::vector<Inequality *> &greaterThanPack,
                        std::vector<Inequality *> &nonePack,
                        std::vector<Inequality *> &strictLessThanPack,
-                       std::vector<Inequality *> &strictGreaterThanPack,
-                       bool isOnFocusVarOnLeft);
+                       std::vector<Inequality *> &strictGreaterThanPack);
 
   static ref<Expr> simplifyConcatExpr(ref<Expr> expr);
 

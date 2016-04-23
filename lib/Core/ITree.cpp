@@ -1058,21 +1058,24 @@ SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
 
       // Normalize the current inequality, by moving the on-focus
       // variable to the lhs, and the other terms to the rhs.
-      bool isOnFocusVarOnLeft = currIneq->normalize(currExistVar);
-
-      llvm::errs() << "AFTER NORMALIZATION: ";
-      currIneq->dump();
-      if (isOnFocusVarOnLeft) {
-        llvm::errs() << "FOCUS VAR LEFT\n";
+      if (currIneq->normalize(currExistVar)) {
+        // Normalization resulted in useful inequality
+        llvm::errs() << "SUCCESSFUL NORMALIZATION: ";
+        currIneq->dump();
+        if (Inequality::containsNonConstantExpr(currIneq->getLhs())) {
+          // STEP 2b: divide the inequalityPack into separated packs
+          // based on its operator existVar <= (lessThanPack), existVar >=
+          // (greaterThanPack), existVar < (strictLessThanPack), existVar >
+          // (strictGreaterThanPack) or (nonePack) if there's no on focus exist
+          // variable in the equation.
+          classify(currExistVar, currIneq, lePack, gePack, ltPack, gtPack,
+                   nonePack);
+        } else {
+          nonePack.push_back(currIneq);
+        }
+      } else {
+        llvm::errs() << "NORMALIZATION DID NOT RESULT IN USEFUL INEQUALITY\n";
       }
-
-      // STEP 2b: divide the inequalityPack into separated packs
-      // based on its operator existVar <= (lessThanPack), existVar >=
-      // (greaterThanPack), existVar < (strictLessThanPack), existVar >
-      // (strictGreaterThanPack) or (nonePack) if there's no on focus exist
-      // variable in the equation.
-      classify(currExistVar, currIneq, lePack, gePack, ltPack, gtPack, nonePack,
-               isOnFocusVarOnLeft);
     }
 
     // STEP 3: matching between inequality
@@ -1199,14 +1202,13 @@ ref<Expr> SubsumptionTableEntry::reconstructExpr(
   return result;
 }
 
-void SubsumptionTableEntry::classify(
-    const Array *onFocusExistential, Inequality *currIneq,
-    std::vector<Inequality *> &lePack, std::vector<Inequality *> &gePack,
-    std::vector<Inequality *> &ltPack, std::vector<Inequality *> &gtPack,
-    std::vector<Inequality *> &nonePack, bool isOnFocusVarOnLeft) {
-  if (!isOnFocusVarOnLeft) {
-    nonePack.push_back(currIneq);
-  } else {
+void SubsumptionTableEntry::classify(const Array *onFocusExistential,
+                                     Inequality *currIneq,
+                                     std::vector<Inequality *> &lePack,
+                                     std::vector<Inequality *> &gePack,
+                                     std::vector<Inequality *> &ltPack,
+                                     std::vector<Inequality *> &gtPack,
+                                     std::vector<Inequality *> &nonePack) {
     if (currIneq->getLhs().size() == 1) {
       if (currIneq->getKind() == Expr::Sle)
         lePack.push_back(currIneq);
@@ -1219,7 +1221,6 @@ void SubsumptionTableEntry::classify(
     } else {
       nonePack.push_back(currIneq);
     }
-  }
 }
 
 ref<Expr> SubsumptionTableEntry::createBinaryExpr(Expr::Kind kind,
@@ -2128,13 +2129,8 @@ Inequality::coefficientOperation(Expr::Kind kind,
 }
 
 bool Inequality::normalize(const Array *focusVariable) {
-  bool isOnFocusVarOnLeft = false; // Denotes if the normalization successfully
-                                   // moved the focus variable to the lhs, such
-                                   // that the lhs only contains a term whose
-                                   // variable is the focus variable.
-
-  std::map<ref<Expr>, int64_t> newLhs;
-  std::map<ref<Expr>, int64_t> newRhs;
+  std::map<ref<Expr>, int64_t> tmpLhs;
+  std::map<ref<Expr>, int64_t> tmpRhs;
 
   int64_t onFocusVarCoefficient = 0;
 
@@ -2148,12 +2144,11 @@ bool Inequality::normalize(const Array *focusVariable) {
     if (SubsumptionTableEntry::isVariable(currExpr) &&
         getArrayFromConcatExpr(currExpr) == focusVariable) {
       // The variable of the current term is the focus variable.
-      mergeTermToLinearExpression(newLhs, currExpr, currCoefficient);
+      mergeTermToLinearExpression(tmpLhs, currExpr, currCoefficient);
       onFocusVarCoefficient = lhsTermsIter->second;
-      isOnFocusVarOnLeft = true;
     } else {
       // Move variable other than on focus existential variable to the rhs.
-      mergeTermToLinearExpression(newRhs, currExpr, 0 - currCoefficient);
+      mergeTermToLinearExpression(tmpRhs, currExpr, 0 - currCoefficient);
     }
   }
 
@@ -2168,11 +2163,10 @@ bool Inequality::normalize(const Array *focusVariable) {
         getArrayFromConcatExpr(currExpr) == focusVariable) {
       // If we find on focus exist variable on the right hand side,
       // move it to the left hand side
-      mergeTermToLinearExpression(newLhs, currExpr, 0 - currCoefficient);
-      onFocusVarCoefficient = newLhs[currExpr];
-      isOnFocusVarOnLeft = true;
+      mergeTermToLinearExpression(tmpLhs, currExpr, 0 - currCoefficient);
+      onFocusVarCoefficient = tmpLhs[currExpr];
     } else {
-      mergeTermToLinearExpression(newRhs, currExpr, currCoefficient);
+      mergeTermToLinearExpression(tmpRhs, currExpr, currCoefficient);
     }
   }
 
@@ -2182,14 +2176,14 @@ bool Inequality::normalize(const Array *focusVariable) {
   if (focusVariable &&
       (onFocusVarCoefficient != 1 && onFocusVarCoefficient != 0)) {
 
-    for (std::map<ref<Expr>, int64_t>::iterator lhsTermsIter = newLhs.begin(),
-                                                lhsTermsIterEnd = newLhs.end();
+    for (std::map<ref<Expr>, int64_t>::iterator lhsTermsIter = tmpLhs.begin(),
+                                                lhsTermsIterEnd = tmpLhs.end();
          lhsTermsIter != lhsTermsIterEnd; ++lhsTermsIter) {
       lhsTermsIter->second = lhsTermsIter->second / onFocusVarCoefficient;
     }
 
-    for (std::map<ref<Expr>, int64_t>::iterator rhsTermsIter = newRhs.begin(),
-                                                rhsTermsIterEnd = newRhs.end();
+    for (std::map<ref<Expr>, int64_t>::iterator rhsTermsIter = tmpRhs.begin(),
+                                                rhsTermsIterEnd = tmpRhs.end();
          rhsTermsIter != rhsTermsIterEnd; ++rhsTermsIter) {
       rhsTermsIter->second = rhsTermsIter->second / onFocusVarCoefficient;
     }
@@ -2219,24 +2213,42 @@ bool Inequality::normalize(const Array *focusVariable) {
     }
   }
 
-  if (newLhs.size() >= 1 && containsNonConstantExpr(newLhs) &&
-      newRhs.size() == 0) {
+  std::map<ref<Expr>, int64_t> newLhs;
+  for (std::map<ref<Expr>, int64_t>::iterator it = tmpLhs.begin(),
+                                              itEnd = tmpLhs.end();
+       it != itEnd; ++it) {
+    if (it->second)
+      newLhs[it->first] = it->second;
+  }
+  tmpLhs.clear();
+
+  std::map<ref<Expr>, int64_t> newRhs;
+  for (std::map<ref<Expr>, int64_t>::iterator it = tmpRhs.begin(),
+                                              itEnd = tmpRhs.end();
+       it != itEnd; ++it) {
+    if (it->second)
+      newRhs[it->first] = it->second;
+  }
+  tmpRhs.clear();
+
+  if (containsNonConstantExpr(newLhs) && newRhs.empty()) {
     ref<Expr> zero = ConstantExpr::alloc(0, newLhs.begin()->first->getWidth());
     newRhs[zero] = 0;
-  } else if (newRhs.size() >= 1 && containsNonConstantExpr(newRhs) &&
-             newLhs.size() == 0) {
+  }
+
+  if (containsNonConstantExpr(newRhs) && newLhs.empty()) {
     ref<Expr> zero = ConstantExpr::alloc(0, newRhs.begin()->first->getWidth());
     newLhs[zero] = 0;
   }
 
-  if (newLhs.size() > 0 && newRhs.size() > 0) {
+  if (!newLhs.empty() && !newLhs.empty()) {
     // We do the actual normalization here
     lhs.clear();
     lhs = newLhs;
     rhs.clear();
     rhs = newRhs;
     kind = newKind;
-    return isOnFocusVarOnLeft;
+    return true;
   }
 
   return false;
