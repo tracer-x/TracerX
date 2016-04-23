@@ -314,17 +314,64 @@ public:
   void setAsMaybeCore();
 };
 
-class Inequality {
-  std::map<ref<Expr>, int64_t> lhs;
-  std::map<ref<Expr>, int64_t> rhs;
-  Expr::Kind kind;
-  bool eliminated;
+class FourierMotzkin {
 
-  Inequality(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
-             std::map<ref<Expr>, int64_t> _rhs);
+  class Inequality {
+    std::map<ref<Expr>, int64_t> lhs;
+    std::map<ref<Expr>, int64_t> rhs;
+    Expr::Kind kind;
+    bool eliminated;
 
-  void init(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
-            std::map<ref<Expr>, int64_t> _rhs, bool _eliminated);
+    void init(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
+              std::map<ref<Expr>, int64_t> _rhs, bool _eliminated);
+
+  public:
+    Inequality(ref<Expr> expr);
+
+    Inequality(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
+               std::map<ref<Expr>, int64_t> _rhs);
+
+    ~Inequality();
+
+    /// This operation sets the elimination status bit to true
+    /// indicating that the inequality is eliminated.
+    void setEliminated() { eliminated = true; }
+
+    /// Query the elimination status of this inequality.
+    ///
+    /// \return The status bit on whether this inequality is
+    ///         eliminated or not.
+    bool isEliminated() const { return eliminated; }
+
+    std::map<ref<Expr>, int64_t> getLhs() const { return lhs; }
+
+    std::map<ref<Expr>, int64_t> getRhs() const { return rhs; }
+
+    Expr::Kind getKind() const { return kind; }
+
+    /// Normalize the current inequality by bringing the term with focus
+    /// variable to the lhs and the rest of the expressions to the rhs.
+    /// In case the focus variable is nonexistent, the lhs will contain
+    /// a single constant 0 term.
+    ///
+    /// \param The focus variable (a KLEE array).
+    /// \return Success status, where true means that the procedure
+    ///         successfully resulted in informative normalized inequality,
+    //          where some terms are non-constant, and false otherwise.
+    bool normalize(const Array *onFocusExistential);
+
+    /// Build KLEE expression from the current inequality
+    ///
+    /// \return The reconstructed expression
+    ref<Expr> reconstructExpr() const;
+
+    void dump() const {
+      this->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+
+    void print(llvm::raw_ostream &stream) const;
+  };
 
   static std::map<ref<Expr>, int64_t> getLinearTerms(ref<Expr> expr);
 
@@ -362,37 +409,29 @@ class Inequality {
   static ref<Expr>
   reconstructLinearExpression(std::map<ref<Expr>, int64_t> linearTerms);
 
-public:
-  Inequality(ref<Expr> expr);
+  static ref<Expr> createBinaryExpr(Expr::Kind kind, ref<Expr> newLhs,
+                                    ref<Expr> newRhs);
 
-  ~Inequality();
+  static bool containsNonConstantExpr(std::map<ref<Expr>, int64_t> map);
 
-  /// Normalize the current inequality by bringing the term with focus
-  /// variable to the lhs and the rest of the expressions to the rhs.
-  /// In case the focus variable is nonexistent, the lhs will contain
-  /// a single constant 0 term.
+  /// Get simplifiable conjuncts from a possible conjunction.
   ///
-  /// \param The focus variable (a KLEE array).
-  /// \return Success status, where true means that the procedure
-  ///         successfully resulted in informative normalized inequality,
-  //          where some terms are non-constant, and false otherwise.
-  bool normalize(const Array *onFocusExistential);
+  /// \param conjunction The conjunction from which we extract simplifiable
+  ///        conjuncts.
+  /// \return A pair consisting of a list of simplifiable conjuncts and the new
+  ///         expression from which the simplifiable conjuncts have been
+  ///         removed. Here all equalities have been converted to pairs of
+  ///         inequalities.
+  static std::pair<std::vector<ref<Expr> >, ref<Expr> >
+  getSimplifiableConjunctsForFourierMotzkin(ref<Expr> conjunction);
 
-  /// This operation sets the elimination status bit to true
-  /// indicating that the inequality is eliminated.
-  void setEliminated() { eliminated = true; }
-
-  /// Query the elimination status of this inequality.
-  ///
-  /// \return The status bit on whether this inequality is
-  ///         eliminated or not.
-  bool isEliminated() const { return eliminated; }
-
-  std::map<ref<Expr>, int64_t> getLhs() const;
-
-  std::map<ref<Expr>, int64_t> getRhs() const;
-
-  Expr::Kind getKind() const;
+  static void classify(const Array *onFocusExistential,
+                       Inequality *inequalityExpr,
+                       std::vector<Inequality *> &lessThanPack,
+                       std::vector<Inequality *> &greaterThanPack,
+                       std::vector<Inequality *> &nonePack,
+                       std::vector<Inequality *> &strictLessThanPack,
+                       std::vector<Inequality *> &strictGreaterThanPack);
 
   static std::vector<Inequality *>
   match(std::vector<Inequality *> lessThanPack,
@@ -400,19 +439,10 @@ public:
         std::vector<Inequality *> strictLessThanPack,
         std::vector<Inequality *> strictGreaterThanPack);
 
-  static bool containsNonConstantExpr(std::map<ref<Expr>, int64_t> map);
+  static ref<Expr> reconstructExpr(std::vector<Inequality *> &pack);
 
-  /// Build KLEE expression from the current inequality
-  ///
-  /// \return The reconstructed expression
-  ref<Expr> reconstructExpr() const;
-
-  void dump() const {
-    this->print(llvm::errs());
-    llvm::errs() << "\n";
-  }
-
-  void print(llvm::raw_ostream &stream) const;
+public:
+  static ref<Expr> simplify(ref<Expr> existsExpr);
 };
 
 class SubsumptionTableEntry {
@@ -459,24 +489,11 @@ class SubsumptionTableEntry {
 
   std::vector<const Array *> existentials;
 
-  static bool hasExistentials(std::vector<const Array *> &existentials,
-                              ref<Expr> expr);
-
   static bool hasFree(std::vector<const Array *> &existentials, ref<Expr> expr);
 
   static bool containShadowExpr(ref<Expr> expr, ref<Expr> shadowExpr);
 
-  static void classify(const Array *onFocusExistential,
-                       Inequality *inequalityExpr,
-                       std::vector<Inequality *> &lessThanPack,
-                       std::vector<Inequality *> &greaterThanPack,
-                       std::vector<Inequality *> &nonePack,
-                       std::vector<Inequality *> &strictLessThanPack,
-                       std::vector<Inequality *> &strictGreaterThanPack);
-
   static ref<Expr> simplifyConcatExpr(ref<Expr> expr);
-
-  static ref<Expr> reconstructExpr(std::vector<Inequality *> &pack);
 
   static ref<Expr> replaceExpr(ref<Expr> originalExpr, ref<Expr> replacedExpr,
                                ref<Expr> withExpr);
@@ -491,19 +508,6 @@ class SubsumptionTableEntry {
   /// whenever it contains constant equalities.
   static ref<Expr> simplifyEqualityExpr(std::vector<ref<Expr> > &equalityPack,
                                         ref<Expr> expr);
-
-  /// Get simplifiable conjuncts from a possible conjunction.
-  ///
-  /// \param conjunction The conjunction from which we extract simplifiable
-  ///        conjuncts.
-  /// \return A pair consisting of a list of simplifiable conjuncts and the new
-  ///         expression from which the simplifiable conjuncts have been
-  ///         removed. Here all equalities have been converted to pairs of
-  ///         inequalities.
-  static std::pair<std::vector<ref<Expr> >, ref<Expr> >
-  getSimplifiableConjunctsForFourierMotzkin(ref<Expr> conjunction);
-
-  static ref<Expr> simplifyWithFourierMotzkin(ref<Expr> existsExpr);
 
   static void convertExpression(ref<Expr> expr,
                                 std::map<ref<Expr>, ref<Expr> > &map);
@@ -546,10 +550,13 @@ public:
     return llvm::isa<ConcatExpr>(expr.get()) || llvm::isa<ReadExpr>(expr.get());
   }
 
-  static ref<Expr> createBinaryExpr(Expr::Kind kind, ref<Expr> newLhs,
-                                    ref<Expr> newRhs);
+  static bool hasExistentials(std::vector<const Array *> &existentials,
+                              ref<Expr> expr);
 
-  void dump() const;
+  void dump() const {
+    this->print(llvm::errs());
+    llvm::errs() << "\n";
+  }
 
   void print(llvm::raw_ostream &stream) const;
 };

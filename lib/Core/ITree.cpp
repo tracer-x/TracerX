@@ -880,239 +880,6 @@ bool SubsumptionTableEntry::hasFree(std::vector<const Array *> &existentials,
   return false;
 }
 
-std::pair<std::vector<ref<Expr> >, ref<Expr> >
-SubsumptionTableEntry::getSimplifiableConjunctsForFourierMotzkin(
-    ref<Expr> conjunction) {
-  std::vector<ref<Expr> > conjunctsList;
-
-  if (!llvm::isa<AndExpr>(conjunction.get())) {
-    if (llvm::isa<EqExpr>(conjunction.get())) {
-      EqExpr *equality = llvm::dyn_cast<EqExpr>(conjunction.get());
-      if (equality->getKid(0)->getWidth() == Expr::Bool &&
-          equality->getKid(0)->isFalse()) {
-        if (llvm::isa<SleExpr>(equality->getKid(1).get())) {
-          SleExpr *expr = llvm::dyn_cast<SleExpr>(equality->getKid(1).get());
-          conjunctsList.push_back(
-              SltExpr::alloc(expr->getKid(1), expr->getKid(0)));
-          conjunction = ConstantExpr::alloc(1, Expr::Bool);
-        } else if (llvm::isa<SltExpr>(equality->getKid(1))) {
-          SltExpr *expr = llvm::dyn_cast<SltExpr>(equality->getKid(1).get());
-          conjunctsList.push_back(
-              SleExpr::alloc(expr->getKid(1), expr->getKid(0)));
-          conjunction = ConstantExpr::alloc(1, Expr::Bool);
-        } else if (llvm::isa<SgeExpr>(equality->getKid(1))) {
-          SgeExpr *expr = llvm::dyn_cast<SgeExpr>(equality->getKid(1).get());
-          conjunctsList.push_back(
-              SltExpr::alloc(expr->getKid(0), expr->getKid(1)));
-          conjunction = ConstantExpr::alloc(1, Expr::Bool);
-        } else if (llvm::isa<SgtExpr>(equality->getKid(1))) {
-          SgtExpr *expr = llvm::dyn_cast<SgtExpr>(equality->getKid(1).get());
-          conjunctsList.push_back(
-              SleExpr::alloc(expr->getKid(0), expr->getKid(1)));
-          conjunction = ConstantExpr::alloc(1, Expr::Bool);
-        } else if (llvm::isa<NeExpr>(equality->getKid(1))) {
-          // Disequality is converted to equality, which in turn is
-          // converted to a pair of inequalities.
-          NeExpr *expr = llvm::dyn_cast<NeExpr>(equality->getKid(1).get());
-          conjunctsList.push_back(
-              SleExpr::alloc(expr->getKid(0), expr->getKid(1)));
-          conjunctsList.push_back(
-              SleExpr::alloc(expr->getKid(1), expr->getKid(0)));
-          conjunction = ConstantExpr::alloc(1, Expr::Bool);
-        }
-      } else {
-        // We convert equality to a pair of inequalities.
-        conjunctsList.push_back(
-            SleExpr::alloc(conjunction->getKid(0), conjunction->getKid(1)));
-        conjunctsList.push_back(
-            SleExpr::alloc(conjunction->getKid(1), conjunction->getKid(0)));
-        conjunction = ConstantExpr::alloc(1, Expr::Bool);
-      }
-    } else if (llvm::isa<SleExpr>(conjunction.get()) ||
-               llvm::isa<SltExpr>(conjunction.get()) ||
-               llvm::isa<SgeExpr>(conjunction.get()) ||
-               llvm::isa<SgtExpr>(conjunction.get())) {
-      conjunctsList.push_back(conjunction);
-      conjunction = ConstantExpr::alloc(1, Expr::Bool);
-    }
-
-    return std::pair<std::vector<ref<Expr> >, ref<Expr> >(conjunctsList,
-                                                          conjunction);
-  }
-
-  std::pair<std::vector<ref<Expr> >, ref<Expr> > ret =
-      getSimplifiableConjunctsForFourierMotzkin(conjunction->getKid(0));
-  conjunctsList = ret.first;
-  ref<Expr> retExpr = ret.second;
-
-  ret = getSimplifiableConjunctsForFourierMotzkin(conjunction->getKid(1));
-  conjunctsList.insert(conjunctsList.end(), ret.first.begin(), ret.first.end());
-  retExpr = AndExpr::alloc(retExpr, ret.second);
-
-  return std::pair<std::vector<ref<Expr> >, ref<Expr> >(conjunctsList, retExpr);
-}
-
-ref<Expr>
-SubsumptionTableEntry::simplifyWithFourierMotzkin(ref<Expr> existsExpr) {
-  ExistsExpr *expr = llvm::dyn_cast<ExistsExpr>(existsExpr.get());
-  if (!expr)
-    return existsExpr;
-
-  std::vector<const Array *> boundVariables = expr->variables;
-  ref<Expr> body = expr->body;
-
-  // We only simplify a conjunction of interpolant and equalities
-  if (!llvm::isa<AndExpr>(body))
-    return existsExpr;
-
-  // If the post-simplified body was a constant, simply return the body;
-  if (llvm::isa<ConstantExpr>(body))
-    return body;
-
-  // The equality constraint is only a single disjunctive clause
-  // of a CNF formula. In this case we simplify nothing.
-  if (llvm::isa<OrExpr>(body->getKid(1)))
-    return existsExpr;
-
-  std::pair<std::vector<ref<Expr> >, ref<Expr> > simplifiable1 =
-      getSimplifiableConjunctsForFourierMotzkin(body->getKid(0));
-  std::pair<std::vector<ref<Expr> >, ref<Expr> > simplifiable2 =
-      getSimplifiableConjunctsForFourierMotzkin(body->getKid(1));
-
-  std::vector<ref<Expr> > interpolantPack = simplifiable1.first;
-  std::vector<ref<Expr> > equalityPack = simplifiable2.first;
-  std::vector<Inequality *> inequalityPack;
-
-  // STEP 1a: represent KLEE expression in equality pack
-  // into InequalityExpr data structure that enable us to do arithmetic
-  // operation
-  for (std::vector<ref<Expr> >::iterator it = equalityPack.begin(),
-                                         itEnd = equalityPack.end();
-       it != itEnd; ++it) {
-    inequalityPack.push_back(new Inequality(*it));
-  }
-
-  // STEP 1b: represent KLEE expression in interpolant pack
-  // into InequalityExpr data structure that enable us to do arithmetic
-  // operation
-  for (std::vector<ref<Expr> >::iterator it = interpolantPack.begin(),
-                                         itEnd = interpolantPack.end();
-       it != itEnd; ++it) {
-    inequalityPack.push_back(new Inequality(*it));
-  }
-
-  // STEP 2: core of Fourier-Motzkin algorithm
-  for (std::vector<const Array *>::iterator
-           boundVariablesIt = boundVariables.begin(),
-           boundVariablesItEnd = boundVariables.end();
-       boundVariablesIt != boundVariablesItEnd; ++boundVariablesIt) {
-    const Array *currExistVar = *boundVariablesIt;
-
-    std::vector<Inequality *> lePack;
-    std::vector<Inequality *> gePack;
-    std::vector<Inequality *> ltPack;
-    std::vector<Inequality *> gtPack;
-    std::vector<Inequality *> nonePack;
-
-    // STEP 2a: normalized the inequality expression into the
-    // form such that exist variables are located on the left-hand side.
-    for (std::vector<Inequality *>::iterator inqt = inequalityPack.begin(),
-                                             inqtEnd = inequalityPack.end();
-         inqt != inqtEnd; ++inqt) {
-      Inequality *currIneq = *inqt;
-
-      // Normalize the current inequality, by moving the on-focus
-      // variable to the lhs, and the other terms to the rhs.
-      if (currIneq->normalize(currExistVar)) {
-        // Normalization resulted in useful inequality
-        if (Inequality::containsNonConstantExpr(currIneq->getLhs())) {
-          // STEP 2b: divide the inequalityPack into separated packs
-          // based on its operator existVar <= (lessThanPack), existVar >=
-          // (greaterThanPack), existVar < (strictLessThanPack), existVar >
-          // (strictGreaterThanPack) or (nonePack) if there's no on focus exist
-          // variable in the equation.
-          classify(currExistVar, currIneq, lePack, gePack, ltPack, gtPack,
-                   nonePack);
-        } else {
-          nonePack.push_back(currIneq);
-        }
-      }
-    }
-
-    // STEP 3: matching between inequality
-    std::vector<Inequality *> resultPack;
-    resultPack = Inequality::match(lePack, gePack, ltPack, gtPack);
-
-    inequalityPack = resultPack;
-    inequalityPack.insert(inequalityPack.end(), nonePack.begin(),
-                          nonePack.end());
-  }
-
-  // STEP 4: reconstruct the result back to KLEE expression
-  if (inequalityPack.size() == 0)
-    return existsExpr;
-
-  ref<Expr> result = reconstructExpr(inequalityPack);
-  if (hasExistentials(expr->variables, result)) {
-    // Here we rebuild using original existentials, although
-    // some existentials may have been eliminated. In the
-    // future, we may be able to engineer hasExistentials
-    // to return the actual existentials used so that we
-    // can rebuild using those existentials only, which may
-    // help naive solvers to not enumerating solutions for
-    // the unused existentials.
-    result = expr->rebuild(&result);
-  }
-  return result;
-}
-
-ref<Expr> SubsumptionTableEntry::reconstructExpr(
-    std::vector<Inequality *> &inequalityPack) {
-  ref<Expr> result;
-  for (std::vector<Inequality *>::iterator it = inequalityPack.begin(),
-                                           itEnd = inequalityPack.end();
-       it != itEnd; ++it) {
-    ref<Expr> reconstructedInequality((*it)->reconstructExpr());
-    if (result.get())
-      result = AndExpr::alloc(result, reconstructedInequality);
-    else
-      result = reconstructedInequality;
-  }
-  return result;
-}
-
-void SubsumptionTableEntry::classify(const Array *onFocusExistential,
-                                     Inequality *currIneq,
-                                     std::vector<Inequality *> &lePack,
-                                     std::vector<Inequality *> &gePack,
-                                     std::vector<Inequality *> &ltPack,
-                                     std::vector<Inequality *> &gtPack,
-                                     std::vector<Inequality *> &nonePack) {
-    if (currIneq->getLhs().size() == 1) {
-      if (currIneq->getKind() == Expr::Sle)
-        lePack.push_back(currIneq);
-      else if (currIneq->getKind() == Expr::Sge)
-        gePack.push_back(currIneq);
-      else if (currIneq->getKind() == Expr::Slt)
-        ltPack.push_back(currIneq);
-      else if (currIneq->getKind() == Expr::Sgt)
-        gtPack.push_back(currIneq);
-    } else {
-      nonePack.push_back(currIneq);
-    }
-}
-
-ref<Expr> SubsumptionTableEntry::createBinaryExpr(Expr::Kind kind,
-                                                  ref<Expr> lhs,
-                                                  ref<Expr> rhs) {
-  std::vector<Expr::CreateArg> exprs;
-  Expr::CreateArg arg1(lhs);
-  Expr::CreateArg arg2(rhs);
-  exprs.push_back(arg1);
-  exprs.push_back(arg2);
-  return Expr::createFromKind(kind, exprs);
-}
-
 ref<Expr>
 SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
                                               bool &hasExistentialsOnly) {
@@ -1267,7 +1034,7 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
     newBody = AndExpr::alloc(simplifiedInterpolant, fullEqualityConstraint);
   }
 
-  return simplifyWithFourierMotzkin(existsExpr->rebuild(&newBody));
+  return FourierMotzkin::simplify(existsExpr->rebuild(&newBody));
 }
 
 ref<Expr> SubsumptionTableEntry::replaceExpr(ref<Expr> originalExpr,
@@ -1750,11 +1517,6 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
   return true;
 }
 
-void SubsumptionTableEntry::dump() const {
-  this->print(llvm::errs());
-  llvm::errs() << "\n";
-}
-
 void SubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
   stream << "------------ Subsumption Table Entry ------------\n";
   stream << "Program point = " << nodeId << "\n";
@@ -1830,221 +1592,35 @@ void SubsumptionTableEntry::printStat(llvm::raw_ostream &stream) {
 
 /**/
 
-Inequality::Inequality(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
-                       std::map<ref<Expr>, int64_t> _rhs) {
+FourierMotzkin::Inequality::Inequality(Expr::Kind _kind,
+                                       std::map<ref<Expr>, int64_t> _lhs,
+                                       std::map<ref<Expr>, int64_t> _rhs) {
   init(_kind, _lhs, _rhs, false);
 }
 
-Inequality::Inequality(ref<Expr> expr) {
+FourierMotzkin::Inequality::Inequality(ref<Expr> expr) {
   init(expr->getKind(), getLinearTerms(expr->getKid(0)),
        getLinearTerms(expr->getKid(1)), false);
 }
 
-Inequality::~Inequality() {}
+FourierMotzkin::Inequality::~Inequality() {}
 
-void Inequality::init(Expr::Kind _kind, std::map<ref<Expr>, int64_t> _lhs,
-                      std::map<ref<Expr>, int64_t> _rhs, bool _eliminated) {
+void FourierMotzkin::Inequality::init(Expr::Kind _kind,
+                                      std::map<ref<Expr>, int64_t> _lhs,
+                                      std::map<ref<Expr>, int64_t> _rhs,
+                                      bool _eliminated) {
   kind = _kind;
   lhs = _lhs;
   rhs = _rhs;
   eliminated = _eliminated;
 }
 
-bool
-Inequality::containsNonConstantExpr(std::map<ref<Expr>, int64_t> termsList) {
-  for (std::map<ref<Expr>, int64_t>::iterator
-           termsListIter = termsList.begin(),
-           termsListIterEnd = termsList.end();
-       termsListIter != termsListIterEnd; ++termsListIter) {
-    if (!llvm::isa<ConstantExpr>(termsListIter->first))
-      return true;
-  }
-  return false;
+ref<Expr> FourierMotzkin::Inequality::reconstructExpr() const {
+  return createBinaryExpr(kind, reconstructLinearExpression(lhs),
+                          reconstructLinearExpression(rhs));
 }
 
-const Array *Inequality::getArrayFromConcatExpr(ref<Expr> expr) {
-  if (llvm::isa<ReadExpr>(expr))
-    return (llvm::dyn_cast<ReadExpr>(expr)->updates).root;
-
-  return getArrayFromConcatExpr(expr->getKid(1));
-}
-
-void Inequality::removeEliminated(std::vector<Inequality *> &inequalityList,
-                                  std::vector<Inequality *> &result) {
-  for (std::vector<Inequality *>::iterator it = inequalityList.begin(),
-                                           itEnd = inequalityList.end();
-       it != itEnd; ++it) {
-    if (!(*it)->isEliminated())
-      result.push_back(*it);
-    else
-      delete *it;
-  }
-  inequalityList.clear();
-}
-
-ref<Expr> Inequality::reconstructLinearExpression(
-    std::map<ref<Expr>, int64_t> linearTerms) {
-  ref<Expr> result;
-
-  for (std::map<ref<Expr>, int64_t>::iterator
-           linearTermsIter = linearTerms.begin(),
-           linearTermsIterEnd = linearTerms.end();
-       linearTermsIter != linearTermsIterEnd; ++linearTermsIter) {
-    ref<Expr> tmp;
-
-    if (llvm::isa<ConstantExpr>(linearTermsIter->first)) {
-      tmp = ConstantExpr::alloc((uint64_t)linearTermsIter->second,
-                                linearTermsIter->first->getWidth());
-    } else {
-      tmp = linearTermsIter->first;
-      if (linearTermsIter->second > 1) {
-        tmp = MulExpr::create(
-            tmp, ConstantExpr::alloc((uint64_t)linearTermsIter->second,
-                                     linearTermsIter->first->getWidth()));
-      }
-    }
-
-    if (result.get()) {
-      result = AddExpr::alloc(result, tmp);
-    } else {
-      result = tmp;
-    }
-  }
-
-  return result;
-}
-
-std::vector<Inequality *> Inequality::match(std::vector<Inequality *> lePack,
-                                            std::vector<Inequality *> gePack,
-                                            std::vector<Inequality *> ltPack,
-                                            std::vector<Inequality *> gtPack) {
-  std::vector<Inequality *> result;
-
-  // Given x <= expr1 and x >= expr2, we eliminate x with introducing the
-  // constraint expr2 <= expr1.
-  matchingLoop(Expr::Sle, gePack, lePack, result);
-
-  // Given x <= expr1 and x > expr2, we eliminate x with introducing the
-  // constraint expr2 < expr1.
-  matchingLoop(Expr::Slt, gtPack, lePack, result);
-
-  // Given x < expr1 and x >= expr2, we eliminate x with introducing the
-  // constraint expr2 < expr1.
-  matchingLoop(Expr::Slt, gePack, ltPack, result);
-
-  // Given x < expr1 and x > expr2 , we eliminate x with introducing the
-  // constraint expr2 < expr1.
-  matchingLoop(Expr::Slt, gtPack, ltPack, result);
-
-  removeEliminated(lePack, result);
-  removeEliminated(gePack, result);
-  removeEliminated(ltPack, result);
-  removeEliminated(gtPack, result);
-
-  return result;
-}
-
-void Inequality::matchingLoop(Expr::Kind kind, std::vector<Inequality *> pack1,
-                              std::vector<Inequality *> pack2,
-                              std::vector<Inequality *> &result) {
-
-  for (std::vector<Inequality *>::iterator it1 = pack1.begin(),
-                                           it1End = pack1.end();
-       it1 != it1End; ++it1) {
-    Inequality *inequality1 = *it1;
-
-    for (std::vector<Inequality *>::iterator it2 = pack2.begin(),
-                                             it2End = pack2.end();
-         it2 != it2End; ++it2) {
-      Inequality *inequality2 = *it2;
-
-      std::map<ref<Expr>, int64_t> lhs = inequality1->getRhs();
-      std::map<ref<Expr>, int64_t> rhs = inequality2->getRhs();
-      result.push_back(new Inequality(kind, lhs, rhs));
-
-      inequality1->setEliminated();
-      inequality2->setEliminated();
-    }
-  }
-}
-
-std::map<ref<Expr>, int64_t> Inequality::getLinearTerms(ref<Expr> expr) {
-  std::map<ref<Expr>, int64_t> map;
-  if (expr->getNumKids() == 2 && !SubsumptionTableEntry::isVariable(expr)) {
-    return coefficientOperation(expr->getKind(),
-                                getLinearTerms(expr->getKid(0)),
-                                getLinearTerms(expr->getKid(1)));
-  }
-
-  if (expr->getNumKids() < 2 || SubsumptionTableEntry::isVariable(expr)) {
-    if (llvm::isa<ConstantExpr>(expr)) {
-      // We adopt the convention that the expression of a constant
-      // is the constant 0;
-      map.insert(std::make_pair(ConstantExpr::alloc(0, expr->getWidth()),
-                                llvm::dyn_cast<ConstantExpr>(expr.get())
-                                    ->getAPValue()
-                                    .getSExtValue()));
-    } else {
-      int64_t count = 1;
-      map.insert(std::make_pair(expr, count));
-    }
-  }
-
-  return map;
-}
-
-ref<Expr> Inequality::reconstructExpr() const {
-  return SubsumptionTableEntry::createBinaryExpr(
-      kind, reconstructLinearExpression(lhs), reconstructLinearExpression(rhs));
-}
-
-std::map<ref<Expr>, int64_t>
-Inequality::coefficientOperation(Expr::Kind kind,
-                                 std::map<ref<Expr>, int64_t> map1,
-                                 std::map<ref<Expr>, int64_t> map2) {
-
-  for (std::map<ref<Expr>, int64_t>::iterator it1 = map1.begin(),
-                                              it1End = map1.end();
-       it1 != it1End; ++it1) {
-
-    ref<Expr> expr1 = it1->first;
-    bool isFound = false;
-    for (std::map<ref<Expr>, int64_t>::iterator it2 = map2.begin(),
-                                                it2End = map2.end();
-         it2 != it2End; ++it2) {
-
-      ref<Expr> expr2 = it2->first;
-      if (expr1.operator==(expr2)) {
-        if (kind == Expr::Add) {
-          it2->second = it1->second + it2->second;
-        } else if (kind == Expr::Sub) {
-          it2->second = it1->second - it2->second;
-        }
-        isFound = true;
-        break;
-      }
-
-      if (kind == Expr::Mul) {
-        it2->second = it1->second * it2->second;
-        isFound = true;
-      } else if (kind == Expr::SDiv || kind == Expr::UDiv) {
-        it2->second = it1->second / it2->second;
-        isFound = true;
-      } else if (kind == Expr::SRem || kind == Expr::URem) {
-        it2->second = it1->second % it2->second;
-        isFound = true;
-      }
-    }
-
-    if (!isFound) {
-      map2.insert(std::make_pair(it1->first, it1->second));
-    }
-  }
-
-  return map2;
-}
-
-bool Inequality::normalize(const Array *focusVariable) {
+bool FourierMotzkin::Inequality::normalize(const Array *focusVariable) {
   std::map<ref<Expr>, int64_t> tmpLhs;
   std::map<ref<Expr>, int64_t> tmpRhs;
 
@@ -2170,13 +1746,7 @@ bool Inequality::normalize(const Array *focusVariable) {
   return false;
 }
 
-std::map<ref<Expr>, int64_t> Inequality::getLhs() const { return lhs; }
-
-std::map<ref<Expr>, int64_t> Inequality::getRhs() const { return rhs; }
-
-Expr::Kind Inequality::getKind() const { return kind; }
-
-void Inequality::print(llvm::raw_ostream &stream) const {
+void FourierMotzkin::Inequality::print(llvm::raw_ostream &stream) const {
   stream << "(" << kind << " (";
   for (std::map<ref<Expr>, int64_t>::const_iterator it = lhs.begin(),
                                                     itEnd = lhs.end();
@@ -2198,6 +1768,428 @@ void Inequality::print(llvm::raw_ostream &stream) const {
     }
   }
   stream << "))";
+}
+
+/**/
+
+std::pair<std::vector<ref<Expr> >, ref<Expr> >
+FourierMotzkin::getSimplifiableConjunctsForFourierMotzkin(
+    ref<Expr> conjunction) {
+  std::vector<ref<Expr> > conjunctsList;
+
+  if (!llvm::isa<AndExpr>(conjunction.get())) {
+    if (llvm::isa<EqExpr>(conjunction.get())) {
+      EqExpr *equality = llvm::dyn_cast<EqExpr>(conjunction.get());
+      if (equality->getKid(0)->getWidth() == Expr::Bool &&
+          equality->getKid(0)->isFalse()) {
+        if (llvm::isa<SleExpr>(equality->getKid(1).get())) {
+          SleExpr *expr = llvm::dyn_cast<SleExpr>(equality->getKid(1).get());
+          conjunctsList.push_back(
+              SltExpr::alloc(expr->getKid(1), expr->getKid(0)));
+          conjunction = ConstantExpr::alloc(1, Expr::Bool);
+        } else if (llvm::isa<SltExpr>(equality->getKid(1))) {
+          SltExpr *expr = llvm::dyn_cast<SltExpr>(equality->getKid(1).get());
+          conjunctsList.push_back(
+              SleExpr::alloc(expr->getKid(1), expr->getKid(0)));
+          conjunction = ConstantExpr::alloc(1, Expr::Bool);
+        } else if (llvm::isa<SgeExpr>(equality->getKid(1))) {
+          SgeExpr *expr = llvm::dyn_cast<SgeExpr>(equality->getKid(1).get());
+          conjunctsList.push_back(
+              SltExpr::alloc(expr->getKid(0), expr->getKid(1)));
+          conjunction = ConstantExpr::alloc(1, Expr::Bool);
+        } else if (llvm::isa<SgtExpr>(equality->getKid(1))) {
+          SgtExpr *expr = llvm::dyn_cast<SgtExpr>(equality->getKid(1).get());
+          conjunctsList.push_back(
+              SleExpr::alloc(expr->getKid(0), expr->getKid(1)));
+          conjunction = ConstantExpr::alloc(1, Expr::Bool);
+        } else if (llvm::isa<NeExpr>(equality->getKid(1))) {
+          // Disequality is converted to equality, which in turn is
+          // converted to a pair of inequalities.
+          NeExpr *expr = llvm::dyn_cast<NeExpr>(equality->getKid(1).get());
+          conjunctsList.push_back(
+              SleExpr::alloc(expr->getKid(0), expr->getKid(1)));
+          conjunctsList.push_back(
+              SleExpr::alloc(expr->getKid(1), expr->getKid(0)));
+          conjunction = ConstantExpr::alloc(1, Expr::Bool);
+        }
+      } else {
+        // We convert equality to a pair of inequalities.
+        conjunctsList.push_back(
+            SleExpr::alloc(conjunction->getKid(0), conjunction->getKid(1)));
+        conjunctsList.push_back(
+            SleExpr::alloc(conjunction->getKid(1), conjunction->getKid(0)));
+        conjunction = ConstantExpr::alloc(1, Expr::Bool);
+      }
+    } else if (llvm::isa<SleExpr>(conjunction.get()) ||
+               llvm::isa<SltExpr>(conjunction.get()) ||
+               llvm::isa<SgeExpr>(conjunction.get()) ||
+               llvm::isa<SgtExpr>(conjunction.get())) {
+      conjunctsList.push_back(conjunction);
+      conjunction = ConstantExpr::alloc(1, Expr::Bool);
+    }
+
+    return std::pair<std::vector<ref<Expr> >, ref<Expr> >(conjunctsList,
+                                                          conjunction);
+  }
+
+  std::pair<std::vector<ref<Expr> >, ref<Expr> > ret =
+      getSimplifiableConjunctsForFourierMotzkin(conjunction->getKid(0));
+  conjunctsList = ret.first;
+  ref<Expr> retExpr = ret.second;
+
+  ret = getSimplifiableConjunctsForFourierMotzkin(conjunction->getKid(1));
+  conjunctsList.insert(conjunctsList.end(), ret.first.begin(), ret.first.end());
+  retExpr = AndExpr::alloc(retExpr, ret.second);
+
+  return std::pair<std::vector<ref<Expr> >, ref<Expr> >(conjunctsList, retExpr);
+}
+
+ref<Expr> FourierMotzkin::simplify(ref<Expr> existsExpr) {
+  ExistsExpr *expr = llvm::dyn_cast<ExistsExpr>(existsExpr.get());
+  if (!expr)
+    return existsExpr;
+
+  std::vector<const Array *> boundVariables = expr->variables;
+  ref<Expr> body = expr->body;
+
+  // We only simplify a conjunction of interpolant and equalities
+  if (!llvm::isa<AndExpr>(body))
+    return existsExpr;
+
+  // If the post-simplified body was a constant, simply return the body;
+  if (llvm::isa<ConstantExpr>(body))
+    return body;
+
+  // The equality constraint is only a single disjunctive clause
+  // of a CNF formula. In this case we simplify nothing.
+  if (llvm::isa<OrExpr>(body->getKid(1)))
+    return existsExpr;
+
+  std::pair<std::vector<ref<Expr> >, ref<Expr> > simplifiable1 =
+      getSimplifiableConjunctsForFourierMotzkin(body->getKid(0));
+  std::pair<std::vector<ref<Expr> >, ref<Expr> > simplifiable2 =
+      getSimplifiableConjunctsForFourierMotzkin(body->getKid(1));
+
+  std::vector<ref<Expr> > interpolantPack = simplifiable1.first;
+  std::vector<ref<Expr> > equalityPack = simplifiable2.first;
+  std::vector<Inequality *> inequalityPack;
+
+  // STEP 1a: represent KLEE expression in equality pack
+  // into InequalityExpr data structure that enable us to do arithmetic
+  // operation
+  for (std::vector<ref<Expr> >::iterator it = equalityPack.begin(),
+                                         itEnd = equalityPack.end();
+       it != itEnd; ++it) {
+    inequalityPack.push_back(new Inequality(*it));
+  }
+
+  // STEP 1b: represent KLEE expression in interpolant pack
+  // into InequalityExpr data structure that enable us to do arithmetic
+  // operation
+  for (std::vector<ref<Expr> >::iterator it = interpolantPack.begin(),
+                                         itEnd = interpolantPack.end();
+       it != itEnd; ++it) {
+    inequalityPack.push_back(new Inequality(*it));
+  }
+
+  // STEP 2: core of Fourier-Motzkin algorithm
+  for (std::vector<const Array *>::iterator
+           boundVariablesIt = boundVariables.begin(),
+           boundVariablesItEnd = boundVariables.end();
+       boundVariablesIt != boundVariablesItEnd; ++boundVariablesIt) {
+    const Array *currExistVar = *boundVariablesIt;
+
+    std::vector<Inequality *> lePack;
+    std::vector<Inequality *> gePack;
+    std::vector<Inequality *> ltPack;
+    std::vector<Inequality *> gtPack;
+    std::vector<Inequality *> nonePack;
+
+    // STEP 2a: normalized the inequality expression into the
+    // form such that exist variables are located on the left-hand side.
+    for (std::vector<Inequality *>::iterator inqt = inequalityPack.begin(),
+                                             inqtEnd = inequalityPack.end();
+         inqt != inqtEnd; ++inqt) {
+      Inequality *currIneq = *inqt;
+
+      // Normalize the current inequality, by moving the on-focus
+      // variable to the lhs, and the other terms to the rhs.
+      if (currIneq->normalize(currExistVar)) {
+        // Normalization resulted in useful inequality
+        if (FourierMotzkin::containsNonConstantExpr(currIneq->getLhs())) {
+          // STEP 2b: divide the inequalityPack into separated packs
+          // based on its operator existVar <= (lessThanPack), existVar >=
+          // (greaterThanPack), existVar < (strictLessThanPack), existVar >
+          // (strictGreaterThanPack) or (nonePack) if there's no on focus exist
+          // variable in the equation.
+          classify(currExistVar, currIneq, lePack, gePack, ltPack, gtPack,
+                   nonePack);
+        } else {
+          nonePack.push_back(currIneq);
+        }
+      }
+    }
+
+    // STEP 3: matching between inequality
+    std::vector<Inequality *> resultPack;
+    resultPack = FourierMotzkin::match(lePack, gePack, ltPack, gtPack);
+
+    inequalityPack = resultPack;
+    inequalityPack.insert(inequalityPack.end(), nonePack.begin(),
+                          nonePack.end());
+  }
+
+  // STEP 4: reconstruct the result back to KLEE expression
+  if (inequalityPack.size() == 0)
+    return existsExpr;
+
+  ref<Expr> result = reconstructExpr(inequalityPack);
+  if (SubsumptionTableEntry::hasExistentials(expr->variables, result)) {
+    // Here we rebuild using original existentials, although
+    // some existentials may have been eliminated. In the
+    // future, we may be able to engineer hasExistentials
+    // to return the actual existentials used so that we
+    // can rebuild using those existentials only, which may
+    // help naive solvers to not enumerating solutions for
+    // the unused existentials.
+    result = expr->rebuild(&result);
+  }
+  return result;
+}
+
+ref<Expr>
+FourierMotzkin::reconstructExpr(std::vector<Inequality *> &inequalityPack) {
+  ref<Expr> result;
+  for (std::vector<Inequality *>::iterator it = inequalityPack.begin(),
+                                           itEnd = inequalityPack.end();
+       it != itEnd; ++it) {
+    ref<Expr> reconstructedInequality((*it)->reconstructExpr());
+    if (result.get())
+      result = AndExpr::alloc(result, reconstructedInequality);
+    else
+      result = reconstructedInequality;
+  }
+  return result;
+}
+
+void FourierMotzkin::classify(const Array *onFocusExistential,
+                              Inequality *currIneq,
+                              std::vector<Inequality *> &lePack,
+                              std::vector<Inequality *> &gePack,
+                              std::vector<Inequality *> &ltPack,
+                              std::vector<Inequality *> &gtPack,
+                              std::vector<Inequality *> &nonePack) {
+  if (currIneq->getLhs().size() == 1) {
+    if (currIneq->getKind() == Expr::Sle)
+      lePack.push_back(currIneq);
+    else if (currIneq->getKind() == Expr::Sge)
+      gePack.push_back(currIneq);
+    else if (currIneq->getKind() == Expr::Slt)
+      ltPack.push_back(currIneq);
+    else if (currIneq->getKind() == Expr::Sgt)
+      gtPack.push_back(currIneq);
+  } else {
+    nonePack.push_back(currIneq);
+  }
+}
+
+ref<Expr> FourierMotzkin::createBinaryExpr(Expr::Kind kind, ref<Expr> lhs,
+                                           ref<Expr> rhs) {
+  std::vector<Expr::CreateArg> exprs;
+  Expr::CreateArg arg1(lhs);
+  Expr::CreateArg arg2(rhs);
+  exprs.push_back(arg1);
+  exprs.push_back(arg2);
+  return Expr::createFromKind(kind, exprs);
+}
+
+bool FourierMotzkin::containsNonConstantExpr(
+    std::map<ref<Expr>, int64_t> termsList) {
+  for (std::map<ref<Expr>, int64_t>::iterator
+           termsListIter = termsList.begin(),
+           termsListIterEnd = termsList.end();
+       termsListIter != termsListIterEnd; ++termsListIter) {
+    if (!llvm::isa<ConstantExpr>(termsListIter->first))
+      return true;
+  }
+  return false;
+}
+
+const Array *FourierMotzkin::getArrayFromConcatExpr(ref<Expr> expr) {
+  if (llvm::isa<ReadExpr>(expr))
+    return (llvm::dyn_cast<ReadExpr>(expr)->updates).root;
+
+  return getArrayFromConcatExpr(expr->getKid(1));
+}
+
+void FourierMotzkin::removeEliminated(std::vector<Inequality *> &inequalityList,
+                                      std::vector<Inequality *> &result) {
+  for (std::vector<Inequality *>::iterator it = inequalityList.begin(),
+                                           itEnd = inequalityList.end();
+       it != itEnd; ++it) {
+    if (!(*it)->isEliminated())
+      result.push_back(*it);
+    else
+      delete *it;
+  }
+  inequalityList.clear();
+}
+
+ref<Expr> FourierMotzkin::reconstructLinearExpression(
+    std::map<ref<Expr>, int64_t> linearTerms) {
+  ref<Expr> result;
+
+  for (std::map<ref<Expr>, int64_t>::iterator
+           linearTermsIter = linearTerms.begin(),
+           linearTermsIterEnd = linearTerms.end();
+       linearTermsIter != linearTermsIterEnd; ++linearTermsIter) {
+    ref<Expr> tmp;
+
+    if (llvm::isa<ConstantExpr>(linearTermsIter->first)) {
+      tmp = ConstantExpr::alloc((uint64_t)linearTermsIter->second,
+                                linearTermsIter->first->getWidth());
+    } else {
+      tmp = linearTermsIter->first;
+      if (linearTermsIter->second > 1) {
+        tmp = MulExpr::create(
+            tmp, ConstantExpr::alloc((uint64_t)linearTermsIter->second,
+                                     linearTermsIter->first->getWidth()));
+      }
+    }
+
+    if (result.get()) {
+      result = AddExpr::alloc(result, tmp);
+    } else {
+      result = tmp;
+    }
+  }
+
+  return result;
+}
+
+std::vector<FourierMotzkin::Inequality *> FourierMotzkin::match(
+    std::vector<Inequality *> lePack, std::vector<Inequality *> gePack,
+    std::vector<Inequality *> ltPack, std::vector<Inequality *> gtPack) {
+  std::vector<Inequality *> result;
+
+  // Given x <= expr1 and x >= expr2, we eliminate x with introducing the
+  // constraint expr2 <= expr1.
+  matchingLoop(Expr::Sle, gePack, lePack, result);
+
+  // Given x <= expr1 and x > expr2, we eliminate x with introducing the
+  // constraint expr2 < expr1.
+  matchingLoop(Expr::Slt, gtPack, lePack, result);
+
+  // Given x < expr1 and x >= expr2, we eliminate x with introducing the
+  // constraint expr2 < expr1.
+  matchingLoop(Expr::Slt, gePack, ltPack, result);
+
+  // Given x < expr1 and x > expr2 , we eliminate x with introducing the
+  // constraint expr2 < expr1.
+  matchingLoop(Expr::Slt, gtPack, ltPack, result);
+
+  removeEliminated(lePack, result);
+  removeEliminated(gePack, result);
+  removeEliminated(ltPack, result);
+  removeEliminated(gtPack, result);
+
+  return result;
+}
+
+void FourierMotzkin::matchingLoop(Expr::Kind kind,
+                                  std::vector<Inequality *> pack1,
+                                  std::vector<Inequality *> pack2,
+                                  std::vector<Inequality *> &result) {
+
+  for (std::vector<Inequality *>::iterator it1 = pack1.begin(),
+                                           it1End = pack1.end();
+       it1 != it1End; ++it1) {
+    Inequality *inequality1 = *it1;
+
+    for (std::vector<Inequality *>::iterator it2 = pack2.begin(),
+                                             it2End = pack2.end();
+         it2 != it2End; ++it2) {
+      Inequality *inequality2 = *it2;
+
+      std::map<ref<Expr>, int64_t> lhs = inequality1->getRhs();
+      std::map<ref<Expr>, int64_t> rhs = inequality2->getRhs();
+      result.push_back(new Inequality(kind, lhs, rhs));
+
+      inequality1->setEliminated();
+      inequality2->setEliminated();
+    }
+  }
+}
+
+std::map<ref<Expr>, int64_t> FourierMotzkin::getLinearTerms(ref<Expr> expr) {
+  std::map<ref<Expr>, int64_t> map;
+  if (expr->getNumKids() == 2 && !SubsumptionTableEntry::isVariable(expr)) {
+    return coefficientOperation(expr->getKind(),
+                                getLinearTerms(expr->getKid(0)),
+                                getLinearTerms(expr->getKid(1)));
+  }
+
+  if (expr->getNumKids() < 2 || SubsumptionTableEntry::isVariable(expr)) {
+    if (llvm::isa<ConstantExpr>(expr)) {
+      // We adopt the convention that the expression of a constant
+      // is the constant 0;
+      map.insert(std::make_pair(ConstantExpr::alloc(0, expr->getWidth()),
+                                llvm::dyn_cast<ConstantExpr>(expr.get())
+                                    ->getAPValue()
+                                    .getSExtValue()));
+    } else {
+      int64_t count = 1;
+      map.insert(std::make_pair(expr, count));
+    }
+  }
+
+  return map;
+}
+
+std::map<ref<Expr>, int64_t>
+FourierMotzkin::coefficientOperation(Expr::Kind kind,
+                                     std::map<ref<Expr>, int64_t> map1,
+                                     std::map<ref<Expr>, int64_t> map2) {
+
+  for (std::map<ref<Expr>, int64_t>::iterator it1 = map1.begin(),
+                                              it1End = map1.end();
+       it1 != it1End; ++it1) {
+
+    ref<Expr> expr1 = it1->first;
+    bool isFound = false;
+    for (std::map<ref<Expr>, int64_t>::iterator it2 = map2.begin(),
+                                                it2End = map2.end();
+         it2 != it2End; ++it2) {
+
+      ref<Expr> expr2 = it2->first;
+      if (expr1.operator==(expr2)) {
+        if (kind == Expr::Add) {
+          it2->second = it1->second + it2->second;
+        } else if (kind == Expr::Sub) {
+          it2->second = it1->second - it2->second;
+        }
+        isFound = true;
+        break;
+      }
+
+      if (kind == Expr::Mul) {
+        it2->second = it1->second * it2->second;
+        isFound = true;
+      } else if (kind == Expr::SDiv || kind == Expr::UDiv) {
+        it2->second = it1->second / it2->second;
+        isFound = true;
+      } else if (kind == Expr::SRem || kind == Expr::URem) {
+        it2->second = it1->second % it2->second;
+        isFound = true;
+      }
+    }
+
+    if (!isFound) {
+      map2.insert(std::make_pair(it1->first, it1->second));
+    }
+  }
+
+  return map2;
 }
 
 /**/
