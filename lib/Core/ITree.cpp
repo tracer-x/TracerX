@@ -1039,7 +1039,11 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
     newBody = AndExpr::alloc(simplifiedInterpolant, fullEqualityConstraint);
   }
 
-  return existsExpr->rebuild(&newBody);
+  // This return is only used if Fourier-Motzkin is called in
+  // SubsumptionTableEntry::subsumed
+  // return existsExpr->rebuild(&newBody);
+
+  return FourierMotzkin::simplify(existsExpr->rebuild(&newBody));
 }
 
 ref<Expr> SubsumptionTableEntry::replaceExpr(ref<Expr> originalExpr,
@@ -1381,11 +1385,12 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
     //     ExprPPrinter::printQuery(llvm::errs(), state.constraints,
     // existsExpr);
     query = simplifyExistsExpr(existsExpr, queryHasNoFreeVariables);
-    if (query.operator==(existsExpr)) {
-      simplifywithFourierTimer.start();
-      query = FourierMotzkin::simplify(query);
-      simplifywithFourierTimer.stop();
-    }
+    // commented as this modification may reduce the number of subsumptions
+    // if (query.operator==(existsExpr)) {
+    // simplifywithFourierTimer.start();
+    // query = FourierMotzkin::simplify(query);
+    // simplifywithFourierTimer.stop();
+    //}
   }
 
   // If query simplification result was false, we quickly fail without calling
