@@ -807,6 +807,7 @@ void PathCondition::print(llvm::raw_ostream &stream) const {
 }
 
 /**/
+StatTimer SubsumptionTableEntry::simplifywithFourierTimer;
 
 StatTimer SubsumptionTableEntry::actualSolverCallTimer;
 
@@ -1038,7 +1039,7 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
     newBody = AndExpr::alloc(simplifiedInterpolant, fullEqualityConstraint);
   }
 
-  return FourierMotzkin::simplify(existsExpr->rebuild(&newBody));
+  return existsExpr->rebuild(&newBody);
 }
 
 ref<Expr> SubsumptionTableEntry::replaceExpr(ref<Expr> originalExpr,
@@ -1380,6 +1381,11 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
     //     ExprPPrinter::printQuery(llvm::errs(), state.constraints,
     // existsExpr);
     query = simplifyExistsExpr(existsExpr, queryHasNoFreeVariables);
+    if (query.operator==(existsExpr)) {
+      simplifywithFourierTimer.start();
+      query = FourierMotzkin::simplify(query);
+      simplifywithFourierTimer.stop();
+    }
   }
 
   // If query simplification result was false, we quickly fail without calling
@@ -1604,6 +1610,9 @@ void SubsumptionTableEntry::printStat(llvm::raw_ostream &stream) {
   stream << "KLEE: done:     Number of solver calls for subsumption check "
             "(failed) = " << checkSolverCount << " (" << checkSolverFailureCount
          << ")\n";
+  stream << "KLEE: done:     Time for simplify expression with Fourier-Motzkin "
+            "in subsumption check "
+            "(ms) = " << simplifywithFourierTimer.get() * 1000 << "\n";
 }
 
 /**/
