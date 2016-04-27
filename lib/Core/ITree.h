@@ -470,7 +470,7 @@ class SubsumptionTableEntry {
 
   /// @brief Statistics for simplify expression with Fourier execution time in
   /// subsumption check
-  static StatTimer simplifywithFourierTimer;
+  static StatTimer fourierMotzkinSimplifyTimer;
 
   /// @brief Statistics for actual solver call time in subsumption check
   static StatTimer actualSolverCallTimer;

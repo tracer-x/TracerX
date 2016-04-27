@@ -807,7 +807,7 @@ void PathCondition::print(llvm::raw_ostream &stream) const {
 }
 
 /**/
-StatTimer SubsumptionTableEntry::simplifywithFourierTimer;
+StatTimer SubsumptionTableEntry::fourierMotzkinSimplifyTimer;
 
 StatTimer SubsumptionTableEntry::actualSolverCallTimer;
 
@@ -1039,11 +1039,16 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
     newBody = AndExpr::alloc(simplifiedInterpolant, fullEqualityConstraint);
   }
 
-  // This return is only used if Fourier-Motzkin is called in
-  // SubsumptionTableEntry::subsumed
+  // *** This return is only used for when the Fourier-Motzkin simplifier is
+  // called in SubsumptionTableEntry::subsumed instead of here. See the
+  // corresponding comment there.
+
   // return existsExpr->rebuild(&newBody);
 
-  return FourierMotzkin::simplify(existsExpr->rebuild(&newBody));
+  fourierMotzkinSimplifyTimer.start();
+  ref<Expr> ret = FourierMotzkin::simplify(existsExpr->rebuild(&newBody));
+  fourierMotzkinSimplifyTimer.stop();
+  return ret;
 }
 
 ref<Expr> SubsumptionTableEntry::replaceExpr(ref<Expr> originalExpr,
@@ -1385,12 +1390,20 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
     //     ExprPPrinter::printQuery(llvm::errs(), state.constraints,
     // existsExpr);
     query = simplifyExistsExpr(existsExpr, queryHasNoFreeVariables);
-    // commented as this modification may reduce the number of subsumptions
+
+    // *** The following applies Fourier-Motzkin elimination more
+    // selectively. It enhances the speed of the analysis significantly compared
+    // to always calling Fourier-Motzkin elimination, but it may result in less
+    // gain in subsumptions number, and hence commented out. When this approach
+    // is used, simplifyExistsExpr should not call Fourier-Motzkin elimination.
+    // (Refer to the corresponding comment marked with *** in
+    // simplifyArithmeticBody.)
+
     // if (query.operator==(existsExpr)) {
-    // simplifywithFourierTimer.start();
-    // query = FourierMotzkin::simplify(query);
-    // simplifywithFourierTimer.stop();
-    //}
+    //   fourierMotzkinSimplifyTimer.start();
+    //   query = FourierMotzkin::simplify(query);
+    //   fourierMotzkinSimplifyTimer.stop();
+    //  }
   }
 
   // If query simplification result was false, we quickly fail without calling
@@ -1615,9 +1628,9 @@ void SubsumptionTableEntry::printStat(llvm::raw_ostream &stream) {
   stream << "KLEE: done:     Number of solver calls for subsumption check "
             "(failed) = " << checkSolverCount << " (" << checkSolverFailureCount
          << ")\n";
-  stream << "KLEE: done:     Time for simplify expression with Fourier-Motzkin "
-            "in subsumption check "
-            "(ms) = " << simplifywithFourierTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     Time for simplifying expressions with "
+            "Fourier-Motzkin elimination in subsumption checks "
+            "(ms) = " << fourierMotzkinSimplifyTimer.get() * 1000 << "\n";
 }
 
 /**/
