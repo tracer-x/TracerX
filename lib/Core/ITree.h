@@ -58,6 +58,22 @@ public:
   }
 
   double get() { return (amount / (double)CLOCKS_PER_SEC); }
+
+  /// @brief Utility function to represent double-precision floating point in
+  /// two decimal points.
+  static std::string inTwoDecimalPoints(double n) {
+    std::ostringstream stream;
+    unsigned long x = (unsigned)((n - ((unsigned)n)) * 100);
+    unsigned y = (unsigned)n;
+    stream << y << ".";
+    if (x > 9)
+      stream << x;
+    else if (x > 0)
+      stream << "0" << x;
+    else
+      stream << "00";
+    return stream.str();
+  }
 };
 
 /// Storage of search tree for displaying
@@ -194,11 +210,31 @@ class SearchTree {
     }
   };
 
+  class NumberedEdge {
+    SearchTree::Node *source;
+    SearchTree::Node *destination;
+    unsigned long number;
+
+  public:
+    NumberedEdge(SearchTree::Node *_source, SearchTree::Node *_destination,
+                 unsigned long _number)
+        : source(_source), destination(_destination), number(_number) {}
+
+    ~NumberedEdge() {
+      delete source;
+      delete destination;
+    }
+
+    std::string render() const;
+  };
+
   SearchTree::Node *root;
   std::map<ITreeNode *, SearchTree::Node *> itreeNodeMap;
   std::map<SubsumptionTableEntry *, SearchTree::Node *> tableEntryMap;
-  std::map<SearchTree::Node *, SearchTree::Node *> subsumptionEdges;
+  std::vector<SearchTree::NumberedEdge *> subsumptionEdges;
   std::map<PathCondition *, SearchTree::Node *> pathConditionMap;
+
+  unsigned long subsumptionEdgeNumber;
 
   static std::string recurseRender(const SearchTree::Node *node);
 
@@ -258,10 +294,13 @@ class PathCondition {
   /// @brief KLEE expression with variables (arrays) replaced by their shadows
   ref<Expr> shadowConstraint;
 
-  /// @brief If shadow consraint had been generated: We generate shadow
-  /// constraint
-  /// on demand only when the constraint is required in an interpolant
+  /// @brief If shadow constraint had been generated: We generate shadow
+  /// constraint on demand only when the constraint is required in an
+  /// interpolant.
   bool shadowed;
+
+  /// @brief The set of bound variables
+  std::set<const Array *> boundVariables;
 
   /// @brief The dependency information for the current
   /// interpolation tree node
@@ -292,7 +331,7 @@ public:
 
   bool isCore() const;
 
-  ref<Expr> packInterpolant(std::vector<const Array *> &replacements);
+  ref<Expr> packInterpolant(std::set<const Array *> &replacements);
 
   void dump() const;
 
@@ -483,17 +522,17 @@ class SubsumptionTableEntry {
 
   ref<Expr> interpolant;
 
-  std::map<llvm::Value *, ref<Expr> > singletonStore;
+  Dependency::ConcreteStore concreteAddressStore;
 
-  std::vector<llvm::Value *> singletonStoreKeys;
+  std::vector<llvm::Value *> concreteAddressStoreKeys;
 
-  std::map<llvm::Value *, std::vector<ref<Expr> > > compositeStore;
+  Dependency::SymbolicStore symbolicAddressStore;
 
-  std::vector<llvm::Value *> compositeStoreKeys;
+  std::vector<llvm::Value *> symbolicAddressStoreKeys;
 
-  std::vector<const Array *> existentials;
+  std::set<const Array *> existentials;
 
-  static bool hasFree(std::vector<const Array *> &existentials, ref<Expr> expr);
+  static bool hasFree(std::set<const Array *> &existentials, ref<Expr> expr);
 
   static bool containShadowExpr(ref<Expr> expr, ref<Expr> shadowExpr);
 
@@ -526,8 +565,7 @@ class SubsumptionTableEntry {
                                    std::map<ref<Expr>, ref<Expr> > &map);
 
   bool empty() {
-    return !interpolant.get() && singletonStoreKeys.empty() &&
-           compositeStoreKeys.empty();
+    return !interpolant.get() && concreteAddressStoreKeys.empty();
   }
 
   /// @brief for printing method running time statistics
@@ -541,6 +579,9 @@ public:
   ~SubsumptionTableEntry();
 
   bool subsumed(TimingSolver *solver, ExecutionState &state, double timeout);
+
+  static bool hasExistentials(std::set<const Array *> &existentials,
+                              ref<Expr> expr);
 
   /// Tests if the argument is a variable. A variable here is defined to be
   /// either a symbolic concatenation or a symbolic read. A concatenation in
@@ -572,10 +613,13 @@ class ITree {
 
   static StatTimer setCurrentINodeTimer;
   static StatTimer removeTimer;
-  static StatTimer checkCurrentStateSubsumptionTimer;
+  static StatTimer subsumptionCheckTimer;
   static StatTimer markPathConditionTimer;
   static StatTimer splitTimer;
   static StatTimer executeOnNodeTimer;
+
+  // @brief Number of subsumption checks for statistical purposes
+  static unsigned long subsumptionCheckCount;
 
   ITreeNode *currentINode;
 
@@ -603,8 +647,8 @@ public:
 
   void remove(ITreeNode *node);
 
-  bool checkCurrentStateSubsumption(TimingSolver *solver, ExecutionState &state,
-                                    double timeout);
+  bool subsumptionCheck(TimingSolver *solver, ExecutionState &state,
+                        double timeout);
 
   void markPathCondition(ExecutionState &state, TimingSolver *solver);
 
@@ -646,10 +690,8 @@ class ITreeNode {
   static StatTimer executeTimer;
   static StatTimer bindCallArgumentsTimer;
   static StatTimer popAbstractDependencyFrameTimer;
-  static StatTimer getSingletonExpressionsTimer;
-  static StatTimer getCompositeExpressionsTimer;
-  static StatTimer getSingletonCoreExpressionsTimer;
-  static StatTimer getCompositeCoreExpressionsTimer;
+  static StatTimer getStoredExpressionsTimer;
+  static StatTimer getStoredCoreExpressionsTimer;
   static StatTimer computeCoreAllocationsTimer;
 
 private:
@@ -685,7 +727,7 @@ private:
 public:
   uintptr_t getNodeId();
 
-  ref<Expr> getInterpolant(std::vector<const Array *> &replacements) const;
+  ref<Expr> getInterpolant(std::set<const Array *> &replacements) const;
 
   void addConstraint(ref<Expr> &constraint, llvm::Value *value);
 
@@ -702,16 +744,11 @@ public:
   void popAbstractDependencyFrame(llvm::CallInst *site, llvm::Instruction *inst,
                                   ref<Expr> returnValue);
 
-  std::map<llvm::Value *, ref<Expr> > getSingletonExpressions() const;
+  std::pair<Dependency::ConcreteStore, Dependency::SymbolicStore>
+  getStoredExpressions() const;
 
-  std::map<llvm::Value *, std::vector<ref<Expr> > >
-  getCompositeExpressions() const;
-
-  std::map<llvm::Value *, ref<Expr> >
-  getSingletonCoreExpressions(std::vector<const Array *> &replacements) const;
-
-  std::map<llvm::Value *, std::vector<ref<Expr> > >
-  getCompositeCoreExpressions(std::vector<const Array *> &replacements) const;
+  std::pair<Dependency::ConcreteStore, Dependency::SymbolicStore>
+  getStoredCoreExpressions(std::set<const Array *> &replacements) const;
 
   void computeCoreAllocations(AllocationGraph *g);
 
