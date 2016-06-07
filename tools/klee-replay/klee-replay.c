@@ -412,7 +412,7 @@ unsigned klee_assume(uintptr_t x) {
 
 unsigned klee_abstract(uintptr_t x) {
   if (!x) {
-    fprintf(stderr, "WARNING: klee_assume(0)!\n");
+    fprintf(stderr, "WARNING: klee_abstract(0)!\n");
   }
   return 0;
 }
