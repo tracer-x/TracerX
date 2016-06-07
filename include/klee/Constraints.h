@@ -44,7 +44,9 @@ public:
   ref<Expr> simplifyExpr(ref<Expr> e) const;
 
   void addConstraint(ref<Expr> e);
-  
+
+  void replaceConstraint(ref<Expr> e);
+
   bool empty() const {
     return constraints.empty();
   }

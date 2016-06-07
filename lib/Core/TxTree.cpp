@@ -267,6 +267,25 @@ void TxTreeGraph::addPathCondition(TxTreeNode *txTreeNode,
   instance->pathConditionMap[pathCondition] = node;
 }
 
+void TxTreeGraph::replacePathCondition(TxTreeNode *txTreeNode,
+                                       PathCondition *pathCondition,
+                                       ref<Expr> condition) {
+  if (!OUTPUT_INTERPOLATION_TREE)
+    return;
+
+  assert(TxTreeGraph::instance && "Search tree graph not initialized");
+
+  TxTreeGraph::Node *node = instance->txTreeNodeMap[txTreeNode];
+
+  std::string s = PrettyExpressionBuilder::construct(condition);
+
+  std::pair<std::string, bool> p(s, false);
+
+  node->pathConditionTable.clear();
+  node->pathConditionTable[pathCondition] = p;
+  instance->pathConditionMap[pathCondition] = node;
+}
+
 void TxTreeGraph::addTableEntryMapping(TxTreeNode *txTreeNode,
                                        SubsumptionTableEntry *entry) {
   if (!OUTPUT_INTERPOLATION_TREE)
@@ -2340,6 +2359,13 @@ void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
   pathCondition = new PathCondition(constraint, dependency, condition,
                                     callHistory, pathCondition);
   graph->addPathCondition(this, pathCondition, constraint);
+}
+
+void TxTreeNode::replaceConstraint(ref<Expr> &constraint,
+                                   llvm::Value *condition) {
+  pathCondition = new PathCondition(constraint, dependency, condition,
+                                    callHistory, pathCondition);
+  graph->replacePathCondition(this, pathCondition, constraint);
 }
 
 void TxTreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {

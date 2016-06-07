@@ -90,6 +90,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("calloc", handleCalloc, true),
   add("free", handleFree, false),
   add("klee_assume", handleAssume, false),
+  add("klee_abstract", handleAbstract, false),
   add("klee_check_memory_access", handleCheckMemoryAccess, false),
   add("klee_get_valuef", handleGetValue, true),
   add("klee_get_valued", handleGetValue, true),
@@ -417,6 +418,24 @@ void SpecialFunctionHandler::handleAssume(ExecutionState &state,
     }
   } else {
     executor.addConstraint(state, e);
+  }
+}
+
+void
+SpecialFunctionHandler::handleAbstract(ExecutionState &state,
+                                       KInstruction *target,
+                                       std::vector<ref<Expr> > &arguments) {
+  assert(arguments.size() == 1 &&
+         "invalid number of arguments to klee_abstract");
+  ref<Expr> e = arguments[0];
+
+  if (e->getWidth() != Expr::Bool)
+    e = NeExpr::create(e, ConstantExpr::create(0, e->getWidth()));
+
+  if (executor.checkImplication(state, e)) {
+    executor.replaceConstraint(state, e);
+  } else {
+    executor.terminateStateOnError(state, "abstraction error", Executor::User);
   }
 }
 

@@ -18,6 +18,7 @@
 #include "klee/Expr.h"
 
 #include "Memory.h"
+#include "TimingSolver.h"
 #include "TxTree.h"
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include "llvm/IR/Function.h"
@@ -128,6 +129,20 @@ void ExecutionState::addTxTreeConstraint(ref<Expr> e,
 
 }
 
+void ExecutionState::replaceITreeConstraint(ref<Expr> e,
+                                            llvm::Instruction *instr) {
+  if (!INTERPOLATION_ENABLED)
+    return;
+
+  llvm::BranchInst *binstr = llvm::dyn_cast<llvm::BranchInst>(instr);
+
+  if (txTreeNode && binstr && binstr->isConditional()) {
+    txTreeNode->replaceConstraint(e, binstr->getCondition());
+  } else if (txTreeNode && !binstr) {
+    txTreeNode->replaceConstraint(e, instr->getOperand(0));
+  }
+}
+
 ExecutionState *ExecutionState::branch() {
   depth++;
 
@@ -192,6 +207,15 @@ llvm::raw_ostream &klee::operator<<(llvm::raw_ostream &os, const MemoryMap &mm) 
   }
   os << "}";
   return os;
+}
+
+bool ExecutionState::checkImplication(TimingSolver *solver, double timeout,
+                                      ExecutionState &state, ref<Expr> query) {
+  solver->setTimeout(timeout);
+  Solver::Validity result;
+  bool success = solver->evaluate(state, query, result);
+  solver->setTimeout(0);
+  return (success && result == Solver::True);
 }
 
 bool ExecutionState::merge(const ExecutionState &b) {

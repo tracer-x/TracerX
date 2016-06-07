@@ -169,3 +169,9 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
   e = simplifyExpr(e);
   addConstraintInternal(e);
 }
+
+void ConstraintManager::replaceConstraint(ref<Expr> e) {
+  constraints.clear();
+  e = simplifyExpr(e);
+  addConstraintInternal(e);
+}

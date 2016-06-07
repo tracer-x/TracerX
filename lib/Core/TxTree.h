@@ -158,6 +158,10 @@ public:
                                PathCondition *pathCondition,
                                ref<Expr> condition);
 
+  static void replacePathCondition(TxTreeNode *txTreeNode,
+                                   PathCondition *pathCondition,
+                                   ref<Expr> condition);
+
   static void addTableEntryMapping(TxTreeNode *txTreeNode,
                                    SubsumptionTableEntry *entry);
 
@@ -596,6 +600,8 @@ public:
   /// \param constraint The constraint to extend the current path condition with
   /// \param value The LLVM value that corresponds to the constraint
   void addConstraint(ref<Expr> &constraint, llvm::Value *value);
+
+  void replaceConstraint(ref<Expr> &constraint, llvm::Value *value);
 
   /// \brief Creates fresh interpolation data holder for the two given KLEE
   /// execution states.

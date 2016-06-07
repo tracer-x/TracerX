@@ -82,6 +82,8 @@ private:
 
   void addTxTreeConstraint(ref<Expr> e, llvm::Instruction *instr);
 
+  void replaceITreeConstraint(ref<Expr> e, llvm::Instruction *instr);
+
 public:
   // Execution - Control Flow specific
 
@@ -190,6 +192,15 @@ public:
     constraints.addConstraint(e);
   }
 
+  void replaceConstraint(ref<Expr> e) {
+#ifdef SUPPORT_Z3
+    replaceITreeConstraint(e, prevPC->inst);
+#endif
+    constraints.replaceConstraint(e);
+  }
+
+  bool checkImplication(TimingSolver *solver, double timeout,
+                        ExecutionState &state, ref<Expr> query);
   bool merge(const ExecutionState &b);
   void dumpStack(llvm::raw_ostream &out) const;
   void debugSubsumption(uint64_t level);

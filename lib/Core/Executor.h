@@ -329,6 +329,13 @@ private:
   /// validity checks, and seed patching.
   void addConstraint(ExecutionState &state, ref<Expr> condition);
 
+  /// Replace the given (boolean) condition as a constraint on state.
+  /// This function is part of the implementation of klee_abstract
+  void replaceConstraint(ExecutionState &state, ref<Expr> condition);
+
+  /// Check the given (boolean) condition implies current state constraint.
+  bool checkImplication(ExecutionState &state, ref<Expr> condition);
+
   // Called on [for now] concrete reads, replaces constant with a symbolic
   // Used for testing.
   ref<Expr> replaceReadWithSymbolic(ExecutionState &state, ref<Expr> e);

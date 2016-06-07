@@ -868,6 +868,7 @@ static const char *modelledExternals[] = {
   "free",
   "abort",
   "klee_abort",
+  "klee_abstract",
   "klee_assume",
   "klee_check_memory_access",
   "klee_define_fixed_object",

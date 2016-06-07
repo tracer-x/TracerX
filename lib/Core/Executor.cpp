@@ -1046,6 +1046,14 @@ void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
                                  ConstantExpr::alloc(1, Expr::Bool));
 }
 
+bool Executor::checkImplication(ExecutionState &state, ref<Expr> condition) {
+  return state.checkImplication(solver, coreSolverTimeout, state, condition);
+}
+
+void Executor::replaceConstraint(ExecutionState &state, ref<Expr> condition) {
+  state.replaceConstraint(condition);
+}
+
 ref<klee::ConstantExpr> Executor::evalConstant(const Constant *c) {
   if (const llvm::ConstantExpr *ce = dyn_cast<llvm::ConstantExpr>(c)) {
     return evalConstantExpr(ce);
