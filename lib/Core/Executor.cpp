@@ -1046,8 +1046,10 @@ void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
                                  ConstantExpr::alloc(1, Expr::Bool));
 }
 
-bool Executor::checkImplication(ExecutionState &state, ref<Expr> condition) {
-  return state.checkImplication(solver, coreSolverTimeout, state, condition);
+bool Executor::checkImplication(ExecutionState &state, ref<Expr> condition,
+                                Solver::Validity &result) {
+  return state.checkImplication(solver, coreSolverTimeout, state, condition,
+                                result);
 }
 
 void Executor::replaceConstraint(ExecutionState &state, ref<Expr> condition) {

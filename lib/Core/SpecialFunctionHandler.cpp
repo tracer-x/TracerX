@@ -428,12 +428,18 @@ SpecialFunctionHandler::handleAbstract(ExecutionState &state,
   assert(arguments.size() == 1 &&
          "invalid number of arguments to klee_abstract");
   ref<Expr> e = arguments[0];
+  Solver::Validity result;
 
   if (e->getWidth() != Expr::Bool)
     e = NeExpr::create(e, ConstantExpr::create(0, e->getWidth()));
 
-  if (executor.checkImplication(state, e)) {
+  bool success = executor.checkImplication(state, e, result);
+  assert(success && "FIXME: Unhandled solver failure");
+
+  if (result == Solver::True) {
     executor.replaceConstraint(state, e);
+  } else if (result == Solver::Unknown) {
+    executor.addConstraint(state, e);
   } else {
     executor.terminateStateOnError(state, "abstraction error", Executor::User);
   }

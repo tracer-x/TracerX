@@ -171,7 +171,18 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
 }
 
 void ConstraintManager::replaceConstraint(ref<Expr> e) {
-  constraints.clear();
-  e = simplifyExpr(e);
-  addConstraintInternal(e);
+  for (std::vector<ref<Expr> >::iterator it = constraints.begin();
+       it != constraints.end(); ++it) {
+    if (getArrayFromConcatExpr(*it) == getArrayFromConcatExpr(e)) {
+      *it = e;
+      break;
+    }
+  }
+}
+
+const Array *ConstraintManager::getArrayFromConcatExpr(ref<Expr> expr) {
+  if (llvm::isa<ReadExpr>(expr))
+    return (llvm::dyn_cast<ReadExpr>(expr)->updates).root;
+
+  return getArrayFromConcatExpr(expr->getKid(1));
 }

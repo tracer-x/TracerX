@@ -210,12 +210,12 @@ llvm::raw_ostream &klee::operator<<(llvm::raw_ostream &os, const MemoryMap &mm) 
 }
 
 bool ExecutionState::checkImplication(TimingSolver *solver, double timeout,
-                                      ExecutionState &state, ref<Expr> query) {
+                                      ExecutionState &state, ref<Expr> query,
+                                      Solver::Validity &result) {
   solver->setTimeout(timeout);
-  Solver::Validity result;
   bool success = solver->evaluate(state, query, result);
   solver->setTimeout(0);
-  return (success && result == Solver::True);
+  return success;
 }
 
 bool ExecutionState::merge(const ExecutionState &b) {

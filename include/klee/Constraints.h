@@ -47,6 +47,8 @@ public:
 
   void replaceConstraint(ref<Expr> e);
 
+  const Array *getArrayFromConcatExpr(ref<Expr> expr);
+
   bool empty() const {
     return constraints.empty();
   }

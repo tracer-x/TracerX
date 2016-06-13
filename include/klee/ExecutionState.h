@@ -12,6 +12,7 @@
 
 #include "klee/Constraints.h"
 #include "klee/Expr.h"
+#include "klee/Solver.h"
 #include "klee/Internal/ADT/TreeStream.h"
 
 // FIXME: We do not want to be exposing these? :(
@@ -200,7 +201,8 @@ public:
   }
 
   bool checkImplication(TimingSolver *solver, double timeout,
-                        ExecutionState &state, ref<Expr> query);
+                        ExecutionState &state, ref<Expr> query,
+                        Solver::Validity &result);
   bool merge(const ExecutionState &b);
   void dumpStack(llvm::raw_ostream &out) const;
   void debugSubsumption(uint64_t level);
