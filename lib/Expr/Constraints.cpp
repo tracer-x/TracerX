@@ -171,11 +171,11 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
 }
 
 void ConstraintManager::replaceConstraint(ref<Expr> e) {
+  const Array *eArray = getArrayFromConcatExpr(e);
   for (std::vector<ref<Expr> >::iterator it = constraints.begin();
        it != constraints.end(); ++it) {
-    if (getArrayFromConcatExpr(*it) == getArrayFromConcatExpr(e)) {
+    if (getArrayFromConcatExpr(*it) == eArray) {
       *it = e;
-      break;
     }
   }
 }
