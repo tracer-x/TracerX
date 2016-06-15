@@ -172,12 +172,15 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
 
 void ConstraintManager::replaceConstraint(ref<Expr> e) {
   const Array *eArray = getArrayFromConcatExpr(e);
-  for (std::vector<ref<Expr> >::iterator it = constraints.begin();
-       it != constraints.end(); ++it) {
+  std::vector<ref<Expr> >::iterator it = constraints.begin();
+  while (it != constraints.end()) {
     if (getArrayFromConcatExpr(*it) == eArray) {
-      *it = e;
+      constraints.erase(it);
+    } else {
+      ++it;
     }
   }
+  constraints.push_back(e);
 }
 
 const Array *ConstraintManager::getArrayFromConcatExpr(ref<Expr> expr) {
