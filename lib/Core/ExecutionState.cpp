@@ -129,20 +129,6 @@ void ExecutionState::addTxTreeConstraint(ref<Expr> e,
 
 }
 
-void ExecutionState::replaceITreeConstraint(ref<Expr> e,
-                                            llvm::Instruction *instr) {
-  if (!INTERPOLATION_ENABLED)
-    return;
-
-  llvm::BranchInst *binstr = llvm::dyn_cast<llvm::BranchInst>(instr);
-
-  if (txTreeNode && binstr && binstr->isConditional()) {
-    txTreeNode->replaceConstraint(e, binstr->getCondition());
-  } else if (txTreeNode && !binstr) {
-    txTreeNode->replaceConstraint(e, instr->getOperand(0));
-  }
-}
-
 ExecutionState *ExecutionState::branch() {
   depth++;
 

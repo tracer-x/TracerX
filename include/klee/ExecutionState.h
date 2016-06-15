@@ -83,8 +83,6 @@ private:
 
   void addTxTreeConstraint(ref<Expr> e, llvm::Instruction *instr);
 
-  void replaceITreeConstraint(ref<Expr> e, llvm::Instruction *instr);
-
 public:
   // Execution - Control Flow specific
 
@@ -194,9 +192,6 @@ public:
   }
 
   void replaceConstraint(ref<Expr> e) {
-#ifdef SUPPORT_Z3
-    replaceITreeConstraint(e, prevPC->inst);
-#endif
     constraints.replaceConstraint(e);
   }
 

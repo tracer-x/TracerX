@@ -1055,6 +1055,20 @@ bool Executor::checkImplication(ExecutionState &state, ref<Expr> condition,
 }
 
 void Executor::replaceConstraint(ExecutionState &state, ref<Expr> condition) {
+#ifdef SUPPORT_Z3
+  if (!INTERPOLATION_ENABLED)
+    return;
+
+  llvm::BranchInst *binstr =
+      llvm::dyn_cast<llvm::BranchInst>(state.prevPC->inst);
+
+  if (state.itreeNode && binstr && binstr->isConditional()) {
+    state.itreeNode->replaceConstraint(condition, binstr->getCondition());
+  } else if (state.itreeNode && !binstr) {
+    state.itreeNode->replaceConstraint(condition,
+                                       state.prevPC->inst->getOperand(0));
+  }
+#endif
   state.replaceConstraint(condition);
 }
 
