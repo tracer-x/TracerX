@@ -170,13 +170,16 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
   addConstraintInternal(e);
 }
 
-void ConstraintManager::replaceConstraint(ref<Expr> e) {
+void
+ConstraintManager::replaceConstraint(ref<Expr> e,
+                                     std::vector<ref<Expr> > keptConstraints) {
   const Array *eArray = getArrayFromConcatExpr(e);
   std::vector<ref<Expr> >::iterator it = constraints.begin();
   while (it != constraints.end()) {
     if (getArrayFromConcatExpr(*it) == eArray) {
       constraints.erase(it);
     } else {
+      keptConstraints.push_back(*it);
       ++it;
     }
   }

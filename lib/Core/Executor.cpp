@@ -1055,6 +1055,8 @@ bool Executor::checkImplication(ExecutionState &state, ref<Expr> condition,
 }
 
 void Executor::replaceConstraint(ExecutionState &state, ref<Expr> condition) {
+  std::vector<ref<Expr> > keptConstraints;
+  state.replaceConstraint(condition, keptConstraints);
 #ifdef SUPPORT_Z3
   if (!INTERPOLATION_ENABLED)
     return;
@@ -1063,13 +1065,14 @@ void Executor::replaceConstraint(ExecutionState &state, ref<Expr> condition) {
       llvm::dyn_cast<llvm::BranchInst>(state.prevPC->inst);
 
   if (state.itreeNode && binstr && binstr->isConditional()) {
-    state.itreeNode->replaceConstraint(condition, binstr->getCondition());
+    state.itreeNode->replaceConstraint(condition, binstr->getCondition(),
+                                       keptConstraints);
   } else if (state.itreeNode && !binstr) {
-    state.itreeNode->replaceConstraint(condition,
-                                       state.prevPC->inst->getOperand(0));
+    state.itreeNode->replaceConstraint(
+        condition, state.prevPC->inst->getOperand(0), keptConstraints);
   }
 #endif
-  state.replaceConstraint(condition);
+  keptConstraints.clear();
 }
 
 ref<klee::ConstantExpr> Executor::evalConstant(const Constant *c) {

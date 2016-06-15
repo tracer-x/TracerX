@@ -2362,9 +2362,18 @@ void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
 }
 
 void TxTreeNode::replaceConstraint(ref<Expr> &constraint,
-                                   llvm::Value *condition) {
-  pathCondition = new PathCondition(constraint, dependency, condition,
-                                    callHistory, pathCondition);
+                                   llvm::Value *condition,
+                                   std::vector<ref<Expr> > keptConstraints) {
+  PathCondition *prev = NULL;
+  PathCondition *current = NULL;
+  for (std::vector<ref<Expr> >::iterator it = keptConstraints.begin();
+       it != keptConstraints.end(); ++it) {
+    current = new PathCondition(*it, dependency, condition, callHistory, prev);
+    prev = current;
+  }
+
+  pathCondition =
+      new PathCondition(constraint, dependency, condition, callHistory, prev);
   graph->replacePathCondition(this, pathCondition, constraint);
 }
 
