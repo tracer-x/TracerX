@@ -200,9 +200,6 @@ public:
     constraints.replaceConstraint(e);
   }
 
-  bool checkImplication(TimingSolver *solver, double timeout,
-                        ExecutionState &state, ref<Expr> query,
-                        Solver::Validity &result);
   bool merge(const ExecutionState &b);
   void dumpStack(llvm::raw_ostream &out) const;
   void debugSubsumption(uint64_t level);

@@ -209,15 +209,6 @@ llvm::raw_ostream &klee::operator<<(llvm::raw_ostream &os, const MemoryMap &mm) 
   return os;
 }
 
-bool ExecutionState::checkImplication(TimingSolver *solver, double timeout,
-                                      ExecutionState &state, ref<Expr> query,
-                                      Solver::Validity &result) {
-  solver->setTimeout(timeout);
-  bool success = solver->evaluate(state, query, result);
-  solver->setTimeout(0);
-  return success;
-}
-
 bool ExecutionState::merge(const ExecutionState &b) {
   if (DebugLogStateMerge)
     llvm::errs() << "-- attempting merge of A:" << this << " with B:" << &b
