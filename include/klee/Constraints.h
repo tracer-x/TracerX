@@ -47,7 +47,11 @@ public:
 
   void replaceConstraint(ref<Expr> e, std::vector<ref<Expr> > keptConstraints);
 
-  const Array *getArrayFromConcatExpr(ref<Expr> expr);
+  void getArrayFromConcatExpr(ref<Expr> expr,
+                              std::vector<const Array *> &arrayPack);
+
+  bool isVariableIntersect(std::vector<const Array *> &v1,
+                           std::vector<const Array *> &v2);
 
   bool empty() const {
     return constraints.empty();
