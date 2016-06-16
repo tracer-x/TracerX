@@ -18,7 +18,6 @@
 #include "klee/Expr.h"
 
 #include "Memory.h"
-#include "TimingSolver.h"
 #include "TxTree.h"
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include "llvm/IR/Function.h"

@@ -1051,8 +1051,7 @@ bool Executor::checkImplication(ExecutionState &state, ref<Expr> condition,
   solver->setTimeout(coreSolverTimeout);
   bool success = solver->evaluate(state, condition, result);
   solver->setTimeout(0);
-  std::vector<ref<Expr> > unsatCore = solver->getUnsatCore();
-  state.itreeNode->unsatCoreMarking(unsatCore, state);
+  txTree->markPathCondition(state, solver);
   return success;
 }
 
