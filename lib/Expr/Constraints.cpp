@@ -179,7 +179,7 @@ void ConstraintManager::abstractConstraints(
   std::vector<ref<Expr> >::iterator it = constraints.begin();
   while (it != constraints.end()) {
     getArrayFromExpr(*it, itArrayPack);
-    if (isVariableIntersect(itArrayPack, eArrayPack)) {
+    if (variablesIntersect(itArrayPack, eArrayPack)) {
       constraints.erase(it);
     } else {
       keptConstraints.push_back(*it);
@@ -190,8 +190,8 @@ void ConstraintManager::abstractConstraints(
   constraints.push_back(e);
 }
 
-bool ConstraintManager::isVariableIntersect(std::set<const Array *> &v1,
-                                            std::set<const Array *> &v2) {
+bool ConstraintManager::variablesIntersect(std::set<const Array *> &v1,
+                                           std::set<const Array *> &v2) {
   std::set<const Array *> v3;
   set_intersection(v1.begin(), v1.end(), v2.begin(), v2.end(),
                    std::inserter(v3, v3.begin()));
