@@ -53,8 +53,8 @@ public:
 
   void getArrayFromExpr(ref<Expr> expr, std::set<const Array *> &arrayPack);
 
-  bool variablesIntersect(std::set<const Array *> &v1,
-                          std::set<const Array *> &v2);
+  static bool variablesIntersect(std::set<const Array *> &v1,
+                                 std::set<const Array *> &v2);
 
   bool empty() const {
     return constraints.empty();
