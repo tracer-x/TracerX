@@ -173,9 +173,9 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
 void
 ConstraintManager::replaceConstraint(ref<Expr> e,
                                      std::vector<ref<Expr> > &keptConstraints) {
-  std::vector<const Array *> eArrayPack;
+  std::set<const Array *> eArrayPack;
   getArrayFromConcatExpr(e, eArrayPack);
-  std::vector<const Array *> itArrayPack;
+  std::set<const Array *> itArrayPack;
 
   std::vector<ref<Expr> >::iterator it = constraints.begin();
   while (it != constraints.end()) {
@@ -191,18 +191,19 @@ ConstraintManager::replaceConstraint(ref<Expr> e,
   constraints.push_back(e);
 }
 
-bool ConstraintManager::isVariableIntersect(std::vector<const Array *> &v1,
-                                            std::vector<const Array *> &v2) {
-  std::vector<const Array *> v3;
+bool ConstraintManager::isVariableIntersect(std::set<const Array *> &v1,
+                                            std::set<const Array *> &v2) {
+  std::set<const Array *> v3;
   set_intersection(v1.begin(), v1.end(), v2.begin(), v2.end(),
-                   back_inserter(v3));
+                   std::inserter(v3, v3.begin()));
   return !v3.empty();
 }
 
-void ConstraintManager::getArrayFromConcatExpr(
-    ref<Expr> expr, std::vector<const Array *> &arrayPack) {
+void
+ConstraintManager::getArrayFromConcatExpr(ref<Expr> expr,
+                                          std::set<const Array *> &arrayPack) {
   if (llvm::isa<ReadExpr>(expr))
-    arrayPack.push_back((llvm::dyn_cast<ReadExpr>(expr)->updates).root);
+    arrayPack.insert((llvm::dyn_cast<ReadExpr>(expr)->updates).root);
 
   for (unsigned int i = 0; i < expr->getNumKids(); ++i) {
     getArrayFromConcatExpr(expr->getKid(i), arrayPack);

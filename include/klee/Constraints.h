@@ -48,10 +48,10 @@ public:
   void replaceConstraint(ref<Expr> e, std::vector<ref<Expr> > &keptConstraints);
 
   void getArrayFromConcatExpr(ref<Expr> expr,
-                              std::vector<const Array *> &arrayPack);
+                              std::set<const Array *> &arrayPack);
 
-  bool isVariableIntersect(std::vector<const Array *> &v1,
-                           std::vector<const Array *> &v2);
+  bool isVariableIntersect(std::set<const Array *> &v1,
+                           std::set<const Array *> &v2);
 
   bool empty() const {
     return constraints.empty();
