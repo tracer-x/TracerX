@@ -90,6 +90,9 @@
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
 
+/* Supporting CLP(R) Backend */
+#undef SUPPORT_CLPR
+
 /* klee-uclibc is supported */
 #undef SUPPORT_KLEE_UCLIBC
 

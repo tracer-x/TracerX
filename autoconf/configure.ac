@@ -643,6 +643,43 @@ if test X$with_z3 != X ; then
 fi
 
 dnl **************************************************************************
+dnl Find an install of CLP(R)
+dnl **************************************************************************
+
+AC_ARG_WITH(clpr,
+  AS_HELP_STRING([--with-clpr], [Location of CLP(R) installation directory]), [
+    # Check for empty argument
+    if test "X$withval" = X ; then
+      AC_MSG_ERROR([<path> cannot be empty in --with-clpr=<path>])
+    fi
+    clpr_root=`(cd $withval && pwd) 2> /dev/null`
+
+    #Check for bad path
+    if test "X$clpr_root" = X ; then
+      AC_MSG_ERROR([Cannot access path $with_clpr passed to --with-clpr])
+    fi
+
+    CLPR_CFLAGS="-I$clpr_root/include"
+    CLPR_LDFLAGS="-L$clpr_root/lib"
+  ])
+
+if test X$with_clpr != X ; then
+  old_CPPFLAGS="$CPPFLAGS"
+  CPPFLAGS="$CPPFLAGS $CLPR_CFLAGS"
+  AC_CHECK_HEADER(clpr_api++.h,,
+    [
+        AC_MSG_ERROR([Unable to use clpr_api++.h header])
+    ])
+  CPPFLAGS="$old_CPPFLAGS"
+
+  CLPR_LDFLAGS="${CLPR_LDFLAGS} -lclpr_api"
+
+  AC_DEFINE(SUPPORT_CLPR, 1, [Supporting CLP(R) Backend])
+  AC_SUBST(CLPR_CFLAGS)
+  AC_SUBST(CLPR_LDFLAGS)
+fi
+
+dnl **************************************************************************
 dnl User option to enable metaSMT constraint solvers and to specify the 
 dnl the location of the metaSMT root directory
 dnl **************************************************************************
