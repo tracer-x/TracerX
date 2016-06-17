@@ -51,7 +51,8 @@ public:
   void abstractConstraints(ref<Expr> e,
                            std::vector<ref<Expr> > &keptConstraints);
 
-  void getArrayFromExpr(ref<Expr> expr, std::set<const Array *> &arrayPack);
+  static void getArrayFromExpr(ref<Expr> expr,
+                               std::set<const Array *> &arrayPack);
 
   static bool variablesIntersect(std::set<const Array *> &v1,
                                  std::set<const Array *> &v2);
