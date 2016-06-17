@@ -1051,7 +1051,9 @@ bool Executor::checkImplication(ExecutionState &state, ref<Expr> condition,
   solver->setTimeout(coreSolverTimeout);
   bool success = solver->evaluate(state, condition, result);
   solver->setTimeout(0);
-  txTree->markPathCondition(state, solver);
+  if (success && result == Solver::True) {
+    txTree->markPathCondition(state, solver);
+  }
   return success;
 }
 
@@ -1584,7 +1586,6 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
-
   switch (i->getOpcode()) {
     // Control flow
   case Instruction::Ret: {
@@ -3093,7 +3094,6 @@ void Executor::run(ExecutionState &initialState) {
       {
 	KInstruction *ki = state.pc;
 	stepInstruction(state);
-
 	executeInstruction(state, ki);
         if (INTERPOLATION_ENABLED) {
           state.txTreeNode->incInstructionsDepth();
@@ -4026,7 +4026,6 @@ void Executor::runFunctionAsMain(Function *f,
   run(*state);
   delete processTree;
   processTree = 0;
-
   if (INTERPOLATION_ENABLED) {
     TxTreeGraph::save(interpreterHandler->getOutputFilename("tree.dot"));
     TxTreeGraph::deallocate();

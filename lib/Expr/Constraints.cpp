@@ -172,7 +172,7 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
 
 void
 ConstraintManager::replaceConstraint(ref<Expr> e,
-                                     std::vector<ref<Expr> > keptConstraints) {
+                                     std::vector<ref<Expr> > &keptConstraints) {
   std::vector<const Array *> eArrayPack;
   getArrayFromConcatExpr(e, eArrayPack);
   std::vector<const Array *> itArrayPack;

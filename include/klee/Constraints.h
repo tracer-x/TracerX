@@ -45,7 +45,7 @@ public:
 
   void addConstraint(ref<Expr> e);
 
-  void replaceConstraint(ref<Expr> e, std::vector<ref<Expr> > keptConstraints);
+  void replaceConstraint(ref<Expr> e, std::vector<ref<Expr> > &keptConstraints);
 
   void getArrayFromConcatExpr(ref<Expr> expr,
                               std::vector<const Array *> &arrayPack);
