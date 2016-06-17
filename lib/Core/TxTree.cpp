@@ -304,7 +304,7 @@ void TxTreeGraph::setAsCore(PathCondition *pathCondition) {
   assert(TxTreeGraph::instance && "Search tree graph not initialized");
 
   assert(instance->pathConditionMap[pathCondition] &&
-         "pathCondition is not found");
+         "pathCondition has no corresponding tree node");
   instance->pathConditionMap[pathCondition]
       ->pathConditionTable[pathCondition]
       .second = true;
