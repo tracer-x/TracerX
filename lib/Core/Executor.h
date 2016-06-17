@@ -330,9 +330,9 @@ private:
   void addConstraint(ExecutionState &state, ref<Expr> condition);
 
   /// Replace the related constraint on state with the given (boolean)
-  /// condition.
+  /// condition annotated at klee_abstract.
   /// This function is part of the implementation of klee_abstract
-  void replaceConstraint(ExecutionState &state, ref<Expr> condition);
+  void abstractConstraints(ExecutionState &state, ref<Expr> condition);
 
   /// Check the given (boolean) condition implies current state constraint.
   bool checkImplication(ExecutionState &state, ref<Expr> condition,

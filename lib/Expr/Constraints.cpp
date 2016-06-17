@@ -170,16 +170,15 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
   addConstraintInternal(e);
 }
 
-void
-ConstraintManager::replaceConstraint(ref<Expr> e,
-                                     std::vector<ref<Expr> > &keptConstraints) {
+void ConstraintManager::abstractConstraints(
+    ref<Expr> e, std::vector<ref<Expr> > &keptConstraints) {
   std::set<const Array *> eArrayPack;
   getArrayFromExpr(e, eArrayPack);
   std::set<const Array *> itArrayPack;
 
   std::vector<ref<Expr> >::iterator it = constraints.begin();
   while (it != constraints.end()) {
-	  getArrayFromExpr(*it, itArrayPack);
+    getArrayFromExpr(*it, itArrayPack);
     if (isVariableIntersect(itArrayPack, eArrayPack)) {
       constraints.erase(it);
     } else {
@@ -199,13 +198,12 @@ bool ConstraintManager::isVariableIntersect(std::set<const Array *> &v1,
   return !v3.empty();
 }
 
-void
-ConstraintManager::getArrayFromExpr(ref<Expr> expr,
-                                          std::set<const Array *> &arrayPack) {
+void ConstraintManager::getArrayFromExpr(ref<Expr> expr,
+                                         std::set<const Array *> &arrayPack) {
   if (llvm::isa<ReadExpr>(expr))
     arrayPack.insert((llvm::dyn_cast<ReadExpr>(expr)->updates).root);
 
   for (unsigned int i = 0; i < expr->getNumKids(); ++i) {
-	  getArrayFromExpr(expr->getKid(i), arrayPack);
+    getArrayFromExpr(expr->getKid(i), arrayPack);
   }
 }

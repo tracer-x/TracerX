@@ -437,7 +437,7 @@ SpecialFunctionHandler::handleAbstract(ExecutionState &state,
   assert(success && "FIXME: Unhandled solver failure");
 
   if (result == Solver::True) {
-    executor.replaceConstraint(state, e);
+    executor.abstractConstraints(state, e);
   } else if (result == Solver::Unknown) {
     executor.addConstraint(state, e);
   } else {

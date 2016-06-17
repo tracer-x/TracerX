@@ -45,10 +45,13 @@ public:
 
   void addConstraint(ref<Expr> e);
 
-  void replaceConstraint(ref<Expr> e, std::vector<ref<Expr> > &keptConstraints);
+  // Replace the state constraint that has variable intersection with the
+  // condition in klee_abstract() and collect constraints that are kept(not
+  // removed/replaced) which later use for construction of a new PathCondition.
+  void abstractConstraints(ref<Expr> e,
+                           std::vector<ref<Expr> > &keptConstraints);
 
-  void getArrayFromExpr(ref<Expr> expr,
-                              std::set<const Array *> &arrayPack);
+  void getArrayFromExpr(ref<Expr> expr, std::set<const Array *> &arrayPack);
 
   bool isVariableIntersect(std::set<const Array *> &v1,
                            std::set<const Array *> &v2);
