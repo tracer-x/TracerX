@@ -332,6 +332,9 @@ private:
   /// Replace the related constraint on state with the given (boolean)
   /// condition annotated at klee_abstract.
   /// This function is part of the implementation of klee_abstract
+  ///
+  /// \param state The state this abstraction is part of
+  /// \param condition The abstract condition
   void abstractConstraints(ExecutionState &state, ref<Expr> condition);
 
   /// Check the given (boolean) condition implies current state constraint.
