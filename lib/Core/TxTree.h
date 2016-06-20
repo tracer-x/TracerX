@@ -602,7 +602,7 @@ public:
   void addConstraint(ref<Expr> &constraint, llvm::Value *value);
 
   void abstractConstraints(ref<Expr> &constraint, llvm::Value *condition,
-                           std::vector<ref<Expr> > &keptConstraints);
+                           std::vector<ref<Expr> > keptConstraints);
 
   /// \brief Creates fresh interpolation data holder for the two given KLEE
   /// execution states.

@@ -337,6 +337,12 @@ private:
   /// \param condition The abstract condition
   void abstractConstraints(ExecutionState &state, ref<Expr> condition);
 
+  static bool variablesIntersect(std::set<const Array *> &v1,
+                                 std::set<const Array *> &v2);
+
+  static void getArrayFromExpr(ref<Expr> expr,
+                               std::set<const Array *> &arrayPack);
+
   // Called on [for now] concrete reads, replaces constant with a symbolic
   // Used for testing.
   ref<Expr> replaceReadWithSymbolic(ExecutionState &state, ref<Expr> e);

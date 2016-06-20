@@ -190,11 +190,6 @@ public:
     constraints.addConstraint(e);
   }
 
-  void abstractConstraints(ref<Expr> e,
-                           std::vector<ref<Expr> > &keptConstraints) {
-    constraints.abstractConstraints(e, keptConstraints);
-  }
-
   bool merge(const ExecutionState &b);
   void dumpStack(llvm::raw_ostream &out) const;
   void debugSubsumption(uint64_t level);
