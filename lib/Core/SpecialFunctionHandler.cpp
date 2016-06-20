@@ -20,6 +20,7 @@
 
 #include "Executor.h"
 #include "MemoryManager.h"
+#include "TxTree.h"
 
 #include "klee/CommandLine.h"
 
@@ -433,7 +434,13 @@ SpecialFunctionHandler::handleAbstract(ExecutionState &state,
   if (e->getWidth() != Expr::Bool)
     e = NeExpr::create(e, ConstantExpr::create(0, e->getWidth()));
 
-  bool success = executor.checkImplication(state, e, result);
+  // Check the given (boolean) condition implies current state constraint.
+  executor.solver->setTimeout(executor.coreSolverTimeout);
+  bool success = executor.solver->evaluate(state, e, result);
+  executor.solver->setTimeout(0);
+  if (success && result == Solver::True) {
+    executor.txTree->markPathCondition(state, executor.solver);
+  }
   assert(success && "FIXME: Unhandled solver failure");
 
   if (result == Solver::True) {

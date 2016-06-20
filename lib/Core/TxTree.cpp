@@ -2363,9 +2363,9 @@ void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
   graph->addPathCondition(this, pathCondition, constraint);
 }
 
-void TxTreeNode::abstractConstraint(ref<Expr> &constraint,
-                                    llvm::Value *condition,
-                                    std::vector<ref<Expr> > &keptConstraints) {
+void TxTreeNode::abstractConstraints(ref<Expr> &constraint,
+                                     llvm::Value *condition,
+                                     std::vector<ref<Expr> > &keptConstraints) {
   PathCondition *prev = NULL;
   PathCondition *current = NULL;
   for (std::vector<ref<Expr> >::iterator it = keptConstraints.begin();

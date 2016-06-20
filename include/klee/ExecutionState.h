@@ -12,7 +12,6 @@
 
 #include "klee/Constraints.h"
 #include "klee/Expr.h"
-#include "klee/Solver.h"
 #include "klee/Internal/ADT/TreeStream.h"
 
 // FIXME: We do not want to be exposing these? :(

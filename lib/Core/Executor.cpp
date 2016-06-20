@@ -1046,17 +1046,6 @@ void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
                                  ConstantExpr::alloc(1, Expr::Bool));
 }
 
-bool Executor::checkImplication(ExecutionState &state, ref<Expr> condition,
-                                Solver::Validity &result) {
-  solver->setTimeout(coreSolverTimeout);
-  bool success = solver->evaluate(state, condition, result);
-  solver->setTimeout(0);
-  if (success && result == Solver::True) {
-    txTree->markPathCondition(state, solver);
-  }
-  return success;
-}
-
 void Executor::abstractConstraints(ExecutionState &state, ref<Expr> condition) {
   std::vector<ref<Expr> > keptConstraints;
   state.abstractConstraints(condition, keptConstraints);
@@ -1066,11 +1055,11 @@ void Executor::abstractConstraints(ExecutionState &state, ref<Expr> condition) {
   llvm::BranchInst *binstr =
       llvm::dyn_cast<llvm::BranchInst>(state.prevPC->inst);
 
-  if (state.itreeNode && binstr && binstr->isConditional()) {
-    state.itreeNode->abstractConstraints(condition, binstr->getCondition(),
-                                         keptConstraints);
-  } else if (state.itreeNode && !binstr) {
-    state.itreeNode->abstractConstraints(
+  if (state.txTreeNode && binstr && binstr->isConditional()) {
+    state.txTreeNode->abstractConstraints(condition, binstr->getCondition(),
+                                          keptConstraints);
+  } else if (state.txTreeNode && !binstr) {
+    state.txTreeNode->abstractConstraints(
         condition, state.prevPC->inst->getOperand(0), keptConstraints);
   }
   keptConstraints.clear();

@@ -337,10 +337,6 @@ private:
   /// \param condition The abstract condition
   void abstractConstraints(ExecutionState &state, ref<Expr> condition);
 
-  /// Check the given (boolean) condition implies current state constraint.
-  bool checkImplication(ExecutionState &state, ref<Expr> condition,
-                        Solver::Validity &result);
-
   // Called on [for now] concrete reads, replaces constant with a symbolic
   // Used for testing.
   ref<Expr> replaceReadWithSymbolic(ExecutionState &state, ref<Expr> e);
