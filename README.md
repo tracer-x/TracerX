@@ -1,8 +1,7 @@
 KLEE Symbolic Virtual Machine
 =============================
 
-Notes: tracer-x-no-abstract-no-clpr for merging with the version with neither klee_abstract nor CLP(R) support.
-===============================================================================================================
+####Notes: This branch (tracer-x-no-abstract-no-clpr) is for merging with the version with neither klee_abstract nor CLP(R) support.####
 
 [![Build Status](https://travis-ci.org/klee/klee.svg?branch=master)](https://travis-ci.org/klee/klee)
 
