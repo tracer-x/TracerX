@@ -254,6 +254,21 @@ namespace klee {
   };
 #endif /* SUPPORT_Z3 */
   
+#ifdef SUPPORT_CLPR
+  /// CLPRSolver - An incomplete solver based on CLP(R)
+  class CLPRSolver : public Solver {
+  public:
+    /// CLPRSolver - Construct a new CLPRSolver
+    CLPRSolver();
+
+    /// getConstraintLog - Return the constraint log for the given state in CVC format.
+    virtual char *getConstraintLog(const Query&);
+
+    /// setCoreSolverTimeout - Set constraint solver timeout delay to the given value; 0 is off.
+    virtual void setCoreSolverTimeout(double timeout);
+  };
+#endif /* SUPPORT_CLPR */
+
 #ifdef SUPPORT_METASMT
   
   template<typename SolverContext>
