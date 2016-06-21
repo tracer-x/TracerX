@@ -1,6 +1,8 @@
 KLEE Symbolic Virtual Machine
 =============================
 
+####Notes: This branch (tracer-x-no-abstract-no-clpr) is a version with neither klee_abstract nor CLP(R) support.####
+
 [![Build Status](https://travis-ci.org/klee/klee.svg?branch=master)](https://travis-ci.org/klee/klee)
 
 `KLEE` is a symbolic virtual machine built on top of the LLVM compiler
