@@ -1,6 +1,6 @@
 KLEE Symbolic Virtual Machine
 =============================
-####This branch (tracer-x-clpr) is for merging with the version with the same features as master but with CLP(R) support.####
+####This branch (tracer-x-clpr) isa version with the same features as that of the master branch but with CLP(R) support.####
 
 [![Build Status](https://travis-ci.org/klee/klee.svg?branch=master)](https://travis-ci.org/klee/klee)
 
