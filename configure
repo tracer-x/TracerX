@@ -626,6 +626,8 @@ ac_subst_vars='LTLIBOBJS
 LIBOBJS
 METASMT_ROOT
 ENABLE_METASMT
+CLPR_LDFLAGS
+CLPR_CFLAGS
 Z3_LDFLAGS
 Z3_CFLAGS
 STP_LDFLAGS
@@ -733,6 +735,7 @@ enable_posix_runtime
 with_runtime
 with_stp
 with_z3
+with_clpr
 with_metasmt
 '
       ac_precious_vars='build_alias
@@ -1385,6 +1388,7 @@ Optional Packages:
                           (default [Release+Asserts])
   --with-stp              Location of STP installation directory
   --with-z3               Location of Z3 installation directory
+  --with-clpr             Location of CLP(R) installation directory
   --with-metasmt          Location of metaSMT installation directory
 
 Some influential environment variables:
@@ -5064,6 +5068,52 @@ fi
 
 
 $as_echo "#define SUPPORT_Z3 1" >>confdefs.h
+
+
+
+fi
+
+
+
+# Check whether --with-clpr was given.
+if test "${with_clpr+set}" = set; then :
+  withval=$with_clpr;
+    # Check for empty argument
+    if test "X$withval" = X ; then
+      as_fn_error $? "<path> cannot be empty in --with-clpr=<path>" "$LINENO" 5
+    fi
+    clpr_root=`(cd $withval && pwd) 2> /dev/null`
+
+    #Check for bad path
+    if test "X$clpr_root" = X ; then
+      as_fn_error $? "Cannot access path $with_clpr passed to --with-clpr" "$LINENO" 5
+    fi
+
+    CLPR_CFLAGS="-I$clpr_root/include"
+    CLPR_LDFLAGS="-L$clpr_root/lib"
+
+fi
+
+
+if test X$with_clpr != X ; then
+  old_CPPFLAGS="$CPPFLAGS"
+  CPPFLAGS="$CPPFLAGS $CLPR_CFLAGS"
+  ac_fn_cxx_check_header_mongrel "$LINENO" "clpr_api++.h" "ac_cv_header_clpr_apipp_h" "$ac_includes_default"
+if test "x$ac_cv_header_clpr_apipp_h" = xyes; then :
+
+else
+
+        as_fn_error $? "Unable to use clpr_api++.h header" "$LINENO" 5
+
+fi
+
+
+  CPPFLAGS="$old_CPPFLAGS"
+
+  CLPR_LDFLAGS="${CLPR_LDFLAGS} -lclpr_api"
+
+
+$as_echo "#define SUPPORT_CLPR 1" >>confdefs.h
 
 
 

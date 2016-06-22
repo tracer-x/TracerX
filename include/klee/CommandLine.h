@@ -10,16 +10,21 @@
 #include "klee/Config/config.h"
 
 #ifdef SUPPORT_Z3
-#ifdef SUPPORT_STP
+
+#ifdef SUPPORT_STP || SUPPORT_CLPR
 #define INTERPOLATION_ENABLED (SelectSolver == SOLVER_Z3 && !NoInterpolation)
-#else
+#else /* SUPPORT_STP || SUPPORT_CLPR */
 #define INTERPOLATION_ENABLED (!NoInterpolation)
-#endif
+#endif /* SUPPORT_STP || SUPPORT_CLPR */
+
 #define OUTPUT_INTERPOLATION_TREE (INTERPOLATION_ENABLED &&OutputTree)
-#else
+
+#else /* SUPPORT_Z3 */
+
 #define INTERPOLATION_ENABLED false
 #define OUTPUT_INTERPOLATION_TREE false
-#endif
+
+#endif /* SUPPORT_Z3 */
 
 namespace klee {
 
@@ -56,12 +61,33 @@ enum QueryLoggingSolverType
  */
 extern llvm::cl::list<QueryLoggingSolverType> queryLoggingOptions;
 
-#if defined(SUPPORT_STP) && defined(SUPPORT_Z3)
-enum SolverType
-{
-	SOLVER_Z3,
-	SOLVER_STP
+#ifdef SUPPORT_STP
+
+#ifdef SUPPORT_Z3
+
+#ifdef SUPPORT_CLPR
+enum SolverType {
+  SOLVER_Z3,
+  SOLVER_STP,
+  SOLVER_CLPR
 };
+#else  /* SUPPORT_CLPR */
+enum SolverType {
+  SOLVER_Z3,
+  SOLVER_STP
+};
+#endif /* SUPPORT_CLPR */
+
+#else /* SUPPORT_Z3 */
+
+#ifdef SUPPORT_CLPR
+enum SolverType {
+  SOLVER_STP,
+  SOLVER_CLPR
+};
+#endif /* SUPPORT_CLPR */
+
+#endif /* SUPPORT_STP */
 
 extern llvm::cl::opt<SolverType> SelectSolver;
 #endif

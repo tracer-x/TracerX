@@ -328,27 +328,91 @@ Executor::Executor(const InterpreterOptions &opts,
 #elif SUPPORT_STP
 
 #ifdef SUPPORT_Z3
+
+#ifdef SUPPORT_CLPR
   switch (SelectSolver) {
-  case SOLVER_STP:
-    coreSolver = new STPSolver(UseForkedCoreSolver, CoreSolverOptimizeDivides);
-    llvm::errs() << "Starting STPSolver ...\n";
-    break;
-  case SOLVER_Z3:
-    coreSolver = new Z3Solver();
-    llvm::errs() << "Starting Z3Solver ...\n";
-    break;
-  default:
-    assert(false);
-    break;
+    case SOLVER_STP:
+      coreSolver = new STPSolver(UseForkedCoreSolver, CoreSolverOptimizeDivides);
+      llvm::errs() << "Starting STPSolver ...\n";
+      break;
+    case SOLVER_Z3:
+      coreSolver = new Z3Solver();
+      llvm::errs() << "Starting Z3Solver ...\n";
+      break;
+    case SOLVER_CLPR:
+      coreSolver = new CLPRSolver();
+      llvm::errs() << "Starting CLPRSolver ...\n";
+      break;
+    default:
+      assert(false);
+      break;
   };
-#else
+#else /* SUPPORT_CLPR */
+  switch (SelectSolver) {
+    case SOLVER_STP:
+      coreSolver = new STPSolver(UseForkedCoreSolver, CoreSolverOptimizeDivides);
+      llvm::errs() << "Starting STPSolver ...\n";
+      break;
+    case SOLVER_Z3:
+      coreSolver = new Z3Solver();
+      llvm::errs() << "Starting Z3Solver ...\n";
+      break;
+    default:
+      assert(false);
+      break;
+  };
+#endif /* SUPPORT_CLPR */
+
+#else /* SUPPORT_Z3 */
+
+#ifdef SUPPORT_CLPR
+
+  switch (SelectSolver) {
+    case SOLVER_STP:
+      coreSolver = new STPSolver(UseForkedCoreSolver, CoreSolverOptimizeDivides);
+      llvm::errs() << "Starting STPSolver ...\n";
+      break;
+    case SOLVER_CLPR:
+      coreSolver = new CLPRSolver();
+      llvm::errs() << "Starting CLPRSolver ...\n";
+      break;
+    default:
+      assert(false);
+      break;
+  };
+
+#else /* SUPPORT_CLPR */
   coreSolver = new STPSolver(UseForkedCoreSolver, CoreSolverOptimizeDivides);
   llvm::errs() << "Starting STPSolver ...\n";
+#endif /* SUPPORT_CLPR */
+
 #endif /* SUPPORT_Z3 */
 
 #elif SUPPORT_Z3
+
+#ifdef SUPPORT_CLPR
+
+  switch (SelectSolver) {
+    case SOLVER_Z3:
+      coreSolver = new Z3Solver();
+      llvm::errs() << "Starting Z3Solver ...\n";
+      break;
+    case SOLVER_CLPR:
+      coreSolver = new CLPRSolver();
+      llvm::errs() << "Starting CLPRSolver ...\n";
+      break;
+    default:
+      assert(false);
+      break;
+  };
+
+#else /* SUPPORT_CLPR */
   coreSolver = new Z3Solver();
   llvm::errs() << "Starting Z3Solver ...\n";
+#endif
+
+#elif SUPPORT_CLPR
+
 #endif /* SUPPORT_METASMT */
   
    

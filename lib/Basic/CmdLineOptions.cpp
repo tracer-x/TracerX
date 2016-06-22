@@ -73,14 +73,41 @@ llvm::cl::list<QueryLoggingSolverType> queryLoggingOptions(
     llvm::cl::CommaSeparated
 );
 
-#if defined(SUPPORT_STP) && defined(SUPPORT_Z3)
+#ifdef SUPPORT_STP
+
+#ifdef SUPPORT_Z3
+
+#ifdef SUPPORT_CLPR
+llvm::cl::opt<SolverType> SelectSolver(
+    "select-solver",
+    llvm::cl::desc("Select solver to use with z3 as the default."),
+    llvm::cl::values(clEnumValN(SOLVER_STP, "stp", "Use STP solver"),
+                     clEnumValN(SOLVER_Z3, "z3", "Use Z3 solver"),
+                     clEnumValN(SOLVER_CLPR, "clpr", "Use CLP(R) solver"),
+                     clEnumValEnd));
+#else  /* SUPPORT_CLPR */
 llvm::cl::opt<SolverType>
 SelectSolver("select-solver",
              llvm::cl::desc("Select solver to use with z3 as the default."),
              llvm::cl::values(clEnumValN(SOLVER_STP, "stp", "Use STP solver"),
                               clEnumValN(SOLVER_Z3, "z3", "Use Z3 solver"),
                               clEnumValEnd));
-#endif
+#endif /* SUPPORT_CLPR */
+
+#else /* SUPPORT_Z3 */
+
+#ifdef SUPPORT_CLPR
+llvm::cl::opt<SolverType> SelectSolver(
+    "select-solver",
+    llvm::cl::desc("Select solver to use with z3 as the default."),
+    llvm::cl::values(clEnumValN(SOLVER_STP, "stp", "Use STP solver"),
+                     clEnumValN(SOLVER_CLPR, "clpr", "Use CLP(R) solver"),
+                     clEnumValEnd));
+#endif /* SUPPORT_CLPR */
+
+#endif /* SUPPORT_Z3 */
+
+#endif /* SUPPORT_STP */
 
 // We should compile in this option even when SUPPORT_Z3
 // was undefined to avoid regression test failure.
