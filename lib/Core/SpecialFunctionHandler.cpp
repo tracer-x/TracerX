@@ -77,12 +77,12 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   addDNR("_exit", handleExit),
   { "exit", &SpecialFunctionHandler::handleExit, true, false, true },
   addDNR("klee_abort", handleAbort),
-  addDNR("klee_silent_exit", handleSilentExit),  
+  addDNR("klee_silent_exit", handleSilentExit),
   addDNR("klee_report_error", handleReportError),
-
   add("calloc", handleCalloc, true),
   add("free", handleFree, false),
   add("klee_assume", handleAssume, false),
+  add("klee_join", handleJoin, false),
   add("klee_check_memory_access", handleCheckMemoryAccess, false),
   add("klee_get_valuef", handleGetValue, true),
   add("klee_get_valued", handleGetValue, true),
@@ -133,7 +133,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("__ubsan_handle_divrem_overflow", handleDivRemOverflow, false),
 
 #undef addDNR
-#undef add  
+#undef add
 };
 
 SpecialFunctionHandler::const_iterator SpecialFunctionHandler::begin() {
@@ -265,6 +265,39 @@ SpecialFunctionHandler::readStringAtAddress(ExecutionState &state,
   std::string result(buf);
   delete[] buf;
   return result;
+}
+
+bool SpecialFunctionHandler::isStringAtAddress(ExecutionState &state,
+                                               ref<Expr> addressExpr,
+                                               std::string &result) {
+  ObjectPair op;
+  addressExpr = executor.toUnique(state, addressExpr);
+  ref<ConstantExpr> address = cast<ConstantExpr>(addressExpr);
+  if (!state.addressSpace.resolveOne(address, op))
+    assert(0 && "XXX out of bounds / multiple resolution unhandled");
+  bool res __attribute__((unused));
+  assert(executor.solver->mustBeTrue(
+             state, EqExpr::create(address, op.first->getBaseExpr()), res) &&
+         res && "XXX interior pointer unhandled");
+  const MemoryObject *mo = op.first;
+  const ObjectState *os = op.second;
+
+  char *buf = new char[mo->size];
+
+  unsigned i;
+  for (i = 0; i < mo->size - 1; i++) {
+    ref<Expr> cur = os->read8(i);
+    cur = executor.toUnique(state, cur);
+    if (isa<ConstantExpr>(cur))
+      buf[i] = cast<ConstantExpr>(cur)->getZExtValue(8);
+    else
+      return false;
+  }
+  buf[i] = 0;
+
+  result = std::string(buf);
+  delete[] buf;
+  return true;
 }
 
 /****/
@@ -474,6 +507,28 @@ void SpecialFunctionHandler::handleStackTrace(ExecutionState &state,
                                               KInstruction *target,
                                               std::vector<ref<Expr> > &arguments) {
   state.dumpStack(outs());
+}
+
+void SpecialFunctionHandler::handleJoin(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments) {
+  std::string name_str = readStringAtAddress(state, arguments[0]);
+  llvm::errs() << name_str << "\n";
+
+  for (unsigned int i = 1; i < arguments.size(); ++i) {
+    if (arguments[i]->getWidth() == Expr::Int32) {
+      // Integer
+    } else if (arguments[i]->getWidth() == Expr::Bool) {
+      // Boolean
+    } else {
+      std::string res_str = "";
+      if (isStringAtAddress(state, arguments[i], res_str)) {
+        // String
+      } else {
+        // Array
+      }
+    }
+  }
 }
 
 void SpecialFunctionHandler::handleWarning(ExecutionState &state,

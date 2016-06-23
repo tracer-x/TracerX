@@ -91,7 +91,10 @@ namespace klee {
     /* Convenience routines */
 
     std::string readStringAtAddress(ExecutionState &state, ref<Expr> address);
-    
+
+    bool isStringAtAddress(ExecutionState &state, ref<Expr> address,
+                           std::string &result);
+
     /* Handlers */
 
 #define HANDLER(name) void name(ExecutionState &state, \
@@ -101,6 +104,7 @@ namespace klee {
     HANDLER(handleAssert);
     HANDLER(handleAssertFail);
     HANDLER(handleAssume);
+    HANDLER(handleJoin);
     HANDLER(handleCalloc);
     HANDLER(handleCheckMemoryAccess);
     HANDLER(handleDefineFixedObject);
