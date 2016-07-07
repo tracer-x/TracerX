@@ -73,41 +73,14 @@ llvm::cl::list<QueryLoggingSolverType> queryLoggingOptions(
     llvm::cl::CommaSeparated
 );
 
-#ifdef SUPPORT_STP
-
-#ifdef SUPPORT_Z3
-
-#ifdef SUPPORT_CLPR
-llvm::cl::opt<SolverType> SelectSolver(
-    "select-solver",
-    llvm::cl::desc("Select solver to use with z3 as the default."),
-    llvm::cl::values(clEnumValN(SOLVER_STP, "stp", "Use STP solver"),
-                     clEnumValN(SOLVER_Z3, "z3", "Use Z3 solver"),
-                     clEnumValN(SOLVER_CLPR, "clpr", "Use CLP(R) solver"),
-                     clEnumValEnd));
-#else  /* SUPPORT_CLPR */
+#if defined(SUPPORT_STP) && defined(SUPPORT_Z3)
 llvm::cl::opt<SolverType>
 SelectSolver("select-solver",
              llvm::cl::desc("Select solver to use with z3 as the default."),
              llvm::cl::values(clEnumValN(SOLVER_STP, "stp", "Use STP solver"),
                               clEnumValN(SOLVER_Z3, "z3", "Use Z3 solver"),
                               clEnumValEnd));
-#endif /* SUPPORT_CLPR */
-
-#else /* SUPPORT_Z3 */
-
-#ifdef SUPPORT_CLPR
-llvm::cl::opt<SolverType> SelectSolver(
-    "select-solver",
-    llvm::cl::desc("Select solver to use with z3 as the default."),
-    llvm::cl::values(clEnumValN(SOLVER_STP, "stp", "Use STP solver"),
-                     clEnumValN(SOLVER_CLPR, "clpr", "Use CLP(R) solver"),
-                     clEnumValEnd));
-#endif /* SUPPORT_CLPR */
-
-#endif /* SUPPORT_Z3 */
-
-#endif /* SUPPORT_STP */
+#endif /* defined(SUPPORT_STP) && defined(SUPPORT_Z3) */
 
 // We should compile in this option even when SUPPORT_Z3
 // was undefined to avoid regression test failure.
@@ -141,7 +114,7 @@ llvm::cl::opt<bool> NoExistential(
         "has an effect of removing all existentially-quantified variables "
         "most solvers are not very powerful at solving, however, at likely "
         "less number of subsumptions due to the strengthening of the query."));
-#endif
+#endif /* SUPPORT_Z3 */
 
 #ifdef SUPPORT_METASMT
 

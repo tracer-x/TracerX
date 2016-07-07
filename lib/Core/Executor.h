@@ -111,6 +111,9 @@ private:
 
   ExternalDispatcher *externalDispatcher;
   TimingSolver *solver;
+#ifdef SUPPORT_CLPR
+  TimingSolver *clprSolver;
+#endif
   MemoryManager *memory;
   std::set<ExecutionState*> states;
   StatsTracker *statsTracker;

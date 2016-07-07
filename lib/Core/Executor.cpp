@@ -328,26 +328,6 @@ Executor::Executor(const InterpreterOptions &opts,
 #elif SUPPORT_STP
 
 #ifdef SUPPORT_Z3
-
-#ifdef SUPPORT_CLPR
-  switch (SelectSolver) {
-    case SOLVER_STP:
-      coreSolver = new STPSolver(UseForkedCoreSolver, CoreSolverOptimizeDivides);
-      llvm::errs() << "Starting STPSolver ...\n";
-      break;
-    case SOLVER_Z3:
-      coreSolver = new Z3Solver();
-      llvm::errs() << "Starting Z3Solver ...\n";
-      break;
-    case SOLVER_CLPR:
-      coreSolver = new CLPRSolver();
-      llvm::errs() << "Starting CLPRSolver ...\n";
-      break;
-    default:
-      assert(false);
-      break;
-  };
-#else /* SUPPORT_CLPR */
   switch (SelectSolver) {
     case SOLVER_STP:
       coreSolver = new STPSolver(UseForkedCoreSolver, CoreSolverOptimizeDivides);
@@ -361,86 +341,56 @@ Executor::Executor(const InterpreterOptions &opts,
       assert(false);
       break;
   };
-#endif /* SUPPORT_CLPR */
-
 #else /* SUPPORT_Z3 */
-
-#ifdef SUPPORT_CLPR
-
-  switch (SelectSolver) {
-    case SOLVER_STP:
-      coreSolver = new STPSolver(UseForkedCoreSolver, CoreSolverOptimizeDivides);
-      llvm::errs() << "Starting STPSolver ...\n";
-      break;
-    case SOLVER_CLPR:
-      coreSolver = new CLPRSolver();
-      llvm::errs() << "Starting CLPRSolver ...\n";
-      break;
-    default:
-      assert(false);
-      break;
-  };
-
-#else /* SUPPORT_CLPR */
   coreSolver = new STPSolver(UseForkedCoreSolver, CoreSolverOptimizeDivides);
   llvm::errs() << "Starting STPSolver ...\n";
-#endif /* SUPPORT_CLPR */
-
 #endif /* SUPPORT_Z3 */
 
 #elif SUPPORT_Z3
-
-#ifdef SUPPORT_CLPR
-
-  switch (SelectSolver) {
-    case SOLVER_Z3:
-      coreSolver = new Z3Solver();
-      llvm::errs() << "Starting Z3Solver ...\n";
-      break;
-    case SOLVER_CLPR:
-      coreSolver = new CLPRSolver();
-      llvm::errs() << "Starting CLPRSolver ...\n";
-      break;
-    default:
-      assert(false);
-      break;
-  };
-
-#else /* SUPPORT_CLPR */
   coreSolver = new Z3Solver();
   llvm::errs() << "Starting Z3Solver ...\n";
-#endif
-
-#elif SUPPORT_CLPR
-
 #endif /* SUPPORT_METASMT */
-  
-   
-  Solver *solver = 
-    constructSolverChain(coreSolver,
-                         interpreterHandler->getOutputFilename(ALL_QUERIES_SMT2_FILE_NAME),
-                         interpreterHandler->getOutputFilename(SOLVER_QUERIES_SMT2_FILE_NAME),
-                         interpreterHandler->getOutputFilename(ALL_QUERIES_PC_FILE_NAME),
-                         interpreterHandler->getOutputFilename(SOLVER_QUERIES_PC_FILE_NAME));
+
+  Solver *solver = constructSolverChain(
+      coreSolver,
+      interpreterHandler->getOutputFilename(ALL_QUERIES_SMT2_FILE_NAME),
+      interpreterHandler->getOutputFilename(SOLVER_QUERIES_SMT2_FILE_NAME),
+      interpreterHandler->getOutputFilename(ALL_QUERIES_PC_FILE_NAME),
+      interpreterHandler->getOutputFilename(SOLVER_QUERIES_PC_FILE_NAME));
 
 #ifdef SUPPORT_Z3
-// In case interpolation is enabled with Z3 solver,
-// we should not simplify the constraints before
-// submitting them to the solver.
 #ifdef SUPPORT_STP
   if (SelectSolver == SOLVER_Z3) {
+    // In case interpolation is enabled with Z3 solver,
+    // we should not simplify the constraints before
+    // submitting them to the solver.
     this->solver = new TimingSolver(
         solver, NoInterpolation ? EqualitySubstitution : false);
   } else {
     this->solver = new TimingSolver(solver, EqualitySubstitution);
   }
 #else
+  // In case interpolation is enabled with Z3 solver,
+  // we should not simplify the constraints before
+  // submitting them to the solver.
   this->solver = new TimingSolver(solver, NoInterpolation? EqualitySubstitution : false);
 #endif /* SUPPORT_STP */
 
 #else
   this->solver = new TimingSolver(solver, EqualitySubstitution);
 #endif /* SUPPORT_Z3 */
+
+#ifdef SUPPORT_CLPR
+  Solver *clprCoreSolver = new CLPRSolver();
+  llvm::errs() << "Starting secondary CLP(R) solver ...\n";
+  Solver *clprSolver = constructSolverChain(
+      clprCoreSolver,
+      interpreterHandler->getOutputFilename(ALL_QUERIES_SMT2_FILE_NAME),
+      interpreterHandler->getOutputFilename(SOLVER_QUERIES_SMT2_FILE_NAME),
+      interpreterHandler->getOutputFilename(ALL_QUERIES_PC_FILE_NAME),
+      interpreterHandler->getOutputFilename(SOLVER_QUERIES_PC_FILE_NAME));
+  this->clprSolver = new TimingSolver(clprSolver, false);
+#endif /* SUPPORT_CLPR */
 
   memory = new MemoryManager(&arrayCache);
 }
@@ -487,6 +437,9 @@ Executor::~Executor() {
   if (statsTracker)
     delete statsTracker;
   delete solver;
+#ifdef SUPPORT_CLPR
+  delete clprSolver;
+#endif
   delete kmodule;
   while(!timers.empty()) {
     delete timers.back();
