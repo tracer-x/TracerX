@@ -199,34 +199,34 @@ SearchTree::PrettyExpressionBuilder::constructMulByConstant(std::string expr,
   return stream.str();
 }
 std::string
-SearchTree::PrettyExpressionBuilder::constructUDivByConstant(std::string expr_n,
+SearchTree::PrettyExpressionBuilder::constructUDivByConstant(std::string expr,
                                                              uint64_t d) {
   std::ostringstream stream;
-  stream << "(" << expr_n << " / " << d << ")";
+  stream << "(" << expr << " / " << d << ")";
   return stream.str();
 }
 std::string
-SearchTree::PrettyExpressionBuilder::constructSDivByConstant(std::string expr_n,
+SearchTree::PrettyExpressionBuilder::constructSDivByConstant(std::string expr,
                                                              uint64_t d) {
   std::ostringstream stream;
-  stream << "(" << expr_n << " / " << d << ")";
+  stream << "(" << expr << " / " << d << ")";
   return stream.str();
 }
 
 std::string
 SearchTree::PrettyExpressionBuilder::getInitialArray(const Array *root) {
-  std::string array_expr =
+  std::string arrayExpr =
       buildArray(root->name.c_str(), root->getDomain(), root->getRange());
 
   if (root->isConstantArray()) {
     for (unsigned i = 0, e = root->size; i != e; ++i) {
-      std::string prev = array_expr;
-      array_expr = writeExpr(
+      std::string prev = arrayExpr;
+      arrayExpr = writeExpr(
           prev, constructActual(ConstantExpr::alloc(i, root->getDomain())),
           constructActual(root->constantValues[i]));
     }
   }
-  return array_expr;
+  return arrayExpr;
 }
 std::string
 SearchTree::PrettyExpressionBuilder::getArrayForUpdate(const Array *root,
@@ -726,7 +726,6 @@ void SearchTree::setAsCore(PathCondition *pathCondition) {
       .second = true;
 }
 
-/// @brief Save the graph
 void SearchTree::save(std::string dotFileName) {
   if (!OUTPUT_INTERPOLATION_TREE)
     return;
@@ -738,21 +737,6 @@ void SearchTree::save(std::string dotFileName) {
   if (!out.fail()) {
     out << g;
     out.close();
-  }
-}
-
-/**/
-
-PathConditionMarker::PathConditionMarker(PathCondition *pathCondition)
-    : maybeCore(false), pathCondition(pathCondition) {}
-
-PathConditionMarker::~PathConditionMarker() {}
-
-void PathConditionMarker::setAsMaybeCore() { maybeCore = true; }
-
-void PathConditionMarker::setAsCore(AllocationGraph *g) {
-  if (maybeCore) {
-    pathCondition->setAsCore(g);
   }
 }
 
@@ -866,8 +850,8 @@ SubsumptionTableEntry::SubsumptionTableEntry(ITreeNode *node)
 SubsumptionTableEntry::~SubsumptionTableEntry() {}
 
 bool
-SubsumptionTableEntry::hasExistentials(std::set<const Array *> &existentials,
-                                       ref<Expr> expr) {
+SubsumptionTableEntry::hasVariableInSet(std::set<const Array *> &existentials,
+                                        ref<Expr> expr) {
   for (int i = 0, numKids = expr->getNumKids(); i < numKids; ++i) {
     if (llvm::isa<ReadExpr>(expr)) {
       ReadExpr *readExpr = llvm::dyn_cast<ReadExpr>(expr.get());
@@ -878,14 +862,14 @@ SubsumptionTableEntry::hasExistentials(std::set<const Array *> &existentials,
         if ((*it) == array)
           return true;
       }
-    } else if (hasExistentials(existentials, expr->getKid(i)))
+    } else if (hasVariableInSet(existentials, expr->getKid(i)))
       return true;
   }
   return false;
 }
 
-bool SubsumptionTableEntry::hasFree(std::set<const Array *> &existentials,
-                                    ref<Expr> expr) {
+bool SubsumptionTableEntry::hasVariableNotInSet(
+    std::set<const Array *> &existentials, ref<Expr> expr) {
   for (int i = 0, numKids = expr->getNumKids(); i < numKids; ++i) {
     if (llvm::isa<ReadExpr>(expr)) {
       ReadExpr *readExpr = llvm::dyn_cast<ReadExpr>(expr.get());
@@ -897,7 +881,7 @@ bool SubsumptionTableEntry::hasFree(std::set<const Array *> &existentials,
           return false;
       }
       return true;
-    } else if (hasFree(existentials, expr->getKid(i)))
+    } else if (hasVariableNotInSet(existentials, expr->getKid(i)))
       return true;
   }
   return false;
@@ -967,7 +951,8 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
   if (fullEqualityConstraint->isTrue()) {
     // This is the case when the result is still an existentially-quantified
     // formula, but one that does not contain free variables.
-    hasExistentialsOnly = !hasFree(expr->variables, simplifiedInterpolant);
+    hasExistentialsOnly =
+        !hasVariableNotInSet(expr->variables, simplifiedInterpolant);
     if (hasExistentialsOnly) {
       return existsExpr->rebuild(&simplifiedInterpolant);
     }
@@ -982,7 +967,7 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
     ref<Expr> interpolantAtom = (*it); // For example C cmp D
 
     // only process the interpolant that still has existential variables in it.
-    if (hasExistentials(boundVariables, interpolantAtom)) {
+    if (hasVariableInSet(boundVariables, interpolantAtom)) {
       for (std::vector<ref<Expr> >::iterator itEq = equalityPack.begin(),
                                              itEqEnd = equalityPack.end();
            itEq != itEqEnd; ++itEq) {
@@ -1008,8 +993,8 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
         ref<Expr> newIntpRight;
 
         // When the if condition holds, we perform substitution
-        if (containShadowExpr(equalityConstraintLeft,
-                              interpolantAtom->getKid(0))) {
+        if (hasSubExpression(equalityConstraintLeft,
+                             interpolantAtom->getKid(0))) {
           // Here we perform substitution, where given
           // an interpolant atom and an equality constraint,
           // we try to find a subexpression in the equality constraint
@@ -1052,7 +1037,7 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
   ref<Expr> newBody;
 
   if (newInterpolant.get()) {
-    if (!hasExistentials(expr->variables, newInterpolant))
+    if (!hasVariableInSet(expr->variables, newInterpolant))
       return newInterpolant;
 
     newBody = AndExpr::alloc(newInterpolant, fullEqualityConstraint);
@@ -1074,35 +1059,35 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
 
 ref<Expr> SubsumptionTableEntry::replaceExpr(ref<Expr> originalExpr,
                                              ref<Expr> replacedExpr,
-                                             ref<Expr> substituteExpr) {
+                                             ref<Expr> replacementExpr) {
   // We only handle binary expressions
   if (!llvm::isa<BinaryExpr>(originalExpr) ||
       llvm::isa<ConcatExpr>(originalExpr))
     return originalExpr;
 
   if (originalExpr->getKid(0) == replacedExpr)
-    return ShadowArray::createBinaryOfSameKind(originalExpr, substituteExpr,
+    return ShadowArray::createBinaryOfSameKind(originalExpr, replacementExpr,
                                                originalExpr->getKid(1));
 
   if (originalExpr->getKid(1) == replacedExpr)
     return ShadowArray::createBinaryOfSameKind(
-        originalExpr, originalExpr->getKid(0), substituteExpr);
+        originalExpr, originalExpr->getKid(0), replacementExpr);
 
   return ShadowArray::createBinaryOfSameKind(
       originalExpr,
-      replaceExpr(originalExpr->getKid(0), replacedExpr, substituteExpr),
-      replaceExpr(originalExpr->getKid(1), replacedExpr, substituteExpr));
+      replaceExpr(originalExpr->getKid(0), replacedExpr, replacementExpr),
+      replaceExpr(originalExpr->getKid(1), replacedExpr, replacementExpr));
 }
 
-bool SubsumptionTableEntry::containShadowExpr(ref<Expr> expr,
-                                              ref<Expr> shadowExpr) {
-  if (expr.operator==(shadowExpr))
+bool SubsumptionTableEntry::hasSubExpression(ref<Expr> expr,
+                                             ref<Expr> subExpr) {
+  if (expr == subExpr)
     return true;
-  if (expr->getNumKids() < 2 && expr.operator!=(shadowExpr))
+  if (expr->getNumKids() < 2 && expr != subExpr)
     return false;
 
-  return containShadowExpr(expr->getKid(0), shadowExpr) ||
-         containShadowExpr(expr->getKid(1), shadowExpr);
+  return hasSubExpression(expr->getKid(0), subExpr) ||
+         hasSubExpression(expr->getKid(1), subExpr);
 }
 
 ref<Expr> SubsumptionTableEntry::simplifyInterpolantExpr(
@@ -1112,13 +1097,13 @@ ref<Expr> SubsumptionTableEntry::simplifyInterpolantExpr(
 
   if (llvm::isa<EqExpr>(expr) && llvm::isa<ConstantExpr>(expr->getKid(0)) &&
       llvm::isa<ConstantExpr>(expr->getKid(1))) {
-    return (expr->getKid(0).operator==(expr->getKid(1)))
+    return (expr->getKid(0) == expr->getKid(1))
                ? ConstantExpr::alloc(1, Expr::Bool)
                : ConstantExpr::alloc(0, Expr::Bool);
   } else if (llvm::isa<NeExpr>(expr) &&
              llvm::isa<ConstantExpr>(expr->getKid(0)) &&
              llvm::isa<ConstantExpr>(expr->getKid(1))) {
-    return (expr->getKid(0).operator!=(expr->getKid(1)))
+    return (expr->getKid(0) != expr->getKid(1))
                ? ConstantExpr::alloc(1, Expr::Bool)
                : ConstantExpr::alloc(0, Expr::Bool);
   }
@@ -1176,7 +1161,7 @@ ref<Expr> SubsumptionTableEntry::simplifyEqualityExpr(
   if (llvm::isa<EqExpr>(expr)) {
     if (llvm::isa<ConstantExpr>(expr->getKid(0)) &&
         llvm::isa<ConstantExpr>(expr->getKid(1))) {
-      return (expr->getKid(0).operator==(expr->getKid(1)))
+      return (expr->getKid(0) == expr->getKid(1))
                  ? ConstantExpr::alloc(1, Expr::Bool)
                  : ConstantExpr::alloc(0, Expr::Bool);
     }
@@ -1233,8 +1218,7 @@ ref<Expr>
 SubsumptionTableEntry::getSubstitution(ref<Expr> equalities,
                                        std::map<ref<Expr>, ref<Expr> > &map) {
   // It is assumed the lhs is an expression on the existentially-quantified
-  // variable whereas
-  // the rhs is an expression on the free variables.
+  // variable whereas the rhs is an expression on the free variables.
   if (llvm::isa<EqExpr>(equalities.get())) {
     ref<Expr> lhs = equalities->getKid(0);
     if (isVariable(lhs)) {
@@ -1262,6 +1246,70 @@ SubsumptionTableEntry::getSubstitution(ref<Expr> equalities,
   return equalities;
 }
 
+bool SubsumptionTableEntry::detectConflictPrimitives(ExecutionState &state,
+                                                     ref<Expr> query) {
+  if (llvm::isa<ExistsExpr>(query.get()))
+    return true;
+
+  std::vector<ref<Expr> > conjunction;
+  if (!fetchQueryEqualityConjuncts(conjunction, query)) {
+    return false;
+  }
+
+  for (std::vector<ref<Expr> >::const_iterator it1 = state.constraints.begin(),
+                                               ie1 = state.constraints.end();
+       it1 != ie1; ++it1) {
+
+    if ((*it1)->getKind() != Expr::Eq)
+      continue;
+
+    for (std::vector<ref<Expr> >::const_iterator it2 = conjunction.begin(),
+                                                 ie2 = conjunction.end();
+         it2 != ie2; ++it2) {
+
+      ref<Expr> stateConstraintExpr = it1->get();
+      ref<Expr> queryExpr = it2->get();
+
+      if (stateConstraintExpr != queryExpr &&
+          (llvm::isa<EqExpr>(stateConstraintExpr) ||
+           llvm::isa<EqExpr>(queryExpr))) {
+
+        if (stateConstraintExpr ==
+                EqExpr::alloc(ConstantExpr::alloc(0, Expr::Bool), queryExpr) ||
+            EqExpr::alloc(ConstantExpr::alloc(0, Expr::Bool),
+                          stateConstraintExpr) == queryExpr) {
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+bool SubsumptionTableEntry::fetchQueryEqualityConjuncts(
+    std::vector<ref<Expr> > &conjunction, ref<Expr> query) {
+
+  if (!llvm::isa<AndExpr>(query.get())) {
+    if (query->getKind() == Expr::Eq) {
+
+      EqExpr *equality = llvm::dyn_cast<EqExpr>(query.get());
+
+      if (llvm::isa<ConstantExpr>(equality->getKid(0)) &&
+          llvm::isa<ConstantExpr>(equality->getKid(1)) &&
+          equality->getKid(0) != equality->getKid(1)) {
+        return false;
+      } else {
+        conjunction.push_back(query);
+      }
+    }
+    return true;
+  }
+
+  return fetchQueryEqualityConjuncts(conjunction, query->getKid(0)) &&
+         fetchQueryEqualityConjuncts(conjunction, query->getKid(1));
+}
+
 ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
                                                     bool &hasExistentialsOnly) {
   assert(llvm::isa<ExistsExpr>(existsExpr.get()));
@@ -1275,7 +1323,7 @@ ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
       ApplySubstitutionVisitor(substitution).visit(body->getKid(0));
 
   ExistsExpr *expr = static_cast<ExistsExpr *>(existsExpr.get());
-  if (hasExistentials(expr->variables, equalities)) {
+  if (hasVariableInSet(expr->variables, equalities)) {
     // we could also replace the occurrence of some variables with its
     // corresponding substitution mapping.
     equalities = ApplySubstitutionVisitor(substitution).visit(equalities);
@@ -1284,7 +1332,7 @@ ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
   ref<Expr> newBody = AndExpr::alloc(interpolant, equalities);
 
   // FIXME: Need to test the performance of the following.
-  if (!hasExistentials(expr->variables, newBody))
+  if (!hasVariableInSet(expr->variables, newBody))
     return newBody;
 
   ref<Expr> ret = simplifyArithmeticBody(existsExpr->rebuild(&newBody),
@@ -1292,14 +1340,13 @@ ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
   return ret;
 }
 
-bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
-                                     ExecutionState &state, double timeout) {
+bool SubsumptionTableEntry::subsumed(
+    TimingSolver *solver, ExecutionState &state, double timeout,
+    const std::pair<Dependency::ConcreteStore, Dependency::SymbolicStore>
+        storedExpressions) {
   // Quick check for subsumption in case the interpolant is empty
   if (empty())
     return true;
-
-  std::pair<Dependency::ConcreteStore, Dependency::SymbolicStore>
-  storedExpressions = state.itreeNode->getStoredExpressions();
 
   Dependency::ConcreteStore stateConcreteAddressStore = storedExpressions.first;
 
@@ -1449,10 +1496,6 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
     }
   }
 
-  // We create path condition marking structure to mark core constraints
-  std::map<Expr *, PathConditionMarker *> markerMap =
-      state.itreeNode->makeMarkerMap();
-
   Solver::Validity result;
   ref<Expr> query;
 
@@ -1505,8 +1548,12 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
 
   Z3Solver *z3solver = 0;
 
+  if (!detectConflictPrimitives(state, query))
+    return false;
+
   // We call the solver only when the simplified query is
-  // not a constant.
+  // not a constant and no contradictory unary constraints found from
+  // solvingUnaryConstraints method.
   if (!llvm::isa<ConstantExpr>(query)) {
     //    llvm::errs() << "Querying for subsumption check:\n";
     //    ExprPPrinter::printQuery(llvm::errs(), state.constraints, query);
@@ -1535,7 +1582,8 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
         constraints.addConstraint(EqExpr::alloc(falseExpr, query->getKid(0)));
 
         // llvm::errs() << "Querying for satisfiability check:\n";
-        // ExprPPrinter::printQuery(llvm::errs(), constraints, falseExpr);
+        // ExprPPrinter::printQuery(llvm::errs(), constraints,
+        // falseExpr);
 
         actualSolverCallTimer.start();
         success = z3solver->getValue(Query(constraints, falseExpr), tmpExpr);
@@ -1546,7 +1594,8 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
 
       } else {
         // llvm::errs() << "Querying for subsumption check:\n";
-        // ExprPPrinter::printQuery(llvm::errs(), state.constraints, query);
+        // ExprPPrinter::printQuery(llvm::errs(), state.constraints,
+        // query);
 
         actualSolverCallTimer.start();
         success = z3solver->directComputeValidity(
@@ -1570,6 +1619,7 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
 
       // We call the solver in the standard way if the
       // formula is unquantified.
+
       solver->setTimeout(timeout);
       actualSolverCallTimer.start();
       success = solver->evaluate(state, query, result);
@@ -1584,6 +1634,7 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
       solver->setTimeout(0);
     }
   } else {
+    // query is a constant expression
     if (query->isTrue())
       return true;
     return false;
@@ -1599,52 +1650,27 @@ bool SubsumptionTableEntry::subsumed(TimingSolver *solver,
       unsatCore = solver->getUnsatCore();
     }
 
-    for (std::vector<ref<Expr> >::iterator it1 = unsatCore.begin();
-         it1 != unsatCore.end(); it1++) {
-      // FIXME: Sometimes some constraints are not in the PC. This is
-      // because constraints are not properly added at state merge.
-      PathConditionMarker *marker = markerMap[it1->get()];
-      if (marker)
-        marker->setAsMaybeCore();
-    }
+    // State subsumed, we mark needed constraints on the
+    // path condition.
 
-  } else {
-    // Here the solver could not decide that the subsumption is valid.
-    // It may have decided invalidity, however,
-    // CexCachingSolver::computeValidity,
-    // which was eventually called from solver->evaluate
-    // is conservative, where it returns Solver::Unknown even in case when
-    // invalidity is established by the solver.
-    // llvm::errs() << "Solver did not decide validity\n";
-
-    ++checkSolverFailureCount;
-    if (z3solver)
-      delete z3solver;
-
-    return false;
+    // We create path condition marking structure to mark core constraints
+    state.itreeNode->unsatCoreMarking(unsatCore);
+    return true;
   }
 
-  // State subsumed, we mark needed constraints on the
-  // path condition.
-  AllocationGraph *g = new AllocationGraph();
-  for (std::map<Expr *, PathConditionMarker *>::iterator
-           it = markerMap.begin(),
-           itEnd = markerMap.end();
-       it != itEnd; it++) {
-    // FIXME: Sometimes some constraints are not in the PC. This is
-    // because constraints are not properly added at state merge.
-    if (it->second)
-      it->second->setAsCore(g);
-  }
-  ITreeNode::deleteMarkerMap(markerMap);
-  // llvm::errs() << "AllocationGraph\n";
-  // g->dump();
+  // Here the solver could not decide that the subsumption is valid.
+  // It may have decided invalidity, however,
+  // CexCachingSolver::computeValidity,
+  // which was eventually called from solver->evaluate
+  // is conservative, where it returns Solver::Unknown even in case when
+  // invalidity is established by the solver.
+  // llvm::errs() << "Solver did not decide validity\n";
 
-  // We mark memory allocations needed for the unsatisfiabilty core
-  state.itreeNode->computeCoreAllocations(g);
+  ++checkSolverFailureCount;
+  if (z3solver)
+    delete z3solver;
 
-  delete g; // Delete the AllocationGraph object
-  return true;
+  return false;
 }
 
 void SubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
@@ -2398,7 +2424,7 @@ ITree::~ITree() {
 
 bool ITree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
                              double timeout) {
-  subsumptionCheckCount++; // For profiling
+  ++subsumptionCheckCount; // For profiling
 
   assert(state.itreeNode == currentINode);
 
@@ -2418,10 +2444,14 @@ bool ITree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
   if (entryList.empty())
     return false;
 
+  std::pair<Dependency::ConcreteStore, Dependency::SymbolicStore>
+  storedExpressions = state.itreeNode->getStoredExpressions();
+
   for (std::vector<SubsumptionTableEntry *>::iterator it = entryList.begin(),
                                                       itEnd = entryList.end();
        it != itEnd; ++it) {
-    if ((*it)->subsumed(solver, state, timeout)) {
+
+    if ((*it)->subsumed(solver, state, timeout, storedExpressions)) {
       // We mark as subsumed such that the node will not be
       // stored into table (the table already contains a more
       // general entry).
@@ -2556,6 +2586,11 @@ void ITree::execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args) {
   executeOnNode(currentINode, instr, args);
 }
 
+void ITree::executePHI(llvm::Instruction *instr, unsigned int incomingBlock,
+                       ref<Expr> valueExpr) {
+  currentINode->dependency->executePHI(instr, incomingBlock, valueExpr);
+}
+
 void ITree::executeOnNode(ITreeNode *node, llvm::Instruction *instr,
                           std::vector<ref<Expr> > &args) {
   executeOnNodeTimer.start();
@@ -2619,11 +2654,9 @@ void ITree::dump() const { this->print(llvm::errs()); }
 StatTimer ITreeNode::getInterpolantTimer;
 StatTimer ITreeNode::addConstraintTimer;
 StatTimer ITreeNode::splitTimer;
-StatTimer ITreeNode::makeMarkerMapTimer;
-StatTimer ITreeNode::deleteMarkerMapTimer;
 StatTimer ITreeNode::executeTimer;
 StatTimer ITreeNode::bindCallArgumentsTimer;
-StatTimer ITreeNode::popAbstractDependencyFrameTimer;
+StatTimer ITreeNode::bindReturnValueTimer;
 StatTimer ITreeNode::getStoredExpressionsTimer;
 StatTimer ITreeNode::getStoredCoreExpressionsTimer;
 StatTimer ITreeNode::computeCoreAllocationsTimer;
@@ -2634,15 +2667,11 @@ void ITreeNode::printTimeStat(llvm::raw_ostream &stream) {
   stream << "KLEE: done:     addConstraintTime = " << addConstraintTimer.get() *
                                                           1000 << "\n";
   stream << "KLEE: done:     splitTime = " << splitTimer.get() * 1000 << "\n";
-  stream << "KLEE: done:     makeMarkerMap = " << makeMarkerMapTimer.get() *
-                                                      1000 << "\n";
-  stream << "KLEE: done:     deleteMarkerMap = " << deleteMarkerMapTimer.get() *
-                                                        1000 << "\n";
   stream << "KLEE: done:     execute = " << executeTimer.get() * 1000 << "\n";
   stream << "KLEE: done:     bindCallArguments = "
          << bindCallArgumentsTimer.get() * 1000 << "\n";
-  stream << "KLEE: done:     popAbstractDependencyFrame = "
-         << popAbstractDependencyFrameTimer.get() * 1000 << "\n";
+  stream << "KLEE: done:     bindReturnValue = " << bindReturnValueTimer.get() *
+                                                        1000 << "\n";
   stream << "KLEE: done:     getStoredExpressions = "
          << getStoredExpressionsTimer.get() * 1000 << "\n";
   stream << "KLEE: done:     getStoredCoreExpressions = "
@@ -2703,39 +2732,6 @@ void ITreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
   ITreeNode::splitTimer.stop();
 }
 
-std::map<Expr *, PathConditionMarker *> ITreeNode::makeMarkerMap() const {
-  ITreeNode::makeMarkerMapTimer.start();
-  std::map<Expr *, PathConditionMarker *> result;
-  for (PathCondition *it = pathCondition; it != 0; it = it->cdr()) {
-    PathConditionMarker *marker = new PathConditionMarker(it);
-    if (llvm::isa<OrExpr>(it->car().get())) {
-      // FIXME: Break up disjunction into its components, because each disjunct
-      // is solved separately. The or constraint was due to state merge.
-      // Hence, the following is just a makeshift for when state merge is
-      // properly implemented.
-      result[it->car()->getKid(0).get()] = new PathConditionMarker(it);
-      result[it->car()->getKid(1).get()] = new PathConditionMarker(it);
-    }
-    result[it->car().get()] = marker;
-  }
-  ITreeNode::makeMarkerMapTimer.stop();
-  return result;
-}
-
-void
-ITreeNode::deleteMarkerMap(std::map<Expr *, PathConditionMarker *> &markerMap) {
-  ITreeNode::deleteMarkerMapTimer.start();
-  for (std::map<Expr *, PathConditionMarker *>::iterator
-           it = markerMap.begin(),
-           itEnd = markerMap.end();
-       it != itEnd; ++it) {
-    if (it->second)
-      delete it->second;
-  }
-  markerMap.clear();
-  ITreeNode::deleteMarkerMapTimer.stop();
-}
-
 void ITreeNode::execute(llvm::Instruction *instr,
                         std::vector<ref<Expr> > &args) {
   executeTimer.start();
@@ -2750,14 +2746,13 @@ void ITreeNode::bindCallArguments(llvm::Instruction *site,
   ITreeNode::bindCallArgumentsTimer.stop();
 }
 
-void ITreeNode::popAbstractDependencyFrame(llvm::CallInst *site,
-                                           llvm::Instruction *inst,
-                                           ref<Expr> returnValue) {
+void ITreeNode::bindReturnValue(llvm::CallInst *site, llvm::Instruction *inst,
+                                ref<Expr> returnValue) {
   // TODO: This is probably where we should simplify
   // the dependency graph by removing callee values.
-  ITreeNode::popAbstractDependencyFrameTimer.start();
+  ITreeNode::bindReturnValueTimer.start();
   dependency->bindReturnValue(site, inst, returnValue);
-  ITreeNode::popAbstractDependencyFrameTimer.stop();
+  ITreeNode::bindReturnValueTimer.stop();
 }
 
 std::pair<Dependency::ConcreteStore, Dependency::SymbolicStore>
@@ -2790,6 +2785,39 @@ ITreeNode::getStoredCoreExpressions(std::set<const Array *> &replacements)
   return ret;
 }
 
+void ITreeNode::unsatCoreMarking(std::vector<ref<Expr> > unsatCore) {
+  // State subsumed, we mark needed constraints on the path condition. We create
+  // path condition marking structure to mark core constraints
+  std::map<Expr *, PathCondition *> markerMap;
+  for (PathCondition *it = pathCondition; it != 0; it = it->cdr()) {
+    if (llvm::isa<OrExpr>(it->car().get())) {
+      // FIXME: Break up disjunction into its components, because each disjunct
+      // is solved separately. The or constraint was due to state merge.
+      // Hence, the following is just a makeshift for when state merge is
+      // properly implemented.
+      markerMap[it->car()->getKid(0).get()] = it;
+      markerMap[it->car()->getKid(1).get()] = it;
+    }
+    markerMap[it->car().get()] = it;
+  }
+
+  AllocationGraph *g = new AllocationGraph();
+  for (std::vector<ref<Expr> >::iterator it1 = unsatCore.begin(),
+                                         it1End = unsatCore.end();
+       it1 != it1End; ++it1) {
+    // FIXME: Sometimes some constraints are not in the PC. This is
+    // because constraints are not properly added at state merge.
+    PathCondition *cond = markerMap[it1->get()];
+    if (cond)
+      cond->setAsCore(g);
+  }
+  // llvm::errs() << "AllocationGraph\n";
+  // g->dump();
+  // We mark memory allocations needed for the unsatisfiabilty core
+  computeCoreAllocations(g);
+  delete g; // Delete the AllocationGraph object
+}
+
 void ITreeNode::computeCoreAllocations(AllocationGraph *g) {
   ITreeNode::computeCoreAllocationsTimer.start();
   dependency->computeCoreAllocations(g);
@@ -2807,35 +2835,36 @@ void ITreeNode::print(llvm::raw_ostream &stream) const {
   this->print(stream, 0);
 }
 
-void ITreeNode::print(llvm::raw_ostream &stream, const unsigned tabNum) const {
-  std::string tabs = makeTabs(tabNum);
-  std::string tabs_next = appendTab(tabs);
+void ITreeNode::print(llvm::raw_ostream &stream,
+                      const unsigned paddingAmount) const {
+  std::string tabs = makeTabs(paddingAmount);
+  std::string tabsNext = appendTab(tabs);
 
   stream << tabs << "ITreeNode\n";
-  stream << tabs_next << "node Id = " << nodeId << "\n";
-  stream << tabs_next << "pathCondition = ";
+  stream << tabsNext << "node Id = " << nodeId << "\n";
+  stream << tabsNext << "pathCondition = ";
   if (pathCondition == 0) {
     stream << "NULL";
   } else {
     pathCondition->print(stream);
   }
   stream << "\n";
-  stream << tabs_next << "Left:\n";
+  stream << tabsNext << "Left:\n";
   if (!left) {
-    stream << tabs_next << "NULL\n";
+    stream << tabsNext << "NULL\n";
   } else {
-    left->print(stream, tabNum + 1);
+    left->print(stream, paddingAmount + 1);
     stream << "\n";
   }
-  stream << tabs_next << "Right:\n";
+  stream << tabsNext << "Right:\n";
   if (!right) {
-    stream << tabs_next << "NULL\n";
+    stream << tabsNext << "NULL\n";
   } else {
-    right->print(stream, tabNum + 1);
+    right->print(stream, paddingAmount + 1);
     stream << "\n";
   }
   if (dependency) {
-    stream << tabs_next << "------- Abstract Dependencies ----------\n";
-    dependency->print(stream, tabNum + 1);
+    stream << tabsNext << "------- Abstract Dependencies ----------\n";
+    dependency->print(stream, paddingAmount + 1);
   }
 }

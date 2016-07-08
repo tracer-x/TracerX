@@ -8,9 +8,9 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file contains the implementation of the flow-insensitive dependency
-/// analysis to compute the allocations upon which the unsatisfiability core
-/// depends, which is used in computing the interpolant.
+/// This file contains the implementation of the dependency analysis to
+/// compute the allocations upon which the unsatisfiability core depends,
+/// which is used in computing the interpolant.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -803,43 +803,50 @@ Dependency::populateArgumentValuesList(llvm::CallInst *site,
   return argumentValuesList;
 }
 
-bool Dependency::buildLoadDependency(llvm::Value *fromValue,
-                                     ref<Expr> fromValueExpr,
-                                     llvm::Value *toValue,
-                                     ref<Expr> toValueExpr) {
-  VersionedValue *arg = getLatestValue(fromValue, fromValueExpr);
-  if (!arg)
+bool Dependency::buildLoadDependency(llvm::Value *address,
+                                     ref<Expr> addressExpr, llvm::Value *value,
+                                     ref<Expr> valueExpr) {
+  VersionedValue *addressValue = getLatestValue(address, addressExpr);
+  if (!addressValue)
     return false;
 
-  std::vector<Allocation *> allocList = resolveAllocationTransitively(arg);
+  std::vector<Allocation *> addressAllocList =
+      resolveAllocationTransitively(addressValue);
 
-  if (allocList.empty())
+  if (addressAllocList.empty())
     assert(!"operand is not an allocation");
 
-  for (std::vector<Allocation *>::iterator it0 = allocList.begin(),
-                                           it0End = allocList.end();
-       it0 != it0End; ++it0) {
-    std::vector<VersionedValue *> valList = stores(*it0);
+  for (std::vector<Allocation *>::iterator
+           allocIter = addressAllocList.begin(),
+           allocIterEnd = addressAllocList.end();
+       allocIter != allocIterEnd; ++allocIter) {
+    std::vector<VersionedValue *> storedValue = stores(*allocIter);
 
-    if (valList.empty())
+    if (storedValue.empty())
       // We could not find the stored value, create
       // a new one.
-      updateStore(*it0, getNewVersionedValue(toValue, toValueExpr));
+      updateStore(*allocIter, getNewVersionedValue(value, valueExpr));
     else {
-      for (std::vector<VersionedValue *>::iterator it1 = valList.begin(),
-                                                   it1End = valList.end();
-           it1 != it1End; ++it1) {
-        std::vector<Allocation *> alloc2 = resolveAllocationTransitively(*it1);
+      for (std::vector<VersionedValue *>::iterator
+               storedValueIter = storedValue.begin(),
+               storedValueIterEnd = storedValue.end();
+           storedValueIter != storedValueIterEnd; ++storedValueIter) {
+        // Here we check if the stored value was an address, in
+        // which case we add pointer equality. Otherwise, we build
+        // value dependency between the return value and the stored value.
+        std::vector<Allocation *> storedValueAddressViews =
+            resolveAllocationTransitively(*storedValueIter);
 
-        if (alloc2.empty())
-          addDependencyViaAllocation(
-              *it1, getNewVersionedValue(toValue, toValueExpr), *it0);
+        if (storedValueAddressViews.empty())
+          addDependencyViaAllocation(*storedValueIter,
+                                     getNewVersionedValue(value, valueExpr),
+                                     *allocIter);
         else {
-          for (std::vector<Allocation *>::iterator it2 = alloc2.begin(),
-                                                   it2End = alloc2.end();
+          for (std::vector<Allocation *>::iterator
+                   it2 = storedValueAddressViews.begin(),
+                   it2End = storedValueAddressViews.end();
                it2 != it2End; ++it2) {
-            addPointerEquality(getNewVersionedValue(toValue, toValueExpr),
-                               *it2);
+            addPointerEquality(getNewVersionedValue(value, valueExpr), *it2);
           }
         }
       }
@@ -848,8 +855,7 @@ bool Dependency::buildLoadDependency(llvm::Value *fromValue,
   return true;
 }
 
-Dependency::Dependency(Dependency *prev)
-    : parentDependency(prev), incomingBlock(prev ? prev->incomingBlock : 0) {}
+Dependency::Dependency(Dependency *prev) : parentDependency(prev) {}
 
 Dependency::~Dependency() {
   // Delete the locally-constructed relations
@@ -878,14 +884,29 @@ void Dependency::execute(llvm::Instruction *instr,
     llvm::Function *f = callInst->getCalledFunction();
     if (f && f->getIntrinsicID() == llvm::Intrinsic::not_intrinsic) {
       llvm::StringRef calleeName = callInst->getCalledFunction()->getName();
-
       // FIXME: We need a more precise way to determine invoked method
       // rather than just using the name.
       std::string getValuePrefix("klee_get_value");
 
-      if (calleeName.equals("malloc") && args.size() == 1) {
+      if (calleeName.equals("getpagesize") && args.size() == 1) {
+        getNewVersionedValue(instr, args.at(0));
+      } else if (calleeName.equals("malloc") && args.size() == 1) {
+        // malloc is an allocation-type instruction: its single argument is the
+        // return address.
         addPointerEquality(getNewVersionedValue(instr, args.at(0)),
                            getInitialAllocation(instr, args.at(0)));
+      } else if (calleeName.equals("realloc") && args.size() == 1) {
+        // realloc is an allocation-type instruction: its single argument is the
+        // return address.
+        VersionedValue *returnValue = getNewVersionedValue(instr, args.at(0));
+        VersionedValue *arg = getLatestValue(instr->getOperand(0), args.at(0));
+        addDependency(arg, returnValue);
+      } else if (calleeName.equals("calloc") && args.size() == 1) {
+        // calloc is an allocation-type instruction: its single argument is the
+        // return address.
+        VersionedValue *returnValue = getNewVersionedValue(instr, args.at(0));
+        VersionedValue *arg = getLatestValue(instr->getOperand(0), args.at(0));
+        addDependency(arg, returnValue);
       } else if (calleeName.equals("syscall") && args.size() >= 2) {
         VersionedValue *returnValue = getNewVersionedValue(instr, args.at(0));
         for (unsigned i = 0; i + 1 < args.size(); ++i) {
@@ -901,10 +922,37 @@ void Dependency::execute(llvm::Instruction *instr,
         VersionedValue *arg =
             getNewVersionedValue(instr->getOperand(0), args.at(1));
         addDependency(arg, returnValue);
+      } else if (calleeName.equals("getenv") && args.size() == 2) {
+        addPointerEquality(getNewVersionedValue(instr, args.at(0)),
+                           getInitialAllocation(instr, args.at(0)));
+      } else if (calleeName.equals("printf") && args.size() >= 2) {
+        VersionedValue *returnValue = getNewVersionedValue(instr, args.at(0));
+        VersionedValue *formatArg =
+            getLatestValue(instr->getOperand(0), args.at(1));
+        addDependency(formatArg, returnValue);
+        for (unsigned i = 2, argsNum = args.size(); i < argsNum; ++i) {
+          VersionedValue *arg =
+              getLatestValue(instr->getOperand(0), args.at(i));
+          addDependency(arg, returnValue);
+        }
+      } else if (calleeName.equals("vprintf") && args.size() == 3) {
+        VersionedValue *returnValue = getNewVersionedValue(instr, args.at(0));
+        VersionedValue *arg0 = getLatestValue(instr->getOperand(0), args.at(1));
+        VersionedValue *arg1 = getLatestValue(instr->getOperand(1), args.at(2));
+        addDependency(arg0, returnValue);
+        addDependency(arg1, returnValue);
+      } else if (calleeName.equals("__ctype_b_loc") && args.size() == 1) {
+        getNewVersionedValue(instr, args.at(0));
+      } else if (calleeName.equals("__ctype_b_locargs") && args.size() == 1) {
+        getNewVersionedValue(instr, args.at(0));
+      } else if (calleeName.equals("geteuid") && args.size() == 1) {
+        VersionedValue *returnValue = getNewVersionedValue(instr, args.at(0));
+        VersionedValue *arg = getLatestValue(instr->getOperand(0), args.at(0));
+        addDependency(arg, returnValue);
+      } else {
+        assert(!"unhandled external function");
       }
     }
-    updateIncomingBlock(instr);
-
     return;
   }
 
@@ -924,7 +972,6 @@ void Dependency::execute(llvm::Instruction *instr,
     default:
       break;
     }
-    updateIncomingBlock(instr);
     return;
   }
   case 1: {
@@ -934,56 +981,6 @@ void Dependency::execute(llvm::Instruction *instr,
     case llvm::Instruction::Alloca: {
       addPointerEquality(getNewVersionedValue(instr, argExpr),
                          getInitialAllocation(instr, argExpr));
-      break;
-    }
-    case llvm::Instruction::GetElementPtr: {
-      if (llvm::isa<llvm::Constant>(instr->getOperand(0))) {
-        Allocation *actualAllocation =
-            getLatestAllocation(instr->getOperand(0), argExpr);
-        if (!actualAllocation)
-          actualAllocation =
-              getInitialAllocation(instr->getOperand(0), argExpr);
-
-        // We simply propagate the pointer to the current
-        addPointerEquality(getNewVersionedValue(instr, argExpr),
-                           actualAllocation);
-        break;
-      }
-
-      VersionedValue *base = getLatestValue(instr->getOperand(0), argExpr);
-      assert(base != 0 && "operand not found");
-
-      std::vector<Allocation *> baseAllocations =
-          resolveAllocationTransitively(base);
-
-      // Allocations
-      if (baseAllocations.size() > 0) {
-        VersionedValue *newValue = getNewVersionedValue(instr, argExpr);
-        for (std::vector<Allocation *>::iterator it = baseAllocations.begin(),
-                                                 itEnd = baseAllocations.end();
-             it != itEnd; ++it) {
-          // We check existing allocations with the same site as the base,
-          // but with the address given as argExpr
-          Allocation *actualAllocation =
-              getLatestAllocation((*it)->getSite(), argExpr);
-          if (!actualAllocation) {
-            actualAllocation = getInitialAllocation((*it)->getSite(), argExpr);
-          }
-          addPointerEquality(newValue, actualAllocation);
-        }
-      } else {
-        // Could not resolve to argument to an address,
-        // simply add flow dependency
-        std::vector<VersionedValue *> vec = directFlowSources(base);
-        if (vec.size() > 0) {
-          VersionedValue *newValue = getNewVersionedValue(instr, argExpr);
-          for (std::vector<VersionedValue *>::iterator it = vec.begin(),
-                                                       itEnd = vec.end();
-               it != itEnd; ++it) {
-            addDependency((*it), newValue);
-          }
-        }
-      }
       break;
     }
     case llvm::Instruction::Trunc:
@@ -1017,20 +1014,8 @@ void Dependency::execute(llvm::Instruction *instr,
       }
       break;
     }
-    case llvm::Instruction::PHI: {
-      llvm::PHINode *node = llvm::dyn_cast<llvm::PHINode>(instr);
-      llvm::Value *llvmArgValue = node->getIncomingValueForBlock(incomingBlock);
-      VersionedValue *val = getLatestValue(llvmArgValue, argExpr);
-      if (val) {
-        addDependency(val, getNewVersionedValue(instr, argExpr));
-      } else if (!llvm::isa<llvm::Constant>(llvmArgValue)) {
-        assert(!"operand not found");
-      }
-      break;
-    }
     default: { assert(!"unhandled unary instruction"); }
     }
-    updateIncomingBlock(instr);
     return;
   }
   case 2: {
@@ -1058,7 +1043,7 @@ void Dependency::execute(llvm::Instruction *instr,
               getInitialAllocation(instr->getOperand(0), address);
           addPointerEquality(addressValue, alloc);
           updateStore(alloc, getNewVersionedValue(instr, valueExpr));
-            break;
+          break;
         } else if (allocations.size() == 1) {
           if (Util::isMainArgument(allocations.at(0)->getSite())) {
             // The load corresponding to a load of the main function's
@@ -1112,9 +1097,81 @@ void Dependency::execute(llvm::Instruction *instr,
 
       break;
     }
+    case llvm::Instruction::GetElementPtr: {
+      if (llvm::isa<llvm::Constant>(instr->getOperand(0))) {
+        // We look up existing allocations with the same site as the argument,
+        // but with the address given as valueExpr (the value of the
+        // getelementptr instruction itself).
+        Allocation *actualAllocation =
+            getLatestAllocation(instr->getOperand(0), valueExpr);
+        if (!actualAllocation)
+          actualAllocation =
+              getInitialAllocation(instr->getOperand(0), valueExpr);
+
+        // We simply propagate the pointer to the current
+        addPointerEquality(getNewVersionedValue(instr, valueExpr),
+                           actualAllocation);
+        break;
+      }
+
+      VersionedValue *addressValue =
+          getLatestValue(instr->getOperand(0), address);
+
+      if (!addressValue) {
+        // We define a new base anyway in case the operand was not found and was
+        // an inbound.
+        llvm::GetElementPtrInst *gepInst =
+            llvm::dyn_cast<llvm::GetElementPtrInst>(instr);
+        assert(gepInst->isInBounds() && "operand not found");
+        addressValue = getNewVersionedValue(instr->getOperand(0), address);
+      }
+
+      std::vector<Allocation *> addressAllocations =
+          resolveAllocationTransitively(addressValue);
+
+      // Allocations
+      if (addressAllocations.size() > 0) {
+        VersionedValue *newValue = getNewVersionedValue(instr, valueExpr);
+        for (std::vector<Allocation *>::iterator
+                 it = addressAllocations.begin(),
+                 itEnd = addressAllocations.end();
+             it != itEnd; ++it) {
+          // We check existing allocations with the same site as the allocation,
+          // but with the address given as valueExpr (the value of the
+          // getelementptr instruction itself).
+          Allocation *actualAllocation =
+              getLatestAllocation((*it)->getSite(), valueExpr);
+          if (!actualAllocation)
+            actualAllocation =
+                getInitialAllocation((*it)->getSite(), valueExpr);
+          addPointerEquality(newValue, actualAllocation);
+        }
+      } else {
+        // Here the base is not found as an address,
+        // try to add flow dependency between values
+        std::vector<VersionedValue *> directSources =
+            directFlowSources(addressValue);
+        if (directSources.size() > 0) {
+          VersionedValue *newValue = getNewVersionedValue(instr, valueExpr);
+          for (std::vector<VersionedValue *>::iterator
+                   it = directSources.begin(),
+                   itEnd = directSources.end();
+               it != itEnd; ++it) {
+            addDependency((*it), newValue);
+          }
+        } else {
+          // Here getelementptr forcibly uses a value not known to be an
+          // address, e.g., a loaded value, as an address. In this case, we then
+          // assume that the argument is a base allocation.
+          addPointerEquality(
+              getNewVersionedValue(instr, valueExpr),
+              getInitialAllocation(addressValue->getValue(), valueExpr));
+        }
+      }
+      break;
+    }
     default: { assert(!"unhandled binary instruction"); }
     }
-    updateIncomingBlock(instr);
     return;
   }
   case 3: {
@@ -1181,13 +1238,26 @@ void Dependency::execute(llvm::Instruction *instr,
     default:
       assert(!"unhandled ternary instruction");
     }
-    updateIncomingBlock(instr);
     return;
   }
   default:
     break;
   }
   assert(!"unhandled instruction arguments number");
+}
+
+void Dependency::executePHI(llvm::Instruction *instr,
+                            unsigned int incomingBlock, ref<Expr> valueExpr) {
+  llvm::PHINode *node = llvm::dyn_cast<llvm::PHINode>(instr);
+  llvm::Value *llvmArgValue = node->getIncomingValue(incomingBlock);
+  VersionedValue *val = getLatestValue(llvmArgValue, valueExpr);
+  if (val) {
+    addDependency(val, getNewVersionedValue(instr, valueExpr));
+  } else if (llvm::isa<llvm::Constant>(llvmArgValue)) {
+    getNewVersionedValue(instr, valueExpr);
+  } else {
+    assert(!"operand not found");
+  }
 }
 
 void Dependency::bindCallArguments(llvm::Instruction *i,
@@ -1218,7 +1288,6 @@ void Dependency::bindCallArguments(llvm::Instruction *i,
     argumentValuesList.pop_back();
     ++index;
   }
-  updateIncomingBlock(i);
 }
 
 void Dependency::bindReturnValue(llvm::CallInst *site, llvm::Instruction *i,
@@ -1232,7 +1301,6 @@ void Dependency::bindReturnValue(llvm::CallInst *site, llvm::Instruction *i,
     if (value)
       addDependency(value, getNewVersionedValue(site, returnValue));
   }
-  updateIncomingBlock(i);
 }
 
 void Dependency::markAllValues(AllocationGraph *g, VersionedValue *value) {
@@ -1247,13 +1315,22 @@ void Dependency::markAllValues(AllocationGraph *g, VersionedValue *value) {
 
 void Dependency::markAllValues(AllocationGraph *g, llvm::Value *val) {
   VersionedValue *value = getLatestValueNoConstantCheck(val);
-  buildAllocationGraph(g, value);
-  std::vector<VersionedValue *> allSources = allFlowSources(value);
-  for (std::vector<VersionedValue *>::iterator it = allSources.begin(),
-                                               itEnd = allSources.end();
-       it != itEnd; ++it) {
-    (*it)->setAsCore();
+
+  // Right now we simply ignore the __dso_handle values. They are due
+  // to library / linking errors caused by missing options (-shared) in the
+  // compilation involving shared library.
+  if (!value) {
+    if (llvm::ConstantExpr *cVal = llvm::dyn_cast<llvm::ConstantExpr>(val)) {
+      for (unsigned i = 0; i < cVal->getNumOperands(); ++i) {
+        if (cVal->getOperand(i)->getName().equals("__dso_handle")) {
+          return;
+        }
+      }
+    }
+    assert(!"unknown value");
   }
+
+  markAllValues(g, value);
 }
 
 void Dependency::computeCoreAllocations(AllocationGraph *g) {
@@ -1348,9 +1425,9 @@ Dependency::directAllocationSources(VersionedValue *target) const {
   return ret;
 }
 
-void Dependency::recursivelyBuildAllocationGraph(AllocationGraph *g,
-                                                 VersionedValue *target,
-                                                 Allocation *alloc) const {
+void Dependency::recursivelyBuildAllocationGraph(
+    AllocationGraph *g, VersionedValue *target, Allocation *alloc,
+    Allocation *parentAlloc) const {
   if (!target)
     return;
 
@@ -1362,9 +1439,11 @@ void Dependency::recursivelyBuildAllocationGraph(AllocationGraph *g,
            it = sourceEdges.begin(),
            itEnd = sourceEdges.end();
        it != itEnd; ++it) {
-    if (it->second != alloc) {
+    // FIXME: Cheap detection of direct and 2-nodes cycles. In general, any
+    // cycle should not be allowed.
+    if (it->second != alloc && it->second != parentAlloc) {
       g->addNewEdge(it->second, alloc);
-      recursivelyBuildAllocationGraph(g, it->first, it->second);
+      recursivelyBuildAllocationGraph(g, it->first, it->second, alloc);
     }
   }
 }
@@ -1380,14 +1459,7 @@ void Dependency::buildAllocationGraph(AllocationGraph *g,
            itEnd = sourceEdges.end();
        it != itEnd; ++it) {
     g->addNewSink(it->second);
-    recursivelyBuildAllocationGraph(g, it->first, it->second);
-  }
-}
-
-void Dependency::updateIncomingBlock(llvm::Instruction *inst) {
-  llvm::BasicBlock::iterator endInstIter = inst->getParent()->end();
-  if (endInstIter->getPrevNode() == inst) {
-    incomingBlock = inst->getParent();
+    recursivelyBuildAllocationGraph(g, it->first, it->second, 0);
   }
 }
 
@@ -1395,8 +1467,9 @@ void Dependency::print(llvm::raw_ostream &stream) const {
   this->print(stream, 0);
 }
 
-void Dependency::print(llvm::raw_ostream &stream, const unsigned tabNum) const {
-  std::string tabs = makeTabs(tabNum);
+void Dependency::print(llvm::raw_ostream &stream,
+                       const unsigned paddingAmount) const {
+  std::string tabs = makeTabs(paddingAmount);
   stream << tabs << "EQUALITIES:";
   std::vector<PointerEquality *>::const_iterator equalityListBegin =
       equalityList.begin();
@@ -1437,7 +1510,7 @@ void Dependency::print(llvm::raw_ostream &stream, const unsigned tabNum) const {
 
   if (parentDependency) {
     stream << "\n" << tabs << "--------- Parent Dependencies ----------\n";
-    parentDependency->print(stream, tabNum);
+    parentDependency->print(stream, paddingAmount);
   }
 }
 
@@ -1455,11 +1528,6 @@ void Dependency::Util::deletePointerVector(std::vector<T *> &list) {
 
 template <typename K, typename T>
 void Dependency::Util::deletePointerMap(std::map<K *, T *> &map) {
-  typedef typename std::map<K *, T *>::iterator IteratorType;
-
-  for (IteratorType it = map.begin(), itEnd = map.end(); it != itEnd; ++it) {
-    map.erase(it);
-  }
   map.clear();
 }
 
@@ -1469,7 +1537,7 @@ void Dependency::Util::deletePointerMapWithVectorValue(
   typedef typename std::map<K *, std::vector<T *> >::iterator IteratorType;
 
   for (IteratorType it = map.begin(), itEnd = map.end(); it != itEnd; ++it) {
-    map.erase(it);
+    it->second.clear();
   }
   map.clear();
 }
@@ -1502,9 +1570,9 @@ bool Dependency::Util::isMainArgument(llvm::Value *site) {
 
 /**/
 
-std::string makeTabs(const unsigned tabNum) {
+std::string makeTabs(const unsigned paddingAmount) {
   std::string tabsString;
-  for (unsigned i = 0; i < tabNum; i++) {
+  for (unsigned i = 0; i < paddingAmount; ++i) {
     tabsString += appendTab(tabsString);
   }
   return tabsString;

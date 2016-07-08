@@ -1572,7 +1572,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           terminateStateOnExecError(state, "return void when caller expected a result");
         }
       }
-    }      
+    }
     break;
   }
 #if LLVM_VERSION_CODE < LLVM_VERSION(3, 1)
@@ -1595,6 +1595,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         }
       }
     }
+    if (INTERPOLATION_ENABLED)
+      interpTree->execute(i);
     break;
   }
 #endif
@@ -1731,9 +1733,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     Value *fp = cs.getCalledValue();
     Function *f = getTargetFunction(fp, state);
 
-    if (INTERPOLATION_ENABLED)
-      interpTree->execute(i);
-
     // Skip debug intrinsics, we can't evaluate their metadata arguments.
     if (f && isDebugIntrinsic(f, kmodule))
       break;
@@ -1842,8 +1841,14 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
-      interpTree->execute(i, result);
+    if (INTERPOLATION_ENABLED) {
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
+      interpTree->executePHI(i, state.incomingBBIndex, result);
+#else
+      interpTree->executePHI(i, state.incomingBBIndex * 2, result);
+#endif
+    }
+
     break;
   }
 
@@ -2152,6 +2157,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   case Instruction::GetElementPtr: {
     KGEPInstruction *kgepi = static_cast<KGEPInstruction*>(ki);
     ref<Expr> base = eval(ki, 0, state).value;
+    ref<Expr> oldBase = base;
 
     for (std::vector< std::pair<unsigned, uint64_t> >::iterator 
            it = kgepi->indices.begin(), ie = kgepi->indices.end(); 
@@ -2169,7 +2175,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
     // Update dependency
     if (INTERPOLATION_ENABLED)
-      interpTree->execute(i, base);
+      interpTree->execute(i, base, oldBase);
     break;
   }
 
@@ -2858,13 +2864,13 @@ void Executor::run(ExecutionState &initialState) {
       // Uncomment the following statements to show the state
       // of the interpolation tree and the active node.
 
-      // llvm::errs() << "\nCurrent state:\n";
-      // processTree->dump();
-      // interpTree->dump();
-      // state.itreeNode->dump();
-      // llvm::errs() << "------------------- Executing New Instruction "
-      //                 "-----------------------\n";
-      // state.pc->inst->dump();
+      //      llvm::errs() << "\nCurrent state:\n";
+      //      processTree->dump();
+      //      interpTree->dump();
+      //      state.itreeNode->dump();
+      //      llvm::errs() << "------------------- Executing New Instruction "
+      //                      "-----------------------\n";
+      //      state.pc->inst->dump();
     }
 
     if (INTERPOLATION_ENABLED &&
