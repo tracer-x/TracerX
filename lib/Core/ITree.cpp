@@ -813,8 +813,8 @@ void PathCondition::print(llvm::raw_ostream &stream) const {
 }
 
 /**/
-StatTimer SubsumptionTableEntry::fourierMotzkinSimplifyTimer;
 
+StatTimer SubsumptionTableEntry::fourierMotzkinSimplifyTimer;
 StatTimer SubsumptionTableEntry::actualSolverCallTimer;
 
 unsigned long SubsumptionTableEntry::checkSolverCount = 0;
@@ -1519,9 +1519,8 @@ bool SubsumptionTableEntry::subsumed(
 
   if (!existentials.empty()) {
     ref<Expr> existsExpr = ExistsExpr::create(existentials, query);
-    //     llvm::errs() << "Before simplification:\n";
-    //     ExprPPrinter::printQuery(llvm::errs(), state.constraints,
-    // existsExpr);
+    // llvm::errs() << "Before simplification:\n";
+    // ExprPPrinter::printQuery(llvm::errs(), state.constraints, existsExpr);
     query = simplifyExistsExpr(existsExpr, queryHasNoFreeVariables);
 
     // *** The following applies Fourier-Motzkin elimination more
@@ -1555,9 +1554,10 @@ bool SubsumptionTableEntry::subsumed(
   // not a constant and no contradictory unary constraints found from
   // solvingUnaryConstraints method.
   if (!llvm::isa<ConstantExpr>(query)) {
-    //    llvm::errs() << "Querying for subsumption check:\n";
-    //    ExprPPrinter::printQuery(llvm::errs(), state.constraints, query);
+    // llvm::errs() << "Querying for subsumption check:\n";
+    // ExprPPrinter::printQuery(llvm::errs(), state.constraints, query);
     ++checkSolverCount;
+
     if (!existentials.empty() && llvm::isa<ExistsExpr>(query)) {
       // llvm::errs() << "Existentials not empty\n";
 
@@ -1641,7 +1641,7 @@ bool SubsumptionTableEntry::subsumed(
   }
 
   if (success && result == Solver::True) {
-    //         llvm::errs() << "Solver decided validity\n";
+    // llvm::errs() << "Solver decided validity\n";
     std::vector<ref<Expr> > unsatCore;
     if (z3solver) {
       unsatCore = z3solver->getUnsatCore();
