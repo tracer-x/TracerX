@@ -102,6 +102,10 @@ extern "C" {
    */
   unsigned klee_is_symbolic(uintptr_t n);
 
+  /* This joins control flows, when a CLP(R) predicate provably holds. It has no
+   * effect when CLP(R) solver backend is not supported.
+   */
+  void klee_join(const char *predicateName, ...);
 
   /* The following intrinsics are primarily intended for internal use
      and may have peculiar semantics. */

@@ -382,7 +382,7 @@ Executor::Executor(const InterpreterOptions &opts,
 
 #ifdef SUPPORT_CLPR
   Solver *clprCoreSolver = new CLPRSolver();
-  llvm::errs() << "Starting secondary CLP(R) solver ...\n";
+  llvm::errs() << "Starting CLP(R) secondary solver ...\n";
   Solver *clprSolver = constructSolverChain(
       clprCoreSolver,
       interpreterHandler->getOutputFilename(ALL_QUERIES_SMT2_FILE_NAME),
