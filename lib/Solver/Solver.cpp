@@ -1263,6 +1263,10 @@ CLPRSolverImpl::CLPRSolverImpl()
 {
   assert(builder && "unable to create CLPRBuilder");
   engine = new clpr::CLPEngine(LOG_NONE);
+
+  // Load multiset and McCarthy's axiom
+  engine->loadLibrary("multiset");
+  engine->loadLibrary("mccarthy");
 }
 
 CLPRSolverImpl::~CLPRSolverImpl() {
