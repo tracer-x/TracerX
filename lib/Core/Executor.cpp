@@ -383,12 +383,13 @@ Executor::Executor(const InterpreterOptions &opts,
 #ifdef SUPPORT_CLPR
   Solver *clprCoreSolver = new CLPRSolver();
   llvm::errs() << "Starting CLP(R) secondary solver ...\n";
+  std::string clprPrefix("clpr-");
   Solver *clprSolver = constructSolverChain(
       clprCoreSolver,
-      interpreterHandler->getOutputFilename(ALL_QUERIES_SMT2_FILE_NAME),
-      interpreterHandler->getOutputFilename(SOLVER_QUERIES_SMT2_FILE_NAME),
-      interpreterHandler->getOutputFilename(ALL_QUERIES_PC_FILE_NAME),
-      interpreterHandler->getOutputFilename(SOLVER_QUERIES_PC_FILE_NAME));
+      interpreterHandler->getOutputFilename(clprPrefix + ALL_QUERIES_SMT2_FILE_NAME),
+      interpreterHandler->getOutputFilename(clprPrefix + SOLVER_QUERIES_SMT2_FILE_NAME),
+      interpreterHandler->getOutputFilename(clprPrefix + ALL_QUERIES_PC_FILE_NAME),
+      interpreterHandler->getOutputFilename(clprPrefix + SOLVER_QUERIES_PC_FILE_NAME));
   this->clprSolver = new TimingSolver(clprSolver, false);
 #endif /* SUPPORT_CLPR */
 
