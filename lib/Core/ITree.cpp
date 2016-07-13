@@ -2196,6 +2196,14 @@ void ITreeNode::computeCoreAllocations(AllocationGraph *g) {
   ITreeNode::computeCoreAllocationsTimer.stop();
 }
 
+#ifdef SUPPORT_CLPR
+bool ITreeNode::executeJoin(llvm::Instruction *instr,
+                            std::vector<ref<Expr> > &arguments) {
+  instr->dump();
+  return false;
+}
+#endif
+
 void ITreeNode::dump() const {
   llvm::errs() << "------------------------- ITree Node "
                   "--------------------------------\n";

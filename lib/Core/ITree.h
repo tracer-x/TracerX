@@ -585,6 +585,16 @@ public:
   /// \brief Compute the allocations that are relevant for the interpolant.
   void computeCoreAllocations(AllocationGraph *g);
 
+#ifdef SUPPORT_CLPR
+  /// \brief Execute klee_join
+  ///
+  /// \param The callsite.
+  /// \param The arguments evaluated as KLEE expressions.
+  /// \return true when proof is successful, false otherwise.
+  bool executeJoin(llvm::Instruction *instr,
+                   std::vector<ref<Expr> > &arguments);
+#endif
+
   /// \brief Print the content of the tree node object to the LLVM error stream.
   void dump() const;
 
