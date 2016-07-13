@@ -58,6 +58,14 @@ DebugDumpSTPQueries("debug-dump-stp-queries",
                      llvm::cl::init(false),
                      llvm::cl::desc("Dump every STP query to stderr (default=off)"));
 
+#ifdef SUPPORT_CLPR
+// CLP(R) files to load
+llvm::cl::list<std::string>
+CLPRLib("use-clpr",
+        llvm::cl::desc("Load a CLP(R) file (option can be multiply specified)"),
+        llvm::cl::value_desc("filespec"));
+#endif
+
 using namespace klee;
 
 
@@ -1267,6 +1275,20 @@ CLPRSolverImpl::CLPRSolverImpl()
   // Load multiset and McCarthy's axiom
   engine->loadLibrary("multiset");
   engine->loadLibrary("mccarthy");
+
+  if (CLPRLib.size()) {
+    llvm::errs() << "Loading CLP(R) file(s)";
+
+    // Load user libraries specified in the command line
+    for (llvm::cl::list<std::string>::const_iterator it = CLPRLib.begin(),
+                                                     itEnd = CLPRLib.end();
+         it != itEnd; ++it) {
+      llvm::errs() << " " << (*it);
+      engine->loadLibraryWithFilespec((*it));
+    }
+
+    llvm::errs() << "\n";
+  }
 }
 
 CLPRSolverImpl::~CLPRSolverImpl() {
@@ -1276,9 +1298,7 @@ CLPRSolverImpl::~CLPRSolverImpl() {
 
 /***/
 
-CLPRSolver::CLPRSolver() : Solver(new CLPRSolverImpl())
-{
-}
+CLPRSolver::CLPRSolver() : Solver(new CLPRSolverImpl()) {}
 
 char *CLPRSolver::getConstraintLog(const Query &query) {
   return impl->getConstraintLog(query);
@@ -1438,7 +1458,6 @@ SolverImpl::SolverRunStatus CLPRSolverImpl::getOperationStatusCode() {
 std::vector< ref<Expr> > CLPRSolverImpl::getUnsatCore() {
   return unsatCore;
 }
-
 
 #endif /* SUPPORT_CLPR */
 

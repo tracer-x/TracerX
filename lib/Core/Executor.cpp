@@ -381,8 +381,9 @@ Executor::Executor(const InterpreterOptions &opts,
 #endif /* SUPPORT_Z3 */
 
 #ifdef SUPPORT_CLPR
-  Solver *clprCoreSolver = new CLPRSolver();
   llvm::errs() << "Starting CLP(R) secondary solver ...\n";
+  Solver *clprCoreSolver = new CLPRSolver();
+
   std::string clprPrefix("clpr-");
   Solver *clprSolver = constructSolverChain(
       clprCoreSolver,
