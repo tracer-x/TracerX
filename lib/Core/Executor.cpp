@@ -1667,9 +1667,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // of the solver to decide its satisfiability, and no generation
       // of the unsatisfiability core.
       if (INTERPOLATION_ENABLED && ((!branches.first && branches.second) ||
-                                    (branches.first && !branches.second))) {
+                                    (branches.first && !branches.second)))
         interpTree->execute(i);
-      }
     }
     break;
   }
