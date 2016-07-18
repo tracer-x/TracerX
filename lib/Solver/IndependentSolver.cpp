@@ -412,6 +412,12 @@ public:
   std::vector< ref<Expr> > getUnsatCore() {
     return solver->getUnsatCore();
   }
+#ifdef SUPPORT_CLPR
+  bool validateRecursivePredicate(std::string predicateName,
+                                  std::vector<ref<Expr> > &arguments) {
+    return solver->validateRecursivePredicate(predicateName, arguments);
+  }
+#endif
 };
   
 bool IndependentSolver::computeValidity(const Query& query,

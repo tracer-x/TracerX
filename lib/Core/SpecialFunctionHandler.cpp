@@ -425,11 +425,9 @@ void SpecialFunctionHandler::handleJoin(ExecutionState &state,
   // This retrieves the predicate name
   std::string predicateName = readStringAtAddress(state, arguments[0]);
 
-  unsigned counter = 0;
-  for (std::vector<ref<Expr> >::const_iterator it = ++(arguments.begin()),
-       itEnd = arguments.end(); it != itEnd; ++it) {
-      std::ostringstream tmpVariableName("__handleJoin_arg_");
-      tmpVariableName << counter++;
+  if (executor.clprSolver->validateRecursivePredicate(predicateName,
+                                                      arguments)) {
+    // Recursive predicate holding, here we terminate the state if necessary.
   }
 #endif /* SUPPORT_CLPR */
 }

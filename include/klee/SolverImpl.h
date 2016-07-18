@@ -112,6 +112,19 @@ namespace klee {
     ///
     /// \return Vector of ref<Expr>
     virtual std::vector< ref<Expr> > getUnsatCore();
+
+  #ifdef SUPPORT_CLPR
+    /// \brief Validate a recursive predicate by invoking CLP(R)
+    ///
+    /// \param the name of the predicate.
+    /// \param the arguments to be passed onto the predicate.
+    /// \return true if the predicate holds (valid), false otherwise.
+    virtual bool
+    validateRecursivePredicate(std::string predicateName,
+                               std::vector<ref<Expr> > &arguments) {
+      return false;
+    }
+  #endif
   };
 
 }

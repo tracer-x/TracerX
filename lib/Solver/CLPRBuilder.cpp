@@ -529,11 +529,15 @@ clpr::CLPTerm CLPRBuilder::constructActual(ref<Expr> e, int *width_out) {
   }
 
   case Expr::Concat: {
-    ConcatExpr *ce = cast<ConcatExpr>(e);
-    ReadExpr *re = cast<ReadExpr>(ce->getKid((ce->numKids) - 1));
-    assert(re && re->updates.root);
+    Expr *ex = e.get();
+    while (llvm::isa<ConcatExpr>(ex)) {
+      ConcatExpr *ce = llvm::cast<ConcatExpr>(ex);
+      ex = ce->getKid((ce->numKids) - 1).get();
+    }
+    assert(llvm::isa<ReadExpr>(ex) && "wrong type");
+    ReadExpr *re = llvm::cast<ReadExpr>(ex);
 
-    clpr::CLPTerm res(re->updates.root->name);
+    clpr::CLPTerm res("__clp__" + re->updates.root->name);
     return res;
   }
 

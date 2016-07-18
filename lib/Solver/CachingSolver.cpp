@@ -108,6 +108,12 @@ public:
   std::vector< ref<Expr> > getUnsatCore() {
     return unsat_core_to_return;
   }
+#ifdef SUPPORT_CLPR
+  bool validateRecursivePredicate(std::string predicateName,
+                                  std::vector<ref<Expr> > &arguments) {
+    return solver->validateRecursivePredicate(predicateName, arguments);
+  }
+#endif
 };
 
 /** @returns the canonical version of the given query.  The reference

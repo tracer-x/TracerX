@@ -66,6 +66,16 @@ namespace klee {
     std::pair< ref<Expr>, ref<Expr> >
     getRange(const ExecutionState&, ref<Expr> query);
     std::vector< ref<Expr> > getUnsatCore();
+
+  #ifdef SUPPORT_CLPR
+    /// \brief Validate a recursive predicate by invoking CLP(R)
+    ///
+    /// \param the name of the predicate.
+    /// \param the arguments to be passed onto the predicate.
+    /// \return true if the predicate holds (valid), false otherwise.
+    bool validateRecursivePredicate(std::string predicateName,
+                                    std::vector<ref<Expr> > &arguments);
+  #endif
   };
 
 }

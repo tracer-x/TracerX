@@ -347,6 +347,13 @@ std::vector< ref<Expr> > Solver::getUnsatCore() {
   return impl->getUnsatCore();
 }
 
+#ifdef SUPPORT_CLPR
+bool Solver::validateRecursivePredicate(std::string predicateName,
+                                        std::vector<ref<Expr> > &arguments) {
+  return impl->validateRecursivePredicate(predicateName, arguments);
+}
+#endif
+
 /***/
 
 class ValidatingSolver : public SolverImpl {
@@ -1262,6 +1269,49 @@ public:
                             bool &hasSolution);
   SolverRunStatus getOperationStatusCode();
   std::vector< ref<Expr> > getUnsatCore();
+
+#ifdef SUPPORT_CLPR
+  bool validateRecursivePredicate(std::string predicateName,
+                                  std::vector<ref<Expr> > &arguments) {
+    clpr::CLPTerm queryAtom(predicateName);
+    std::vector<clpr::CLPTerm> constraintsList;
+
+    unsigned i = 0;
+    for (std::vector<ref<Expr> >::const_iterator it = ++(arguments.begin()),
+                                                 itEnd = arguments.end();
+         it != itEnd; ++it) {
+      clpr::CLPTerm clpExpr = builder->construct(*it);
+      std::ostringstream tmpVarName;
+      tmpVarName << "__clpr__arg" << i++ << "__";
+      clpr::CLPTerm varName(tmpVarName.str());
+      queryAtom.addArgument(varName);
+      clpr::CLPTerm constraint("=");
+      constraint.addArgument(varName);
+      constraint.addArgument(clpExpr);
+      constraintsList.push_back(constraint);
+    }
+
+    // Build the query
+    clpr::CLPQuery query;
+    for (std::vector<clpr::CLPTerm>::const_iterator
+             it = constraintsList.begin(),
+             itEnd = constraintsList.end();
+         it != itEnd; ++it) {
+      query.addTerm(*it);
+    }
+
+    // Remember order is important in SLDNF, the consequent has to be last.
+    clpr::CLPTerm consequent("not");
+    consequent.addArgument(queryAtom);
+    query.addTerm(consequent);
+
+    engine->query(query);
+    if (!engine->hasSolution()) {
+      return true;
+    }
+    return false;
+  }
+#endif
 };
 
 CLPRSolverImpl::CLPRSolverImpl()

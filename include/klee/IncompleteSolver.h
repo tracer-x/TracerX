@@ -107,6 +107,13 @@ public:
   std::vector< ref<Expr> > getUnsatCore() {
     return secondary->impl->getUnsatCore();
   }
+#ifdef SUPPORT_CLPR
+  bool validateRecursivePredicate(std::string predicateName,
+                                  std::vector<ref<Expr> > &arguments) {
+    return secondary->impl->validateRecursivePredicate(predicateName,
+                                                       arguments);
+  }
+#endif
 };
 
 }

@@ -147,3 +147,11 @@ TimingSolver::getRange(const ExecutionState& state, ref<Expr> expr) {
 std::vector< ref<Expr> > TimingSolver::getUnsatCore() {
   return solver->getUnsatCore();
 }
+
+#ifdef SUPPORT_CLPR
+bool
+TimingSolver::validateRecursivePredicate(std::string predicateName,
+                                         std::vector<ref<Expr> > &arguments) {
+  return solver->validateRecursivePredicate(predicateName, arguments);
+}
+#endif
