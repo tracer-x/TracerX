@@ -319,7 +319,8 @@ class Allocation {
     /// set, and replace them as sinks with their parents.
     ///
     /// \param The allocation to match the sink nodes with.
-    void consumeSinksWithAllocations(std::vector<Allocation *> allocationsList);
+    void consumeSinksWithAllocations(std::vector<Allocation *> allocationsList,
+                                     std::set<Allocation *> &visitedAlloc);
 
     /// \brief Print the content of the object to the LLVM error stream
     void dump() const {
@@ -607,10 +608,9 @@ class Allocation {
     directAllocationSources(VersionedValue *target) const;
 
     /// \brief Builds dependency graph between memory allocations
-    void
-    recursivelyBuildAllocationGraph(AllocationGraph *g, VersionedValue *source,
-                                    Allocation *target,
-                                    std::set<Allocation *> parentTargets) const;
+    void recursivelyBuildAllocationGraph(AllocationGraph *g,
+                                         VersionedValue *source,
+                                         Allocation *target) const;
 
     /// \brief Builds dependency graph between memory allocations
     void buildAllocationGraph(AllocationGraph *g, VersionedValue *value) const;
