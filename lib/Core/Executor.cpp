@@ -1275,19 +1275,6 @@ void Executor::executeCall(ExecutionState &state,
   if (f && f->isDeclaration()) {
     switch(f->getIntrinsicID()) {
     case Intrinsic::not_intrinsic:
-#ifdef SUPPORT_CLPR
-      if (INTERPOLATION_ENABLED && f->getName().equals("klee_join")) {
-        // Handle klee_join in a special way. Klee_join handling cannot be
-        // left to SpecialFunctionHandler mechanism, as we need the extra
-        // information on the actual LLVM value of the arguments.
-        if (state.itreeNode->executeJoin(ki->inst, arguments)) {
-          // Do something
-        } else {
-          // Do something else
-        }
-        return;
-      }
-#endif
       // state may be destroyed by this call, cannot touch
       callExternalFunction(state, ki, f, arguments);
       break;

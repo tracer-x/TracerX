@@ -93,6 +93,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_get_obj_size", handleGetObjSize, true),
   add("klee_get_errno", handleGetErrno, true),
   add("klee_is_symbolic", handleIsSymbolic, true),
+  add("klee_join", handleJoin, true),
   add("klee_make_symbolic", handleMakeSymbolic, false),
   add("klee_mark_global", handleMarkGlobal, false),
   add("klee_merge", handleMerge, false),
@@ -415,6 +416,22 @@ void SpecialFunctionHandler::handleIsSymbolic(ExecutionState &state,
   executor.bindLocal(target, state, 
                      ConstantExpr::create(!isa<ConstantExpr>(arguments[0]),
                                           Expr::Int32));
+}
+
+void SpecialFunctionHandler::handleJoin(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments) {
+#ifdef SUPPORT_CLPR
+  // This retrieves the predicate name
+  std::string predicateName = readStringAtAddress(state, arguments[0]);
+
+  unsigned counter = 0;
+  for (std::vector<ref<Expr> >::const_iterator it = ++(arguments.begin()),
+       itEnd = arguments.end(); it != itEnd; ++it) {
+      std::ostringstream tmpVariableName("__handleJoin_arg_");
+      tmpVariableName << counter++;
+  }
+#endif /* SUPPORT_CLPR */
 }
 
 void SpecialFunctionHandler::handlePreferCex(ExecutionState &state,
