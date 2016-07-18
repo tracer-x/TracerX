@@ -426,8 +426,11 @@ void SpecialFunctionHandler::handleJoin(ExecutionState &state,
   std::string predicateName = readStringAtAddress(state, arguments[0]);
 
   if (executor.clprSolver->validateRecursivePredicate(predicateName,
-                                                      arguments)) {
-    // Recursive predicate holding, here we terminate the state if necessary.
+                                                      arguments) &&
+      !executor.interpTree->recordJoinCallsite(target->inst)) {
+    // Recursive predicate holding and this callsite has been seen before,
+    // terminate state.
+    executor.terminateStateOnSubsumption(state);
   }
 #endif /* SUPPORT_CLPR */
 }

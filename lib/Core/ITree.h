@@ -649,6 +649,10 @@ class ITree {
 
   std::map<uintptr_t, std::vector<SubsumptionTableEntry *> > subsumptionTable;
 
+#ifdef SUPPORT_CLPR
+  std::set<llvm::Instruction *> successfulJoinCallsiteList;
+#endif
+
   void printNode(llvm::raw_ostream &stream, ITreeNode *n,
                  std::string edges) const;
 
@@ -725,6 +729,16 @@ public:
   /// information, given a particular interpolation tree node.
   static void executeOnNode(ITreeNode *node, llvm::Instruction *instr,
                             std::vector<ref<Expr> > &args);
+
+#ifdef SUPPORT_CLPR
+  /// \brief Record klee_join callsite
+  ///
+  /// \param the call instruction.
+  /// \return true if the callsite is new, false otherwise.
+  bool recordJoinCallsite(llvm::Instruction *instr) {
+    return successfulJoinCallsiteList.insert(instr).second;
+  }
+#endif
 
   /// \brief Print the content of the tree node object into a stream.
   ///
