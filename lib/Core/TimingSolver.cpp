@@ -150,9 +150,10 @@ std::vector< ref<Expr> > TimingSolver::getUnsatCore() {
 
 #ifdef SUPPORT_CLPR
 bool
-TimingSolver::validateRecursivePredicate(const ExecutionState &state,
+TimingSolver::validateRecursivePredicate(const ConstraintManager &constraints,
                                          std::string predicateName,
                                          std::vector<ref<Expr> > &arguments) {
-  return solver->validateRecursivePredicate(state, predicateName, arguments);
+  return solver->validateRecursivePredicate(constraints, predicateName,
+                                            arguments);
 }
 #endif

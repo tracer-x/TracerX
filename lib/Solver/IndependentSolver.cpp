@@ -413,10 +413,11 @@ public:
     return solver->getUnsatCore();
   }
 #ifdef SUPPORT_CLPR
-  bool validateRecursivePredicate(const ExecutionState &state,
+  bool validateRecursivePredicate(const ConstraintManager &constraints,
                                   std::string predicateName,
                                   std::vector<ref<Expr> > &arguments) {
-    return solver->validateRecursivePredicate(state, predicateName, arguments);
+    return solver->validateRecursivePredicate(constraints, predicateName,
+                                              arguments);
   }
 #endif
 };

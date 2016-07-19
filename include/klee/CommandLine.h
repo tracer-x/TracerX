@@ -11,7 +11,7 @@
 
 #ifdef SUPPORT_Z3
 
-#ifdef SUPPORT_STP || SUPPORT_CLPR
+#if defined(SUPPORT_STP) || defined(SUPPORT_CLPR)
 #define INTERPOLATION_ENABLED (SelectSolver == SOLVER_Z3 && !NoInterpolation)
 #else /* SUPPORT_STP || SUPPORT_CLPR */
 #define INTERPOLATION_ENABLED (!NoInterpolation)

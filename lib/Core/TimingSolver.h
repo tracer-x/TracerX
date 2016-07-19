@@ -70,11 +70,11 @@ namespace klee {
   #ifdef SUPPORT_CLPR
     /// \brief Validate a recursive predicate by invoking CLP(R)
     ///
-    /// \param the current execution state.
+    /// \param the constraints of the current state.
     /// \param the name of the predicate.
     /// \param the arguments to be passed onto the predicate.
     /// \return true if the predicate holds (valid), false otherwise.
-    bool validateRecursivePredicate(const ExecutionState &state,
+    bool validateRecursivePredicate(const ConstraintManager &constraint,
                                     std::string predicateName,
                                     std::vector<ref<Expr> > &arguments);
   #endif

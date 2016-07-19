@@ -348,10 +348,11 @@ std::vector< ref<Expr> > Solver::getUnsatCore() {
 }
 
 #ifdef SUPPORT_CLPR
-bool Solver::validateRecursivePredicate(const ExecutionState &state,
+bool Solver::validateRecursivePredicate(const ConstraintManager &constraints,
                                         std::string predicateName,
                                         std::vector<ref<Expr> > &arguments) {
-  return impl->validateRecursivePredicate(state, predicateName, arguments);
+  return impl->validateRecursivePredicate(constraints, predicateName,
+                                          arguments);
 }
 #endif
 
@@ -1272,7 +1273,7 @@ public:
   std::vector< ref<Expr> > getUnsatCore();
 
 #ifdef SUPPORT_CLPR
-  bool validateRecursivePredicate(const ExecutionState &state,
+  bool validateRecursivePredicate(const ConstraintManager &constraints,
                                   std::string predicateName,
                                   std::vector<ref<Expr> > &arguments) {
     clpr::CLPTerm queryAtom(predicateName);

@@ -425,8 +425,8 @@ void SpecialFunctionHandler::handleJoin(ExecutionState &state,
   // This retrieves the predicate name
   std::string predicateName = readStringAtAddress(state, arguments[0]);
 
-  if (executor.clprSolver->validateRecursivePredicate(state, predicateName,
-                                                      arguments) &&
+  if (executor.clprSolver->validateRecursivePredicate(
+          state.constraints, predicateName, arguments) &&
       !executor.interpTree->recordJoinCallsite(target->inst)) {
     // Recursive predicate holding and this callsite has been seen before,
     // terminate state.
