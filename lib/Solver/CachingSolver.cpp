@@ -109,9 +109,10 @@ public:
     return unsat_core_to_return;
   }
 #ifdef SUPPORT_CLPR
-  bool validateRecursivePredicate(std::string predicateName,
+  bool validateRecursivePredicate(const ExecutionState &state,
+                                  std::string predicateName,
                                   std::vector<ref<Expr> > &arguments) {
-    return solver->validateRecursivePredicate(predicateName, arguments);
+    return solver->validateRecursivePredicate(state, predicateName, arguments);
   }
 #endif
 };
