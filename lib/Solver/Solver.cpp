@@ -1296,6 +1296,15 @@ public:
 
     // Build the query
     clpr::CLPQuery query;
+
+    // Add the constraints on the path condition
+    for (ConstraintManager::const_iterator it = constraints.begin(),
+                                           itEnd = constraints.end();
+         it != itEnd; ++it) {
+      clpr::CLPTerm clprConstraint = builder->construct(*it);
+      query.addTerm(clprConstraint);
+    }
+
     for (std::vector<clpr::CLPTerm>::const_iterator
              it = constraintsList.begin(),
              itEnd = constraintsList.end();
