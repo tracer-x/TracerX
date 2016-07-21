@@ -1332,7 +1332,7 @@ CLPRSolverImpl::CLPRSolverImpl()
     runStatusCode(SOLVER_RUN_STATUS_FAILURE)
 {
   assert(builder && "unable to create CLPRBuilder");
-  engine = new clpr::CLPEngine(LOG_NONE);
+  engine = new clpr::CLPEngine(LOG_TMP);
 
   // Load multiset and McCarthy's axiom
   engine->loadLibrary("multiset");
