@@ -64,6 +64,11 @@ llvm::cl::list<std::string>
 CLPRLib("use-clpr",
         llvm::cl::desc("Load a CLP(R) file (option can be multiply specified)"),
         llvm::cl::value_desc("filespec"));
+
+llvm::cl::opt<bool>
+CLPRLog("clpr-log", llvm::cl::init(false),
+        llvm::cl::desc("Log communication with CLP(R) backend in "
+                       "/tmp/clpr-XXXXXX with XXXXXX some character sequence"));
 #endif
 
 using namespace klee;
@@ -1332,24 +1337,29 @@ CLPRSolverImpl::CLPRSolverImpl()
     runStatusCode(SOLVER_RUN_STATUS_FAILURE)
 {
   assert(builder && "unable to create CLPRBuilder");
-  engine = new clpr::CLPEngine(LOG_TMP);
+  if (CLPRLog) {
+    klee_message("Logging CLP(R) output in /tmp/clpr-XXXXXX");
+    engine = new clpr::CLPEngine(LOG_TMP);
+  } else {
+    engine = new clpr::CLPEngine(LOG_NONE);
+  }
 
   // Load multiset and McCarthy's axiom
   engine->loadLibrary("multiset");
   engine->loadLibrary("mccarthy");
 
   if (CLPRLib.size()) {
-    llvm::errs() << "Loading CLP(R) file(s)";
+    std::ostringstream stream;
+    stream << "Loading CLP(R) file(s)";
 
     // Load user libraries specified in the command line
     for (llvm::cl::list<std::string>::const_iterator it = CLPRLib.begin(),
                                                      itEnd = CLPRLib.end();
          it != itEnd; ++it) {
-      llvm::errs() << " " << (*it);
+      stream << " " << (*it);
       engine->loadLibraryWithFilespec((*it));
     }
-
-    llvm::errs() << "\n";
+    klee_message("%s", stream.str().c_str());
   }
 }
 
