@@ -306,7 +306,11 @@ private:
 
   // Called on [for now] concrete reads, replaces constant with a symbolic
   // Used for testing.
-  ref<Expr> replaceReadWithSymbolic(ExecutionState &state, ref<Expr> e);
+  ref<Expr> replaceReadWithSymbolic(ExecutionState &state,
+#ifdef SUPPORT_CLPR
+                                    const MemoryObject *mo,
+#endif
+                                    ref<Expr> e);
 
   const Cell& eval(KInstruction *ki, unsigned index, 
                    ExecutionState &state) const;

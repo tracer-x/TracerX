@@ -44,6 +44,8 @@ CLPRArrayExprHash::~CLPRArrayExprHash() {}
 
 /***/
 
+clpr::CLPTerm CLPRBuilder::globalHeap("__heap__");
+
 CLPRBuilder::CLPRBuilder() {
   tempVars[0] = buildVar("__tmpInt8", 8);
   tempVars[1] = buildVar("__tmpInt16", 16);
@@ -273,9 +275,13 @@ clpr::CLPTerm CLPRBuilder::writeExpr(clpr::CLPTerm array, clpr::CLPTerm index, c
 }
 
 clpr::CLPTerm CLPRBuilder::readExpr(clpr::CLPTerm array, clpr::CLPTerm index) {
+  clpr::CLPTerm address("+");
+  address.addArgument(array);
+  address.addArgument(index);
+
   clpr::CLPTerm select("mcc_select");
-  select.addArgument(array);
-  select.addArgument(index);
+  select.addArgument(globalHeap);
+  select.addArgument(address);
 
   std::ostringstream tmpVarNameStream;
   tmpVarNameStream << "_t" << (&select);
@@ -405,28 +411,37 @@ clpr::CLPTerm CLPRBuilder::getInitialArray(const Array *root) {
   bool hashed = _arr_hash.lookupArrayExpr(root, array_expr);
   
   if (!hashed) {
-    // STP uniques arrays by name, so we make sure the name is unique by
-    // including the address.
-    char buf[32];
-    unsigned const addrlen = sprintf(buf, "_%p", (const void*)root) + 1; // +1 for null-termination
-    unsigned const space = (root->name.length() > 32 - addrlen)?(32 - addrlen):root->name.length();
-    memmove(buf + space, buf, addrlen); // moving the address part to the end
-    memcpy(buf, root->name.c_str(), space); // filling out the name part
-    
-    array_expr = buildArray(buf, root->getDomain(), root->getRange());
-    
-    if (root->isConstantArray()) {
-    	// FIXME: Flush the concrete values into STP. Ideally we would do this
-    	// using assertions, which is much faster, but we need to fix the caching
-    	// to work correctly in that case.
-    	for (unsigned i = 0, e = root->size; i != e; ++i) {
-    		clpr::CLPTerm prev = array_expr;
-    		array_expr = writeExpr(prev,
-    				construct(ConstantExpr::alloc(i, root->getDomain()), 0),
-    				construct(root->constantValues[i], 0));
-    	}
-    }
+    if (arrayAddressRegistry[root]) {
+      std::ostringstream stream;
+      stream << arrayAddressRegistry[root];
+      array_expr = clpr::CLPTerm(stream.str());
+    } else {
+      // STP uniques arrays by name, so we make sure the name is unique by
+      // including the address.
+      char buf[32];
+      unsigned const addrlen = sprintf(buf, "_%p", (const void *)root) +
+                               1; // +1 for null-termination
+      unsigned const space = (root->name.length() > 32 - addrlen)
+                                 ? (32 - addrlen)
+                                 : root->name.length();
+      memmove(buf + space, buf, addrlen); // moving the address part to the end
+      memcpy(buf, root->name.c_str(), space); // filling out the name part
 
+      array_expr = buildArray(buf, root->getDomain(), root->getRange());
+
+      if (root->isConstantArray()) {
+        // FIXME: Flush the concrete values into STP. Ideally we would do this
+        // using assertions, which is much faster, but we need to fix the
+        // caching
+        // to work correctly in that case.
+        for (unsigned i = 0, e = root->size; i != e; ++i) {
+          clpr::CLPTerm prev = array_expr;
+          array_expr = writeExpr(
+              prev, construct(ConstantExpr::alloc(i, root->getDomain()), 0),
+              construct(root->constantValues[i], 0));
+        }
+      }
+    }
     _arr_hash.hashArrayExpr(root, array_expr);
   }
   
@@ -440,7 +455,7 @@ clpr::CLPTerm CLPRBuilder::getInitialRead(const Array *root, unsigned index) {
 clpr::CLPTerm CLPRBuilder::getArrayForUpdate(const Array *root,
                                        const UpdateNode *un) {
   if (!un) {
-      return(getInitialArray(root));
+    return getInitialArray(root);
   }
   else {
 	  // FIXME: This really needs to be non-recursive.
@@ -448,14 +463,14 @@ clpr::CLPTerm CLPRBuilder::getArrayForUpdate(const Array *root,
 	  bool hashed = _arr_hash.lookupUpdateNodeExpr(un, un_expr);
 
 	  if (!hashed) {
-		  un_expr = writeExpr(getArrayForUpdate(root, un->next),
-				  construct(un->index, 0),
-				  construct(un->value, 0));
+            un_expr =
+                writeExpr(getArrayForUpdate(root, un->next),
+                          construct(un->index, 0), construct(un->value, 0));
 
-		  _arr_hash.hashUpdateNodeExpr(un, un_expr);
-	  }
+            _arr_hash.hashUpdateNodeExpr(un, un_expr);
+          }
 
-	  return(un_expr);
+	  return (un_expr);
   }
 }
 

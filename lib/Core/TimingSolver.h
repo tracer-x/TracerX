@@ -71,12 +71,15 @@ namespace klee {
     /// \brief Validate a recursive predicate by invoking CLP(R)
     ///
     /// \param the constraints of the current state.
+    /// \param the mapping of array to its base address for building CLP(R)
+    /// expressions.
     /// \param the name of the predicate.
     /// \param the arguments to be passed onto the predicate.
     /// \return true if the predicate holds (valid), false otherwise.
-    bool validateRecursivePredicate(const ConstraintManager &constraint,
-                                    std::string predicateName,
-                                    std::vector<ref<Expr> > &arguments);
+    bool validateRecursivePredicate(
+        const ConstraintManager &constraint,
+        std::map<const Array *, uint64_t> &arrayAddressRegistry,
+        std::string predicateName, std::vector<ref<Expr> > &arguments) const;
   #endif
   };
 

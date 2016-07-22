@@ -650,7 +650,12 @@ class ITree {
   std::map<uintptr_t, std::vector<SubsumptionTableEntry *> > subsumptionTable;
 
 #ifdef SUPPORT_CLPR
+  /// \brief A record of successful klee_join callsites, where the CLP predicate
+  /// has been shown to hold before.
   std::set<llvm::Instruction *> successfulJoinCallsiteList;
+
+  /// \brief This associates an array with its address
+  std::map<const Array *, uint64_t> arrayAddressRegistry;
 #endif
 
   void printNode(llvm::raw_ostream &stream, ITreeNode *n,
@@ -737,6 +742,20 @@ public:
   /// \return true if the callsite is new, false otherwise.
   bool recordJoinCallsite(llvm::Instruction *instr) {
     return successfulJoinCallsiteList.insert(instr).second;
+  }
+
+  /// \brief Register array starting address. This for substituting arrays with
+  /// its address in building CLP expression.
+  ///
+  /// \param the array to associate the address with
+  /// \param the address to associate the array with
+  void registerArrayAddress(const Array *array, uint64_t address) {
+    arrayAddressRegistry[array] = address;
+  }
+
+  /// \brief Retrieve the array address registry
+  std::map<const Array *, uint64_t> &getArrayAddressRegistry() {
+    return arrayAddressRegistry;
   }
 #endif
 
