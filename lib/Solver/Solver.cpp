@@ -64,6 +64,11 @@ llvm::cl::list<std::string>
 CLPRLib("use-clpr",
         llvm::cl::desc("Load a CLP(R) file (option can be multiply specified)"),
         llvm::cl::value_desc("filespec"));
+
+llvm::cl::opt<bool>
+CLPRLog("clpr-log", llvm::cl::init(false),
+        llvm::cl::desc("Log communication with CLP(R) backend in "
+                       "/tmp/clpr-XXXXXX with XXXXXX some character sequence"));
 #endif
 
 using namespace klee;
@@ -348,11 +353,12 @@ std::vector< ref<Expr> > Solver::getUnsatCore() {
 }
 
 #ifdef SUPPORT_CLPR
-bool Solver::validateRecursivePredicate(const ConstraintManager &constraints,
-                                        std::string predicateName,
-                                        std::vector<ref<Expr> > &arguments) {
-  return impl->validateRecursivePredicate(constraints, predicateName,
-                                          arguments);
+bool Solver::validateRecursivePredicate(
+    const ConstraintManager &constraints,
+    std::map<const Array *, uint64_t> &arrayAddressRegistry,
+    std::string predicateName, std::vector<ref<Expr> > &arguments) const {
+  return impl->validateRecursivePredicate(constraints, arrayAddressRegistry,
+                                          predicateName, arguments);
 }
 #endif
 
@@ -1272,58 +1278,10 @@ public:
   SolverRunStatus getOperationStatusCode();
   std::vector< ref<Expr> > getUnsatCore();
 
-#ifdef SUPPORT_CLPR
-  bool validateRecursivePredicate(const ConstraintManager &constraints,
-                                  std::string predicateName,
-                                  std::vector<ref<Expr> > &arguments) {
-    clpr::CLPTerm queryAtom(predicateName);
-    std::vector<clpr::CLPTerm> constraintsList;
-
-    unsigned i = 0;
-    for (std::vector<ref<Expr> >::const_iterator it = ++(arguments.begin()),
-                                                 itEnd = arguments.end();
-         it != itEnd; ++it) {
-      clpr::CLPTerm clpExpr = builder->construct(*it);
-      std::ostringstream tmpVarName;
-      tmpVarName << "__clpr__arg" << i++ << "__";
-      clpr::CLPTerm varName(tmpVarName.str());
-      queryAtom.addArgument(varName);
-      clpr::CLPTerm constraint("=");
-      constraint.addArgument(varName);
-      constraint.addArgument(clpExpr);
-      constraintsList.push_back(constraint);
-    }
-
-    // Build the query
-    clpr::CLPQuery query;
-
-    // Add the constraints on the path condition
-    for (ConstraintManager::const_iterator it = constraints.begin(),
-                                           itEnd = constraints.end();
-         it != itEnd; ++it) {
-      clpr::CLPTerm clprConstraint = builder->construct(*it);
-      query.addTerm(clprConstraint);
-    }
-
-    for (std::vector<clpr::CLPTerm>::const_iterator
-             it = constraintsList.begin(),
-             itEnd = constraintsList.end();
-         it != itEnd; ++it) {
-      query.addTerm(*it);
-    }
-
-    // Remember order is important in SLDNF, the consequent has to be last.
-    clpr::CLPTerm consequent("not");
-    consequent.addArgument(queryAtom);
-    query.addTerm(consequent);
-
-    engine->query(query);
-    if (!engine->hasSolution()) {
-      return true;
-    }
-    return false;
-  }
-#endif
+  bool validateRecursivePredicate(
+      const ConstraintManager &constraints,
+      std::map<const Array *, uint64_t> &arrayAddressRegistry,
+      std::string predicateName, std::vector<ref<Expr> > &arguments) const;
 };
 
 CLPRSolverImpl::CLPRSolverImpl()
@@ -1332,24 +1290,29 @@ CLPRSolverImpl::CLPRSolverImpl()
     runStatusCode(SOLVER_RUN_STATUS_FAILURE)
 {
   assert(builder && "unable to create CLPRBuilder");
-  engine = new clpr::CLPEngine(LOG_TMP);
+  if (CLPRLog) {
+    klee_message("Logging CLP(R) output in /tmp/clpr-XXXXXX");
+    engine = new clpr::CLPEngine(LOG_TMP);
+  } else {
+    engine = new clpr::CLPEngine(LOG_NONE);
+  }
 
   // Load multiset and McCarthy's axiom
   engine->loadLibrary("multiset");
   engine->loadLibrary("mccarthy");
 
   if (CLPRLib.size()) {
-    llvm::errs() << "Loading CLP(R) file(s)";
+    std::ostringstream stream;
+    stream << "Loading CLP(R) file(s)";
 
     // Load user libraries specified in the command line
     for (llvm::cl::list<std::string>::const_iterator it = CLPRLib.begin(),
                                                      itEnd = CLPRLib.end();
          it != itEnd; ++it) {
-      llvm::errs() << " " << (*it);
+      stream << " " << (*it);
       engine->loadLibraryWithFilespec((*it));
     }
-
-    llvm::errs() << "\n";
+    klee_message("%s", stream.str().c_str());
   }
 }
 
@@ -1519,6 +1482,71 @@ SolverImpl::SolverRunStatus CLPRSolverImpl::getOperationStatusCode() {
 
 std::vector< ref<Expr> > CLPRSolverImpl::getUnsatCore() {
   return unsatCore;
+}
+
+bool CLPRSolverImpl::validateRecursivePredicate(
+    const ConstraintManager &constraints,
+    std::map<const Array *, uint64_t> &arrayAddressRegistry,
+    std::string predicateName, std::vector<ref<Expr> > &arguments) const {
+  clpr::CLPTerm queryAtom(predicateName);
+  std::vector<clpr::CLPTerm> constraintsList;
+
+  // First we clear the auxiliary constraints and
+  // register the registry.
+  builder->init(arrayAddressRegistry);
+
+  // We add the global heap as the first argument always
+  queryAtom.addArgument(builder->globalHeap);
+
+  unsigned i = 0;
+  for (std::vector<ref<Expr> >::const_iterator it = ++(arguments.begin()),
+                                               itEnd = arguments.end();
+       it != itEnd; ++it) {
+    clpr::CLPTerm clpExpr = builder->construct(*it);
+    std::ostringstream tmpVarName;
+    tmpVarName << "__clpr__arg" << i++ << "__";
+    clpr::CLPTerm varName(tmpVarName.str());
+    queryAtom.addArgument(varName);
+    clpr::CLPTerm constraint("=");
+    constraint.addArgument(varName);
+    constraint.addArgument(clpExpr);
+    constraintsList.push_back(constraint);
+  }
+
+  // Build the query
+  clpr::CLPQuery query;
+
+  // Add the constraints on the path condition
+  for (ConstraintManager::const_iterator it = constraints.begin(),
+                                         itEnd = constraints.end();
+       it != itEnd; ++it) {
+    clpr::CLPTerm clprConstraint = builder->construct(*it);
+    query.addTerm(clprConstraint);
+  }
+
+  for (std::vector<clpr::CLPTerm>::const_iterator it = constraintsList.begin(),
+                                                  itEnd = constraintsList.end();
+       it != itEnd; ++it) {
+    query.addTerm(*it);
+  }
+
+  for (std::vector<clpr::CLPTerm>::iterator
+           it = builder->auxiliaryConstraintsBegin(),
+           itEnd = builder->auxiliaryConstraintsEnd();
+       it != itEnd; ++it) {
+    query.addTerm(*it);
+  }
+
+  // Remember order is important in SLDNF, the consequent has to be last.
+  clpr::CLPTerm consequent("not");
+  consequent.addArgument(queryAtom);
+  query.addTerm(consequent);
+
+  engine->query(query);
+  if (!engine->hasSolution()) {
+    return true;
+  }
+  return false;
 }
 
 #endif /* SUPPORT_CLPR */

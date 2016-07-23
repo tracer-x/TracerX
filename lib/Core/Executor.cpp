@@ -3264,7 +3264,10 @@ void Executor::callExternalFunction(ExecutionState &state,
 
 /***/
 
-ref<Expr> Executor::replaceReadWithSymbolic(ExecutionState &state, 
+ref<Expr> Executor::replaceReadWithSymbolic(ExecutionState &state,
+#ifdef SUPPORT_CLPR
+                                            const MemoryObject *mo,
+#endif
                                             ref<Expr> e) {
   unsigned n = interpreterOpts.MakeConcreteSymbolic;
   if (!n || replayOut || replayPath)
@@ -3295,6 +3298,9 @@ ref<Expr> Executor::replaceReadWithSymbolic(ExecutionState &state,
     const Array *shadow = arrayCache.CreateArray(
         ShadowArray::getShadowName(arrayName), arrayWidth);
     ShadowArray::addShadowArrayMap(array, shadow);
+#ifdef SUPPORT_CLPR
+    interpTree->registerArrayAddress(array, mo->address);
+#endif
   }
 
   return res;
@@ -3564,9 +3570,13 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
         }          
       } else {
         ref<Expr> result = os->read(offset, type);
-        
+
         if (interpreterOpts.MakeConcreteSymbolic)
+#ifdef SUPPORT_CLPR
+          result = replaceReadWithSymbolic(state, mo, result);
+#else
           result = replaceReadWithSymbolic(state, result);
+#endif
 
         bindLocal(target, state, result);
 
@@ -3653,6 +3663,9 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
       const Array *shadow =
           arrayCache.CreateArray(ShadowArray::getShadowName(uniqueName), mo->size);
       ShadowArray::addShadowArrayMap(array, shadow);
+#ifdef SUPPORT_CLPR
+      interpTree->registerArrayAddress(array, mo->address);
+#endif
     }
 
     bindObjectInState(state, mo, false, array);

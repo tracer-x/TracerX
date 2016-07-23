@@ -46,6 +46,8 @@ class CLPRBuilder {
 
   std::vector<clpr::CLPTerm> auxiliaryConstraints;
 
+  std::map<const Array *, uint64_t> arrayAddressRegistry;
+
 private:  
 
   clpr::CLPTerm bvOne(unsigned width);
@@ -119,6 +121,7 @@ private:
   clpr::CLPTerm buildArray(const char *name, unsigned indexWidth, unsigned valueWidth);
 
 public:
+  static clpr::CLPTerm globalHeap;
 
   CLPRBuilder();
   ~CLPRBuilder();
@@ -134,6 +137,24 @@ public:
     return res;
   }
 
+  /// \brief (Re-)initialize for (re-)building of CLP(R) constraints
+  ///
+  /// \param The address registry.
+  void init(std::map<const Array *, uint64_t> &_arrayAddressRegistry) {
+    auxiliaryConstraints.clear();
+    arrayAddressRegistry.clear();
+    arrayAddressRegistry = _arrayAddressRegistry;
+  }
+
+  /// \brief Gets the beginning iterator of the auxiliary constraints
+  std::vector<clpr::CLPTerm>::iterator auxiliaryConstraintsBegin() {
+    return auxiliaryConstraints.begin();
+  }
+
+  /// \brief Gets the end iterator of the auxiliary constraints
+  std::vector<clpr::CLPTerm>::iterator auxiliaryConstraintsEnd() {
+    return auxiliaryConstraints.end();
+  }
 };
 
 }

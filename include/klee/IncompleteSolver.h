@@ -108,11 +108,12 @@ public:
     return secondary->impl->getUnsatCore();
   }
 #ifdef SUPPORT_CLPR
-  bool validateRecursivePredicate(const ConstraintManager &constraints,
-                                  std::string predicateName,
-                                  std::vector<ref<Expr> > &arguments) {
+  bool validateRecursivePredicate(
+      const ConstraintManager &constraints,
+      std::map<const Array *, uint64_t> &arrayAddressRegistry,
+      std::string predicateName, std::vector<ref<Expr> > &arguments) const {
     return secondary->impl->validateRecursivePredicate(
-        constraints, predicateName, arguments);
+        constraints, arrayAddressRegistry, predicateName, arguments);
   }
 #endif
 };
