@@ -432,6 +432,7 @@ void SpecialFunctionHandler::handleJoin(ExecutionState &state,
     // Recursive predicate holding and this callsite has been seen before,
     // terminate state.
     executor.terminateStateOnSubsumption(state);
+    SearchTree::markAsProvedByJoin(state.itreeNode, target->inst);
   }
 #endif /* SUPPORT_CLPR */
 }
