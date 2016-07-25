@@ -211,8 +211,43 @@ clpr::CLPTerm CLPRBuilder::sbvModExpr(unsigned width, clpr::CLPTerm dividend, cl
 }
 
 clpr::CLPTerm CLPRBuilder::notExpr(clpr::CLPTerm expr) {
-  clpr::CLPTerm ret("not");
-  ret.addArgument(expr);
+  std::string subtermName = expr.getName();
+  clpr::CLPTerm ret;
+
+  if (subtermName == "=") {
+    clpr::CLPTerm leftOperand("<");
+    clpr::CLPTerm rightOperand(">");
+
+    for (std::vector<clpr::CLPTerm>::iterator it = expr.begin(),
+                                              ie = expr.end();
+         it != ie; ++it) {
+      leftOperand.addArgument(*it);
+      rightOperand.addArgument(*it);
+    }
+
+    ret.setName(";");
+    ret.addArgument(leftOperand);
+    ret.addArgument(rightOperand);
+
+  } else {
+    if (subtermName == "<") {
+      ret.setName(">=");
+    } else if (subtermName == ">") {
+      ret.setName("<=");
+    } else if (subtermName == "<=") {
+      ret.setName(">");
+    } else if (subtermName == ">=") {
+      ret.setName("<");
+    } else {
+      assert(!"unknown negation of operator");
+    }
+    for (std::vector<clpr::CLPTerm>::iterator it = expr.begin(),
+                                              ie = expr.end();
+         it != ie; ++it) {
+      ret.addArgument(*it);
+    }
+  }
+
   return ret;
 }
 
