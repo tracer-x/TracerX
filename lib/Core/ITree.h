@@ -185,6 +185,15 @@ class SearchTree {
     /// \brief Indicates that node is subsumed
     bool subsumed;
 
+#ifdef SUPPORT_CLPR
+    /// \brief Indicates that the node is join-subsumed (subsumed via klee_join)
+    bool joinSubsumed;
+
+    /// \brief Indicates that the CLP predicate of klee_join is proved, but
+    /// there was no previous proof of the predicate.
+    bool joinProved;
+#endif
+
     /// \brief Conditions under which this node is visited from its parent
     std::map<PathCondition *, std::pair<std::string, bool> > pathConditionTable;
 
@@ -193,7 +202,7 @@ class SearchTree {
 
     Node(uintptr_t nodeId)
         : iTreeNodeId(nodeId), nodeId(0), falseTarget(0), trueTarget(0),
-          subsumed(false) {}
+          subsumed(false), joinSubsumed(false), joinProved(false) {}
 
     ~Node() {
       if (falseTarget)
@@ -233,6 +242,10 @@ class SearchTree {
   std::map<SubsumptionTableEntry *, SearchTree::Node *> tableEntryMap;
   std::vector<SearchTree::NumberedEdge *> subsumptionEdges;
   std::map<PathCondition *, SearchTree::Node *> pathConditionMap;
+
+#ifdef SUPPORT_CLPR
+  std::map<llvm::Instruction *, SearchTree::Node *> joinCallsiteMap;
+#endif
 
   unsigned long subsumptionEdgeNumber;
 
@@ -280,6 +293,11 @@ public:
                                    SubsumptionTableEntry *entry);
 
   static void setAsCore(PathCondition *pathCondition);
+
+#ifdef SUPPORT_CLPR
+  static void markAsProvedByJoin(ITreeNode *iTreeNode,
+                                 llvm::Instruction *callsite);
+#endif
 
   /// \brief Save the graph
   static void save(std::string dotFileName);

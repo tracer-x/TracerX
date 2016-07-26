@@ -573,6 +573,15 @@ std::string SearchTree::recurseRender(const SearchTree::Node *node) {
   if (node->subsumed) {
     stream << "(subsumed)\\l";
   }
+#ifdef SUPPORT_CLPR
+  if (node->joinSubsumed) {
+    stream << "(join-subsumed)\\l";
+  }
+  if (node->joinProved) {
+    stream << "(join-proved)\\l";
+    ;
+  }
+#endif
   if (node->falseTarget || node->trueTarget)
     stream << "|{<s0>F|<s1>T}";
   stream << "}\"];\n";
@@ -725,6 +734,28 @@ void SearchTree::setAsCore(PathCondition *pathCondition) {
       ->pathConditionTable[pathCondition]
       .second = true;
 }
+
+#ifdef SUPPORT_CLPR
+void SearchTree::markAsProvedByJoin(ITreeNode *iTreeNode,
+                                    llvm::Instruction *callsite) {
+  if (!OUTPUT_INTERPOLATION_TREE)
+    return;
+
+  assert(SearchTree::instance && "Search tree graph not initialized");
+
+  Node *target = instance->joinCallsiteMap[callsite];
+  if (!target) {
+    target = instance->itreeNodeMap[iTreeNode];
+    target->joinProved = true;
+    instance->joinCallsiteMap[callsite] = target;
+  } else {
+    Node *source = instance->itreeNodeMap[iTreeNode];
+    source->joinSubsumed = true;
+    instance->subsumptionEdges.push_back(new SearchTree::NumberedEdge(
+        source, target, ++(instance->subsumptionEdgeNumber)));
+  }
+}
+#endif
 
 void SearchTree::save(std::string dotFileName) {
   if (!OUTPUT_INTERPOLATION_TREE)
