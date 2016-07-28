@@ -663,6 +663,9 @@ class Allocation {
     /// the core.
     void markAllValues(AllocationGraph *g, llvm::Value *value);
 
+    /// \brief Remove element from FlowsToList that already set as core
+    void removeCoreFromFlowsToList();
+
     /// \brief Compute the allocations that are relevant for the interpolant
     /// (core).
     void computeCoreAllocations(AllocationGraph *g);
