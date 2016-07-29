@@ -335,20 +335,27 @@ std::set<Allocation *> AllocationGraph::getSinksWithAllocations(
 }
 
 void AllocationGraph::consumeSinksWithAllocations(
-    std::vector<Allocation *> allocationsList) {
+    std::vector<Allocation *> allocationsList,
+    std::set<Allocation *> &visitedAlloc) {
   std::set<Allocation *> sinkAllocs(getSinksWithAllocations(allocationsList));
 
+  bool isUnvisitedAlloc = false;
   if (sinkAllocs.empty())
     return;
 
   for (std::set<Allocation *>::iterator it = sinkAllocs.begin(),
                                         itEnd = sinkAllocs.end();
        it != itEnd; ++it) {
-    consumeSinkNode((*it));
+    if (visitedAlloc.find(*it) == visitedAlloc.end()) { // haven't visited
+      isUnvisitedAlloc = true;
+      visitedAlloc.insert(*it);
+      consumeSinkNode((*it));
+    }
   }
 
   // Recurse until fixpoint
-  consumeSinksWithAllocations(allocationsList);
+  if (isUnvisitedAlloc)
+    consumeSinksWithAllocations(allocationsList, visitedAlloc);
 }
 
 void AllocationGraph::print(llvm::raw_ostream &stream) const {
@@ -1383,7 +1390,8 @@ void Dependency::computeCoreAllocations(AllocationGraph *g) {
     // should just contain the allocations that belong to the ancestor
     // dependency nodes, and we then recursively compute the
     // core allocations for the parent.
-    g->consumeSinksWithAllocations(versionedAllocationsList);
+    std::set<Allocation *> visitedAlloc;
+    g->consumeSinksWithAllocations(versionedAllocationsList, visitedAlloc);
     parentDependency->computeCoreAllocations(g);
   }
 }
@@ -1465,9 +1473,9 @@ Dependency::directAllocationSources(VersionedValue *target) const {
   return ret;
 }
 
-void Dependency::recursivelyBuildAllocationGraph(
-    AllocationGraph *g, VersionedValue *source, Allocation *target,
-    std::set<Allocation *> parentTargets) const {
+void Dependency::recursivelyBuildAllocationGraph(AllocationGraph *g,
+                                                 VersionedValue *source,
+                                                 Allocation *target) const {
   if (!source)
     return;
 
@@ -1479,14 +1487,8 @@ void Dependency::recursivelyBuildAllocationGraph(
            it = sourceEdges.begin(),
            itEnd = sourceEdges.end();
        it != itEnd; ++it) {
-    // Here we prevent construction of cycle in the graph by checking if the
-    // source equals target or included as an ancestor.
-    if (it->second != target &&
-        parentTargets.find(it->second) == parentTargets.end()) {
       g->addNewEdge(it->second, target);
-      parentTargets.insert(target);
-      recursivelyBuildAllocationGraph(g, it->first, it->second, parentTargets);
-    }
+      recursivelyBuildAllocationGraph(g, it->first, it->second);
   }
 }
 
@@ -1501,8 +1503,7 @@ void Dependency::buildAllocationGraph(AllocationGraph *g,
            itEnd = sourceEdges.end();
        it != itEnd; ++it) {
     g->addNewSink(it->second);
-    recursivelyBuildAllocationGraph(g, it->first, it->second,
-                                    std::set<Allocation *>());
+    recursivelyBuildAllocationGraph(g, it->first, it->second);
   }
 }
 
