@@ -182,9 +182,6 @@ class SearchTree {
     /// \brief False and true children of this node
     SearchTree::Node *falseTarget, *trueTarget;
 
-    /// \brief Indicates that node is subsumed
-    bool subsumed;
-
 #ifdef SUPPORT_CLPR
     /// \brief Indicates that the node is join-subsumed (subsumed via klee_join)
     bool joinSubsumed;
@@ -194,6 +191,9 @@ class SearchTree {
     bool joinProved;
 #endif
 
+    /// \brief Indicates that node is subsumed
+    bool subsumed;
+
     /// \brief Conditions under which this node is visited from its parent
     std::map<PathCondition *, std::pair<std::string, bool> > pathConditionTable;
 
@@ -202,7 +202,11 @@ class SearchTree {
 
     Node(uintptr_t nodeId)
         : iTreeNodeId(nodeId), nodeId(0), falseTarget(0), trueTarget(0),
-          subsumed(false), joinSubsumed(false), joinProved(false) {}
+#ifdef SUPPORT_CLPR
+          joinSubsumed(false), joinProved(false),
+#endif
+          subsumed(false) {
+    }
 
     ~Node() {
       if (falseTarget)
