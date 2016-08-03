@@ -1347,6 +1347,11 @@ void Dependency::markAllValues(AllocationGraph *g, VersionedValue *value) {
        it != itEnd; ++it) {
     (*it)->setAsCore();
   }
+  // Remove element of FlowsToList where its source and target already set as
+  // core. FlowsToList is frequently accessed from markAllValues method to mark
+  // the element as a core. So, we can remove the element that already set as
+  // core, to prevent set the same elements as core multiple times
+  removeCoreFromFlowsToList();
 }
 
 void Dependency::markAllValues(AllocationGraph *g, llvm::Value *val) {
@@ -1371,14 +1376,6 @@ void Dependency::markAllValues(AllocationGraph *g, llvm::Value *val) {
   }
 
   markAllValues(g, value);
-  // Remove element of FlowsToList where its source and target already set as
-  // core.
-  // FlowsToList is frequently accessed from markAllValues method to mark the
-  // element
-  // as a core. So, we can remove the element that already set as core, to
-  // prevent
-  // set the same elements as core multiple times
-  removeCoreFromFlowsToList();
 }
 void Dependency::removeCoreFromFlowsToList() {
   std::vector<FlowsTo *>::iterator it = flowsToList.begin();
