@@ -1046,55 +1046,21 @@ void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
                                  ConstantExpr::alloc(1, Expr::Bool));
 }
 
-bool Executor::variablesIntersect(std::set<const Array *> &v1,
-                                  std::set<const Array *> &v2) {
-  std::set<const Array *> v3;
-  set_intersection(v1.begin(), v1.end(), v2.begin(), v2.end(),
-                   std::inserter(v3, v3.begin()));
-  return !v3.empty();
-}
-
-void Executor::getArrayFromExpr(ref<Expr> expr,
-                                std::set<const Array *> &arrayPack) {
-  if (llvm::isa<ReadExpr>(expr))
-    arrayPack.insert((llvm::dyn_cast<ReadExpr>(expr)->updates).root);
-
-  for (unsigned int i = 0; i < expr->getNumKids(); ++i) {
-    getArrayFromExpr(expr->getKid(i), arrayPack);
-  }
-}
-
 void Executor::abstractConstraints(ExecutionState &state, ref<Expr> condition) {
   if (!INTERPOLATION_ENABLED)
     return;
-
-  std::set<const Array *> condArrayPack;
-  getArrayFromExpr(condition, condArrayPack);
-  std::set<const Array *> itArrayPack;
-  ConstraintManager keptConstraints;
-  std::vector<ref<Expr> >::const_iterator it = state.constraints.begin();
-  while (it != state.constraints.end()) {
-    getArrayFromExpr(*it, itArrayPack);
-    if (!variablesIntersect(itArrayPack, condArrayPack)) {
-      keptConstraints.addConstraint(*it);
-    }
-    ++it;
-    itArrayPack.clear();
-  }
-  state.constraints = keptConstraints;
-  state.constraints.addConstraint(condition);
 
   llvm::BranchInst *binstr =
       llvm::dyn_cast<llvm::BranchInst>(state.prevPC->inst);
 
   if (state.txTreeNode && binstr && binstr->isConditional()) {
-    state.txTreeNode->abstractConstraints(condition, binstr->getCondition(),
-                                          keptConstraints.getConstraints());
+    state.constraints = state.txTreeNode->abstractConstraints(
+        state, condition, binstr->getCondition());
   } else if (state.txTreeNode && !binstr) {
-    state.txTreeNode->abstractConstraints(condition,
-                                          state.prevPC->inst->getOperand(0),
-                                          keptConstraints.getConstraints());
+    state.constraints = state.txTreeNode->abstractConstraints(
+        state, condition, state.prevPC->inst->getOperand(0));
   }
+  state.constraints.addConstraint(condition);
 }
 
 ref<klee::ConstantExpr> Executor::evalConstant(const Constant *c) {

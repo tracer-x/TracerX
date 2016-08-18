@@ -206,6 +206,9 @@ class PathCondition {
   PathCondition *tail;
 
 public:
+  PathCondition(const ref<Expr> &newConstraint, PathCondition *src,
+                PathCondition *prev);
+
   PathCondition(ref<Expr> &constraint, Dependency *dependency,
                 llvm::Value *condition,
                 const std::vector<llvm::Instruction *> &callHistory,
@@ -601,8 +604,15 @@ public:
   /// \param value The LLVM value that corresponds to the constraint
   void addConstraint(ref<Expr> &constraint, llvm::Value *value);
 
-  void abstractConstraints(ref<Expr> &constraint, llvm::Value *condition,
-                           std::vector<ref<Expr> > keptConstraints);
+  /// \brief For abstracting constraints
+  ///
+  /// \param The current execution state
+  /// \param The constraint of the klee_abstract condition
+  /// \param The LLVM value that is the condition of klee_abstract
+  /// \return The list of constraints that should be retained
+  ConstraintManager abstractConstraints(ExecutionState &state,
+                                        ref<Expr> &constraint,
+                                        llvm::Value *condition);
 
   /// \brief Creates fresh interpolation data holder for the two given KLEE
   /// execution states.
@@ -648,6 +658,11 @@ public:
       Dependency::ConcreteStore &concretelyAddressedStore,
       Dependency::SymbolicStore &symbolicallyAddressedStore) const;
 
+  /// \brief This returns the path condition linked list
+  ///
+  /// \return The path condition linked list
+  PathCondition *getPathCondition() const { return pathCondition; }
+
   void incInstructionsDepth();
 
   uint64_t getInstructionsDepth();
@@ -662,6 +677,12 @@ public:
                                   const std::string &reason) {
     dependency->markAllPointerValues(value, address, bounds, reason);
   }
+
+  static bool variablesIntersect(std::set<const Array *> &v1,
+                                 std::set<const Array *> &v2);
+
+  static void getArrayFromExpr(ref<Expr> expr,
+                               std::set<const Array *> &arrayPack);
 
   /// \brief Print the content of the tree node object to the LLVM error stream.
   void dump() const;
