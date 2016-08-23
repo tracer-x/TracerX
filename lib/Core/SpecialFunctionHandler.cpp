@@ -447,9 +447,9 @@ SpecialFunctionHandler::handleAbstract(ExecutionState &state,
     executor.abstractConstraints(state, e);
   } else if (result == Solver::Unknown) {
     executor.addConstraint(state, e);
-  } else {
-    executor.terminateStateOnError(state, "abstraction error", Executor::User);
   }
+
+  // When abstraction failed, we continue executing as if nothing happened.
 }
 
 void SpecialFunctionHandler::handleIsSymbolic(ExecutionState &state,
