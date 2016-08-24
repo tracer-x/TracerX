@@ -615,6 +615,9 @@ class Allocation {
     /// \brief Builds dependency graph between memory allocations
     void buildAllocationGraph(AllocationGraph *g, VersionedValue *value) const;
 
+    /// \brief Remove element from FlowsToList that already set as core
+    void removeCoreFromFlowsToList();
+
   public:
     Dependency(Dependency *prev);
 
