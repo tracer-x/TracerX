@@ -20,6 +20,7 @@
 #include <klee/CommandLine.h>
 #include <klee/Expr.h>
 #include <klee/Solver.h>
+#include <klee/SolverStats.h>
 #include <klee/util/ExprPPrinter.h>
 #include <fstream>
 #include <vector>
@@ -559,13 +560,34 @@ std::string SearchTree::recurseRender(const SearchTree::Node *node) {
   stream << "Node" << node->nodeId;
   std::string sourceNodeName = stream.str();
 
-  stream << " [shape=record,label=\"{" << node->nodeId << ": " << node->name
-         << "\\l";
+  size_t pos = 0;
+  std::string replacementName(node->name);
+  std::stringstream repStream1;
+  while ((pos = replacementName.find("{")) != std::string::npos) {
+    if (pos != std::string::npos) {
+      repStream1 << replacementName.substr(0, pos) << "\\{";
+      replacementName = replacementName.substr(pos + 2);
+    }
+  }
+  repStream1 << replacementName;
+  replacementName = repStream1.str();
+  std::stringstream repStream2;
+  while ((pos = replacementName.find("}")) != std::string::npos) {
+    if (pos != std::string::npos) {
+      repStream2 << replacementName.substr(0, pos) << "\\}";
+      replacementName = replacementName.substr(pos + 2);
+    }
+  }
+  repStream2 << replacementName;
+  replacementName = repStream2.str();
+
+  stream << " [shape=record,label=\"{" << node->nodeId << ": "
+         << replacementName << "\\l";
   for (std::map<PathCondition *, std::pair<std::string, bool> >::const_iterator
            it = node->pathConditionTable.begin(),
            itEnd = node->pathConditionTable.end();
        it != itEnd; ++it) {
-    stream << (it->second.first);
+    stream << it->second.first;
     if (it->second.second)
       stream << " ITP";
     stream << "\\l";
@@ -573,7 +595,7 @@ std::string SearchTree::recurseRender(const SearchTree::Node *node) {
   if (node->subsumed) {
     stream << "(subsumed)\\l";
   }
-#ifdef SUPPORT_CLPR
+#ifdef ENABLE_CLPR
   if (node->joinSubsumed) {
     stream << "(join-subsumed)\\l";
   }
@@ -735,7 +757,7 @@ void SearchTree::setAsCore(PathCondition *pathCondition) {
       .second = true;
 }
 
-#ifdef SUPPORT_CLPR
+#ifdef ENABLE_CLPR
 void SearchTree::markAsProvedByJoin(ITreeNode *iTreeNode,
                                     llvm::Instruction *callsite) {
   if (!OUTPUT_INTERPOLATION_TREE)
@@ -806,7 +828,7 @@ PathCondition::packInterpolant(std::set<const Array *> &replacements) {
   for (PathCondition *it = this; it != 0; it = it->tail) {
     if (it->core) {
       if (!it->shadowed) {
-#ifdef SUPPORT_Z3
+#ifdef ENABLE_Z3
         it->shadowConstraint =
             (NoExistential ? it->constraint
                            : ShadowArray::getShadowExpression(it->constraint,
@@ -848,12 +870,6 @@ void PathCondition::print(llvm::raw_ostream &stream) const {
 }
 
 /**/
-
-StatTimer SubsumptionTableEntry::actualSolverCallTimer;
-
-unsigned long SubsumptionTableEntry::checkSolverCount = 0;
-
-unsigned long SubsumptionTableEntry::checkSolverFailureCount = 0;
 
 SubsumptionTableEntry::SubsumptionTableEntry(ITreeNode *node)
     : nodeId(node->getNodeId()) {
@@ -1557,9 +1573,9 @@ bool SubsumptionTableEntry::subsumed(
 
   bool success = false;
 
-#ifdef SUPPORT_Z3
+#ifdef ENABLE_Z3
   Z3Solver *z3solver = 0;
-#endif /* SUPPORT_Z3 */
+#endif /* ENABLE_Z3 */
 
   if (!detectConflictPrimitives(state, query))
     return false;
@@ -1568,9 +1584,8 @@ bool SubsumptionTableEntry::subsumed(
   // not a constant and no contradictory unary constraints found from
   // solvingUnaryConstraints method.
   if (!llvm::isa<ConstantExpr>(query)) {
-    ++checkSolverCount;
 
-#ifdef SUPPORT_Z3
+#ifdef ENABLE_Z3
     if (!existentials.empty() && llvm::isa<ExistsExpr>(query)) {
       // llvm::errs() << "Existentials not empty\n";
 
@@ -1598,10 +1613,9 @@ bool SubsumptionTableEntry::subsumed(
         // ExprPPrinter::printQuery(llvm::errs(), constraints,
         // falseExpr);
 
-        actualSolverCallTimer.start();
+        z3solver->startSubsumptionCheck();
         success = z3solver->getValue(Query(constraints, falseExpr), tmpExpr);
-        // double elapsedTime =
-        actualSolverCallTimer.stop();
+        z3solver->endSubsumptionCheck();
 
         result = success ? Solver::True : Solver::Unknown;
 
@@ -1610,22 +1624,16 @@ bool SubsumptionTableEntry::subsumed(
         // ExprPPrinter::printQuery(llvm::errs(), state.constraints,
         // query);
 
-        actualSolverCallTimer.start();
+        z3solver->startSubsumptionCheck();
         success = z3solver->directComputeValidity(
             Query(state.constraints, query), result);
-        // double elapsedTime =
-        actualSolverCallTimer.stop();
-
-        //        if (elapsedTime > expectedMaxElapsedTime) {
-        //            llvm::errs() << "LONG QUERY 2:" << "\n";
-        //            Query(state.constraints, query).dump();
-        //        }
+        z3solver->endSubsumptionCheck();
       }
 
       z3solver->setCoreSolverTimeout(0);
 
     } else
-#endif /* SUPPORT_Z3 */
+#endif /* ENABLE_Z3 */
     {
       // llvm::errs() << "No existential\n";
 
@@ -1636,16 +1644,9 @@ bool SubsumptionTableEntry::subsumed(
       // formula is unquantified.
 
       solver->setTimeout(timeout);
-      actualSolverCallTimer.start();
+      solver->startSubsumptionCheck();
       success = solver->evaluate(state, query, result);
-      // double elapsedTime =
-      actualSolverCallTimer.stop();
-
-      //      if (elapsedTime > expectedMaxElapsedTime) {
-      //          llvm::errs() << "LONG QUERY 3:" << "\n";
-      //          Query(state.constraints, query).dump();
-      //      }
-
+      solver->endSubsumptionCheck();
       solver->setTimeout(0);
     }
   } else {
@@ -1658,12 +1659,12 @@ bool SubsumptionTableEntry::subsumed(
   if (success && result == Solver::True) {
     // llvm::errs() << "Solver decided validity\n";
     std::vector<ref<Expr> > unsatCore;
-#ifdef SUPPORT_Z3
+#ifdef ENABLE_Z3
     if (z3solver) {
       unsatCore = z3solver->getUnsatCore();
       delete z3solver;
     } else
-#endif /* SUPPORT_Z3 */
+#endif /* ENABLE_Z3 */
       unsatCore = solver->getUnsatCore();
 
     // State subsumed, we mark needed constraints on the
@@ -1682,11 +1683,10 @@ bool SubsumptionTableEntry::subsumed(
   // invalidity is established by the solver.
   // llvm::errs() << "Solver did not decide validity\n";
 
-  ++checkSolverFailureCount;
-#ifdef SUPPORT_Z3
+#ifdef ENABLE_Z3
   if (z3solver)
     delete z3solver;
-#endif /* SUPPORT_Z3 */
+#endif /* ENABLE_Z3 */
 
   return false;
 }
@@ -1739,12 +1739,13 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
   }
 }
 
-void SubsumptionTableEntry::printStat(llvm::raw_ostream &stream) {
+void SubsumptionTableEntry::printStat(std::stringstream &stream) {
   stream << "KLEE: done:     Time for actual solver calls in subsumption check "
-            "(ms) = " << actualSolverCallTimer.get() * 1000 << "\n";
+            "(ms) = " << ((double)stats::subsumptionQueryTime.getValue()) / 1000
+         << "\n";
   stream << "KLEE: done:     Number of solver calls for subsumption check "
-            "(failed) = " << checkSolverCount << " (" << checkSolverFailureCount
-         << ")\n";
+            "(failed) = " << stats::subsumptionQueryCount.getValue() << " ("
+         << stats::subsumptionQueryFailureCount.getValue() << ")\n";
 }
 
 /**/
@@ -1755,14 +1756,16 @@ StatTimer ITree::subsumptionCheckTimer;
 StatTimer ITree::markPathConditionTimer;
 StatTimer ITree::splitTimer;
 StatTimer ITree::executeOnNodeTimer;
+double ITree::entryNumber;
+double ITree::programPointNumber;
 
 unsigned long ITree::subsumptionCheckCount = 0;
 
-void ITree::printTimeStat(llvm::raw_ostream &stream) {
+void ITree::printTimeStat(std::stringstream &stream) {
   stream << "KLEE: done:     setCurrentINode = " << setCurrentINodeTimer.get() *
                                                         1000 << "\n";
   stream << "KLEE: done:     remove = " << removeTimer.get() * 1000 << "\n";
-  stream << "KLEE: done:     subsumptionCheckTimer = "
+  stream << "KLEE: done:     subsumptionCheck = "
          << subsumptionCheckTimer.get() * 1000 << "\n";
   stream << "KLEE: done:     markPathCondition = "
          << markPathConditionTimer.get() * 1000 << "\n";
@@ -1771,19 +1774,7 @@ void ITree::printTimeStat(llvm::raw_ostream &stream) {
                                                       1000 << "\n";
 }
 
-void ITree::printTableStat(llvm::raw_ostream &stream) const {
-  double programPointNumber = 0.0, entryNumber = 0.0;
-  for (std::map<uintptr_t,
-                std::vector<SubsumptionTableEntry *> >::const_iterator
-           it = subsumptionTable.begin(),
-           itEnd = subsumptionTable.end();
-       it != itEnd; ++it) {
-    if (!it->second.empty()) {
-      entryNumber += it->second.size();
-      ++programPointNumber;
-    }
-  }
-
+void ITree::printTableStat(std::stringstream &stream) {
   SubsumptionTableEntry::printStat(stream);
 
   stream
@@ -1791,26 +1782,24 @@ void ITree::printTableStat(llvm::raw_ostream &stream) const {
       << StatTimer::inTwoDecimalPoints(entryNumber / programPointNumber)
       << "\n";
 
+  stream << "KLEE: done:     Number of subsumption checks = "
+         << subsumptionCheckCount << "\n";
+
   stream << "KLEE: done:     Average solver calls per subsumption check = "
-         << StatTimer::inTwoDecimalPoints(
-                (double)SubsumptionTableEntry::checkSolverCount /
-                (double)subsumptionCheckCount) << "\n";
+         << StatTimer::inTwoDecimalPoints((double)stats::subsumptionQueryCount /
+                                          (double)subsumptionCheckCount)
+         << "\n";
 }
 
-void ITree::dumpInterpolationStat() const {
-  bool useColors = llvm::errs().is_displayed();
-  if (useColors)
-    llvm::errs().changeColor(llvm::raw_ostream::GREEN,
-                             /*bold=*/true,
-                             /*bg=*/false);
-  llvm::errs() << "\nKLEE: done: Subsumption statistics\n";
-  printTableStat(llvm::errs());
-  llvm::errs() << "KLEE: done: ITree method execution times (ms):\n";
-  printTimeStat(llvm::errs());
-  llvm::errs() << "KLEE: done: ITreeNode method execution times (ms):\n";
-  ITreeNode::printTimeStat(llvm::errs());
-  if (useColors)
-    llvm::errs().resetColor();
+std::string ITree::getInterpolationStat() {
+  std::stringstream stream;
+  stream << "\nKLEE: done: Subsumption statistics\n";
+  printTableStat(stream);
+  stream << "KLEE: done: ITree method execution times (ms):\n";
+  printTimeStat(stream);
+  stream << "KLEE: done: ITreeNode method execution times (ms):\n";
+  ITreeNode::printTimeStat(stream);
+  return stream.str();
 }
 
 ITree::ITree(ExecutionState *_root) {
@@ -1822,11 +1811,21 @@ ITree::ITree(ExecutionState *_root) {
 }
 
 ITree::~ITree() {
-  for (std::map<uintptr_t, std::vector<SubsumptionTableEntry *> >::iterator
+  for (std::map<uintptr_t, std::deque<SubsumptionTableEntry *> >::const_iterator
            it = subsumptionTable.begin(),
            itEnd = subsumptionTable.end();
        it != itEnd; ++it) {
-    for (std::vector<SubsumptionTableEntry *>::iterator
+    if (!it->second.empty()) {
+      entryNumber += it->second.size();
+      ++programPointNumber;
+    }
+  }
+
+  for (std::map<uintptr_t, std::deque<SubsumptionTableEntry *> >::iterator
+           it = subsumptionTable.begin(),
+           itEnd = subsumptionTable.end();
+       it != itEnd; ++it) {
+    for (std::deque<SubsumptionTableEntry *>::iterator
              it1 = it->second.begin(),
              it1End = it->second.end();
          it1 != it1End; ++it1) {
@@ -1834,6 +1833,7 @@ ITree::~ITree() {
     }
     it->second.clear();
   }
+
   subsumptionTable.clear();
 }
 
@@ -1853,7 +1853,7 @@ bool ITree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
     return false;
 
   subsumptionCheckTimer.start();
-  std::vector<SubsumptionTableEntry *> entryList =
+  std::deque<SubsumptionTableEntry *> entryList =
       subsumptionTable[state.itreeNode->getNodeId()];
 
   if (entryList.empty())
@@ -1862,8 +1862,11 @@ bool ITree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
   std::pair<Dependency::ConcreteStore, Dependency::SymbolicStore>
   storedExpressions = state.itreeNode->getStoredExpressions();
 
-  for (std::vector<SubsumptionTableEntry *>::iterator it = entryList.begin(),
-                                                      itEnd = entryList.end();
+  // Iterate the subsumption table entry with reverse iterator because
+  // the successful subsumption mostly happen in the newest entry.
+  for (std::deque<SubsumptionTableEntry *>::reverse_iterator
+           it = entryList.rbegin(),
+           itEnd = entryList.rend();
        it != itEnd; ++it) {
 
     if ((*it)->subsumed(solver, state, timeout, storedExpressions)) {
@@ -1884,6 +1887,12 @@ bool ITree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
 
 void ITree::store(SubsumptionTableEntry *subItem) {
   subsumptionTable[subItem->nodeId].push_back(subItem);
+#ifdef ENABLE_Z3
+  if (MaxFailSubsumption > 0 &&
+      (unsigned)MaxFailSubsumption < subsumptionTable[subItem->nodeId].size()) {
+    subsumptionTable[subItem->nodeId].pop_front();
+  }
+#endif
 }
 
 void ITree::setCurrentINode(ExecutionState &state) {
@@ -2047,12 +2056,11 @@ void ITree::print(llvm::raw_ostream &stream) const {
   this->printNode(stream, this->root, "");
   stream << "\n------------------------- Subsumption Table "
             "-------------------------\n";
-  for (std::map<uintptr_t,
-                std::vector<SubsumptionTableEntry *> >::const_iterator
+  for (std::map<uintptr_t, std::deque<SubsumptionTableEntry *> >::const_iterator
            it = subsumptionTable.begin(),
            itEnd = subsumptionTable.end();
        it != itEnd; ++it) {
-    for (std::vector<SubsumptionTableEntry *>::const_iterator
+    for (std::deque<SubsumptionTableEntry *>::const_iterator
              it1 = it->second.begin(),
              it1End = it->second.end();
          it1 != it1End; ++it1) {
@@ -2076,7 +2084,7 @@ StatTimer ITreeNode::getStoredExpressionsTimer;
 StatTimer ITreeNode::getStoredCoreExpressionsTimer;
 StatTimer ITreeNode::computeCoreAllocationsTimer;
 
-void ITreeNode::printTimeStat(llvm::raw_ostream &stream) {
+void ITreeNode::printTimeStat(std::stringstream &stream) {
   stream << "KLEE: done:     getInterpolant = " << getInterpolantTimer.get() *
                                                        1000 << "\n";
   stream << "KLEE: done:     addConstraintTime = " << addConstraintTimer.get() *
@@ -2097,7 +2105,8 @@ void ITreeNode::printTimeStat(llvm::raw_ostream &stream) {
 
 ITreeNode::ITreeNode(ITreeNode *_parent)
     : parent(_parent), left(0), right(0), nodeId(0), isSubsumed(false),
-      graph(_parent ? _parent->graph : 0) {
+      storable(true), graph(_parent ? _parent->graph : 0),
+      instructionsDepth(_parent ? _parent->instructionsDepth : 0) {
 
   pathCondition = (_parent != 0) ? _parent->pathCondition : 0;
 
@@ -2199,6 +2208,10 @@ ITreeNode::getStoredCoreExpressions(std::set<const Array *> &replacements)
   ITreeNode::getStoredCoreExpressionsTimer.stop();
   return ret;
 }
+
+unsigned ITreeNode::getInstructionsDepth() { return instructionsDepth; }
+
+void ITreeNode::incInstructionsDepth() { ++instructionsDepth; }
 
 void ITreeNode::unsatCoreMarking(std::vector<ref<Expr> > unsatCore) {
   // State subsumed, we mark needed constraints on the path condition. We create

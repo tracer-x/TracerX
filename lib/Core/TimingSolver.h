@@ -66,8 +66,9 @@ namespace klee {
     std::pair< ref<Expr>, ref<Expr> >
     getRange(const ExecutionState&, ref<Expr> query);
     std::vector< ref<Expr> > getUnsatCore();
-
-  #ifdef SUPPORT_CLPR
+    void startSubsumptionCheck();
+    void endSubsumptionCheck();
+  #ifdef ENABLE_CLPR
     /// \brief Validate a recursive predicate by invoking CLP(R)
     ///
     /// \param the constraints of the current state.

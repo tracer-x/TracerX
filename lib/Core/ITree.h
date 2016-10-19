@@ -182,7 +182,7 @@ class SearchTree {
     /// \brief False and true children of this node
     SearchTree::Node *falseTarget, *trueTarget;
 
-#ifdef SUPPORT_CLPR
+#ifdef ENABLE_CLPR
     /// \brief Indicates that the node is join-subsumed (subsumed via klee_join)
     bool joinSubsumed;
 
@@ -202,7 +202,7 @@ class SearchTree {
 
     Node(uintptr_t nodeId)
         : iTreeNodeId(nodeId), nodeId(0), falseTarget(0), trueTarget(0),
-#ifdef SUPPORT_CLPR
+#ifdef ENABLE_CLPR
           joinSubsumed(false), joinProved(false),
 #endif
           subsumed(false) {
@@ -247,7 +247,7 @@ class SearchTree {
   std::vector<SearchTree::NumberedEdge *> subsumptionEdges;
   std::map<PathCondition *, SearchTree::Node *> pathConditionMap;
 
-#ifdef SUPPORT_CLPR
+#ifdef ENABLE_CLPR
   std::map<llvm::Instruction *, SearchTree::Node *> joinCallsiteMap;
 #endif
 
@@ -298,7 +298,7 @@ public:
 
   static void setAsCore(PathCondition *pathCondition);
 
-#ifdef SUPPORT_CLPR
+#ifdef ENABLE_CLPR
   static void markAsProvedByJoin(ITreeNode *iTreeNode,
                                  llvm::Instruction *callsite);
 #endif
@@ -385,15 +385,6 @@ class SubsumptionTableEntry {
     }
   };
 
-  /// \brief Statistics for actual solver call time in subsumption check
-  static StatTimer actualSolverCallTimer;
-
-  /// \brief The number of solver calls for subsumption checks
-  static unsigned long checkSolverCount;
-
-  /// \brief The number of failed solver calls for subsumption checks
-  static unsigned long checkSolverFailureCount;
-
   ref<Expr> interpolant;
 
   Dependency::ConcreteStore concreteAddressStore;
@@ -478,7 +469,7 @@ class SubsumptionTableEntry {
   }
 
   /// \brief For printing method running time statistics
-  static void printStat(llvm::raw_ostream &stream);
+  static void printStat(std::stringstream &stream);
 
 public:
   const uintptr_t nodeId;
@@ -534,10 +525,6 @@ class ITreeNode {
   static StatTimer computeCoreAllocationsTimer;
 
 private:
-  typedef ref<Expr> expression_type;
-
-  typedef std::pair<expression_type, expression_type> pair_type;
-
   /// \brief The path condition
   PathCondition *pathCondition;
 
@@ -555,6 +542,9 @@ private:
   /// \brief Graph for displaying as .dot file
   SearchTree *graph;
 
+  /// \brief For statistics on the number of instructions executed along a path.
+  unsigned instructionsDepth;
+
   void setNodeLocation(llvm::Instruction *instr) {
     if (!nodeId)
       nodeId = reinterpret_cast<uintptr_t>(instr);
@@ -566,7 +556,7 @@ private:
   }
 
   /// \brief for printing method running time statistics
-  static void printTimeStat(llvm::raw_ostream &stream);
+  static void printTimeStat(std::stringstream &stream);
 
   void execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args);
 
@@ -624,6 +614,10 @@ public:
   std::pair<Dependency::ConcreteStore, Dependency::SymbolicStore>
   getStoredCoreExpressions(std::set<const Array *> &replacements) const;
 
+  void incInstructionsDepth();
+
+  unsigned getInstructionsDepth();
+
   /// \brief Marking the core constraints on the path condition, and all the
   /// relevant values on the dependency graph, given an unsatistiability core.
   void unsatCoreMarking(std::vector<ref<Expr> > unsatCore);
@@ -631,7 +625,7 @@ public:
   /// \brief Compute the allocations that are relevant for the interpolant.
   void computeCoreAllocations(AllocationGraph *g);
 
-#ifdef SUPPORT_CLPR
+#ifdef ENABLE_CLPR
   /// \brief Execute klee_join
   ///
   /// \param The callsite.
@@ -672,15 +666,17 @@ class ITree {
   static StatTimer markPathConditionTimer;
   static StatTimer splitTimer;
   static StatTimer executeOnNodeTimer;
+  static double entryNumber;
+  static double programPointNumber;
 
   /// \brief Number of subsumption checks for statistical purposes
   static unsigned long subsumptionCheckCount;
 
   ITreeNode *currentINode;
 
-  std::map<uintptr_t, std::vector<SubsumptionTableEntry *> > subsumptionTable;
+  std::map<uintptr_t, std::deque<SubsumptionTableEntry *> > subsumptionTable;
 
-#ifdef SUPPORT_CLPR
+#ifdef ENABLE_CLPR
   /// \brief A record of successful klee_join callsites, where the CLP predicate
   /// has been shown to hold before.
   std::set<llvm::Instruction *> successfulJoinCallsiteList;
@@ -693,10 +689,10 @@ class ITree {
                  std::string edges) const;
 
   /// \brief Displays method running time statistics
-  static void printTimeStat(llvm::raw_ostream &stream);
+  static void printTimeStat(std::stringstream &stream);
 
   /// \brief Displays subsumption table statistics
-  void printTableStat(llvm::raw_ostream &stream) const;
+  static void printTableStat(std::stringstream &stream);
 
 public:
   ITreeNode *root;
@@ -765,7 +761,7 @@ public:
   static void executeOnNode(ITreeNode *node, llvm::Instruction *instr,
                             std::vector<ref<Expr> > &args);
 
-#ifdef SUPPORT_CLPR
+#ifdef ENABLE_CLPR
   /// \brief Record klee_join callsite
   ///
   /// \param the call instruction.
@@ -797,8 +793,8 @@ public:
   /// \brief Print the content of the tree object to the LLVM error stream
   void dump() const;
 
-  /// \brief Outputs interpolation statistics to LLVM error stream.
-  void dumpInterpolationStat() const;
+  /// \brief Retrieve subsumption statistics result in std::string format
+  static std::string getInterpolationStat();
 };
 }
 #endif /* ITREE_H_ */

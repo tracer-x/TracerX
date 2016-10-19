@@ -14,7 +14,7 @@
 #include "klee/util/ArrayExprHash.h"
 #include "klee/Config/config.h"
 
-#ifdef SUPPORT_CLPR
+#ifdef ENABLE_CLPR
 
 #include <sstream>
 #include <vector>
@@ -159,6 +159,6 @@ public:
 
 }
 
-#endif /* SUPPORT_CLPR */
+#endif /* ENABLE_CLPR */
 
 #endif /* __UTIL_CLPRBUILDER_H__ */

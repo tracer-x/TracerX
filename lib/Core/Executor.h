@@ -21,6 +21,7 @@
 #include "klee/Internal/Module/KInstruction.h"
 #include "klee/Internal/Module/KModule.h"
 #include "klee/util/ArrayCache.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "llvm/ADT/Twine.h"
 
@@ -102,7 +103,24 @@ public:
 
   typedef std::pair<ExecutionState*,ExecutionState*> StatePair;
 
+  enum TerminateReason {
+    Abort,
+    Assert,
+    Exec,
+    External,
+    Free,
+    Model,
+    Overflow,
+    Ptr,
+    ReadOnly,
+    ReportError,
+    User,
+    Unhandled
+  };
+
 private:
+  static const char *TerminateReasonNames[];
+
   class TimerInfo;
 
   KModule *kmodule;
@@ -111,7 +129,7 @@ private:
 
   ExternalDispatcher *externalDispatcher;
   TimingSolver *solver;
-#ifdef SUPPORT_CLPR
+#ifdef ENABLE_CLPR
   TimingSolver *clprSolver;
 #endif
   MemoryManager *memory;
@@ -128,12 +146,12 @@ private:
   /// instructions step. 
   /// \invariant \ref addedStates is a subset of \ref states. 
   /// \invariant \ref addedStates and \ref removedStates are disjoint.
-  std::set<ExecutionState*> addedStates;
+  std::vector<ExecutionState *> addedStates;
   /// Used to track states that have been removed during the current
   /// instructions step. 
   /// \invariant \ref removedStates is a subset of \ref states. 
   /// \invariant \ref addedStates and \ref removedStates are disjoint.
-  std::set<ExecutionState*> removedStates;
+  std::vector<ExecutionState *> removedStates;
 
   /// When non-empty the Executor is running in "seed" mode. The
   /// states in this map will be executed in an arbitrary order
@@ -157,10 +175,10 @@ private:
 
   /// When non-null the bindings that will be used for calls to
   /// klee_make_symbolic in order replay.
-  const struct KTest *replayOut;
+  const struct KTest *replayKTest;
   /// When non-null a list of branch decisions to be used for replay.
   const std::vector<bool> *replayPath;
-  /// The index into the current \ref replayOut or \ref replayPath
+  /// The index into the current \ref replayKTest or \ref replayPath
   /// object.
   unsigned replayPosition;
 
@@ -190,12 +208,22 @@ private:
   /// Assumes ownership of the created array objects
   ArrayCache arrayCache;
 
+  /// File to print executed instructions to
+  llvm::raw_ostream *debugInstFile;
+
+  // @brief Buffer used by logBuffer
+  std::string debugBufferString;
+
+  // @brief buffer to store logs before flushing to file
+  llvm::raw_string_ostream debugLogBuffer;
+
   llvm::Function* getTargetFunction(llvm::Value *calledVal,
                                     ExecutionState &state);
   
   void executeInstruction(ExecutionState &state, KInstruction *ki);
 
-  void printFileLine(ExecutionState &state, KInstruction *ki);
+  void printFileLine(ExecutionState &state, KInstruction *ki,
+                     llvm::raw_ostream &file);
 
   void run(ExecutionState &initialState);
 
@@ -307,7 +335,7 @@ private:
   // Called on [for now] concrete reads, replaces constant with a symbolic
   // Used for testing.
   ref<Expr> replaceReadWithSymbolic(ExecutionState &state,
-#ifdef SUPPORT_CLPR
+#ifdef ENABLE_CLPR
                                     const MemoryObject *mo,
 #endif
                                     ref<Expr> e);
@@ -362,6 +390,8 @@ private:
   const InstructionInfo & getLastNonKleeInternalInstruction(const ExecutionState &state,
       llvm::Instruction** lastInstruction);
 
+  bool shouldExitOn(enum TerminateReason termReason);
+
   // remove state from queue and delete
   void terminateState(ExecutionState &state);
   // call subsumption handler and terminate state
@@ -371,10 +401,10 @@ private:
   // call exit handler and terminate state
   void terminateStateOnExit(ExecutionState &state);
   // call error handler and terminate state
-  void terminateStateOnError(ExecutionState &state, 
-                             const llvm::Twine &message,
-                             const char *suffix,
-                             const llvm::Twine &longMessage="");
+  void terminateStateOnError(ExecutionState &state, const llvm::Twine &message,
+                             enum TerminateReason termReason,
+                             const char *suffix = NULL,
+                             const llvm::Twine &longMessage = "");
 
   // call error handler and terminate state, for execution errors
   // (things that should not be possible, like illegal instruction or
@@ -382,7 +412,7 @@ private:
   void terminateStateOnExecError(ExecutionState &state, 
                                  const llvm::Twine &message,
                                  const llvm::Twine &info="") {
-    terminateStateOnError(state, message, "exec.err", info);
+    terminateStateOnError(state, message, Exec, NULL, info);
   }
 
   /// bindModuleConstants - Initialize the module constant table.
@@ -412,6 +442,9 @@ private:
   void initTimers();
   void processTimers(ExecutionState *current,
                      double maxInstTime);
+  void checkMemoryUsage();
+  void printDebugInstructions(ExecutionState &state);
+  void doDumpStates();
 
 public:
   Executor(const InterpreterOptions &opts, InterpreterHandler *ie);
@@ -429,16 +462,16 @@ public:
   }
   virtual void setSymbolicPathWriter(TreeStreamWriter *tsw) {
     symPathWriter = tsw;
-  }      
+  }
 
-  virtual void setReplayOut(const struct KTest *out) {
+  virtual void setReplayKTest(const struct KTest *out) {
     assert(!replayPath && "cannot replay both buffer and path");
-    replayOut = out;
+    replayKTest = out;
     replayPosition = 0;
   }
 
   virtual void setReplayPath(const std::vector<bool> *path) {
-    assert(!replayOut && "cannot replay both buffer and path");
+    assert(!replayKTest && "cannot replay both buffer and path");
     replayPath = path;
     replayPosition = 0;
   }

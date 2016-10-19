@@ -10,6 +10,7 @@
 #ifndef KLEE_SOLVER_H
 #define KLEE_SOLVER_H
 
+#include "klee/CommandLine.h" // FIXME: This is just for CoreSolverType
 #include "klee/Expr.h"
 
 #include <vector>
@@ -209,7 +210,15 @@ namespace klee {
     /// \return Vector of ref<Expr>
     virtual std::vector< ref<Expr> > getUnsatCore();
 
-  #ifdef SUPPORT_CLPR
+    /// startSubsumptionCheck - Mark the usage of the solver as for subsumption
+    /// check.
+    virtual void startSubsumptionCheck();
+
+    /// endSubsumptionCheck - Mark the usage of the solver as not belonging to
+    /// subsumption check.
+    virtual void endSubsumptionCheck();
+
+  #ifdef ENABLE_CLPR
     /// \brief Validate a recursive predicate by invoking CLP(R)
     ///
     /// \param the constraints of the current state.
@@ -225,7 +234,7 @@ namespace klee {
   #endif
   };
 
-  #ifdef SUPPORT_STP
+  #ifdef ENABLE_STP
   /// STPSolver - A complete solver based on STP.
   class STPSolver : public Solver {
   public:
@@ -241,35 +250,35 @@ namespace klee {
 	/// format.
 	virtual char *getConstraintLog(const Query&);
 
-	/// setCoreSolverTimeout - Set constraint solver timeout delay to the given value; 0
-	/// is off.
-	virtual void setCoreSolverTimeout(double timeout);
+        /// setCoreSolverTimeout - Set constraint solver timeout delay to the
+        /// given value; 0
+        /// is off.
+        virtual void setCoreSolverTimeout(double timeout);
   };
-  #endif /*SUPPORT_STP */
+  #endif // ENABLE_STP
 
-#ifdef SUPPORT_Z3
-  /// Z3Solver - A complete solver based on Z3
+  #ifdef ENABLE_Z3
+  /// Z3Solver - A solver complete solver based on Z3
   class Z3Solver : public Solver {
   public:
-	/// Z3Solver - Construct a new Z3Solver.
-	Z3Solver();
+    /// Z3Solver - Construct a new Z3Solver.
+    Z3Solver();
 
-	/// getConstraintLog - Return the constraint log for the given state in CVC
-	/// format.
-	virtual char *getConstraintLog(const Query&);
+    /// Get the query in SMT-LIBv2 format.
+    /// \return A C-style string. The caller is responsible for freeing this.
+    virtual char *getConstraintLog(const Query &);
 
-	/// setCoreSolverTimeout - Set constraint solver timeout delay to the given value; 0
-	/// is off.
-	virtual void setCoreSolverTimeout(double timeout);
+    /// setCoreSolverTimeout - Set constraint solver timeout delay to the given
+    /// value; 0
+    /// is off.
+    virtual void setCoreSolverTimeout(double timeout);
 
-        /// directComputeValidity - Compute validity directly without other
-        /// layers of solving
-        bool directComputeValidity(const Query &query,
-                                   Solver::Validity &result);
+    /// directComputeValidity - Compute validity directly without other
+    /// layers of solving
+    bool directComputeValidity(const Query &query, Solver::Validity &result);
   };
-#endif /* SUPPORT_Z3 */
-  
-#ifdef SUPPORT_CLPR
+
+  #ifdef ENABLE_CLPR
   /// CLPRSolver - An incomplete solver based on CLP(R)
   class CLPRSolver : public Solver {
   public:
@@ -282,10 +291,12 @@ namespace klee {
     /// setCoreSolverTimeout - Set constraint solver timeout delay to the given value; 0 is off.
     virtual void setCoreSolverTimeout(double timeout);
   };
-#endif /* SUPPORT_CLPR */
+  #endif // ENABLE_CLPR
 
-#ifdef SUPPORT_METASMT
-  
+  #endif // ENABLE_Z3
+
+  #ifdef ENABLE_METASMT
+
   template<typename SolverContext>
   class MetaSMTSolver : public Solver {
   public:
@@ -296,7 +307,7 @@ namespace klee {
     virtual void setCoreSolverTimeout(double timeout);
 };
 
-#endif /* SUPPORT_METASMT */
+#endif /* ENABLE_METASMT */
 
   /* *** */
 
@@ -351,7 +362,9 @@ namespace klee {
   /// createDummySolver - Create a dummy solver implementation which always
   /// fails.
   Solver *createDummySolver();
-  
+
+  // Create a solver based on the supplied ``CoreSolverType``.
+  Solver *createCoreSolver(CoreSolverType cst);
 }
 
 #endif

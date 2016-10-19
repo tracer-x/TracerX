@@ -104,10 +104,12 @@ public:
   SolverRunStatus getOperationStatusCode();
   char *getConstraintLog(const Query&);
   void setCoreSolverTimeout(double timeout);
-  std::vector< ref<Expr> > getUnsatCore() {
+  std::vector<ref<Expr> > getUnsatCore() {
     return secondary->impl->getUnsatCore();
   }
-#ifdef SUPPORT_CLPR
+  void startSubsumptionCheck() { secondary->impl->startSubsumptionCheck(); }
+  void endSubsumptionCheck() { secondary->impl->endSubsumptionCheck(); }
+#ifdef ENABLE_CLPR
   bool validateRecursivePredicate(
       const ConstraintManager &constraints,
       std::map<const Array *, uint64_t> &arrayAddressRegistry,

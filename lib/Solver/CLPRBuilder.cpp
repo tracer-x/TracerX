@@ -17,7 +17,7 @@
 #include "ConstantDivision.h"
 #include "CLPRBuilder.h"
 
-#ifdef SUPPORT_CLPR
+#ifdef ENABLE_CLPR
 
 #include "llvm/Support/CommandLine.h"
 
@@ -938,4 +938,4 @@ clpr::CLPTerm CLPRBuilder::constructActual(ref<Expr> e, int *width_out) {
   }
 }
 
-#endif /* SUPPORT_CLPR */
+#endif /* ENABLE_CLPR */
