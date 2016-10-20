@@ -352,20 +352,27 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
   this->solver = new TimingSolver(solver, EqualitySubstitution);
 
 #ifdef ENABLE_CLPR
-  llvm::errs() << "Using CLP(R) secondary solver backend\n";
-  Solver *clprCoreSolver = new CLPRSolver();
-  if (!clprCoreSolver) {
-    klee_error("Failed to create CLPR(R) secondary solver\n");
-  }
-  std::string clprPrefix("clpr-");
-  Solver *clprSolver = constructSolverChain(
-      clprCoreSolver,
-      interpreterHandler->getOutputFilename(clprPrefix + ALL_QUERIES_SMT2_FILE_NAME),
-      interpreterHandler->getOutputFilename(clprPrefix + SOLVER_QUERIES_SMT2_FILE_NAME),
-      interpreterHandler->getOutputFilename(clprPrefix + ALL_QUERIES_PC_FILE_NAME),
-      interpreterHandler->getOutputFilename(clprPrefix + SOLVER_QUERIES_PC_FILE_NAME));
+  if (INTERPOLATION_ENABLED) {
+    llvm::errs() << "Using CLP(R) secondary solver backend\n";
+    Solver *clprCoreSolver = new CLPRSolver();
+    if (!clprCoreSolver) {
+      klee_error("Failed to create CLPR(R) secondary solver\n");
+    }
+    std::string clprPrefix("clpr-");
+    Solver *clprSolver = constructSolverChain(
+        clprCoreSolver, interpreterHandler->getOutputFilename(
+                            clprPrefix + ALL_QUERIES_SMT2_FILE_NAME),
+        interpreterHandler->getOutputFilename(clprPrefix +
+                                              SOLVER_QUERIES_SMT2_FILE_NAME),
+        interpreterHandler->getOutputFilename(clprPrefix +
+                                              ALL_QUERIES_PC_FILE_NAME),
+        interpreterHandler->getOutputFilename(clprPrefix +
+                                              SOLVER_QUERIES_PC_FILE_NAME));
 
-  this->clprSolver = new TimingSolver(clprSolver, false);
+    this->clprSolver = new TimingSolver(clprSolver, false);
+  } else {
+    this->clprSolver = 0;
+  }
 #endif /* ENABLE_CLPR */
 
   memory = new MemoryManager(&arrayCache);
@@ -443,7 +450,9 @@ Executor::~Executor() {
     delete statsTracker;
   delete solver;
 #ifdef ENABLE_CLPR
-  delete clprSolver;
+  if (clprSolver) {
+    delete clprSolver;
+  }
 #endif
   delete kmodule;
   while(!timers.empty()) {
