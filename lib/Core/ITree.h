@@ -770,7 +770,7 @@ public:
     return successfulJoinCallsiteList.insert(instr).second;
   }
 
-  /// \brief Register array starting address. This for substituting arrays with
+  /// \brief Register array base address. This is for substituting arrays with
   /// its address in building CLP expression.
   ///
   /// \param the array to associate the address with

@@ -429,17 +429,18 @@ void SpecialFunctionHandler::handleJoin(ExecutionState &state,
                                         KInstruction *target,
                                         std::vector<ref<Expr> > &arguments) {
 #ifdef ENABLE_CLPR
-  // This retrieves the predicate name
-  std::string predicateName = readStringAtAddress(state, arguments[0]);
-
-  if (executor.clprSolver->validateRecursivePredicate(
-          state.constraints, executor.interpTree->getArrayAddressRegistry(),
-          predicateName, arguments) &&
-      !executor.interpTree->recordJoinCallsite(target->inst)) {
-    // Recursive predicate holding and this callsite has been seen before,
-    // terminate state.
-    executor.terminateStateOnSubsumption(state);
-    SearchTree::markAsProvedByJoin(state.itreeNode, target->inst);
+  if (INTERPOLATION_ENABLED) {
+    // This retrieves the predicate name
+    std::string predicateName = readStringAtAddress(state, arguments[0]);
+    if (executor.clprSolver->validateRecursivePredicate(
+            state.constraints, executor.interpTree->getArrayAddressRegistry(),
+            predicateName, arguments) &&
+        !executor.interpTree->recordJoinCallsite(target->inst)) {
+      // Recursive predicate holding and this callsite has been seen before,
+      // terminate state.
+      executor.terminateStateOnSubsumption(state);
+      SearchTree::markAsProvedByJoin(state.itreeNode, target->inst);
+    }
   }
 #endif /* ENABLE_CLPR */
 }

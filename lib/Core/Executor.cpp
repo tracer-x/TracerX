@@ -352,9 +352,11 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
   this->solver = new TimingSolver(solver, EqualitySubstitution);
 
 #ifdef ENABLE_CLPR
-  llvm::errs() << "Starting CLP(R) secondary solver ...\n";
+  llvm::errs() << "Using CLP(R) secondary solver backend\n";
   Solver *clprCoreSolver = new CLPRSolver();
-
+  if (!clprCoreSolver) {
+    klee_error("Failed to create CLPR(R) secondary solver\n");
+  }
   std::string clprPrefix("clpr-");
   Solver *clprSolver = constructSolverChain(
       clprCoreSolver,
@@ -362,6 +364,7 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
       interpreterHandler->getOutputFilename(clprPrefix + SOLVER_QUERIES_SMT2_FILE_NAME),
       interpreterHandler->getOutputFilename(clprPrefix + ALL_QUERIES_PC_FILE_NAME),
       interpreterHandler->getOutputFilename(clprPrefix + SOLVER_QUERIES_PC_FILE_NAME));
+
   this->clprSolver = new TimingSolver(clprSolver, false);
 #endif /* ENABLE_CLPR */
 
