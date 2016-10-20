@@ -802,13 +802,11 @@ if test X$with_clpr != X ; then
   CLPR_LDFLAGS="${CLPR_LDFLAGS} -lclpr_api"
 
   AC_DEFINE(ENABLE_CLPR, 1, [Supporting CLP(R) Backend])
-  AC_SUBST(CLPR_CFLAGS)
-  AC_SUBST(CLPR_LDFLAGS)
 fi
 
-AC_SUBST(ENABLE_Z3)
-AC_SUBST(Z3_CFLAGS)
-AC_SUBST(Z3_LDFLAGS)
+AC_SUBST(ENABLE_CLPR)
+AC_SUBST(CLPR_CFLAGS)
+AC_SUBST(CLPR_LDFLAGS)
 
 
 dnl **************************************************************************
