@@ -388,8 +388,8 @@ static bool printInputAsSMTLIBv2(const char *Filename,
         // Clean up
         for (std::vector<Decl *>::iterator it = Decls.begin(), ie = Decls.end();
              it != ie; ++it)
-                delete *it;
-	delete P;
+          delete *it;
+        delete P;
 
 	return true;
 }
