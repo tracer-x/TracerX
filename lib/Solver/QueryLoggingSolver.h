@@ -60,6 +60,7 @@ protected:
 public:
   QueryLoggingSolver(Solver *_solver, std::string path,
                      const std::string &commentSign, int queryTimeToLog);
+
   virtual ~QueryLoggingSolver();
 
   /// implementation of the SolverImpl interface

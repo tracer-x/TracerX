@@ -240,28 +240,23 @@ private:
   unsigned m_pathsExplored; // number of paths explored so far
 
   unsigned m_totalBranchingDepthOnExitTermination; // total depth paths explored
-                                                   // so far
-                                                   // on exit
-  unsigned m_totalInstructionsDepthOnExitTermination;  // total instructions
-                                                       // explored so far on
-                                                       // exit
-  unsigned m_totalBranchingDepthOnEarlyTermination;    // total depth paths
-                                                       // explored so
-                                                       // far on early
+                                                   // so far on exit
+  unsigned m_totalInstructionsDepthOnExitTermination; // total instructions
+                                                      // explored so far on exit
+  unsigned m_totalBranchingDepthOnEarlyTermination;   // total depth paths
+  // explored so far on early
   unsigned m_totalInstructionsDepthOnEarlyTermination; // total instructions
                                                        // explored so far on
                                                        // early
   unsigned m_totalBranchingDepthOnErrorTermination;    // total depth paths
-                                                       // explored so
-                                                       // far on error
+  // explored so far on error
   unsigned m_totalInstructionsDepthOnErrorTermination; // total instructions
                                                        // explored so far on
                                                        // error
-  unsigned m_totalBranchingDepthOnSubsumption;    // total depth explored so
-                                                  // far on subsumption
+  unsigned m_totalBranchingDepthOnSubsumption; // total depth explored so far on
+                                               // subsumption
   unsigned m_totalInstructionsDepthOnSubsumption; // total instruction explored
-                                                  // so
-                                                  // far on subsumption
+                                                  // so far on subsumption
 
   unsigned m_subsumptionTermination;     // number of termination by subsumption
   unsigned m_subsumptionTerminationTest; // number of tests generated from

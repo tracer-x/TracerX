@@ -806,6 +806,11 @@ if test X$with_clpr != X ; then
   AC_SUBST(CLPR_LDFLAGS)
 fi
 
+AC_SUBST(ENABLE_Z3)
+AC_SUBST(Z3_CFLAGS)
+AC_SUBST(Z3_LDFLAGS)
+
+
 dnl **************************************************************************
 dnl User option to enable metaSMT constraint solvers and to specify the
 dnl the location of the metaSMT root directory
