@@ -234,10 +234,6 @@ bool Solver::validateRecursivePredicate(
 }
 #endif
 
-void Solver::startSubsumptionCheck() { impl->startSubsumptionCheck(); }
-
-void Solver::endSubsumptionCheck() { impl->endSubsumptionCheck(); }
-
 void Query::dump() const {
   llvm::errs() << "Constraints [\n";
   for (ConstraintManager::const_iterator i = constraints.begin();

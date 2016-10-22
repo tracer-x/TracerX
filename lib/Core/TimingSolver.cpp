@@ -148,14 +148,6 @@ std::vector< ref<Expr> > TimingSolver::getUnsatCore() {
   return solver->getUnsatCore();
 }
 
-void TimingSolver::startSubsumptionCheck() {
-  return solver->startSubsumptionCheck();
-}
-
-void TimingSolver::endSubsumptionCheck() {
-  return solver->endSubsumptionCheck();
-}
-
 #ifdef ENABLE_CLPR
 bool TimingSolver::validateRecursivePredicate(
     const ConstraintManager &constraints,
