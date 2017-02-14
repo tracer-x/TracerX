@@ -366,24 +366,25 @@ namespace klee {
                      ref<VersionedValue> value);
 
     /// \brief Add flow dependency between source and target value
-    void addDependency(ref<VersionedValue> source, ref<VersionedValue> target,
-                       bool multiLocationsCheck = true);
+    static void addDependency(ref<VersionedValue> source,
+                              ref<VersionedValue> target,
+                              bool multiLocationsCheck = true);
 
     /// \brief Add flow dependency between source and target value
-    void addDependencyIntToPtr(ref<VersionedValue> source,
-                               ref<VersionedValue> target);
+    static void addDependencyIntToPtr(ref<VersionedValue> source,
+                                      ref<VersionedValue> target);
 
     /// \brief Add flow dependency between source and target pointers, offset by
     /// some amount
-    void addDependencyWithOffset(ref<VersionedValue> source,
-                                 ref<VersionedValue> target,
-                                 ref<Expr> offsetDelta);
+    static void addDependencyWithOffset(ref<VersionedValue> source,
+                                        ref<VersionedValue> target,
+                                        ref<Expr> offsetDelta);
 
     /// \brief Add flow dependency between source and target value, as the
     /// result of store/load via a memory location.
-    void addDependencyViaLocation(ref<VersionedValue> source,
-                                  ref<VersionedValue> target,
-                                  ref<MemoryLocation> via);
+    static void addDependencyViaLocation(ref<VersionedValue> source,
+                                         ref<VersionedValue> target,
+                                         ref<MemoryLocation> via);
 
     /// \brief Add a flow dependency from a pointer value to a non-pointer
     /// value, for an external function call.
@@ -393,12 +394,12 @@ namespace klee {
     /// we assumed all memory access within the external function is valid.
     void addDependencyViaExternalFunction(
         const std::vector<llvm::Instruction *> &stack,
-        ref<VersionedValue> source, ref<VersionedValue> target);
+        ref<VersionedValue> source, ref<VersionedValue> target) const;
 
-    /// \brief Add a flow dependency from a pointer value to a non-pointer
-    /// value.
-    void addDependencyToNonPointer(ref<VersionedValue> source,
-                                   ref<VersionedValue> target);
+    /// \brief The basic procedure for adding dependency between versioned
+    /// values.
+    static void addSimpleDependency(ref<VersionedValue> source,
+                                    ref<VersionedValue> target);
 
     /// \brief All values that flows to the target in one step
     std::vector<ref<VersionedValue> >

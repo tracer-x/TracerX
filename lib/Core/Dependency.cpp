@@ -580,7 +580,8 @@ void Dependency::addDependencyIntToPtr(ref<VersionedValue> source,
         SubExpr::create(targetExpr, sourceBase), (*it)->getOffset()));
     target->addLocation(MemoryLocation::create(*it, targetExpr, offsetDelta));
   }
-  target->addDependency(source, nullLocation);
+
+  addSimpleDependency(source, target);
 }
 
 void Dependency::addDependencyWithOffset(ref<VersionedValue> source,
@@ -625,7 +626,8 @@ void Dependency::addDependencyWithOffset(ref<VersionedValue> source,
     target->addLocation(MemoryLocation::create(*it, targetExpr, offsetDelta));
     locationAdded = true;
   }
-  target->addDependency(source, nullLocation);
+
+  addSimpleDependency(source, target);
 }
 
 void Dependency::addDependencyViaLocation(ref<VersionedValue> source,
@@ -645,7 +647,7 @@ void Dependency::addDependencyViaLocation(ref<VersionedValue> source,
 
 void Dependency::addDependencyViaExternalFunction(
     const std::vector<llvm::Instruction *> &stack, ref<VersionedValue> source,
-    ref<VersionedValue> target) {
+    ref<VersionedValue> target) const {
   if (source.isNull() || target.isNull())
     return;
 
@@ -683,14 +685,29 @@ void Dependency::addDependencyViaExternalFunction(
         MemoryLocation::create(target->getValue(), stack, address, size));
   }
 
-  addDependencyToNonPointer(source, target);
+  addSimpleDependency(source, target);
 }
 
-void Dependency::addDependencyToNonPointer(ref<VersionedValue> source,
-                                           ref<VersionedValue> target) {
+void Dependency::addSimpleDependency(ref<VersionedValue> source,
+                                     ref<VersionedValue> target) {
   if (source.isNull() || target.isNull())
     return;
 
+  llvm::Instruction *inst =
+      llvm::dyn_cast<llvm::Instruction>(source->getValue());
+  if (inst && inst->getOpcode() != llvm::Instruction::Load) {
+    std::map<ref<VersionedValue>, ref<MemoryLocation> > sourceSources =
+        source->getSources();
+    if (!sourceSources.empty()) {
+      for (std::map<ref<VersionedValue>, ref<MemoryLocation> >::iterator
+               it = sourceSources.begin(),
+               ie = sourceSources.end();
+           it != ie; ++it) {
+        target->addDependency(it->first, it->second);
+      }
+      return;
+    }
+  }
   ref<MemoryLocation> nullLocation;
   target->addDependency(source, nullLocation);
 }
@@ -1273,7 +1290,7 @@ void Dependency::execute(llvm::Instruction *instr,
         if (llvm::isa<llvm::IntToPtrInst>(instr)) {
           if (val->getLocations().size() == 0) {
             // 0 signifies unknown allocation size
-            addDependencyToNonPointer(
+            addSimpleDependency(
                 val, getNewTemporaryPointerValue(instr, stack, result, 0));
           } else {
             addDependencyIntToPtr(
@@ -1389,8 +1406,8 @@ void Dependency::execute(llvm::Instruction *instr,
         newValue = getNewTemporaryVersionedValue(instr, stack, result);
         if (instr->getOpcode() == llvm::Instruction::ICmp ||
             instr->getOpcode() == llvm::Instruction::FCmp) {
-          addDependencyToNonPointer(op1, newValue);
-          addDependencyToNonPointer(op2, newValue);
+          addSimpleDependency(op1, newValue);
+          addSimpleDependency(op2, newValue);
         } else {
           addDependency(op1, newValue);
           // We do not require that the locations set is empty
