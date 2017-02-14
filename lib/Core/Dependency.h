@@ -285,6 +285,10 @@ namespace klee {
     /// \brief The store of the versioned values
     std::map<llvm::Value *, std::vector<ref<VersionedValue> > > valuesMap;
 
+    /// \brief The store of the temporary versioned values
+    std::map<llvm::Value *, std::vector<ref<VersionedValue> > >
+    temporaryValuesMap;
+
     /// \brief Locations of this node and its ancestors that are needed for
     /// the core and dominates other locations.
     std::set<ref<MemoryLocation> > coreLocations;
@@ -300,18 +304,34 @@ namespace klee {
     ref<VersionedValue> registerNewVersionedValue(llvm::Value *value,
                                                   ref<VersionedValue> vvalue);
 
+    /// \brief Register new temporary versioned value, used by
+    /// getNewVersionedValue member functions
+    ref<VersionedValue>
+    registerNewTemporaryVersionedValue(llvm::Value *value,
+                                       ref<VersionedValue> vvalue);
+
     /// \brief Create a new versioned value object, typically when executing a
     /// new instruction, as a value for the instruction.
     ref<VersionedValue>
     getNewVersionedValue(llvm::Value *value,
                          const std::vector<llvm::Instruction *> &stack,
                          ref<Expr> valueExpr) {
-      return registerNewVersionedValue(
+      return registerNewTemporaryVersionedValue(
+          value, VersionedValue::create(value, stack, valueExpr));
+    }
+
+    /// \brief Create a new temporary versioned value object, typically when
+    /// executing a new instruction, as a value for the instruction.
+    ref<VersionedValue>
+    getNewTemporaryVersionedValue(llvm::Value *value,
+                                  const std::vector<llvm::Instruction *> &stack,
+                                  ref<Expr> valueExpr) {
+      return registerNewTemporaryVersionedValue(
           value, VersionedValue::create(value, stack, valueExpr));
     }
 
     /// \brief Create a new versioned value object, which is a pointer with
-    /// absolute address
+    /// absolute address. A new pointer value is always temporary.
     ref<VersionedValue>
     getNewPointerValue(llvm::Value *loc,
                        const std::vector<llvm::Instruction *> &stack,
@@ -321,15 +341,15 @@ namespace klee {
       return registerNewVersionedValue(loc, vvalue);
     }
 
-    /// \brief Create a new versioned value object, which is a pointer which
-    /// offsets existing pointer
-    ref<VersionedValue> getNewPointerValue(
-        llvm::Value *value, const std::vector<llvm::Instruction *> &stack,
-        ref<Expr> address, ref<MemoryLocation> loc, ref<Expr> offset) {
-      ref<VersionedValue> vvalue =
-          VersionedValue::create(value, stack, address);
-      vvalue->addLocation(MemoryLocation::create(loc, address, offset));
-      return registerNewVersionedValue(value, vvalue);
+    /// \brief Create a new temporary versioned value object, which is a pointer
+    /// with absolute address. A new pointer value is always temporary.
+    ref<VersionedValue>
+    getNewTemporaryPointerValue(llvm::Value *loc,
+                                const std::vector<llvm::Instruction *> &stack,
+                                ref<Expr> address, uint64_t size) {
+      ref<VersionedValue> vvalue = VersionedValue::create(loc, stack, address);
+      vvalue->addLocation(MemoryLocation::create(loc, stack, address, size));
+      return registerNewTemporaryVersionedValue(loc, vvalue);
     }
 
     /// \brief Gets the latest version of the location, but without checking
@@ -411,6 +431,12 @@ namespace klee {
     populateArgumentValuesList(llvm::CallInst *site,
                                const std::vector<llvm::Instruction *> &stack,
                                std::vector<ref<Expr> > &arguments);
+
+    /// \brief Extract value's expression from values map
+    static ref<VersionedValue> getFromValuesMap(
+        llvm::Value *value,
+        std::map<llvm::Value *, std::vector<ref<VersionedValue> > > &vMap,
+        ref<Expr> valueExpr, bool constraint);
 
   public:
     /// \brief This is for dynamic setting up of debug messages.
