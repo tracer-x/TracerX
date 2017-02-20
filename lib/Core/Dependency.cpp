@@ -696,17 +696,8 @@ void Dependency::addSimpleDependency(ref<VersionedValue> source,
   llvm::Instruction *inst =
       llvm::dyn_cast<llvm::Instruction>(source->getValue());
   if (inst && inst->getOpcode() != llvm::Instruction::Load) {
-    std::map<ref<VersionedValue>, ref<MemoryLocation> > sourceSources =
-        source->getSources();
-    if (!sourceSources.empty()) {
-      for (std::map<ref<VersionedValue>, ref<MemoryLocation> >::iterator
-               it = sourceSources.begin(),
-               ie = sourceSources.end();
-           it != ie; ++it) {
-        target->addDependency(it->first, it->second);
-      }
-      return;
-    }
+    target->copyAllDependencies(source);
+    return;
   }
   ref<MemoryLocation> nullLocation;
   target->addDependency(source, nullLocation);
