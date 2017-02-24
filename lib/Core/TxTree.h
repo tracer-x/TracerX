@@ -16,7 +16,9 @@
 #ifndef TXTREE_H_
 #define TXTREE_H_
 
-#include <klee/Expr.h>
+#include "Dependency.h"
+
+#include "klee/Expr.h"
 #include "klee/CommandLine.h"
 #include "klee/Config/Version.h"
 #include "klee/ExecutionState.h"
@@ -24,8 +26,6 @@
 #include "klee/Statistic.h"
 #include "klee/TimerStatIncrementer.h"
 #include "klee/util/ExprVisitor.h"
-
-#include "Dependency.h"
 
 #include "llvm/Support/raw_ostream.h"
 
@@ -579,8 +579,8 @@ private:
   /// \brief for printing member function running time statistics
   static void printTimeStat(std::stringstream &stream);
 
-  void execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args,
-               bool symbolicExecutionError);
+  ref<VersionedValue> execute(llvm::Instruction *instr, std::vector<Cell> &args,
+                              bool symbolicExecutionError);
 
 public:
   uintptr_t getProgramPoint() { return programPoint; }
@@ -611,8 +611,7 @@ public:
   void split(ExecutionState *leftData, ExecutionState *rightData);
 
   /// \brief Record call arguments in a function call
-  void bindCallArguments(llvm::Instruction *site,
-                         std::vector<ref<Expr> > &arguments);
+  void bindCallArguments(llvm::Instruction *site, std::vector<Cell> &arguments);
 
   /// \brief This propagates the dependency due to the return value of a call
   void bindReturnValue(llvm::CallInst *site, llvm::Instruction *inst,
@@ -865,57 +864,60 @@ public:
 
   /// \brief Abstractly execute an instruction of no argument for building
   /// dependency information.
-  void execute(llvm::Instruction *instr);
+  ref<VersionedValue> execute(llvm::Instruction *instr);
 
   /// \brief Abstractly execute an instruction of one argument for building
   /// dependency information.
-  void execute(llvm::Instruction *instr, ref<Expr> arg1);
+  ref<VersionedValue> execute(llvm::Instruction *instr, Cell arg1);
 
   /// \brief Abstractly execute an instruction of two arguments for building
   /// dependency information.
-  void execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2);
+  ref<VersionedValue> execute(llvm::Instruction *instr, Cell arg1, Cell arg2);
 
   /// \brief Abstractly execute an instruction of three arguments for building
   /// dependency information.
-  void execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2,
-               ref<Expr> arg3);
+  ref<VersionedValue> execute(llvm::Instruction *instr, Cell arg1, Cell arg2,
+                              Cell arg3);
 
   /// \brief Abstractly execute an instruction of a number of arguments for
   /// building dependency information.
-  void execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args);
+  ref<VersionedValue> execute(llvm::Instruction *instr,
+                              std::vector<Cell> &args);
 
   /// \brief Abstractly execute a PHI instruction for building dependency
   /// information.
-  void executePHI(llvm::Instruction *instr, unsigned incomingBlock,
-                  ref<Expr> valueExpr);
+  ref<VersionedValue> executePHI(llvm::Instruction *instr,
+                                 unsigned incomingBlock, ref<Expr> valueExpr);
 
   /// \brief For executing memory operations, called by
   /// Executor::executeMemoryOperation
-  void executeMemoryOperation(llvm::Instruction *instr, ref<Expr> value,
-                              ref<Expr> address, bool boundsCheck) {
-    executeMemoryOperationOnNode(currentTxTreeNode, instr, value, address,
-                                 boundsCheck);
+  ref<VersionedValue> executeMemoryOperation(llvm::Instruction *instr,
+                                             Cell value, Cell address,
+                                             bool boundsCheck) {
+    return executeMemoryOperationOnNode(currentTxTreeNode, instr, value,
+                                        address, boundsCheck);
   }
 
   /// \brief Internal method for executing memory operations
-  static void executeMemoryOperationOnNode(TxTreeNode *node,
-                                           llvm::Instruction *instr,
-                                           ref<Expr> value, ref<Expr> address,
-                                           bool boundsCheck) {
+  static ref<VersionedValue>
+  executeMemoryOperationOnNode(TxTreeNode *node, llvm::Instruction *instr,
+                               Cell value, Cell address, bool boundsCheck) {
     TimerStatIncrementer t(executeMemoryOperationTime);
-    std::vector<ref<Expr> > args;
+    std::vector<Cell> args;
     args.push_back(value);
     args.push_back(address);
-    node->dependency->executeMemoryOperation(
+    ref<VersionedValue> ret = node->dependency->executeMemoryOperation(
         instr, node->callHistory, args, boundsCheck, symbolicExecutionError);
     symbolicExecutionError = false;
+    return ret;
   }
 
   /// \brief General member function for executing an instruction for building
   /// dependency
   /// information, given a particular Tracer-X tree node.
-  static void executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
-                            std::vector<ref<Expr> > &args);
+  static ref<VersionedValue> executeOnNode(TxTreeNode *node,
+                                           llvm::Instruction *instr,
+                                           std::vector<Cell> &args);
 
   /// \brief Print the content of the tree node object into a stream.
   ///

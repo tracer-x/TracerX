@@ -13,12 +13,10 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "TxTree.h"
-
-#include "Dependency.h"
 #include "ShadowArray.h"
 #include "TimingSolver.h"
 #include "TxPrintUtil.h"
+#include "TxTree.h"
 
 #include <klee/CommandLine.h>
 #include <klee/Expr.h>
@@ -2182,50 +2180,56 @@ void TxTree::markPathCondition(ExecutionState &state, TimingSolver *solver) {
   }
 }
 
-void TxTree::execute(llvm::Instruction *instr) {
-  std::vector<ref<Expr> > dummyArgs;
-  executeOnNode(currentTxTreeNode, instr, dummyArgs);
+ref<VersionedValue> TxTree::execute(llvm::Instruction *instr) {
+  std::vector<Cell> dummyArgs;
+  return executeOnNode(currentTxTreeNode, instr, dummyArgs);
 }
 
-void TxTree::execute(llvm::Instruction *instr, ref<Expr> arg1) {
-  std::vector<ref<Expr> > args;
+ref<VersionedValue> TxTree::execute(llvm::Instruction *instr, Cell arg1) {
+  std::vector<Cell> args;
   args.push_back(arg1);
-  executeOnNode(currentTxTreeNode, instr, args);
+  return executeOnNode(currentTxTreeNode, instr, args);
 }
 
-void TxTree::execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2) {
-  std::vector<ref<Expr> > args;
+ref<VersionedValue> TxTree::execute(llvm::Instruction *instr, Cell arg1,
+                                    Cell arg2) {
+  std::vector<Cell> args;
   args.push_back(arg1);
   args.push_back(arg2);
-  executeOnNode(currentTxTreeNode, instr, args);
+  return executeOnNode(currentTxTreeNode, instr, args);
 }
 
-void TxTree::execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2,
-                     ref<Expr> arg3) {
-  std::vector<ref<Expr> > args;
+ref<VersionedValue> TxTree::execute(llvm::Instruction *instr, Cell arg1,
+                                    Cell arg2, Cell arg3) {
+  std::vector<Cell> args;
   args.push_back(arg1);
   args.push_back(arg2);
   args.push_back(arg3);
-  executeOnNode(currentTxTreeNode, instr, args);
+  return executeOnNode(currentTxTreeNode, instr, args);
 }
 
-void TxTree::execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args) {
-  executeOnNode(currentTxTreeNode, instr, args);
+ref<VersionedValue> TxTree::execute(llvm::Instruction *instr,
+                                    std::vector<Cell> &args) {
+  return executeOnNode(currentTxTreeNode, instr, args);
 }
 
-void TxTree::executePHI(llvm::Instruction *instr, unsigned incomingBlock,
-                        ref<Expr> valueExpr) {
-  currentTxTreeNode->dependency->executePHI(instr, incomingBlock,
-                                            currentTxTreeNode->callHistory,
-                                            valueExpr, symbolicExecutionError);
+ref<VersionedValue> TxTree::executePHI(llvm::Instruction *instr,
+                                       unsigned incomingBlock,
+                                       ref<Expr> valueExpr) {
+  ref<VersionedValue> ret = currentTxTreeNode->dependency->executePHI(
+      instr, incomingBlock, currentTxTreeNode->callHistory, valueExpr,
+      symbolicExecutionError);
   symbolicExecutionError = false;
+  return ret;
 }
 
-void TxTree::executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
-                           std::vector<ref<Expr> > &args) {
+ref<VersionedValue> TxTree::executeOnNode(TxTreeNode *node,
+                                          llvm::Instruction *instr,
+                                          std::vector<Cell> &args) {
   TimerStatIncrementer t(executeOnNodeTime);
-  node->execute(instr, args, symbolicExecutionError);
+  ref<VersionedValue> ret = node->execute(instr, args, symbolicExecutionError);
   symbolicExecutionError = false;
+  return ret;
 }
 
 void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
@@ -2363,15 +2367,15 @@ void TxTreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
   rightData->txTreeNode = right = new TxTreeNode(this, targetData);
 }
 
-void TxTreeNode::execute(llvm::Instruction *instr,
-                         std::vector<ref<Expr> > &args,
-                         bool symbolicExecutionError) {
+ref<VersionedValue> TxTreeNode::execute(llvm::Instruction *instr,
+                                        std::vector<Cell> &args,
+                                        bool symbolicExecutionError) {
   TimerStatIncrementer t(executeTime);
-  dependency->execute(instr, callHistory, args, symbolicExecutionError);
+  return dependency->execute(instr, callHistory, args, symbolicExecutionError);
 }
 
 void TxTreeNode::bindCallArguments(llvm::Instruction *site,
-                                   std::vector<ref<Expr> > &arguments) {
+                                   std::vector<Cell> &arguments) {
   TimerStatIncrementer t(bindCallArgumentsTime);
   dependency->bindCallArguments(site, callHistory, arguments);
 }

@@ -240,10 +240,9 @@ private:
 			    llvm::BasicBlock *src,
 			    ExecutionState &state);
 
-  void callExternalFunction(ExecutionState &state,
-                            KInstruction *target,
+  void callExternalFunction(ExecutionState &state, KInstruction *target,
                             llvm::Function *function,
-                            std::vector< ref<Expr> > &arguments);
+                            std::vector<Cell> &arguments);
 
   ObjectState *bindObjectInState(ExecutionState &state, const MemoryObject *mo,
                                  bool isLocal, const Array *array = 0);
@@ -290,21 +289,16 @@ private:
   /// convenience for realloc). Note that this function can cause the
   /// state to fork and that \ref state cannot be safely accessed
   /// afterwards.
-  void executeFree(ExecutionState &state,
-                   ref<Expr> address,
+  void executeFree(ExecutionState &state, Cell address,
                    KInstruction *target = 0);
-  
-  void executeCall(ExecutionState &state, 
-                   KInstruction *ki,
-                   llvm::Function *f,
-                   std::vector< ref<Expr> > &arguments);
-                   
+
+  void executeCall(ExecutionState &state, KInstruction *ki, llvm::Function *f,
+                   std::vector<Cell> &arguments);
+
   // do address resolution / object binding / out of bounds checking
   // and perform the operation
-  void executeMemoryOperation(ExecutionState &state,
-                              bool isWrite,
-                              ref<Expr> address,
-                              ref<Expr> value /* undef if read */,
+  void executeMemoryOperation(ExecutionState &state, bool isWrite, Cell address,
+                              Cell value /* undef if read */,
                               KInstruction *target /* undef if write */);
 
   void executeMakeSymbolic(ExecutionState &state, const MemoryObject *mo,
@@ -347,9 +341,8 @@ private:
     return state.stack.back().locals[target->dest];
   }
 
-  void bindLocal(KInstruction *target, 
-                 ExecutionState &state, 
-                 ref<Expr> value);
+  void bindLocal(KInstruction *target, ExecutionState &state, ref<Expr> value,
+                 ref<VersionedValue> vvalue);
   void bindArgument(KFunction *kf, 
                     unsigned index,
                     ExecutionState &state,
@@ -373,7 +366,7 @@ private:
 
   /// Bind a constant value for e to the given target. NOTE: This
   /// function may fork state if the state has multiple seeds.
-  void executeGetValue(ExecutionState &state, ref<Expr> e, KInstruction *target);
+  void executeGetValue(ExecutionState &state, Cell e, KInstruction *target);
 
   /// Get textual information regarding a memory address.
   std::string getAddressInfo(ExecutionState &state, ref<Expr> address) const;
