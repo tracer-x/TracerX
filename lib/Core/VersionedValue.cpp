@@ -29,10 +29,11 @@ using namespace klee;
 
 namespace klee {
 
-void MemoryLocation::adjustOffsetBound(ref<VersionedValue> checkedAddress,
+bool MemoryLocation::adjustOffsetBound(ref<VersionedValue> checkedAddress,
                                        std::set<ref<Expr> > &_bounds) {
   std::set<ref<MemoryLocation> > locations = checkedAddress->getLocations();
   std::set<ref<Expr> > bounds(_bounds);
+  bool boundUpdated = false;
 
   if (bounds.empty()) {
     bounds.insert(Expr::createPointer(size));
@@ -62,6 +63,7 @@ void MemoryLocation::adjustOffsetBound(ref<VersionedValue> checkedAddress,
                 if (elementType->isStructTy() &&
                     elementType->getStructName() == "struct.dirent") {
                   concreteOffsetBound = newBound;
+                  boundUpdated = true;
                   continue;
                 }
               }
@@ -76,8 +78,10 @@ void MemoryLocation::adjustOffsetBound(ref<VersionedValue> checkedAddress,
 
       symbolicOffsetBounds.insert(
           SubExpr::create(*it1, SubExpr::create(checkedOffset, offset)));
+      boundUpdated = true;
     }
   }
+  return boundUpdated;
 }
 
 ref<MemoryLocation>
