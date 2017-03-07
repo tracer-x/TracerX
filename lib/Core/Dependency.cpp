@@ -345,6 +345,7 @@ bool Dependency::markPointerFlow(ref<TxStateValue> target,
                                  const std::string &reason,
                                  bool incrementDirectUseCount) const {
   bool memoryError = false;
+  bool boundUpdated = false;
 
   if (target.isNull())
     return memoryError;
@@ -361,11 +362,18 @@ bool Dependency::markPointerFlow(ref<TxStateValue> target,
     for (std::set<ref<TxStateAddress> >::iterator it = locations.begin(),
                                                   ie = locations.end();
          it != ie; ++it) {
-      memoryError = (*it)->adjustOffsetBound(checkedAddress, bounds);
+      memoryError =
+          (*it)->adjustOffsetBound(checkedAddress, bounds, boundUpdated);
       if (memoryError)
         break;
     }
   }
+
+  // If this was the first time this value gets marked, we should propagate the
+  // marking further
+  if (!target->isCore())
+    boundUpdated = true;
+
   target->setAsCore(reason);
 
   // Compute the direct pointer flow dependency
@@ -382,14 +390,17 @@ bool Dependency::markPointerFlow(ref<TxStateValue> target,
       markFlow(it->first, reason, incrementDirectUseCount);
     }
   } else {
-    for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::iterator
-             it = sources.begin(),
-             ie = sources.end();
-         it != ie; ++it) {
-      memoryError = markPointerFlow(it->first, checkedAddress, bounds, reason,
-                                    incrementDirectUseCount)
-                        ? true
-                        : memoryError;
+    // Bound was updated, this means we need to update further up
+    if (boundUpdated) {
+      for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::iterator
+               it = sources.begin(),
+               ie = sources.end();
+           it != ie; ++it) {
+        memoryError = markPointerFlow(it->first, checkedAddress, bounds, reason,
+                                      incrementDirectUseCount)
+                          ? true
+                          : memoryError;
+      }
     }
   }
 

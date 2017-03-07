@@ -536,7 +536,7 @@ public:
   /// \brief Adjust the offset bound for interpolation (a.k.a. slackening).
   /// Returns true if a memory bound violation is detected, and false if not.
   bool adjustOffsetBound(ref<TxStateValue> checkedAddress,
-                         std::set<ref<Expr> > &bounds);
+                         std::set<ref<Expr> > &bounds, bool &boundUpdated);
 
   bool hasConstantAddress() const { return llvm::isa<ConstantExpr>(address); }
 
@@ -623,7 +623,10 @@ private:
   /// \brief The addresses by which this loaded value was stored
   std::set<ref<TxStateValue> > storeAddresses;
 
-  /// \brief Reasons for this value to be in the core
+  /// \brief Reasons for this value to be in the core. This may not contain all
+  /// the reasons since values are no longer marked if they were already found
+  /// to be marked, therefore the reasons are not propagated to all the values
+  /// this value is dependent upon.
   std::set<std::string> coreReasons;
 
   /// \brief Direct use count of this value by another value in all interpolants
