@@ -231,8 +231,6 @@ ref<Expr> StoredValue::getBoundsCheck(ref<StoredValue> stateValue,
   return res;
 }
 
-void StoredValue::print(llvm::raw_ostream &stream) const { print(stream, ""); }
-
 void StoredValue::print(llvm::raw_ostream &stream,
                         const std::string &prefix) const {
   std::string nextTabs = appendTab(prefix);
@@ -297,6 +295,58 @@ void StoredValue::print(llvm::raw_ostream &stream,
         stream << "\n";
       stream << nextTabs << *it;
     }
+  }
+}
+
+/**/
+
+void StoreFrame::print(llvm::raw_ostream &stream,
+                       const std::string &prefix) const {
+  std::string tabsNext = appendTab(prefix);
+  std::string tabsNextNext = appendTab(tabsNext);
+
+  if (concretelyAddressedStore.empty()) {
+    stream << prefix << "concrete store = []\n";
+  } else {
+    stream << prefix << "concrete store = [\n";
+    for (std::map<ref<MemoryLocation>,
+                  std::pair<ref<VersionedValue>,
+                            ref<VersionedValue> > >::const_iterator
+             is = concretelyAddressedStore.begin(),
+             ie = concretelyAddressedStore.end(), it = is;
+         it != ie; ++it) {
+      if (it != is)
+        stream << tabsNext << "------------------------------------------\n";
+      stream << tabsNext << "address:\n";
+      it->first->print(stream, tabsNextNext);
+      stream << "\n";
+      stream << tabsNext << "content:\n";
+      it->second.second->print(stream, tabsNextNext);
+      stream << "\n";
+    }
+    stream << prefix << "]\n";
+  }
+
+  if (symbolicallyAddressedStore.empty()) {
+    stream << prefix << "symbolic store = []\n";
+  } else {
+    stream << prefix << "symbolic store = [\n";
+    for (std::map<ref<MemoryLocation>,
+                  std::pair<ref<VersionedValue>,
+                            ref<VersionedValue> > >::const_iterator
+             is = symbolicallyAddressedStore.begin(),
+             ie = symbolicallyAddressedStore.end(), it = is;
+         it != ie; ++it) {
+      if (it != is)
+        stream << tabsNext << "------------------------------------------\n";
+      stream << tabsNext << "address:\n";
+      it->first->print(stream, tabsNextNext);
+      stream << "\n";
+      stream << tabsNext << "content:\n";
+      it->second.second->print(stream, tabsNextNext);
+      stream << "\n";
+    }
+    stream << "]\n";
   }
 }
 
@@ -406,10 +456,19 @@ void Dependency::getStoredExpressions(
     std::set<const Array *> &replacements, bool coreOnly,
     Dependency::ConcreteStore &_concretelyAddressedStore,
     Dependency::SymbolicStore &_symbolicallyAddressedStore) {
-  getConcreteStore(callHistory, concretelyAddressedStore, replacements,
+  getConcreteStore(callHistory, globalFrame->getConcreteStore(), replacements,
                    coreOnly, _concretelyAddressedStore);
-  getSymbolicStore(callHistory, symbolicallyAddressedStore, replacements,
+  getSymbolicStore(callHistory, globalFrame->getSymbolicStore(), replacements,
                    coreOnly, _symbolicallyAddressedStore);
+
+  for (std::vector<ref<StoreFrame> >::const_iterator it = stack.begin(),
+                                                     ie = stack.end();
+       it != ie; ++it) {
+    getConcreteStore(callHistory, (*it)->getConcreteStore(), replacements,
+                     coreOnly, _concretelyAddressedStore);
+    getSymbolicStore(callHistory, (*it)->getSymbolicStore(), replacements,
+                     coreOnly, _symbolicallyAddressedStore);
+  }
 }
 
 ref<VersionedValue>
@@ -591,12 +650,19 @@ ref<VersionedValue> Dependency::getLatestValueForMarking(llvm::Value *val,
 void Dependency::updateStore(ref<MemoryLocation> loc,
                              ref<VersionedValue> address,
                              ref<VersionedValue> value) {
-  if (loc->hasConstantAddress())
-    concretelyAddressedStore[loc] =
-        std::pair<ref<VersionedValue>, ref<VersionedValue> >(address, value);
-  else
-    symbolicallyAddressedStore[loc] =
-        std::pair<ref<VersionedValue>, ref<VersionedValue> >(address, value);
+  std::map<ref<MemoryLocation>,
+           std::pair<ref<VersionedValue>, ref<VersionedValue> > > concreteStore,
+      symbolicStore;
+
+  if (loc->isGlobal()) {
+    globalFrame->updateStore(loc, address, value);
+  } else {
+    if (stack.empty()) {
+      stack.push_back(StoreFrame::create());
+    }
+    ref<StoreFrame> topFrame = stack.back();
+    topFrame->updateStore(loc, address, value);
+  }
 }
 
 void Dependency::addDependency(ref<VersionedValue> source,
@@ -841,14 +907,15 @@ void Dependency::populateArgumentValuesList(
   }
 }
 
-Dependency::Dependency(Dependency *parent, llvm::DataLayout *_targetData)
-    : parent(parent), targetData(_targetData) {
-  if (parent) {
-    concretelyAddressedStore = parent->concretelyAddressedStore;
-    symbolicallyAddressedStore = parent->symbolicallyAddressedStore;
-    debugSubsumptionLevel = parent->debugSubsumptionLevel;
-    debugStateLevel = parent->debugStateLevel;
+Dependency::Dependency(Dependency *_parent, llvm::DataLayout *_targetData)
+    : parent(_parent), targetData(_targetData) {
+  if (_parent) {
+    globalFrame = _parent->globalFrame;
+    stack = _parent->stack;
+    debugSubsumptionLevel = _parent->debugSubsumptionLevel;
+    debugStateLevel = _parent->debugStateLevel;
   } else {
+    globalFrame = ref<StoreFrame>(new StoreFrame());
 #ifdef ENABLE_Z3
     debugSubsumptionLevel = DebugSubsumption;
     debugStateLevel = DebugState;
@@ -860,9 +927,8 @@ Dependency::Dependency(Dependency *parent, llvm::DataLayout *_targetData)
 }
 
 Dependency::~Dependency() {
-  // Delete the locally-constructed relations
-  concretelyAddressedStore.clear();
-  symbolicallyAddressedStore.clear();
+  // Delete the stack
+  stack.clear();
 
   // Delete valuesMap
   for (std::map<llvm::Value *, std::vector<ref<VersionedValue> > >::iterator
@@ -1154,16 +1220,34 @@ void Dependency::execute(llvm::Instruction *instr,
           std::map<ref<MemoryLocation>,
                    std::pair<ref<VersionedValue>,
                              ref<VersionedValue> > >::iterator storeIt =
-              concretelyAddressedStore.find(loc);
+              globalFrame->getConcreteStore().find(loc);
           std::pair<ref<VersionedValue>, ref<VersionedValue> > target;
 
-          if (storeIt == concretelyAddressedStore.end()) {
-              storeIt = symbolicallyAddressedStore.find(loc);
-              if (storeIt != symbolicallyAddressedStore.end()) {
+          if (storeIt == globalFrame->getConcreteStore().end()) {
+            storeIt = globalFrame->getSymbolicStore().find(loc);
+            if (storeIt != globalFrame->getSymbolicStore().end()) {
+              target = storeIt->second;
+            }
+          } else {
+            target = storeIt->second;
+          }
+
+          if (target.second.isNull()) {
+            for (std::vector<ref<StoreFrame> >::const_reverse_iterator
+                     stackIt = stack.rbegin(),
+                     stackIe = stack.rend();
+                 stackIt != stackIe; ++stackIt) {
+              storeIt = (*stackIt)->getConcreteStore().find(loc);
+              if (storeIt == (*stackIt)->getConcreteStore().end()) {
+                storeIt = (*stackIt)->getSymbolicStore().find(loc);
+                if (storeIt != (*stackIt)->getSymbolicStore().end()) {
+                  target = storeIt->second;
+                  break;
+                }
+              } else {
                 target = storeIt->second;
               }
-          } else {
-              target = storeIt->second;
+            }
           }
 
           if (!target.second.isNull() &&
@@ -1239,22 +1323,12 @@ void Dependency::execute(llvm::Instruction *instr,
            li != le; ++li) {
         std::pair<ref<VersionedValue>, ref<VersionedValue> > addressValuePair;
 
-        std::map<ref<MemoryLocation>,
-                 std::pair<ref<VersionedValue>,
-                           ref<VersionedValue> > >::iterator storeIter;
-        if ((*li)->hasConstantAddress()) {
-          storeIter = concretelyAddressedStore.find(*li);
-          if (storeIter != concretelyAddressedStore.end()) {
-            addressValuePair = storeIter->second;
-          }
-        } else {
-          storeIter = symbolicallyAddressedStore.find(*li);
-          if (storeIter != symbolicallyAddressedStore.end()) {
-            // FIXME: Here we assume that the expressions have to exactly be the
-            // same expression object. More properly, this should instead add an
-            // ite constraint onto the path condition.
-            addressValuePair = storeIter->second;
-          }
+        if (!stack.back().isNull()) {
+          addressValuePair = stack.back()->read(*li);
+        }
+        if (addressValuePair.first.isNull() ||
+            addressValuePair.second.isNull()) {
+          addressValuePair = globalFrame->read(*li);
         }
 
         // Build the loaded value
@@ -1671,6 +1745,9 @@ Dependency::bindCallArguments(llvm::Instruction *i,
     argumentValuesList.pop_back();
     ++index;
   }
+
+  // Push the stack frame before doing anything else
+  stack.push_back(StoreFrame::create());
 }
 
 void Dependency::bindReturnValue(llvm::CallInst *site,
@@ -1689,6 +1766,9 @@ void Dependency::bindReturnValue(llvm::CallInst *site,
       addDependency(value,
                     getNewVersionedValue(site, callHistory, returnValue));
   }
+
+  // Pop the stack frame
+  stack.pop_back();
 }
 
 void Dependency::markAllValues(ref<VersionedValue> value,
@@ -1724,52 +1804,17 @@ void Dependency::print(llvm::raw_ostream &stream) const {
 void Dependency::print(llvm::raw_ostream &stream,
                        const unsigned paddingAmount) const {
   std::string tabs = makeTabs(paddingAmount);
-  std::string tabsNext = appendTab(tabs);
-  std::string tabsNextNext = appendTab(tabsNext);
 
-  if (concretelyAddressedStore.empty()) {
-    stream << tabs << "concrete store = []\n";
-  } else {
-    stream << tabs << "concrete store = [\n";
-    for (std::map<ref<MemoryLocation>,
-                  std::pair<ref<VersionedValue>,
-                            ref<VersionedValue> > >::const_iterator
-             is = concretelyAddressedStore.begin(),
-             ie = concretelyAddressedStore.end(), it = is;
-         it != ie; ++it) {
-      if (it != is)
-        stream << tabsNext << "------------------------------------------\n";
-      stream << tabsNext << "address:\n";
-      it->first->print(stream, tabsNextNext);
-      stream << "\n";
-      stream << tabsNext << "content:\n";
-      it->second.second->print(stream, tabsNextNext);
-      stream << "\n";
-    }
-    stream << tabs << "]\n";
+  for (std::vector<ref<StoreFrame> >::const_reverse_iterator
+           it = stack.rbegin(),
+           ie = stack.rend();
+       it != ie; ++it) {
+    stream << tabs << "------------- Stack Frame ---------------\n";
+    (*it)->print(stream, tabs);
+    stream << tabs << "\n";
   }
-
-  if (symbolicallyAddressedStore.empty()) {
-    stream << tabs << "symbolic store = []\n";
-  } else {
-    stream << tabs << "symbolic store = [\n";
-    for (std::map<ref<MemoryLocation>,
-                  std::pair<ref<VersionedValue>,
-                            ref<VersionedValue> > >::const_iterator
-             is = symbolicallyAddressedStore.begin(),
-             ie = symbolicallyAddressedStore.end(), it = is;
-         it != ie; ++it) {
-      if (it != is)
-        stream << tabsNext << "------------------------------------------\n";
-      stream << tabsNext << "address:\n";
-      it->first->print(stream, tabsNextNext);
-      stream << "\n";
-      stream << tabsNext << "content:\n";
-      it->second.second->print(stream, tabsNextNext);
-      stream << "\n";
-    }
-    stream << "]\n";
-  }
+  stream << tabs << "------------- Global Frame ---------------\n";
+  globalFrame->print(stream, tabs);
 
   if (parent) {
     stream << tabs << "--------- Parent Dependencies ----------\n";

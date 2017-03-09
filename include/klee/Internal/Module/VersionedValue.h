@@ -21,9 +21,11 @@
 #include "klee/Expr.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Value.h>
 #else
+#include <llvm/BasicBlock.h>
 #include <llvm/Instruction.h>
 #include <llvm/Value.h>
 #endif
@@ -40,7 +42,7 @@ public:
   unsigned refCount;
 
 private:
-  /// \brief The location's LLVM value
+  /// \brief The location of the allocation's LLVM value
   llvm::Value *value;
 
   /// \brief The call history by which the allocation is reached
@@ -172,12 +174,23 @@ private:
   /// \brief The allocation id
   uintptr_t allocationId;
 
+  /// \brief Indicates that this address is global
+  bool globalFlag;
+
   MemoryLocation(ref<AllocationContext> _context, ref<Expr> &_address,
                  ref<Expr> &_base, ref<Expr> &_offset, uint64_t _size,
                  uintptr_t _allocationId = 0)
       : refCount(0), context(_context), offset(_offset),
         concreteOffsetBound(_size), size(_size) {
     bool unknownBase = false;
+
+    globalFlag = true;
+    if (const llvm::Instruction *inst =
+            llvm::dyn_cast<llvm::Instruction>(_context->getValue())) {
+      if (inst->getParent() && inst->getParent()->getParent()) {
+        globalFlag = false;
+      }
+    }
 
     isConcrete = false;
     if (ConstantExpr *co = llvm::dyn_cast<ConstantExpr>(_offset)) {
@@ -326,6 +339,8 @@ public:
   ref<Expr> getOffset() const { return offset; }
 
   uint64_t getSize() const { return size; }
+
+  bool isGlobal() const { return globalFlag; }
 
   /// \brief Print the content of the object to the LLVM error stream
   void dump() const {
