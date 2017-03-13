@@ -181,7 +181,7 @@ public:
   public:
     unsigned refCount;
 
-    StoreFrame() {}
+    StoreFrame() : refCount(0) {}
 
     ~StoreFrame() {
       // Delete the locally-constructed relations
