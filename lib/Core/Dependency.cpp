@@ -385,120 +385,6 @@ Dependency::getStoredExpressions(const std::vector<llvm::Instruction *> &stack,
 }
 
 ref<VersionedValue>
-Dependency::getLatestValue(llvm::Value *value,
-                           const std::vector<llvm::Instruction *> &stack,
-                           ref<Expr> valueExpr, bool constraint) {
-  assert(value && !valueExpr.isNull() && "value cannot be null");
-  if (llvm::isa<llvm::ConstantExpr>(value)) {
-    llvm::Instruction *asInstruction =
-        llvm::dyn_cast<llvm::ConstantExpr>(value)->getAsInstruction();
-    if (llvm::GetElementPtrInst *gi =
-            llvm::dyn_cast<llvm::GetElementPtrInst>(asInstruction)) {
-      uint64_t offset = 0;
-      uint64_t size = 0;
-
-      // getelementptr may be cascading, so we loop
-      while (gi) {
-        if (gi->getNumOperands() >= 2) {
-          if (llvm::ConstantInt *idx =
-                  llvm::dyn_cast<llvm::ConstantInt>(gi->getOperand(1))) {
-            offset += idx->getLimitedValue();
-          }
-        }
-        llvm::Value *ptrOp = gi->getPointerOperand();
-        llvm::Type *pointerElementType =
-            ptrOp->getType()->getPointerElementType();
-
-        size = pointerElementType->isSized()
-                   ? targetData->getTypeStoreSize(pointerElementType)
-                   : 0;
-
-        if (llvm::isa<llvm::ConstantExpr>(ptrOp)) {
-          llvm::Instruction *asInstruction =
-              llvm::dyn_cast<llvm::ConstantExpr>(ptrOp)->getAsInstruction();
-          gi = llvm::dyn_cast<llvm::GetElementPtrInst>(asInstruction);
-          continue;
-        }
-
-        gi = 0;
-      }
-
-      return getNewPointerValue(value, stack, valueExpr, size);
-    } else if (llvm::isa<llvm::IntToPtrInst>(asInstruction)) {
-	// 0 signifies unknown size
-      return getNewPointerValue(value, stack, valueExpr, 0);
-    }
-  }
-
-  // A global value is a constant: Its value is constant throughout execution,
-  // but
-  // indeterministic. In case this was a non-global-value (normal) constant, we
-  // immediately return with a versioned value, as dependencies are not
-  // important. However, the dependencies of global values should be searched
-  // for in the ancestors (later) as they need to be consistent in an execution.
-  if (llvm::isa<llvm::Constant>(value) && !llvm::isa<llvm::GlobalValue>(value))
-    return getNewVersionedValue(value, stack, valueExpr);
-
-  if (valuesMap.find(value) != valuesMap.end()) {
-    // Slight complication here that the latest version of an LLVM
-    // value may not be at the end of the vector; it is possible other
-    // values in a call stack has been appended to the vector, before
-    // the function returned, so the end part of the vector contains
-    // local values in a call already returned. To resolve this issue,
-    // here we naively search for values with equivalent expression.
-    std::vector<ref<VersionedValue> > allValues = valuesMap[value];
-
-    // In case this was for adding constraints, simply assume the
-    // latest value is the one. This is due to the difficulty in
-    // that the constraint in valueExpr is already processed into
-    // a different syntax.
-    if (constraint)
-      return allValues.back();
-
-    for (std::vector<ref<VersionedValue> >::reverse_iterator
-             it = allValues.rbegin(),
-             ie = allValues.rend();
-         it != ie; ++it) {
-      ref<Expr> e = (*it)->getExpression();
-      if (e == valueExpr)
-        return *it;
-    }
-  }
-
-  ref<VersionedValue> ret = 0;
-  if (parent)
-    ret = parent->getLatestValue(value, stack, valueExpr, constraint);
-
-  if (ret.isNull()) {
-    if (llvm::GlobalValue *gv = llvm::dyn_cast<llvm::GlobalValue>(value)) {
-      // We could not find the global value: we register it anew.
-      if (gv->getType()->isPointerTy()) {
-        uint64_t size = 0;
-        if (gv->getType()->getPointerElementType()->isSized())
-          size = targetData->getTypeStoreSize(
-              gv->getType()->getPointerElementType());
-        ret = getNewPointerValue(value, stack, valueExpr, size);
-      } else {
-        ret = getNewVersionedValue(value, stack, valueExpr);
-      }
-    } else {
-      llvm::StringRef name(value->getName());
-      if (name.str() == "argc") {
-        ret = getNewVersionedValue(value, stack, valueExpr);
-      } else if (name.str() == "this" && value->getType()->isPointerTy()) {
-        // For C++ "this" variable that is not found
-        if (value->getType()->getPointerElementType()->isSized()) {
-          uint64_t size = targetData->getTypeStoreSize(
-              value->getType()->getPointerElementType());
-          ret = getNewPointerValue(value, stack, valueExpr, size);
-        }
-      }
-    }
-  }
-  return ret;
-}
-
-ref<VersionedValue>
 Dependency::getLatestValueNoConstantCheck(llvm::Value *value,
                                           ref<Expr> valueExpr) {
   assert(value && "value cannot be null");
@@ -795,8 +681,7 @@ std::vector<ref<VersionedValue> > Dependency::populateArgumentValuesList(
   std::vector<ref<VersionedValue> > argumentValuesList;
   for (unsigned i = numArgs; i > 0;) {
     llvm::Value *argOperand = site->getArgOperand(--i);
-    ref<VersionedValue> latestValue =
-        getLatestValue(argOperand, stack, arguments.at(i).value);
+    ref<VersionedValue> latestValue = arguments.at(i).vvalue;
 
     if (!latestValue.isNull())
       argumentValuesList.push_back(latestValue);
@@ -1362,16 +1247,16 @@ Dependency::execute(llvm::Instruction *instr,
 ref<VersionedValue>
 Dependency::executePHI(llvm::Instruction *instr, unsigned int incomingBlock,
                        const std::vector<llvm::Instruction *> &stack,
-                       ref<Expr> valueExpr, bool symbolicExecutionError) {
+                       Cell valueCell, bool symbolicExecutionError) {
   llvm::PHINode *node = llvm::dyn_cast<llvm::PHINode>(instr);
   llvm::Value *llvmArgValue = node->getIncomingValue(incomingBlock);
-  ref<VersionedValue> val = getLatestValue(llvmArgValue, stack, valueExpr);
+  ref<VersionedValue> val = valueCell.vvalue;
   if (!val.isNull()) {
-    addDependency(val, getNewVersionedValue(instr, stack, valueExpr));
+    addDependency(val, getNewVersionedValue(instr, stack, valueCell.value));
   } else if (llvm::isa<llvm::Constant>(llvmArgValue) ||
              llvm::isa<llvm::Argument>(llvmArgValue) ||
              symbolicExecutionError) {
-    getNewVersionedValue(instr, stack, valueExpr);
+    getNewVersionedValue(instr, stack, valueCell.value);
   } else {
     assert(!"operand not found");
   }
@@ -1507,18 +1392,17 @@ void Dependency::bindCallArguments(llvm::Instruction *i,
 
 void Dependency::bindReturnValue(llvm::CallInst *site,
                                  std::vector<llvm::Instruction *> &stack,
-                                 llvm::Instruction *i, ref<Expr> returnValue) {
+                                 llvm::Instruction *i, Cell returnCell) {
   llvm::ReturnInst *retInst = llvm::dyn_cast<llvm::ReturnInst>(i);
   if (site && retInst &&
       retInst->getReturnValue() // For functions returning void
       ) {
-    ref<VersionedValue> value =
-        getLatestValue(retInst->getReturnValue(), stack, returnValue);
+    ref<VersionedValue> value = returnCell.vvalue;
     if (!stack.empty()) {
       stack.pop_back();
     }
     if (!value.isNull())
-      addDependency(value, getNewVersionedValue(site, stack, returnValue));
+      addDependency(value, getNewVersionedValue(site, stack, returnCell.value));
   }
 }
 

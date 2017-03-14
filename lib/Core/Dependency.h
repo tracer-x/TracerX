@@ -425,11 +425,6 @@ namespace klee {
 
     Dependency *cdr() const;
 
-    ref<VersionedValue>
-    getLatestValue(llvm::Value *value,
-                   const std::vector<llvm::Instruction *> &stack,
-                   ref<Expr> valueExpr, bool constraint = false);
-
     /// \brief Abstract dependency state transition with argument(s)
     ref<VersionedValue> execute(llvm::Instruction *instr,
                                 const std::vector<llvm::Instruction *> &stack,
@@ -439,8 +434,8 @@ namespace klee {
     /// \brief Build dependencies from PHI node
     ref<VersionedValue>
     executePHI(llvm::Instruction *instr, unsigned int incomingBlock,
-               const std::vector<llvm::Instruction *> &stack,
-               ref<Expr> valueExpr, bool symbolicExecutionError);
+               const std::vector<llvm::Instruction *> &stack, Cell valueCell,
+               bool symbolicExecutionError);
 
     /// \brief Execute memory operation (load/store)
     ref<VersionedValue> executeMemoryOperation(
@@ -471,7 +466,7 @@ namespace klee {
     /// \brief This propagates the dependency due to the return value of a call
     void bindReturnValue(llvm::CallInst *site,
                          std::vector<llvm::Instruction *> &stack,
-                         llvm::Instruction *inst, ref<Expr> returnValue);
+                         llvm::Instruction *inst, Cell returnValue);
 
     /// \brief Given a versioned value, retrieve all its sources and mark them
     /// as in the core.

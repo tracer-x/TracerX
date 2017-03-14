@@ -20,6 +20,10 @@ namespace klee {
     ref<Expr> value;
     ref<VersionedValue> vvalue;
   };
+
+  inline bool operator<(const Cell &lhs, const Cell &rhs) {
+    return lhs.value < rhs.value;
+  }
 }
 
 #endif

@@ -324,14 +324,13 @@ void TxTreeGraph::save(std::string dotFileName) {
 /**/
 
 PathCondition::PathCondition(
-    ref<Expr> &constraint, Dependency *dependency, llvm::Value *_condition,
+    Cell &constraint, Dependency *dependency, llvm::Value *_condition,
     const std::vector<llvm::Instruction *> &callHistory, PathCondition *prev)
     : constraint(constraint), shadowConstraint(constraint), shadowed(false),
       dependency(dependency), core(false), tail(prev) {
   ref<VersionedValue> emptyCondition;
   if (dependency) {
-    condition =
-        dependency->getLatestValue(_condition, callHistory, constraint, true);
+    condition = constraint.vvalue;
     assert(!condition.isNull() && "null constraint on path condition");
   } else {
     condition = emptyCondition;
@@ -2214,10 +2213,9 @@ ref<VersionedValue> TxTree::execute(llvm::Instruction *instr,
 }
 
 ref<VersionedValue> TxTree::executePHI(llvm::Instruction *instr,
-                                       unsigned incomingBlock,
-                                       ref<Expr> valueExpr) {
+                                       unsigned incomingBlock, Cell valueCell) {
   ref<VersionedValue> ret = currentTxTreeNode->dependency->executePHI(
-      instr, incomingBlock, currentTxTreeNode->callHistory, valueExpr,
+      instr, incomingBlock, currentTxTreeNode->callHistory, valueCell,
       symbolicExecutionError);
   symbolicExecutionError = false;
   return ret;
@@ -2353,11 +2351,11 @@ TxTreeNode::getInterpolant(std::set<const Array *> &replacements) const {
   return expr;
 }
 
-void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
+void TxTreeNode::addConstraint(Cell &constraint, llvm::Value *condition) {
   TimerStatIncrementer t(addConstraintTime);
   pathCondition = new PathCondition(constraint, dependency, condition,
                                     callHistory, pathCondition);
-  graph->addPathCondition(this, pathCondition, constraint);
+  graph->addPathCondition(this, pathCondition, constraint.value);
 }
 
 void TxTreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
@@ -2381,11 +2379,11 @@ void TxTreeNode::bindCallArguments(llvm::Instruction *site,
 }
 
 void TxTreeNode::bindReturnValue(llvm::CallInst *site, llvm::Instruction *inst,
-                                 ref<Expr> returnValue) {
+                                 Cell returnCell) {
   // TODO: This is probably where we should simplify
   // the dependency graph by removing callee values.
   TimerStatIncrementer t(bindReturnValueTime);
-  dependency->bindReturnValue(site, callHistory, inst, returnValue);
+  dependency->bindReturnValue(site, callHistory, inst, returnCell);
 }
 
 std::pair<Dependency::ConcreteStore, Dependency::SymbolicStore>

@@ -202,7 +202,7 @@ class PathCondition {
   PathCondition *tail;
 
 public:
-  PathCondition(ref<Expr> &constraint, Dependency *dependency,
+  PathCondition(Cell &constraint, Dependency *dependency,
                 llvm::Value *condition,
                 const std::vector<llvm::Instruction *> &callHistory,
                 PathCondition *prev);
@@ -598,7 +598,7 @@ public:
   ///
   /// \param constraint The constraint to extend the current path condition with
   /// \param value The LLVM value that corresponds to the constraint
-  void addConstraint(ref<Expr> &constraint, llvm::Value *value);
+  void addConstraint(Cell &constraint, llvm::Value *value);
 
   /// \brief Creates fresh interpolation data holder for the two given KLEE
   /// execution states.
@@ -615,7 +615,7 @@ public:
 
   /// \brief This propagates the dependency due to the return value of a call
   void bindReturnValue(llvm::CallInst *site, llvm::Instruction *inst,
-                       ref<Expr> returnValue);
+                       Cell returnValue);
 
   /// \brief This retrieves the allocations known at this state, and the
   /// expressions stored in the allocations.
@@ -887,7 +887,7 @@ public:
   /// \brief Abstractly execute a PHI instruction for building dependency
   /// information.
   ref<VersionedValue> executePHI(llvm::Instruction *instr,
-                                 unsigned incomingBlock, ref<Expr> valueExpr);
+                                 unsigned incomingBlock, Cell valueExpr);
 
   /// \brief For executing memory operations, called by
   /// Executor::executeMemoryOperation

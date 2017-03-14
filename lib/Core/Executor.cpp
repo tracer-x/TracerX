@@ -664,9 +664,9 @@ void Executor::initializeGlobals(ExecutionState &state) {
   }
 }
 
-void Executor::branch(ExecutionState &state, 
-                      const std::vector< ref<Expr> > &conditions,
-                      std::vector<ExecutionState*> &result) {
+void Executor::branch(ExecutionState &state,
+                      const std::vector<Cell> &conditions,
+                      std::vector<ExecutionState *> &result) {
   TimerStatIncrementer timer(stats::forkTime);
   unsigned N = conditions.size();
   assert(N);
@@ -723,9 +723,8 @@ void Executor::branch(ExecutionState &state,
       unsigned i;
       for (i=0; i<N; ++i) {
         ref<ConstantExpr> res;
-        bool success = 
-          solver->getValue(state, siit->assignment.evaluate(conditions[i]), 
-                           res);
+        bool success = solver->getValue(
+            state, siit->assignment.evaluate(conditions[i].value), res);
         assert(success && "FIXME: Unhandled solver failure");
         (void) success;
         if (res->isTrue())
@@ -757,8 +756,8 @@ void Executor::branch(ExecutionState &state,
       addConstraint(*result[i], conditions[i]);
 }
 
-Executor::StatePair 
-Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
+Executor::StatePair Executor::fork(ExecutionState &current, Cell condition,
+                                   bool isInternal) {
   Solver::Validity res;
   std::map< ExecutionState*, std::vector<SeedInfo> >::iterator it = 
     seedMap.find(&current);
@@ -782,11 +781,14 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
         (MaxStaticCPForkPct<1. &&
          cpn && (cpn->statistics.getValue(stats::solverTime) > 
                  stats::solverTime*MaxStaticCPSolvePct))) {
-      ref<ConstantExpr> value; 
-      bool success = solver->getValue(current, condition, value);
+      ref<ConstantExpr> value;
+      bool success = solver->getValue(current, condition.value, value);
       assert(success && "FIXME: Unhandled solver failure");
       (void) success;
-      addConstraint(current, EqExpr::create(value, condition));
+      Cell newCell;
+      newCell.value = EqExpr::create(value, condition.value);
+      newCell.vvalue = condition.vvalue;
+      addConstraint(current, newCell);
       condition = value;
     }
   }
@@ -825,7 +827,10 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
           addConstraint(current, condition);
         } else  {
           res = Solver::False;
-          addConstraint(current, Expr::createIsZero(condition));
+          Cell newCell;
+          newCell.value = Expr::createIsZero(condition.value);
+          newCell.vvalue = condition.vvalue;
+          addConstraint(current, newCell);
         }
       }
     } else if (res==Solver::Unknown) {
@@ -850,7 +855,10 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
           addConstraint(current, condition);
           res = Solver::True;        
         } else {
-          addConstraint(current, Expr::createIsZero(condition));
+          Cell newCell;
+          newCell.value = Expr::createIsZero(condition.value);
+          newCell.vvalue = condition.vvalue;
+          addConstraint(current, newCell);
           res = Solver::False;
         }
       }
@@ -867,8 +875,8 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
     for (std::vector<SeedInfo>::iterator siit = it->second.begin(), 
            siie = it->second.end(); siit != siie; ++siit) {
       ref<ConstantExpr> res;
-      bool success = 
-        solver->getValue(current, siit->assignment.evaluate(condition), res);
+      bool success = solver->getValue(
+          current, siit->assignment.evaluate(condition.value), res);
       assert(success && "FIXME: Unhandled solver failure");
       (void) success;
       if (res->isTrue()) {
@@ -883,8 +891,10 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       assert(trueSeed || falseSeed);
       
       res = trueSeed ? Solver::True : Solver::False;
-      addConstraint(current,
-                    trueSeed ? condition : Expr::createIsZero(condition));
+      Cell newCell;
+      newCell.value = Expr::createIsZero(condition.value);
+      newCell.vvalue = condition.vvalue;
+      addConstraint(current, trueSeed ? condition : newCell);
     }
   }
 
@@ -946,8 +956,8 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       for (std::vector<SeedInfo>::iterator siit = seeds.begin(), 
              siie = seeds.end(); siit != siie; ++siit) {
         ref<ConstantExpr> res;
-        bool success =
-          solver->getValue(current, siit->assignment.evaluate(condition), res);
+        bool success = solver->getValue(
+            current, siit->assignment.evaluate(condition.value), res);
         assert(success && "FIXME: Unhandled solver failure");
         (void) success;
         if (res->isTrue()) {
@@ -999,7 +1009,10 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
     }
 
     addConstraint(*trueState, condition);
-    addConstraint(*falseState, Expr::createIsZero(condition));
+    Cell newCell;
+    newCell.value = Expr::createIsZero(condition.value);
+    newCell.vvalue = condition.vvalue;
+    addConstraint(*falseState, newCell);
 
     // Kinda gross, do we even really still want this option?
     if (MaxDepth && MaxDepth<=trueState->depth) {
@@ -1012,7 +1025,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
   }
 }
 
-void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
+void Executor::addConstraint(ExecutionState &state, Cell condition) {
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(condition)) {
     if (!CE->isTrue())
       llvm::report_fatal_error("attempt to add invalid constraint");
@@ -1027,12 +1040,12 @@ void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
     for (std::vector<SeedInfo>::iterator siit = it->second.begin(), 
            siie = it->second.end(); siit != siie; ++siit) {
       bool res;
-      bool success = 
-        solver->mustBeFalse(state, siit->assignment.evaluate(condition), res);
+      bool success = solver->mustBeFalse(
+          state, siit->assignment.evaluate(condition.value), res);
       assert(success && "FIXME: Unhandled solver failure");
       (void) success;
       if (res) {
-        siit->patchSeed(state, condition, solver);
+        siit->patchSeed(state, condition.value, solver);
         warn = true;
       }
     }
@@ -1042,7 +1055,7 @@ void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
 
   state.addConstraint(condition);
   if (ivcEnabled)
-    doImpliedValueConcretization(state, condition, 
+    doImpliedValueConcretization(state, condition.value,
                                  ConstantExpr::alloc(1, Expr::Bool));
 }
 
@@ -1160,16 +1173,14 @@ ref<Expr> Executor::toUnique(const ExecutionState &state,
 
 /* Concretize the given expression, and return a possible constant value. 
    'reason' is just a documentation string stating the reason for concretization. */
-ref<klee::ConstantExpr> 
-Executor::toConstant(ExecutionState &state, 
-                     ref<Expr> e,
-                     const char *reason) {
-  e = state.constraints.simplifyExpr(e);
-  if (ConstantExpr *CE = dyn_cast<ConstantExpr>(e))
+ref<klee::ConstantExpr> Executor::toConstant(ExecutionState &state, Cell e,
+                                             const char *reason) {
+  e.value = state.constraints.simplifyExpr(e.value);
+  if (ConstantExpr *CE = dyn_cast<ConstantExpr>(e.value))
     return CE;
 
   ref<ConstantExpr> value;
-  bool success = solver->getValue(state, e, value);
+  bool success = solver->getValue(state, e.value, value);
   assert(success && "FIXME: Unhandled solver failure");
   (void) success;
 
@@ -1184,7 +1195,10 @@ Executor::toConstant(ExecutionState &state,
   else
     klee_warning_once(reason, "%s", os.str().c_str());
 
-  addConstraint(state, EqExpr::create(e, value));
+  Cell newCell;
+  newCell.value = EqExpr::create(e.value, value);
+  newCell.vvalue = e.vvalue;
+  addConstraint(state, newCell);
 
   return value;
 }
@@ -1208,7 +1222,7 @@ void Executor::executeGetValue(ExecutionState &state, Cell e,
     bindLocal(target, state, value, vvalue);
 
   } else {
-    std::set< ref<Expr> > values;
+    std::set<Cell> cells;
     for (std::vector<SeedInfo>::iterator siit = it->second.begin(), 
            siie = it->second.end(); siit != siie; ++siit) {
       ref<ConstantExpr> value;
@@ -1216,33 +1230,36 @@ void Executor::executeGetValue(ExecutionState &state, Cell e,
           solver->getValue(state, siit->assignment.evaluate(e.value), value);
       assert(success && "FIXME: Unhandled solver failure");
       (void) success;
-      values.insert(value);
+      Cell newCell;
+      newCell.value = value;
+      newCell.vvalue = e.vvalue;
+      cells.insert(newCell);
     }
-    
-    std::vector< ref<Expr> > conditions;
-    for (std::set< ref<Expr> >::iterator vit = values.begin(), 
-           vie = values.end(); vit != vie; ++vit)
-      conditions.push_back(EqExpr::create(e.value, *vit));
 
+    std::vector<Cell> conditions;
+    for (std::set<Cell>::iterator vit = cells.begin(), vie = cells.end();
+         vit != vie; ++vit) {
+      Cell newCell;
+      newCell.value = EqExpr::create(e.value, (*vit).value);
+      newCell.vvalue = e.vvalue;
+      conditions.push_back(newCell);
+    }
     std::vector<ExecutionState*> branches;
     branch(state, conditions, branches);
     
     std::vector<ExecutionState*>::iterator bit = branches.begin();
-    for (std::set<ref<Expr> >::iterator vit = values.begin(),
-                                        vie = values.end();
+    for (std::set<Cell>::iterator vit = cells.begin(), vie = cells.end();
          vit != vie; ++vit) {
       ExecutionState *es = *bit;
       if (es) {
         ref<VersionedValue> vvalue;
         if (INTERPOLATION_ENABLED) {
           std::vector<Cell> args;
-          Cell tmpCell;
-          tmpCell.value = *vit;
           args.push_back(e);
-          args.push_back(tmpCell);
+          args.push_back(*vit);
           vvalue = TxTree::executeOnNode(es->txTreeNode, target->inst, args);
         }
-        bindLocal(target, *es, *vit, vvalue);
+        bindLocal(target, *es, (*vit).value, vvalue);
       }
       ++bit;
     }
@@ -1572,10 +1589,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     KInstIterator kcaller = state.stack.back().caller;
     Instruction *caller = kcaller ? kcaller->inst : 0;
     bool isVoidReturn = (ri->getNumOperands() == 0);
-    ref<Expr> result = ConstantExpr::alloc(0, Expr::Bool);
-    
+    Cell result;
+    result.value = ConstantExpr::alloc(0, Expr::Bool);
+
     if (!isVoidReturn) {
-      result = eval(ki, 0, state).value;
+      result = eval(ki, 0, state);
     }
 
     if (state.stack.size() <= 1) {
@@ -1598,7 +1616,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         LLVM_TYPE_Q Type *t = caller->getType();
         if (t != Type::getVoidTy(getGlobalContext())) {
           // may need to do coercion due to bitcasts
-          Expr::Width from = result->getWidth();
+          Expr::Width from = result.value->getWidth();
           Expr::Width to = getWidthForLLVMType(t);
             
           if (from != to) {
@@ -1614,15 +1632,13 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 	    bool isSExt = cs.paramHasAttr(0, llvm::Attribute::SExt);
 #endif
             if (isSExt) {
-              result = SExtExpr::create(result, to);
+              result.value = SExtExpr::create(result.value, to);
             } else {
-              result = ZExtExpr::create(result, to);
+              result.value = ZExtExpr::create(result.value, to);
             }
           }
 
-          ref<VersionedValue> vvalue;
-
-          bindLocal(kcaller, state, result, vvalue);
+          bindLocal(kcaller, state, result.value, result.vvalue);
         }
       } else {
         // We check that the return value has no users instead of
@@ -1670,7 +1686,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // FIXME: Find a way that we don't have this hidden dependency.
       assert(bi->getCondition() == bi->getOperand(0) &&
              "Wrong operand index!");
-      ref<Expr> cond = eval(ki, 0, state).value;
+      Cell cond = eval(ki, 0, state);
       Executor::StatePair branches = fork(state, cond, false);
 
       // NOTE: There is a hidden dependency here, markBranchVisited
@@ -1727,7 +1743,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // - order of case branches is based on the order of the expressions of
       //   the scase values, still default is handled last
       std::vector<BasicBlock *> bbOrder;
-      std::map<BasicBlock *, ref<Expr> > branchTargets;
+      std::map<BasicBlock *, Cell> branchTargets;
 
       std::map<ref<Expr>, BasicBlock *> expressionOrder;
 
@@ -1750,7 +1766,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       }
 
       // Track default branch values
-      ref<Expr> defaultValue = ConstantExpr::alloc(1, Expr::Bool);
+      Cell defaultValue;
+      defaultValue.value = ConstantExpr::alloc(1, Expr::Bool);
 
       // iterate through all non-default cases but in order of the expressions
       for (std::map<ref<Expr>, BasicBlock *>::iterator
@@ -1760,7 +1777,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         ref<Expr> match = EqExpr::create(cond, it->first);
 
         // Make sure that the default value does not contain this target's value
-        defaultValue = AndExpr::create(defaultValue, Expr::createIsZero(match));
+        defaultValue.value =
+            AndExpr::create(defaultValue.value, Expr::createIsZero(match));
 
         // Check if control flow could take this case
         bool result;
@@ -1791,11 +1809,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
       // Check if control could take the default case
       bool res;
-      bool success = solver->mayBeTrue(state, defaultValue, res);
+      bool success = solver->mayBeTrue(state, defaultValue.value, res);
       assert(success && "FIXME: Unhandled solver failure");
       (void) success;
       if (res) {
-        std::pair<std::map<BasicBlock *, ref<Expr> >::iterator, bool> ret =
+        std::pair<std::map<BasicBlock *, Cell>::iterator, bool> ret =
             branchTargets.insert(
                 std::make_pair(si->getDefaultDest(), defaultValue));
         if (ret.second) {
@@ -1805,7 +1823,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
       // Fork the current state with each state having one of the possible
       // successors of this switch
-      std::vector< ref<Expr> > conditions;
+      std::vector<Cell> conditions;
       for (std::vector<BasicBlock *>::iterator it = bbOrder.begin(),
                                                ie = bbOrder.end();
            it != ie; ++it) {
@@ -1902,7 +1920,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       }
       executeCall(state, ki, f, arguments);
     } else {
-      ref<Expr> v = eval(ki, 0, state).value;
+      Cell v = eval(ki, 0, state);
 
       ExecutionState *free = &state;
       bool hasInvalid = false, first = true;
@@ -1912,10 +1930,13 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
          handle it for us, albeit with some overhead. */
       do {
         ref<ConstantExpr> value;
-        bool success = solver->getValue(*free, v, value);
+        bool success = solver->getValue(*free, v.value, value);
         assert(success && "FIXME: Unhandled solver failure");
         (void) success;
-        StatePair res = fork(*free, EqExpr::create(v, value), true);
+        Cell newCell;
+        newCell.value = EqExpr::create(v.value, value);
+        newCell.vvalue = v.vvalue;
+        StatePair res = fork(*free, newCell, true);
         if (res.first) {
           uint64_t addr = value->getZExtValue();
           if (legalFunctions.count(addr)) {
@@ -1948,19 +1969,18 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #else
     Cell resultCell = eval(ki, state.incomingBBIndex * 2, state);
 #endif
-    ref<Expr> result = resultCell.value;
     ref<VersionedValue> vvalue;
 
     // Update dependency
     if (INTERPOLATION_ENABLED) {
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
-      vvalue = txTree->executePHI(i, state.incomingBBIndex, result);
+      vvalue = txTree->executePHI(i, state.incomingBBIndex, resultCell);
 #else
-      vvalue = txTree->executePHI(i, state.incomingBBIndex * 2, result);
+      vvalue = txTree->executePHI(i, state.incomingBBIndex * 2, resultCell);
 #endif
     }
 
-    bindLocal(ki, state, result, vvalue);
+    bindLocal(ki, state, resultCell.value, vvalue);
     break;
   }
 
@@ -2584,10 +2604,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     Cell leftCell = eval(ki, 0, state);
     Cell rightCell = eval(ki, 1, state);
 
-    ref<ConstantExpr> left =
-        toConstant(state, leftCell.value, "floating point");
-    ref<ConstantExpr> right =
-        toConstant(state, rightCell.value, "floating point");
+    ref<ConstantExpr> left = toConstant(state, leftCell, "floating point");
+    ref<ConstantExpr> right = toConstant(state, rightCell, "floating point");
     if (!fpWidthToSemantics(left->getWidth()) ||
         !fpWidthToSemantics(right->getWidth()))
       return terminateStateOnExecError(state, "Unsupported FAdd operation");
@@ -2616,10 +2634,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     Cell leftCell = eval(ki, 0, state);
     Cell rightCell = eval(ki, 1, state);
 
-    ref<ConstantExpr> left =
-        toConstant(state, leftCell.value, "floating point");
-    ref<ConstantExpr> right =
-        toConstant(state, rightCell.value, "floating point");
+    ref<ConstantExpr> left = toConstant(state, leftCell, "floating point");
+    ref<ConstantExpr> right = toConstant(state, rightCell, "floating point");
     if (!fpWidthToSemantics(left->getWidth()) ||
         !fpWidthToSemantics(right->getWidth()))
       return terminateStateOnExecError(state, "Unsupported FSub operation");
@@ -2647,10 +2663,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     Cell leftCell = eval(ki, 0, state);
     Cell rightCell = eval(ki, 1, state);
 
-    ref<ConstantExpr> left =
-        toConstant(state, leftCell.value, "floating point");
-    ref<ConstantExpr> right =
-        toConstant(state, rightCell.value, "floating point");
+    ref<ConstantExpr> left = toConstant(state, leftCell, "floating point");
+    ref<ConstantExpr> right = toConstant(state, rightCell, "floating point");
     if (!fpWidthToSemantics(left->getWidth()) ||
         !fpWidthToSemantics(right->getWidth()))
       return terminateStateOnExecError(state, "Unsupported FMul operation");
@@ -2679,10 +2693,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     Cell leftCell = eval(ki, 0, state);
     Cell rightCell = eval(ki, 1, state);
 
-    ref<ConstantExpr> left =
-        toConstant(state, leftCell.value, "floating point");
-    ref<ConstantExpr> right =
-        toConstant(state, rightCell.value, "floating point");
+    ref<ConstantExpr> left = toConstant(state, leftCell, "floating point");
+    ref<ConstantExpr> right = toConstant(state, rightCell, "floating point");
     if (!fpWidthToSemantics(left->getWidth()) ||
         !fpWidthToSemantics(right->getWidth()))
       return terminateStateOnExecError(state, "Unsupported FDiv operation");
@@ -2711,10 +2723,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     Cell leftCell = eval(ki, 0, state);
     Cell rightCell = eval(ki, 1, state);
 
-    ref<ConstantExpr> left =
-        toConstant(state, leftCell.value, "floating point");
-    ref<ConstantExpr> right =
-        toConstant(state, rightCell.value, "floating point");
+    ref<ConstantExpr> left = toConstant(state, leftCell, "floating point");
+    ref<ConstantExpr> right = toConstant(state, rightCell, "floating point");
     if (!fpWidthToSemantics(left->getWidth()) ||
         !fpWidthToSemantics(right->getWidth()))
       return terminateStateOnExecError(state, "Unsupported FRem operation");
@@ -2743,7 +2753,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     FPTruncInst *fi = cast<FPTruncInst>(i);
     Expr::Width resultType = getWidthForLLVMType(fi->getType());
     Cell origArg = eval(ki, 0, state);
-    ref<ConstantExpr> arg = toConstant(state, origArg.value, "floating point");
+    ref<ConstantExpr> arg = toConstant(state, origArg, "floating point");
     if (!fpWidthToSemantics(arg->getWidth()) || resultType > arg->getWidth())
       return terminateStateOnExecError(state, "Unsupported FPTrunc operation");
 
@@ -2773,7 +2783,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     FPExtInst *fi = cast<FPExtInst>(i);
     Expr::Width resultType = getWidthForLLVMType(fi->getType());
     Cell origArg = eval(ki, 0, state);
-    ref<ConstantExpr> arg = toConstant(state, origArg.value, "floating point");
+    ref<ConstantExpr> arg = toConstant(state, origArg, "floating point");
     if (!fpWidthToSemantics(arg->getWidth()) || arg->getWidth() > resultType)
       return terminateStateOnExecError(state, "Unsupported FPExt operation");
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
@@ -2802,7 +2812,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     FPToUIInst *fi = cast<FPToUIInst>(i);
     Expr::Width resultType = getWidthForLLVMType(fi->getType());
     Cell origArg = eval(ki, 0, state);
-    ref<ConstantExpr> arg = toConstant(state, origArg.value, "floating point");
+    ref<ConstantExpr> arg = toConstant(state, origArg, "floating point");
     if (!fpWidthToSemantics(arg->getWidth()) || resultType > 64)
       return terminateStateOnExecError(state, "Unsupported FPToUI operation");
 
@@ -2832,7 +2842,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     FPToSIInst *fi = cast<FPToSIInst>(i);
     Expr::Width resultType = getWidthForLLVMType(fi->getType());
     Cell origArg = eval(ki, 0, state);
-    ref<ConstantExpr> arg = toConstant(state, origArg.value, "floating point");
+    ref<ConstantExpr> arg = toConstant(state, origArg, "floating point");
     if (!fpWidthToSemantics(arg->getWidth()) || resultType > 64)
       return terminateStateOnExecError(state, "Unsupported FPToSI operation");
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
@@ -2862,7 +2872,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     UIToFPInst *fi = cast<UIToFPInst>(i);
     Expr::Width resultType = getWidthForLLVMType(fi->getType());
     Cell origArg = eval(ki, 0, state);
-    ref<ConstantExpr> arg = toConstant(state, origArg.value, "floating point");
+    ref<ConstantExpr> arg = toConstant(state, origArg, "floating point");
     const llvm::fltSemantics *semantics = fpWidthToSemantics(resultType);
     if (!semantics)
       return terminateStateOnExecError(state, "Unsupported UIToFP operation");
@@ -2887,7 +2897,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     SIToFPInst *fi = cast<SIToFPInst>(i);
     Expr::Width resultType = getWidthForLLVMType(fi->getType());
     Cell origArg = eval(ki, 0, state);
-    ref<ConstantExpr> arg = toConstant(state, origArg.value, "floating point");
+    ref<ConstantExpr> arg = toConstant(state, origArg, "floating point");
     const llvm::fltSemantics *semantics = fpWidthToSemantics(resultType);
     if (!semantics)
       return terminateStateOnExecError(state, "Unsupported SIToFP operation");
@@ -2913,10 +2923,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     Cell leftCell = eval(ki, 0, state);
     Cell rightCell = eval(ki, 1, state);
 
-    ref<ConstantExpr> left =
-        toConstant(state, leftCell.value, "floating point");
-    ref<ConstantExpr> right =
-        toConstant(state, rightCell.value, "floating point");
+    ref<ConstantExpr> left = toConstant(state, leftCell, "floating point");
+    ref<ConstantExpr> right = toConstant(state, rightCell, "floating point");
     if (!fpWidthToSemantics(left->getWidth()) ||
         !fpWidthToSemantics(right->getWidth()))
       return terminateStateOnExecError(state, "Unsupported FCmp operation");
@@ -3732,14 +3740,13 @@ void Executor::callExternalFunction(ExecutionState &state, KInstruction *target,
 
 /***/
 
-ref<Expr> Executor::replaceReadWithSymbolic(ExecutionState &state, 
-                                            ref<Expr> e) {
+ref<Expr> Executor::replaceReadWithSymbolic(ExecutionState &state, Cell e) {
   unsigned n = interpreterOpts.MakeConcreteSymbolic;
   if (!n || replayKTest || replayPath)
     return e;
 
   // right now, we don't replace symbolics (is there any reason to?)
-  if (!isa<ConstantExpr>(e))
+  if (!isa<ConstantExpr>(e.value))
     return e;
 
   if (n != 1 && random() % n)
@@ -3750,12 +3757,15 @@ ref<Expr> Executor::replaceReadWithSymbolic(ExecutionState &state,
   
   static unsigned id;
   const std::string arrayName("rrws_arr" + llvm::utostr(++id));
-  const unsigned arrayWidth(Expr::getMinBytesForWidth(e->getWidth()));
+  const unsigned arrayWidth(Expr::getMinBytesForWidth(e.value->getWidth()));
   const Array *array = arrayCache.CreateArray(arrayName, arrayWidth);
-  ref<Expr> res = Expr::createTempRead(array, e->getWidth());
-  ref<Expr> eq = NotOptimizedExpr::create(EqExpr::create(e, res));
+  ref<Expr> res = Expr::createTempRead(array, e.value->getWidth());
+  ref<Expr> eq = NotOptimizedExpr::create(EqExpr::create(e.value, res));
+  Cell newCell;
+  newCell.value = eq;
+  newCell.vvalue = e.vvalue;
   llvm::errs() << "Making symbolic: " << eq << "\n";
-  state.addConstraint(eq);
+  state.addConstraint(newCell);
 
   if (INTERPOLATION_ENABLED) {
     // We create shadow array as existentially-quantified
@@ -3785,13 +3795,10 @@ ObjectState *Executor::bindObjectInState(ExecutionState &state,
   return os;
 }
 
-void Executor::executeAlloc(ExecutionState &state,
-                            ref<Expr> size,
-                            bool isLocal,
-                            KInstruction *target,
-                            bool zeroMemory,
+void Executor::executeAlloc(ExecutionState &state, Cell size, bool isLocal,
+                            KInstruction *target, bool zeroMemory,
                             const ObjectState *reallocFrom) {
-  size = toUnique(state, size);
+  size.value = toUnique(state, size.value);
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(size)) {
     MemoryObject *mo = memory->allocate(CE->getZExtValue(), isLocal, false, 
                                         state.prevPC->inst);
@@ -3841,16 +3848,18 @@ void Executor::executeAlloc(ExecutionState &state,
     // collapses the size expression with a select.
 
     ref<ConstantExpr> example;
-    bool success = solver->getValue(state, size, example);
+    bool success = solver->getValue(state, size.value, example);
     assert(success && "FIXME: Unhandled solver failure");
     (void) success;
     
     // Try and start with a small example.
     Expr::Width W = example->getWidth();
     while (example->Ugt(ConstantExpr::alloc(128, W))->isTrue()) {
+
       ref<ConstantExpr> tmp = example->LShr(ConstantExpr::alloc(1, W));
       bool res;
-      bool success = solver->mayBeTrue(state, EqExpr::create(tmp, size), res);
+      bool success =
+          solver->mayBeTrue(state, EqExpr::create(tmp, size.value), res);
       assert(success && "FIXME: Unhandled solver failure");      
       (void) success;
       if (!res)
@@ -3858,29 +3867,34 @@ void Executor::executeAlloc(ExecutionState &state,
       example = tmp;
     }
 
-    StatePair fixedSize = fork(state, EqExpr::create(example, size), true);
-    
+    Cell newCell;
+    newCell.value = EqExpr::create(example, size.value);
+    StatePair fixedSize = fork(state, newCell, true);
+
     if (fixedSize.second) { 
       // Check for exactly two values
       ref<ConstantExpr> tmp;
-      bool success = solver->getValue(*fixedSize.second, size, tmp);
+      bool success = solver->getValue(*fixedSize.second, size.value, tmp);
       assert(success && "FIXME: Unhandled solver failure");      
       (void) success;
       bool res;
-      success = solver->mustBeTrue(*fixedSize.second, 
-                                   EqExpr::create(tmp, size),
-                                   res);
+      success = solver->mustBeTrue(*fixedSize.second,
+                                   EqExpr::create(tmp, size.value), res);
       assert(success && "FIXME: Unhandled solver failure");      
       (void) success;
       if (res) {
-        executeAlloc(*fixedSize.second, tmp, isLocal,
-                     target, zeroMemory, reallocFrom);
+        Cell newCell;
+        newCell.value = tmp;
+        executeAlloc(*fixedSize.second, newCell, isLocal, target, zeroMemory,
+                     reallocFrom);
       } else {
         // See if a *really* big value is possible. If so assume
         // malloc will fail for it, so lets fork and return 0.
-        StatePair hugeSize =
-            fork(*fixedSize.second,
-                 UltExpr::create(ConstantExpr::alloc(1 << 31, W), size), true);
+        Cell newCell;
+        newCell.value =
+            UltExpr::create(ConstantExpr::alloc(1 << 31, W), size.value);
+        newCell.vvalue = size.vvalue;
+        StatePair hugeSize = fork(*fixedSize.second, newCell, true);
         if (hugeSize.first) {
           klee_message("NOTE: found huge malloc, returning 0");
           Cell result;
@@ -3900,7 +3914,7 @@ void Executor::executeAlloc(ExecutionState &state,
 
           std::string Str;
           llvm::raw_string_ostream info(Str);
-          ExprPPrinter::printOne(info, "  size expr", size);
+          ExprPPrinter::printOne(info, "  size expr", size.value);
           info << "  concretization : " << example << "\n";
           info << "  unbound example: " << tmp << "\n";
           terminateStateOnError(*hugeSize.second, "concretized symbolic size",
@@ -3910,14 +3924,23 @@ void Executor::executeAlloc(ExecutionState &state,
     }
 
     if (fixedSize.first) // can be zero when fork fails
-      executeAlloc(*fixedSize.first, example, isLocal, 
-                   target, zeroMemory, reallocFrom);
+    {
+      Cell newCell;
+      newCell.value = example;
+      newCell.vvalue = size.vvalue;
+      executeAlloc(*fixedSize.first, newCell, isLocal, target, zeroMemory,
+                   reallocFrom);
+    }
   }
 }
 
 void Executor::executeFree(ExecutionState &state, Cell address,
                            KInstruction *target) {
-  StatePair zeroPointer = fork(state, Expr::createIsZero(address.value), true);
+  Cell newCell;
+  newCell.value = Expr::createIsZero(address.value);
+  newCell.vvalue = address.vvalue;
+
+  StatePair zeroPointer = fork(state, newCell, true);
   ref<VersionedValue> vvalue;
 
   if (zeroPointer.first) {
@@ -3946,9 +3969,8 @@ void Executor::executeFree(ExecutionState &state, Cell address,
   }
 }
 
-void Executor::resolveExact(ExecutionState &state,
-                            ref<Expr> p,
-                            ExactResolutionList &results, 
+void Executor::resolveExact(ExecutionState &state, Cell p,
+                            ExactResolutionList &results,
                             const std::string &name) {
   // XXX we may want to be capping this?
   ResolutionList rl;
@@ -4044,7 +4066,7 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
         result.value = os->read(offset, type);
 
         if (interpreterOpts.MakeConcreteSymbolic)
-          result.value = replaceReadWithSymbolic(state, result.value);
+          result.value = replaceReadWithSymbolic(state, result);
 
         // Update dependency
         if (INTERPOLATION_ENABLED && target)
@@ -4420,7 +4442,11 @@ bool Executor::getSymbolicSolution(const ExecutionState &state,
       if (!success) break;
       // If the particular constraint operated on in this iteration through
       // the loop isn't implied then add it to the list of constraints.
-      if (!mustBeTrue) tmp.addConstraint(*pi);
+      if (!mustBeTrue) {
+        Cell newCell;
+        newCell.value = *pi;
+        tmp.addConstraint(newCell);
+      }
     }
     if (pi!=pie) break;
   }
