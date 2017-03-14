@@ -10,6 +10,8 @@
 #ifndef KLEE_SPECIALFUNCTIONHANDLER_H
 #define KLEE_SPECIALFUNCTIONHANDLER_H
 
+#include <klee/Internal/Module/Cell.h>
+
 #include <iterator>
 #include <map>
 #include <vector>
@@ -28,10 +30,9 @@ namespace klee {
   
   class SpecialFunctionHandler {
   public:
-    typedef void (SpecialFunctionHandler::*Handler)(ExecutionState &state,
-                                                    KInstruction *target, 
-                                                    std::vector<ref<Expr> > 
-                                                      &arguments);
+    typedef void (SpecialFunctionHandler::*Handler)(
+        ExecutionState &state, KInstruction *target,
+        std::vector<Cell> &arguments);
     typedef std::map<const llvm::Function*, 
                      std::pair<Handler,bool> > handlers_ty;
 
@@ -83,10 +84,8 @@ namespace klee {
     /// prepared for execution.
     void bind();
 
-    bool handle(ExecutionState &state, 
-                llvm::Function *f,
-                KInstruction *target,
-                std::vector< ref<Expr> > &arguments);
+    bool handle(ExecutionState &state, llvm::Function *f, KInstruction *target,
+                std::vector<Cell> &arguments);
 
     /* Convenience routines */
 
@@ -94,9 +93,9 @@ namespace klee {
     
     /* Handlers */
 
-#define HANDLER(name) void name(ExecutionState &state, \
-                                KInstruction *target, \
-                                std::vector< ref<Expr> > &arguments)
+  #define HANDLER(name)                                                        \
+    void name(ExecutionState &state, KInstruction *target,                     \
+              std::vector<Cell> &arguments)
     HANDLER(handleAbort);
     HANDLER(handleAssert);
     HANDLER(handleAssertFail);

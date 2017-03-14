@@ -80,7 +80,7 @@ private:
 
   std::map<std::string, std::string> fnAliases;
 
-  void addTxTreeConstraint(ref<Expr> e, llvm::Instruction *instr);
+  void addTxTreeConstraint(Cell e, llvm::Instruction *instr);
 
 public:
   // Execution - Control Flow specific
@@ -180,14 +180,14 @@ public:
   ExecutionState *branch();
 
   void pushFrame(KInstIterator caller, KFunction *kf);
-  void popFrame(KInstruction *ki, ref<Expr> returnValue);
+  void popFrame(KInstruction *ki, Cell returnCell);
 
   void addSymbolic(const MemoryObject *mo, const Array *array);
-  void addConstraint(ref<Expr> e) {
+  void addConstraint(Cell e) {
 #ifdef ENABLE_Z3
     addTxTreeConstraint(e, prevPC->inst);
 #endif
-    constraints.addConstraint(e);
+    constraints.addConstraint(e.value);
   }
 
   bool merge(const ExecutionState &b);

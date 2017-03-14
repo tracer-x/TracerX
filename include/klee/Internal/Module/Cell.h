@@ -11,13 +11,19 @@
 #define KLEE_CELL_H
 
 #include <klee/Expr.h>
+#include <klee/Internal/Module/VersionedValue.h>
 
 namespace klee {
   class MemoryObject;
 
   struct Cell {
     ref<Expr> value;
+    ref<VersionedValue> vvalue;
   };
+
+  inline bool operator<(const Cell &lhs, const Cell &rhs) {
+    return lhs.value < rhs.value;
+  }
 }
 
 #endif

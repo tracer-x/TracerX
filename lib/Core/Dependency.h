@@ -18,7 +18,7 @@
 #define KLEE_DEPENDENCY_H
 
 #include "klee/Config/Version.h"
-#include "klee/Internal/Module/VersionedValue.h"
+#include "klee/Internal/Module/Cell.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include <llvm/IR/Function.h>
@@ -410,7 +410,7 @@ namespace klee {
     std::vector<ref<VersionedValue> >
     populateArgumentValuesList(llvm::CallInst *site,
                                const std::vector<llvm::Instruction *> &stack,
-                               std::vector<ref<Expr> > &arguments);
+                               std::vector<Cell> &arguments);
 
   public:
     /// \brief This is for dynamic setting up of debug messages.
@@ -425,26 +425,22 @@ namespace klee {
 
     Dependency *cdr() const;
 
-    ref<VersionedValue>
-    getLatestValue(llvm::Value *value,
-                   const std::vector<llvm::Instruction *> &stack,
-                   ref<Expr> valueExpr, bool constraint = false);
-
     /// \brief Abstract dependency state transition with argument(s)
-    void execute(llvm::Instruction *instr,
-                 const std::vector<llvm::Instruction *> &stack,
-                 std::vector<ref<Expr> > &args, bool symbolicExecutionError);
+    ref<VersionedValue> execute(llvm::Instruction *instr,
+                                const std::vector<llvm::Instruction *> &stack,
+                                std::vector<Cell> &args,
+                                bool symbolicExecutionError);
 
     /// \brief Build dependencies from PHI node
-    void executePHI(llvm::Instruction *instr, unsigned int incomingBlock,
-                    const std::vector<llvm::Instruction *> &stack,
-                    ref<Expr> valueExpr, bool symbolicExecutionError);
+    ref<VersionedValue>
+    executePHI(llvm::Instruction *instr, unsigned int incomingBlock,
+               const std::vector<llvm::Instruction *> &stack, Cell valueCell,
+               bool symbolicExecutionError);
 
     /// \brief Execute memory operation (load/store)
-    void executeMemoryOperation(llvm::Instruction *instr,
-                                const std::vector<llvm::Instruction *> &stack,
-                                std::vector<ref<Expr> > &args, bool boundsCheck,
-                                bool symbolicExecutionError);
+    ref<VersionedValue> executeMemoryOperation(
+        llvm::Instruction *instr, const std::vector<llvm::Instruction *> &stack,
+        std::vector<Cell> &args, bool boundsCheck, bool symbolicExecutionError);
 
     /// \brief This retrieves the locations known at this state, and the
     /// expressions stored in the locations.
@@ -465,12 +461,12 @@ namespace klee {
     /// \brief Record call arguments in a function call
     void bindCallArguments(llvm::Instruction *instr,
                            std::vector<llvm::Instruction *> &stack,
-                           std::vector<ref<Expr> > &arguments);
+                           std::vector<Cell> &arguments);
 
     /// \brief This propagates the dependency due to the return value of a call
     void bindReturnValue(llvm::CallInst *site,
                          std::vector<llvm::Instruction *> &stack,
-                         llvm::Instruction *inst, ref<Expr> returnValue);
+                         llvm::Instruction *inst, Cell returnValue);
 
     /// \brief Given a versioned value, retrieve all its sources and mark them
     /// as in the core.

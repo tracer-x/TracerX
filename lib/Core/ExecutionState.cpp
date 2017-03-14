@@ -95,8 +95,11 @@ ExecutionState::~ExecutionState() {
       delete mo;
   }
 
-  while (!stack.empty())
-    popFrame(0, ConstantExpr::alloc(0, Expr::Bool));
+  while (!stack.empty()) {
+    Cell newCell;
+    newCell.value = ConstantExpr::alloc(0, Expr::Bool);
+    popFrame(0, newCell);
+  }
 }
 
 ExecutionState::ExecutionState(const ExecutionState &state)
@@ -113,8 +116,7 @@ ExecutionState::ExecutionState(const ExecutionState &state)
     symbolics[i].first->refCount++;
 }
 
-void ExecutionState::addTxTreeConstraint(ref<Expr> e,
-                                         llvm::Instruction *instr) {
+void ExecutionState::addTxTreeConstraint(Cell e, llvm::Instruction *instr) {
   if (!INTERPOLATION_ENABLED)
     return;
 
@@ -145,7 +147,7 @@ void ExecutionState::pushFrame(KInstIterator caller, KFunction *kf) {
   stack.push_back(StackFrame(caller,kf));
 }
 
-void ExecutionState::popFrame(KInstruction *ki, ref<Expr> returnValue) {
+void ExecutionState::popFrame(KInstruction *ki, Cell returnCell) {
   StackFrame &sf = stack.back();
   llvm::CallInst *site =
       (sf.caller ? llvm::dyn_cast<CallInst>(sf.caller->inst) : 0);
@@ -155,7 +157,7 @@ void ExecutionState::popFrame(KInstruction *ki, ref<Expr> returnValue) {
   stack.pop_back();
 
   if (INTERPOLATION_ENABLED && site && ki)
-    txTreeNode->bindReturnValue(site, ki->inst, returnValue);
+    txTreeNode->bindReturnValue(site, ki->inst, returnCell);
 }
 
 void ExecutionState::addSymbolic(const MemoryObject *mo, const Array *array) { 
