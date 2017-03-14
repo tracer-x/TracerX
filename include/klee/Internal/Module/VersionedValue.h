@@ -375,6 +375,11 @@ public:
     sources[source] = via;
   }
 
+  /// \brief Simply copy all dependencies from source
+  void copyAllDependencies(ref<VersionedValue> source) {
+    sources.insert(source->sources.begin(), source->sources.end());
+  }
+
   std::map<ref<VersionedValue>, ref<MemoryLocation> > getSources() {
     return sources;
   }
