@@ -1008,15 +1008,15 @@ Dependency::execute(llvm::Instruction *instr,
     return nullRet;
   }
   case 1: {
-    Cell argExpr = args.at(0);
+    Cell argCell = args.at(0);
     ref<VersionedValue> ret;
 
     switch (instr->getOpcode()) {
     case llvm::Instruction::BitCast: {
 
-      if (!argExpr.vvalue.isNull()) {
-        ret = getNewVersionedValue(instr, stack, argExpr.value);
-        addDependency(argExpr.vvalue, ret);
+      if (!argCell.vvalue.isNull()) {
+        ret = getNewVersionedValue(instr, stack, argCell.value);
+        addDependency(argCell.vvalue, ret);
       } else if (!llvm::isa<llvm::Constant>(instr->getOperand(0)))
           // Constants would kill dependencies, the remaining is for
           // cases that may actually require dependencies.
@@ -1024,16 +1024,16 @@ Dependency::execute(llvm::Instruction *instr,
         if (instr->getOperand(0)->getType()->isPointerTy()) {
           uint64_t size = targetData->getTypeStoreSize(
               instr->getOperand(0)->getType()->getPointerElementType());
-          ret = getNewVersionedValue(instr, stack, argExpr.value);
+          ret = getNewVersionedValue(instr, stack, argCell.value);
           addDependency(getNewPointerValue(instr->getOperand(0), stack,
-                                           argExpr.value, size),
+                                           argCell.value, size),
                         ret);
         } else if (llvm::isa<llvm::Argument>(instr->getOperand(0)) ||
                    llvm::isa<llvm::CallInst>(instr->getOperand(0)) ||
                    symbolicExecutionError) {
-          ret = getNewVersionedValue(instr, stack, argExpr.value);
+          ret = getNewVersionedValue(instr, stack, argCell.value);
           addDependency(
-              getNewVersionedValue(instr->getOperand(0), stack, argExpr.value),
+              getNewVersionedValue(instr->getOperand(0), stack, argCell.value),
               ret);
         } else {
           assert(!"operand not found");
@@ -1046,19 +1046,19 @@ Dependency::execute(llvm::Instruction *instr,
     return ret;
   }
   case 2: {
-    Cell valueExpr = args.at(0);
+    Cell valueCell = args.at(0);
     Cell address = args.at(1);
     ref<VersionedValue> ret;
 
     switch (instr->getOpcode()) {
     case llvm::Instruction::Alloca: {
-      // In case of alloca, the valueExpr is the address, and address is the
+      // In case of alloca, the valueCell is the address, and address is the
       // allocation size.
       uint64_t size = 0;
       if (ConstantExpr *ce = llvm::dyn_cast<ConstantExpr>(address.value)) {
         size = ce->getZExtValue();
       }
-      ret = getNewPointerValue(instr, stack, valueExpr.value, size);
+      ret = getNewPointerValue(instr, stack, valueCell.value, size);
       break;
     }
     case llvm::Instruction::Load: {
@@ -1077,8 +1077,8 @@ Dependency::execute(llvm::Instruction *instr,
 
           // Build the loaded value
           ret = loadedType->isPointerTy()
-                    ? getNewPointerValue(instr, stack, valueExpr.value, 0)
-                    : getNewVersionedValue(instr, stack, valueExpr.value);
+                    ? getNewPointerValue(instr, stack, valueCell.value, 0)
+                    : getNewVersionedValue(instr, stack, valueCell.value);
 
           updateStore(loc, address.vvalue, ret);
           break;
@@ -1090,8 +1090,8 @@ Dependency::execute(llvm::Instruction *instr,
 
             // Build the loaded value
             ret = loadedType->isPointerTy()
-                      ? getNewPointerValue(instr, stack, valueExpr.value, 0)
-                      : getNewVersionedValue(instr, stack, valueExpr.value);
+                      ? getNewPointerValue(instr, stack, valueCell.value, 0)
+                      : getNewVersionedValue(instr, stack, valueCell.value);
 
             updateStore(loc, address.vvalue, ret);
             break;
@@ -1109,8 +1109,8 @@ Dependency::execute(llvm::Instruction *instr,
 
           // Build the loaded value
           ret = loadedType->isPointerTy()
-                    ? getNewPointerValue(instr, stack, valueExpr.value, 0)
-                    : getNewVersionedValue(instr, stack, valueExpr.value);
+                    ? getNewPointerValue(instr, stack, valueCell.value, 0)
+                    : getNewVersionedValue(instr, stack, valueCell.value);
 
           updateStore(*(locations.begin()), addressValue, ret);
           break;
@@ -1139,8 +1139,8 @@ Dependency::execute(llvm::Instruction *instr,
         ret = (addressValuePair.second.isNull() ||
                addressValuePair.second->getLocations().empty()) &&
                       loadedType->isPointerTy()
-                  ? getNewPointerValue(instr, stack, valueExpr.value, 0)
-                  : getNewVersionedValue(instr, stack, valueExpr.value);
+                  ? getNewPointerValue(instr, stack, valueCell.value, 0)
+                  : getNewVersionedValue(instr, stack, valueCell.value);
 
         if (addressValuePair.second.isNull() ||
             ret->getExpression() != addressValuePair.second->getExpression()) {
@@ -1158,12 +1158,12 @@ Dependency::execute(llvm::Instruction *instr,
     case llvm::Instruction::Store: {
       // If there was no dependency found, we should create
       // a new value
-      ref<VersionedValue> storedValue = valueExpr.vvalue;
+      ref<VersionedValue> storedValue = valueCell.vvalue;
       ref<VersionedValue> addressValue = address.vvalue;
 
       if (storedValue.isNull())
         storedValue =
-            getNewVersionedValue(instr->getOperand(0), stack, valueExpr.value);
+            getNewVersionedValue(instr->getOperand(0), stack, valueCell.value);
 
       if (addressValue.isNull()) {
         // assert(!"null address");
@@ -1200,21 +1200,21 @@ Dependency::execute(llvm::Instruction *instr,
     case llvm::Instruction::SExt:
     case llvm::Instruction::ExtractValue: {
       Cell result = args.at(0);
-      Cell argExpr = args.at(1);
+      Cell argCell = args.at(1);
 
-      if (!argExpr.vvalue.isNull()) {
+      if (!argCell.vvalue.isNull()) {
         if (llvm::isa<llvm::IntToPtrInst>(instr)) {
-          if (argExpr.vvalue->getLocations().size() == 0) {
+          if (argCell.vvalue->getLocations().size() == 0) {
             ret = getNewPointerValue(instr, stack, result.value, 0);
             // 0 signifies unknown allocation size
-            addDependencyToNonPointer(argExpr.vvalue, ret);
+            addDependencyToNonPointer(argCell.vvalue, ret);
           } else {
             ret = getNewVersionedValue(instr, stack, result.value);
-            addDependencyIntToPtr(argExpr.vvalue, ret);
+            addDependencyIntToPtr(argCell.vvalue, ret);
           }
         } else {
           ret = getNewVersionedValue(instr, stack, result.value);
-          addDependency(argExpr.vvalue, ret);
+          addDependency(argCell.vvalue, ret);
         }
       } else if (!llvm::isa<llvm::Constant>(instr->getOperand(0)))
           // Constants would kill dependencies, the remaining is for
@@ -1228,7 +1228,7 @@ Dependency::execute(llvm::Instruction *instr,
           // dependency target as it will be properly made a
           // pointer value by addDependency.
           addDependency(getNewPointerValue(instr->getOperand(0), stack,
-                                           argExpr.value, size),
+                                           argCell.value, size),
                         ret);
         } else if (llvm::isa<llvm::Argument>(instr->getOperand(0)) ||
                    llvm::isa<llvm::CallInst>(instr->getOperand(0)) ||
@@ -1237,12 +1237,12 @@ Dependency::execute(llvm::Instruction *instr,
             ret = getNewPointerValue(instr, stack, result.value, 0);
             // 0 signifies unknown allocation size
             addDependency(getNewVersionedValue(instr->getOperand(0), stack,
-                                               argExpr.value),
+                                               argCell.value),
                           ret);
           } else {
             ret = getNewVersionedValue(instr, stack, result.value);
             addDependency(getNewVersionedValue(instr->getOperand(0), stack,
-                                               argExpr.value),
+                                               argCell.value),
                           ret);
           }
         } else {
@@ -1257,22 +1257,22 @@ Dependency::execute(llvm::Instruction *instr,
   }
   case 3: {
     Cell result = args.at(0);
-    Cell op1Expr = args.at(1);
-    Cell op2Expr = args.at(2);
+    Cell op1Cell = args.at(1);
+    Cell op2Cell = args.at(2);
     ref<VersionedValue> ret;
 
     switch (instr->getOpcode()) {
     case llvm::Instruction::Select: {
       ret = getNewVersionedValue(instr, stack, result.value);
 
-      if (result.value == op1Expr.value) {
-        addDependency(op1Expr.vvalue, ret);
-      } else if (result.value == op2Expr.value) {
-        addDependency(op2Expr.vvalue, ret);
+      if (result.value == op1Cell.value) {
+        addDependency(op1Cell.vvalue, ret);
+      } else if (result.value == op2Cell.value) {
+        addDependency(op2Cell.vvalue, ret);
       } else {
-        addDependency(op1Expr.vvalue, ret);
+        addDependency(op1Cell.vvalue, ret);
         // We do not require that the locations set is empty
-        addDependency(op2Expr.vvalue, ret, false);
+        addDependency(op2Cell.vvalue, ret, false);
       }
       break;
     }
@@ -1298,18 +1298,18 @@ Dependency::execute(llvm::Instruction *instr,
     case llvm::Instruction::FRem:
     case llvm::Instruction::FCmp:
     case llvm::Instruction::InsertValue: {
-      ref<VersionedValue> op1 = op1Expr.vvalue;
-      ref<VersionedValue> op2 = op2Expr.vvalue;
+      ref<VersionedValue> op1 = op1Cell.vvalue;
+      ref<VersionedValue> op2 = op2Cell.vvalue;
 
       if (op1.isNull() &&
           (instr->getParent()->getParent()->getName().equals("klee_range") &&
            instr->getOperand(0)->getName().equals("start"))) {
-        op1 = getNewVersionedValue(instr->getOperand(0), stack, op1Expr.value);
+        op1 = getNewVersionedValue(instr->getOperand(0), stack, op1Cell.value);
       }
       if (op2.isNull() &&
           (instr->getParent()->getParent()->getName().equals("klee_range") &&
            instr->getOperand(1)->getName().equals("end"))) {
-        op2 = getNewVersionedValue(instr->getOperand(1), stack, op2Expr.value);
+        op2 = getNewVersionedValue(instr->getOperand(1), stack, op2Cell.value);
       }
 
       if (!op1.isNull() || !op2.isNull()) {
