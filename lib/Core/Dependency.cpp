@@ -915,7 +915,7 @@ Dependency::Dependency(Dependency *_parent, llvm::DataLayout *_targetData)
     debugSubsumptionLevel = _parent->debugSubsumptionLevel;
     debugStateLevel = _parent->debugStateLevel;
   } else {
-    globalFrame = ref<StoreFrame>(new StoreFrame());
+    globalFrame = StoreFrame::create();
 #ifdef ENABLE_Z3
     debugSubsumptionLevel = DebugSubsumption;
     debugStateLevel = DebugState;
