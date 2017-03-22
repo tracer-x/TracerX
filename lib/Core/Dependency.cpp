@@ -461,8 +461,9 @@ void Dependency::getStoredExpressions(
   getSymbolicStore(callHistory, globalFrame->getSymbolicStore(), replacements,
                    coreOnly, _symbolicallyAddressedStore);
 
-  for (std::vector<ref<StoreFrame> >::const_iterator it = stack.begin(),
-                                                     ie = stack.end();
+  for (std::vector<ref<StoreFrame> >::const_reverse_iterator
+           it = stack.rbegin(),
+           ie = stack.rend();
        it != ie; ++it) {
     getConcreteStore(callHistory, (*it)->getConcreteStore(), replacements,
                      coreOnly, _concretelyAddressedStore);
