@@ -179,9 +179,7 @@ public:
     symbolicallyAddressedStore;
 
   public:
-    unsigned refCount;
-
-    StoreFrame() : refCount(0) {}
+    StoreFrame() {}
 
     ~StoreFrame() {
       // Delete the locally-constructed relations
@@ -189,9 +187,9 @@ public:
       symbolicallyAddressedStore.clear();
     }
 
-    static ref<StoreFrame> create() {
-      ref<StoreFrame> ret(new StoreFrame());
-      return ret;
+    static StoreFrame &create() {
+      StoreFrame *ret = new StoreFrame();
+      return (*ret);
     }
 
     std::map<ref<MemoryLocation>,
@@ -387,10 +385,10 @@ public:
     std::vector<ref<VersionedValue> > argumentValuesList;
 
     /// \brief The global frame
-    ref<StoreFrame> globalFrame;
+    StoreFrame globalFrame;
 
     /// \brief The stack
-    std::vector<ref<StoreFrame> > stack;
+    std::vector<StoreFrame> stack;
 
     /// \brief The store of the versioned values
     std::map<llvm::Value *, std::vector<ref<VersionedValue> > > valuesMap;

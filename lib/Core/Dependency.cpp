@@ -456,18 +456,17 @@ void Dependency::getStoredExpressions(
     std::set<const Array *> &replacements, bool coreOnly,
     Dependency::ConcreteStore &_concretelyAddressedStore,
     Dependency::SymbolicStore &_symbolicallyAddressedStore) {
-  getConcreteStore(callHistory, globalFrame->getConcreteStore(), replacements,
+  getConcreteStore(callHistory, globalFrame.getConcreteStore(), replacements,
                    coreOnly, _concretelyAddressedStore);
-  getSymbolicStore(callHistory, globalFrame->getSymbolicStore(), replacements,
+  getSymbolicStore(callHistory, globalFrame.getSymbolicStore(), replacements,
                    coreOnly, _symbolicallyAddressedStore);
 
-  for (std::vector<ref<StoreFrame> >::const_reverse_iterator
-           it = stack.rbegin(),
-           ie = stack.rend();
+  for (std::vector<StoreFrame>::reverse_iterator it = stack.rbegin(),
+                                                 ie = stack.rend();
        it != ie; ++it) {
-    getConcreteStore(callHistory, (*it)->getConcreteStore(), replacements,
+    getConcreteStore(callHistory, it->getConcreteStore(), replacements,
                      coreOnly, _concretelyAddressedStore);
-    getSymbolicStore(callHistory, (*it)->getSymbolicStore(), replacements,
+    getSymbolicStore(callHistory, it->getSymbolicStore(), replacements,
                      coreOnly, _symbolicallyAddressedStore);
   }
 }
@@ -656,13 +655,12 @@ void Dependency::updateStore(ref<MemoryLocation> loc,
       symbolicStore;
 
   if (loc->isGlobal()) {
-    globalFrame->updateStore(loc, address, value);
+    globalFrame.updateStore(loc, address, value);
   } else {
     if (stack.empty()) {
       stack.push_back(StoreFrame::create());
     }
-    ref<StoreFrame> topFrame = stack.back();
-    topFrame->updateStore(loc, address, value);
+    stack.back().updateStore(loc, address, value);
   }
 }
 
@@ -1221,12 +1219,12 @@ void Dependency::execute(llvm::Instruction *instr,
           std::map<ref<MemoryLocation>,
                    std::pair<ref<VersionedValue>,
                              ref<VersionedValue> > >::iterator storeIt =
-              globalFrame->getConcreteStore().find(loc);
+              globalFrame.getConcreteStore().find(loc);
           std::pair<ref<VersionedValue>, ref<VersionedValue> > target;
 
-          if (storeIt == globalFrame->getConcreteStore().end()) {
-            storeIt = globalFrame->getSymbolicStore().find(loc);
-            if (storeIt != globalFrame->getSymbolicStore().end()) {
+          if (storeIt == globalFrame.getConcreteStore().end()) {
+            storeIt = globalFrame.getSymbolicStore().find(loc);
+            if (storeIt != globalFrame.getSymbolicStore().end()) {
               target = storeIt->second;
             }
           } else {
@@ -1234,14 +1232,14 @@ void Dependency::execute(llvm::Instruction *instr,
           }
 
           if (target.second.isNull()) {
-            for (std::vector<ref<StoreFrame> >::const_reverse_iterator
+            for (std::vector<StoreFrame>::reverse_iterator
                      stackIt = stack.rbegin(),
                      stackIe = stack.rend();
                  stackIt != stackIe; ++stackIt) {
-              storeIt = (*stackIt)->getConcreteStore().find(loc);
-              if (storeIt == (*stackIt)->getConcreteStore().end()) {
-                storeIt = (*stackIt)->getSymbolicStore().find(loc);
-                if (storeIt != (*stackIt)->getSymbolicStore().end()) {
+              storeIt = stackIt->getConcreteStore().find(loc);
+              if (storeIt == stackIt->getConcreteStore().end()) {
+                storeIt = stackIt->getSymbolicStore().find(loc);
+                if (storeIt != stackIt->getSymbolicStore().end()) {
                   target = storeIt->second;
                   break;
                 }
@@ -1324,12 +1322,12 @@ void Dependency::execute(llvm::Instruction *instr,
            li != le; ++li) {
         std::pair<ref<VersionedValue>, ref<VersionedValue> > addressValuePair;
 
-        if (!stack.back().isNull()) {
-          addressValuePair = stack.back()->read(*li);
+        if (!stack.empty()) {
+          addressValuePair = stack.back().read(*li);
         }
         if (addressValuePair.first.isNull() ||
             addressValuePair.second.isNull()) {
-          addressValuePair = globalFrame->read(*li);
+          addressValuePair = globalFrame.read(*li);
         }
 
         // Build the loaded value
@@ -1806,16 +1804,15 @@ void Dependency::print(llvm::raw_ostream &stream,
                        const unsigned paddingAmount) const {
   std::string tabs = makeTabs(paddingAmount);
 
-  for (std::vector<ref<StoreFrame> >::const_reverse_iterator
-           it = stack.rbegin(),
-           ie = stack.rend();
+  for (std::vector<StoreFrame>::const_reverse_iterator it = stack.rbegin(),
+                                                       ie = stack.rend();
        it != ie; ++it) {
     stream << tabs << "------------- Stack Frame ---------------\n";
-    (*it)->print(stream, tabs);
+    it->print(stream, tabs);
     stream << tabs << "\n";
   }
   stream << tabs << "------------- Global Frame ---------------\n";
-  globalFrame->print(stream, tabs);
+  globalFrame.print(stream, tabs);
 
   if (parent) {
     stream << tabs << "--------- Parent Dependencies ----------\n";
