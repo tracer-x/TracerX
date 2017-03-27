@@ -26,6 +26,7 @@
 #include "klee/util/ExprVisitor.h"
 
 #include "Dependency.h"
+#include "TxInterpolantTypes.h"
 
 #include "llvm/Support/raw_ostream.h"
 
@@ -379,9 +380,9 @@ class SubsumptionTableEntry {
 
   ref<Expr> interpolant;
 
-  Dependency::ConcreteStore concreteAddressStore;
+  TxConcreteStore concreteAddressStore;
 
-  Dependency::SymbolicStore symbolicAddressStore;
+  TxSymbolicStore symbolicAddressStore;
 
   std::set<const Array *> existentials;
 
@@ -471,8 +472,8 @@ public:
   ~SubsumptionTableEntry();
 
   bool subsumed(TimingSolver *solver, ExecutionState &state, double timeout,
-                Dependency::ConcreteStore &concretelyAddressedStore,
-                Dependency::SymbolicStore &symbolicallyAddressedStore,
+                TxConcreteStore &concretelyAddressedStore,
+                TxSymbolicStore &symbolicallyAddressedStore,
                 int debugSubsumptionLevel);
 
   /// Tests if the argument is a variable. A variable here is defined to be
@@ -632,10 +633,9 @@ public:
   /// expressions stored in the allocations. This returns as the two last
   /// arguments a pair of the store part indexed by constants, and the store
   /// part indexed by symbolic expressions.
-  void getStoredExpressions(
-      const std::vector<llvm::Instruction *> &callHistory,
-      Dependency::ConcreteStore &concretelyAddressedStore,
-      Dependency::SymbolicStore &symbolicallyAddressedStore) const;
+  void getStoredExpressions(const std::vector<llvm::Instruction *> &callHistory,
+                            TxConcreteStore &concretelyAddressedStore,
+                            TxSymbolicStore &symbolicallyAddressedStore) const;
 
   /// \brief This retrieves the allocations known at this state, and the
   /// expressions stored in the allocations, as long as the allocation is
@@ -648,11 +648,11 @@ public:
   /// expression will
   /// be used for storing in the subsumption table, the variables need to be
   /// replaced with the bound ones.
-  void getStoredCoreExpressions(
-      const std::vector<llvm::Instruction *> &callHistory,
-      std::set<const Array *> &replacements,
-      Dependency::ConcreteStore &concretelyAddressedStore,
-      Dependency::SymbolicStore &symbolicallyAddressedStore) const;
+  void
+  getStoredCoreExpressions(const std::vector<llvm::Instruction *> &callHistory,
+                           std::set<const Array *> &replacements,
+                           TxConcreteStore &concretelyAddressedStore,
+                           TxSymbolicStore &symbolicallyAddressedStore) const;
 
   void incInstructionsDepth();
 

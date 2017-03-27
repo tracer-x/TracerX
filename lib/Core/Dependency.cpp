@@ -306,7 +306,7 @@ void Dependency::getConcreteStore(
                    std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
         store,
     std::set<const Array *> &replacements, bool coreOnly,
-    Dependency::ConcreteStore &concreteStore) const {
+    TxConcreteStore &concreteStore) const {
 
   for (std::map<ref<MemoryLocation>,
                 std::pair<ref<VersionedValue>,
@@ -344,7 +344,7 @@ void Dependency::getSymbolicStore(
                    std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
         store,
     std::set<const Array *> &replacements, bool coreOnly,
-    Dependency::SymbolicStore &symbolicStore) const {
+    TxSymbolicStore &symbolicStore) const {
   for (std::map<ref<MemoryLocation>,
                 std::pair<ref<VersionedValue>,
                           ref<VersionedValue> > >::const_iterator
@@ -360,22 +360,22 @@ void Dependency::getSymbolicStore(
     if (!coreOnly) {
       llvm::Value *base = it->first->getContext()->getValue();
       symbolicStore[base].push_back(
-          Dependency::AddressValuePair(StoredAddress::create(it->first),
-                                       StoredValue::create(it->second.second)));
+          TxAddressValuePair(StoredAddress::create(it->first),
+                             StoredValue::create(it->second.second)));
     } else if (it->second.second->isCore()) {
       // An address is in the core if it stores a value that is in the core
       llvm::Value *base = it->first->getContext()->getValue();
 #ifdef ENABLE_Z3
       if (!NoExistential) {
-        symbolicStore[base].push_back(Dependency::AddressValuePair(
+        symbolicStore[base].push_back(TxAddressValuePair(
             StoredAddress::create(
                 MemoryLocation::create(it->first, replacements)),
             StoredValue::create(it->second.second, replacements)));
       } else
 #endif
-        symbolicStore[base].push_back(Dependency::AddressValuePair(
-            StoredAddress::create(it->first),
-            StoredValue::create(it->second.second)));
+        symbolicStore[base].push_back(
+            TxAddressValuePair(StoredAddress::create(it->first),
+                               StoredValue::create(it->second.second)));
     }
   }
 }
@@ -402,8 +402,8 @@ Dependency::registerNewVersionedValue(llvm::Value *value,
 void Dependency::getStoredExpressions(
     const std::vector<llvm::Instruction *> &callHistory,
     std::set<const Array *> &replacements, bool coreOnly,
-    Dependency::ConcreteStore &_concretelyAddressedStore,
-    Dependency::SymbolicStore &_symbolicallyAddressedStore) {
+    TxConcreteStore &_concretelyAddressedStore,
+    TxSymbolicStore &_symbolicallyAddressedStore) {
   getConcreteStore(callHistory, globalFrame.getConcreteStore(), replacements,
                    coreOnly, _concretelyAddressedStore);
   getSymbolicStore(callHistory, globalFrame.getSymbolicStore(), replacements,
