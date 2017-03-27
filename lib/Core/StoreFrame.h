@@ -30,8 +30,17 @@ class StoreFrame {
            std::pair<ref<VersionedValue>, ref<VersionedValue> > >
   symbolicallyAddressedStore;
 
+  /// \brief The previous frame lower in the stack
+  StoreFrame *parent;
+
+  /// \brief Non-hollow source of this frame, which stores concrete data
+  StoreFrame *source;
+
+  /// \brief Constructor
+  StoreFrame(StoreFrame *_parent, StoreFrame *_source)
+      : parent(_parent), source(_source) {}
+
 public:
-  StoreFrame() {}
 
   ~StoreFrame() {
     // Delete the locally-constructed relations
@@ -39,9 +48,8 @@ public:
     symbolicallyAddressedStore.clear();
   }
 
-  static StoreFrame &create() {
-    StoreFrame *ret = new StoreFrame();
-    return (*ret);
+  static StoreFrame *create(StoreFrame *_parent, StoreFrame *_source = 0) {
+    return new StoreFrame(_parent, _source);
   }
 
   void getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
@@ -64,6 +72,14 @@ public:
 
   void updateStore(ref<MemoryLocation> loc, ref<VersionedValue> address,
                    ref<VersionedValue> value) {
+
+    // We copy the store to update on demand, only when this function is invoked
+    if (source) {
+      concretelyAddressedStore = source->concretelyAddressedStore;
+      symbolicallyAddressedStore = source->symbolicallyAddressedStore;
+      source = 0;
+    }
+
     if (loc->hasConstantAddress()) {
       concretelyAddressedStore[loc] =
           std::pair<ref<VersionedValue>, ref<VersionedValue> >(address, value);

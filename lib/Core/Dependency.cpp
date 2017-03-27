@@ -526,7 +526,7 @@ void Dependency::updateStore(ref<MemoryLocation> loc,
     globalFrame.updateStore(loc, address, value);
   } else {
     if (stack.empty()) {
-      stack.push_back(StoreFrame::create());
+      stack.push_back(*StoreFrame::create(0));
     }
     stack.back().updateStore(loc, address, value);
   }
@@ -775,14 +775,14 @@ void Dependency::populateArgumentValuesList(
 }
 
 Dependency::Dependency(Dependency *_parent, llvm::DataLayout *_targetData)
-    : parent(_parent), targetData(_targetData) {
+    : parent(_parent),
+      globalFrame(_parent ? _parent->globalFrame : *StoreFrame::create(0)),
+      targetData(_targetData) {
   if (_parent) {
-    globalFrame = _parent->globalFrame;
     stack = _parent->stack;
     debugSubsumptionLevel = _parent->debugSubsumptionLevel;
     debugStateLevel = _parent->debugStateLevel;
   } else {
-    globalFrame = StoreFrame::create();
 #ifdef ENABLE_Z3
     debugSubsumptionLevel = DebugSubsumption;
     debugStateLevel = DebugState;
@@ -1615,7 +1615,7 @@ Dependency::bindCallArguments(llvm::Instruction *i,
   }
 
   // Push the stack frame before doing anything else
-  stack.push_back(StoreFrame::create());
+  stack.push_back(*StoreFrame::create(0));
 }
 
 void Dependency::bindReturnValue(llvm::CallInst *site,

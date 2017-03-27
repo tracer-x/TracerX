@@ -24,8 +24,11 @@ StoreFrame::findInConcreteStore(ref<MemoryLocation> loc) const {
                            std::pair<ref<VersionedValue>,
                                      ref<VersionedValue> > >::const_iterator>
   ret;
-  ret.second = concretelyAddressedStore.find(loc);
-  ret.first = (ret.second != concretelyAddressedStore.end());
+  const std::map<ref<MemoryLocation>,
+                 std::pair<ref<VersionedValue>, ref<VersionedValue> > > &store =
+      (source ? source->concretelyAddressedStore : concretelyAddressedStore);
+  ret.second = store.find(loc);
+  ret.first = (ret.second != store.end());
   return ret;
 }
 
@@ -37,8 +40,12 @@ StoreFrame::findInSymbolicStore(ref<MemoryLocation> loc) const {
                            std::pair<ref<VersionedValue>,
                                      ref<VersionedValue> > >::const_iterator>
   ret;
-  ret.second = symbolicallyAddressedStore.find(loc);
-  ret.first = (ret.second != symbolicallyAddressedStore.end());
+  const std::map<ref<MemoryLocation>,
+                 std::pair<ref<VersionedValue>, ref<VersionedValue> > > &store =
+      (source ? source->symbolicallyAddressedStore
+              : symbolicallyAddressedStore);
+  ret.second = store.find(loc);
+  ret.first = (ret.second != store.end());
   return ret;
 }
 
@@ -46,15 +53,19 @@ void StoreFrame::getConcreteStore(
     const std::vector<llvm::Instruction *> &callHistory,
     std::set<const Array *> &replacements, bool coreOnly,
     TxConcreteStore &concreteStore) const {
+  const std::map<ref<MemoryLocation>,
+                 std::pair<ref<VersionedValue>, ref<VersionedValue> > > &store =
+      (source ? source->concretelyAddressedStore : concretelyAddressedStore);
 
   for (std::map<ref<MemoryLocation>,
                 std::pair<ref<VersionedValue>,
                           ref<VersionedValue> > >::const_iterator
-           it = concretelyAddressedStore.begin(),
-           ie = concretelyAddressedStore.end();
+           it = store.begin(),
+           ie = store.end();
        it != ie; ++it) {
     if (!it->first->contextIsPrefixOf(callHistory))
       continue;
+
     if (it->second.second.isNull())
       continue;
 
@@ -81,11 +92,16 @@ void StoreFrame::getSymbolicStore(
     const std::vector<llvm::Instruction *> &callHistory,
     std::set<const Array *> &replacements, bool coreOnly,
     TxSymbolicStore &symbolicStore) const {
+  const std::map<ref<MemoryLocation>,
+                 std::pair<ref<VersionedValue>, ref<VersionedValue> > > &store =
+      (source ? source->symbolicallyAddressedStore
+              : symbolicallyAddressedStore);
+
   for (std::map<ref<MemoryLocation>,
                 std::pair<ref<VersionedValue>,
                           ref<VersionedValue> > >::const_iterator
-           it = symbolicallyAddressedStore.begin(),
-           ie = symbolicallyAddressedStore.end();
+           it = store.begin(),
+           ie = store.end();
        it != ie; ++it) {
     if (!it->first->contextIsPrefixOf(callHistory))
       continue;
@@ -121,15 +137,25 @@ void StoreFrame::print(llvm::raw_ostream &stream,
   std::string tabsNext = appendTab(prefix);
   std::string tabsNextNext = appendTab(tabsNext);
 
-  if (concretelyAddressedStore.empty()) {
+  const std::map<ref<MemoryLocation>,
+                 std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
+  concreteStore = (source ? source->symbolicallyAddressedStore
+                          : symbolicallyAddressedStore);
+
+  const std::map<ref<MemoryLocation>,
+                 std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
+  symbolicStore = (source ? source->symbolicallyAddressedStore
+                          : symbolicallyAddressedStore);
+
+  if (concreteStore.empty()) {
     stream << prefix << "concrete store = []\n";
   } else {
     stream << prefix << "concrete store = [\n";
     for (std::map<ref<MemoryLocation>,
                   std::pair<ref<VersionedValue>,
                             ref<VersionedValue> > >::const_iterator
-             is = concretelyAddressedStore.begin(),
-             ie = concretelyAddressedStore.end(), it = is;
+             is = concreteStore.begin(),
+             ie = concreteStore.end(), it = is;
          it != ie; ++it) {
       if (it != is)
         stream << tabsNext << "------------------------------------------\n";
@@ -143,15 +169,15 @@ void StoreFrame::print(llvm::raw_ostream &stream,
     stream << prefix << "]\n";
   }
 
-  if (symbolicallyAddressedStore.empty()) {
+  if (symbolicStore.empty()) {
     stream << prefix << "symbolic store = []\n";
   } else {
     stream << prefix << "symbolic store = [\n";
     for (std::map<ref<MemoryLocation>,
                   std::pair<ref<VersionedValue>,
                             ref<VersionedValue> > >::const_iterator
-             is = symbolicallyAddressedStore.begin(),
-             ie = symbolicallyAddressedStore.end(), it = is;
+             is = symbolicStore.begin(),
+             ie = symbolicStore.end(), it = is;
          it != ie; ++it) {
       if (it != is)
         stream << tabsNext << "------------------------------------------\n";
