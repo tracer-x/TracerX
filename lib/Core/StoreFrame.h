@@ -10,6 +10,8 @@
 #ifndef KLEE_STOREFRAME_H
 #define KLEE_STOREFRAME_H
 
+#include "TxInterpolantTypes.h"
+
 #include "klee/Internal/Module/VersionedValue.h"
 
 #include <map>
@@ -42,17 +44,23 @@ public:
     return (*ret);
   }
 
-  std::map<ref<MemoryLocation>,
-           std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
-  getConcreteStore() {
-    return concretelyAddressedStore;
-  }
+  void getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
+                        std::set<const Array *> &replacements, bool coreOnly,
+                        TxConcreteStore &concreteStore) const;
 
-  std::map<ref<MemoryLocation>,
-           std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
-  getSymbolicStore() {
-    return symbolicallyAddressedStore;
-  }
+  void getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
+                        std::set<const Array *> &replacements, bool coreOnly,
+                        TxSymbolicStore &symbolicStore) const;
+
+  std::pair<bool, std::map<ref<MemoryLocation>,
+                           std::pair<ref<VersionedValue>,
+                                     ref<VersionedValue> > >::const_iterator>
+  findInConcreteStore(ref<MemoryLocation> loc) const;
+
+  std::pair<bool, std::map<ref<MemoryLocation>,
+                           std::pair<ref<VersionedValue>,
+                                     ref<VersionedValue> > >::const_iterator>
+  findInSymbolicStore(ref<MemoryLocation> loc) const;
 
   void updateStore(ref<MemoryLocation> loc, ref<VersionedValue> address,
                    ref<VersionedValue> value) {

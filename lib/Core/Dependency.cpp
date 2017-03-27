@@ -300,86 +300,6 @@ void StoredValue::print(llvm::raw_ostream &stream,
 
 /**/
 
-void Dependency::getConcreteStore(
-    const std::vector<llvm::Instruction *> &callHistory,
-    const std::map<ref<MemoryLocation>,
-                   std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
-        store,
-    std::set<const Array *> &replacements, bool coreOnly,
-    TxConcreteStore &concreteStore) const {
-
-  for (std::map<ref<MemoryLocation>,
-                std::pair<ref<VersionedValue>,
-                          ref<VersionedValue> > >::const_iterator
-           it = store.begin(),
-           ie = store.end();
-       it != ie; ++it) {
-    if (!it->first->contextIsPrefixOf(callHistory))
-      continue;
-    if (it->second.second.isNull())
-      continue;
-
-    if (!coreOnly) {
-      const llvm::Value *base = it->first->getContext()->getValue();
-      concreteStore[base][StoredAddress::create(it->first)] =
-          StoredValue::create(it->second.second);
-    } else if (it->second.second->isCore()) {
-      // An address is in the core if it stores a value that is in the core
-      const llvm::Value *base = it->first->getContext()->getValue();
-#ifdef ENABLE_Z3
-      if (!NoExistential) {
-        concreteStore[base][StoredAddress::create(it->first)] =
-            StoredValue::create(it->second.second, replacements);
-      } else
-#endif
-        concreteStore[base][StoredAddress::create(it->first)] =
-            StoredValue::create(it->second.second);
-    }
-  }
-}
-
-void Dependency::getSymbolicStore(
-    const std::vector<llvm::Instruction *> &callHistory,
-    const std::map<ref<MemoryLocation>,
-                   std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
-        store,
-    std::set<const Array *> &replacements, bool coreOnly,
-    TxSymbolicStore &symbolicStore) const {
-  for (std::map<ref<MemoryLocation>,
-                std::pair<ref<VersionedValue>,
-                          ref<VersionedValue> > >::const_iterator
-           it = store.begin(),
-           ie = store.end();
-       it != ie; ++it) {
-    if (!it->first->contextIsPrefixOf(callHistory))
-      continue;
-
-    if (it->second.second.isNull())
-      continue;
-
-    if (!coreOnly) {
-      llvm::Value *base = it->first->getContext()->getValue();
-      symbolicStore[base].push_back(
-          TxAddressValuePair(StoredAddress::create(it->first),
-                             StoredValue::create(it->second.second)));
-    } else if (it->second.second->isCore()) {
-      // An address is in the core if it stores a value that is in the core
-      llvm::Value *base = it->first->getContext()->getValue();
-#ifdef ENABLE_Z3
-      if (!NoExistential) {
-        symbolicStore[base].push_back(TxAddressValuePair(
-            StoredAddress::create(
-                MemoryLocation::create(it->first, replacements)),
-            StoredValue::create(it->second.second, replacements)));
-      } else
-#endif
-        symbolicStore[base].push_back(
-            TxAddressValuePair(StoredAddress::create(it->first),
-                               StoredValue::create(it->second.second)));
-    }
-  }
-}
-
 bool Dependency::isMainArgument(const llvm::Value *loc) {
   const llvm::Argument *vArg = llvm::dyn_cast<llvm::Argument>(loc);
 
@@ -404,18 +324,18 @@ void Dependency::getStoredExpressions(
     std::set<const Array *> &replacements, bool coreOnly,
     TxConcreteStore &_concretelyAddressedStore,
     TxSymbolicStore &_symbolicallyAddressedStore) {
-  getConcreteStore(callHistory, globalFrame.getConcreteStore(), replacements,
-                   coreOnly, _concretelyAddressedStore);
-  getSymbolicStore(callHistory, globalFrame.getSymbolicStore(), replacements,
-                   coreOnly, _symbolicallyAddressedStore);
+  globalFrame.getConcreteStore(callHistory, replacements, coreOnly,
+                               _concretelyAddressedStore);
+  globalFrame.getSymbolicStore(callHistory, replacements, coreOnly,
+                               _symbolicallyAddressedStore);
 
   for (std::vector<StoreFrame>::reverse_iterator it = stack.rbegin(),
                                                  ie = stack.rend();
        it != ie; ++it) {
-    getConcreteStore(callHistory, it->getConcreteStore(), replacements,
-                     coreOnly, _concretelyAddressedStore);
-    getSymbolicStore(callHistory, it->getSymbolicStore(), replacements,
-                     coreOnly, _symbolicallyAddressedStore);
+    it->getConcreteStore(callHistory, replacements, coreOnly,
+                         _concretelyAddressedStore);
+    it->getSymbolicStore(callHistory, replacements, coreOnly,
+                         _symbolicallyAddressedStore);
   }
 }
 
@@ -1164,19 +1084,20 @@ void Dependency::execute(llvm::Instruction *instr,
           ref<MemoryLocation> loc = *(locations.begin());
 
           // Check the possible mismatch between Tracer-X and KLEE loaded value
-          std::map<ref<MemoryLocation>,
-                   std::pair<ref<VersionedValue>,
-                             ref<VersionedValue> > >::iterator storeIt =
-              globalFrame.getConcreteStore().find(loc);
+          std::pair<bool,
+                    std::map<ref<MemoryLocation>,
+                             std::pair<ref<VersionedValue>,
+                                       ref<VersionedValue> > >::const_iterator>
+          storedValue = globalFrame.findInConcreteStore(loc);
           std::pair<ref<VersionedValue>, ref<VersionedValue> > target;
 
-          if (storeIt == globalFrame.getConcreteStore().end()) {
-            storeIt = globalFrame.getSymbolicStore().find(loc);
-            if (storeIt != globalFrame.getSymbolicStore().end()) {
-              target = storeIt->second;
+          if (!storedValue.first) {
+            storedValue = globalFrame.findInSymbolicStore(loc);
+            if (storedValue.first) {
+              target = storedValue.second->second;
             }
           } else {
-            target = storeIt->second;
+            target = storedValue.second->second;
           }
 
           if (target.second.isNull()) {
@@ -1184,15 +1105,15 @@ void Dependency::execute(llvm::Instruction *instr,
                      stackIt = stack.rbegin(),
                      stackIe = stack.rend();
                  stackIt != stackIe; ++stackIt) {
-              storeIt = stackIt->getConcreteStore().find(loc);
-              if (storeIt == stackIt->getConcreteStore().end()) {
-                storeIt = stackIt->getSymbolicStore().find(loc);
-                if (storeIt != stackIt->getSymbolicStore().end()) {
-                  target = storeIt->second;
+              storedValue = stackIt->findInConcreteStore(loc);
+              if (!storedValue.first) {
+                storedValue = stackIt->findInSymbolicStore(loc);
+                if (storedValue.first) {
+                  target = storedValue.second->second;
                   break;
                 }
               } else {
-                target = storeIt->second;
+                target = storedValue.second->second;
               }
             }
           }
