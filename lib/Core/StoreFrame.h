@@ -52,6 +52,35 @@ public:
     return new StoreFrame(_parent, _source);
   }
 
+  /// \brief Replicating the stack
+  StoreFrame *replicate() {
+    StoreFrame *sourceFrame = this;
+    StoreFrame *t, *ret = 0;
+
+    if (sourceFrame != 0) {
+      ret = t = new StoreFrame(0, sourceFrame);
+      while (sourceFrame != 0) {
+        sourceFrame = sourceFrame->parent;
+        if (sourceFrame != 0) {
+          t->parent = new StoreFrame(0, sourceFrame);
+          t = t->parent;
+        } else {
+          t->parent = 0;
+        }
+      }
+    }
+    return ret;
+  }
+
+  /// \brief Clearing the stack
+  static void clearRecursively(StoreFrame *frame) {
+    if (!frame)
+      return;
+    clearRecursively(frame->parent);
+    if (frame->parent)
+      delete frame->parent;
+  }
+
   void getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
                         std::set<const Array *> &replacements, bool coreOnly,
                         TxConcreteStore &concreteStore) const;
@@ -75,6 +104,8 @@ public:
 
   std::pair<ref<VersionedValue>, ref<VersionedValue> >
   read(ref<MemoryLocation> address);
+
+  StoreFrame *getParent() const { return parent; }
 
   void print(llvm::raw_ostream &stream) const { print(stream, ""); }
 

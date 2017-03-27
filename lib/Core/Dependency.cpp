@@ -324,18 +324,18 @@ void Dependency::getStoredExpressions(
     std::set<const Array *> &replacements, bool coreOnly,
     TxConcreteStore &_concretelyAddressedStore,
     TxSymbolicStore &_symbolicallyAddressedStore) {
-  globalFrame.getConcreteStore(callHistory, replacements, coreOnly,
-                               _concretelyAddressedStore);
-  globalFrame.getSymbolicStore(callHistory, replacements, coreOnly,
-                               _symbolicallyAddressedStore);
+  globalFrame->getConcreteStore(callHistory, replacements, coreOnly,
+                                _concretelyAddressedStore);
+  globalFrame->getSymbolicStore(callHistory, replacements, coreOnly,
+                                _symbolicallyAddressedStore);
 
-  for (std::vector<StoreFrame>::reverse_iterator it = stack.rbegin(),
-                                                 ie = stack.rend();
-       it != ie; ++it) {
-    it->getConcreteStore(callHistory, replacements, coreOnly,
-                         _concretelyAddressedStore);
-    it->getSymbolicStore(callHistory, replacements, coreOnly,
-                         _symbolicallyAddressedStore);
+  StoreFrame *s = stack;
+  while (s != 0) {
+    s->getConcreteStore(callHistory, replacements, coreOnly,
+                        _concretelyAddressedStore);
+    s->getSymbolicStore(callHistory, replacements, coreOnly,
+                        _symbolicallyAddressedStore);
+    s = s->getParent();
   }
 }
 
@@ -519,10 +519,10 @@ std::pair<ref<VersionedValue>, ref<VersionedValue> >
 Dependency::readStore(ref<MemoryLocation> loc) {
   std::pair<ref<VersionedValue>, ref<VersionedValue> > ret;
   if (loc->isGlobal()) {
-    return globalFrame.read(loc);
+    return globalFrame->read(loc);
   }
-  if (!stack.empty()) {
-    return stack.back().read(loc);
+  if (stack) {
+    return stack->read(loc);
   }
   return ret;
 }
@@ -538,29 +538,29 @@ void Dependency::updateStore(ref<MemoryLocation> loc,
     if (debugSubsumptionLevel >= 3) {
       std::string msg;
       llvm::raw_string_ostream stream(msg);
-      globalFrame.print(stream);
+      globalFrame->print(stream);
       stream << "with address:\n";
       loc->print(stream);
       stream.flush();
 
       klee_message("Storing into global frame:\n%s", msg.c_str());
     }
-    globalFrame.updateStore(loc, address, value);
+    globalFrame->updateStore(loc, address, value);
   } else {
-    if (stack.empty()) {
-      stack.push_back(*StoreFrame::create(0));
+    if (stack == 0) {
+      stack = StoreFrame::create(0);
     }
     if (debugSubsumptionLevel >= 3) {
       std::string msg;
       llvm::raw_string_ostream stream(msg);
-      stack.back().print(stream);
+      stack->print(stream);
       stream << "with address:\n";
       loc->print(stream);
       stream.flush();
 
       klee_message("Storing into local frame:\n%s", msg.c_str());
     }
-    stack.back().updateStore(loc, address, value);
+    stack->updateStore(loc, address, value);
   }
 }
 
@@ -808,13 +808,14 @@ void Dependency::populateArgumentValuesList(
 
 Dependency::Dependency(Dependency *_parent, llvm::DataLayout *_targetData)
     : parent(_parent),
-      globalFrame(_parent ? _parent->globalFrame : *StoreFrame::create(0)),
+      globalFrame(StoreFrame::create(0, _parent ? _parent->globalFrame : 0)),
       targetData(_targetData) {
   if (_parent) {
-    stack = _parent->stack;
+    stack = (_parent->stack ? _parent->stack->replicate() : 0);
     debugSubsumptionLevel = _parent->debugSubsumptionLevel;
     debugStateLevel = _parent->debugStateLevel;
   } else {
+    stack = 0;
 #ifdef ENABLE_Z3
     debugSubsumptionLevel = DebugSubsumption;
     debugStateLevel = DebugState;
@@ -827,7 +828,8 @@ Dependency::Dependency(Dependency *_parent, llvm::DataLayout *_targetData)
 
 Dependency::~Dependency() {
   // Delete the stack
-  stack.clear();
+  StoreFrame::clearRecursively(stack);
+  stack = 0;
 
   // Delete valuesMap
   for (std::map<llvm::Value *, std::vector<ref<VersionedValue> > >::iterator
@@ -1609,7 +1611,7 @@ Dependency::bindCallArguments(llvm::Instruction *i,
   }
 
   // Push the stack frame before doing anything else
-  stack.push_back(*StoreFrame::create(0));
+  stack = StoreFrame::create(stack);
 }
 
 void Dependency::bindReturnValue(llvm::CallInst *site,
@@ -1630,7 +1632,11 @@ void Dependency::bindReturnValue(llvm::CallInst *site,
   }
 
   // Pop the stack frame
-  stack.pop_back();
+  StoreFrame *s = stack;
+  if (s) {
+    stack = s->getParent();
+    delete s;
+  }
 }
 
 void Dependency::markAllValues(ref<VersionedValue> value,
@@ -1667,15 +1673,16 @@ void Dependency::print(llvm::raw_ostream &stream,
                        const unsigned paddingAmount) const {
   std::string tabs = makeTabs(paddingAmount);
 
-  for (std::vector<StoreFrame>::const_reverse_iterator it = stack.rbegin(),
-                                                       ie = stack.rend();
-       it != ie; ++it) {
+  StoreFrame *s = stack;
+  while (s) {
     stream << tabs << "------------- Stack Frame ---------------\n";
-    it->print(stream, tabs);
+    s->print(stream, tabs);
     stream << tabs << "\n";
+    s = s->getParent();
   }
+
   stream << tabs << "------------- Global Frame ---------------\n";
-  globalFrame.print(stream, tabs);
+  globalFrame->print(stream, tabs);
 
   if (parent) {
     stream << tabs << "--------- Parent Dependencies ----------\n";

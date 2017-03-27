@@ -171,10 +171,10 @@ namespace klee {
     std::vector<ref<VersionedValue> > argumentValuesList;
 
     /// \brief The global frame
-    StoreFrame globalFrame;
+    StoreFrame *globalFrame;
 
     /// \brief The stack
-    std::vector<StoreFrame> stack;
+    StoreFrame *stack;
 
     /// \brief The store of the versioned values
     std::map<llvm::Value *, std::vector<ref<VersionedValue> > > valuesMap;
