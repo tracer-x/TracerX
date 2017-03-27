@@ -523,10 +523,26 @@ void Dependency::updateStore(ref<MemoryLocation> loc,
       symbolicStore;
 
   if (loc->isGlobal()) {
+    if (debugSubsumptionLevel >= 3) {
+      std::string msg;
+      llvm::raw_string_ostream stream(msg);
+      globalFrame.print(stream);
+      stream.flush();
+
+      klee_message("Storing into global frame:\n%s", msg.c_str());
+    }
     globalFrame.updateStore(loc, address, value);
   } else {
     if (stack.empty()) {
       stack.push_back(*StoreFrame::create(0));
+    }
+    if (debugSubsumptionLevel >= 3) {
+      std::string msg;
+      llvm::raw_string_ostream stream(msg);
+      stack.back().print(stream);
+      stream.flush();
+
+      klee_message("Storing into local frame:\n%s", msg.c_str());
     }
     stack.back().updateStore(loc, address, value);
   }
