@@ -327,7 +327,7 @@ namespace klee {
 
   public:
     /// \brief This is for dynamic setting up of debug messages.
-    int debugSubsumptionLevel;
+    uint64_t debugSubsumptionLevel;
 
     /// \brief Flag to display debug information on the state.
     uint64_t debugStateLevel;
