@@ -139,8 +139,8 @@ void StoreFrame::print(llvm::raw_ostream &stream,
 
   const std::map<ref<MemoryLocation>,
                  std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
-  concreteStore = (source ? source->symbolicallyAddressedStore
-                          : symbolicallyAddressedStore);
+  concreteStore =
+      (source ? source->concretelyAddressedStore : concretelyAddressedStore);
 
   const std::map<ref<MemoryLocation>,
                  std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
