@@ -40,6 +40,14 @@ class StoreFrame {
   StoreFrame(StoreFrame *_parent, StoreFrame *_source)
       : parent(_parent), source(_source) {}
 
+  static StoreFrame *replicateRecursively(StoreFrame *current) {
+    if (current == 0)
+      return 0;
+    StoreFrame *ret = new StoreFrame(0, current);
+    ret->parent = replicateRecursively(current->parent);
+    return ret;
+  }
+
 public:
 
   ~StoreFrame() {
@@ -53,24 +61,7 @@ public:
   }
 
   /// \brief Replicating the stack
-  StoreFrame *replicate() {
-    StoreFrame *sourceFrame = this;
-    StoreFrame *t, *ret = 0;
-
-    if (sourceFrame != 0) {
-      ret = t = new StoreFrame(0, sourceFrame);
-      while (sourceFrame != 0) {
-        sourceFrame = sourceFrame->parent;
-        if (sourceFrame != 0) {
-          t->parent = new StoreFrame(0, sourceFrame);
-          t = t->parent;
-        } else {
-          t->parent = 0;
-        }
-      }
-    }
-    return ret;
-  }
+  StoreFrame *replicate() { return replicateRecursively(this); }
 
   /// \brief Clearing the stack
   static void clearRecursively(StoreFrame *frame) {
