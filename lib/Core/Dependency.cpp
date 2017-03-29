@@ -527,6 +527,8 @@ void Dependency::updateStore(ref<MemoryLocation> loc,
       std::string msg;
       llvm::raw_string_ostream stream(msg);
       globalFrame.print(stream);
+      stream << "with address:\n";
+      loc->print(stream);
       stream.flush();
 
       klee_message("Storing into global frame:\n%s", msg.c_str());
@@ -540,6 +542,8 @@ void Dependency::updateStore(ref<MemoryLocation> loc,
       std::string msg;
       llvm::raw_string_ostream stream(msg);
       stack.back().print(stream);
+      stream << "with address:\n";
+      loc->print(stream);
       stream.flush();
 
       klee_message("Storing into local frame:\n%s", msg.c_str());
