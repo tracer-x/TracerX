@@ -1705,7 +1705,7 @@ void Dependency::print(llvm::raw_ostream &stream,
 
   if (parent) {
     stream << tabs << "--------- Parent Dependencies ----------\n";
-    parent->print(stream, paddingAmount);
+    parent->print(stream, paddingAmount + 1);
   }
 }
 
