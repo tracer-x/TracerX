@@ -515,6 +515,18 @@ ref<VersionedValue> Dependency::getLatestValueForMarking(llvm::Value *val,
   return value;
 }
 
+std::pair<ref<VersionedValue>, ref<VersionedValue> >
+Dependency::readStore(ref<MemoryLocation> loc) {
+  std::pair<ref<VersionedValue>, ref<VersionedValue> > ret;
+  if (loc->isGlobal()) {
+    return globalFrame.read(loc);
+  }
+  if (!stack.empty()) {
+    return stack.back().read(loc);
+  }
+  return ret;
+}
+
 void Dependency::updateStore(ref<MemoryLocation> loc,
                              ref<VersionedValue> address,
                              ref<VersionedValue> value) {
@@ -1104,39 +1116,8 @@ void Dependency::execute(llvm::Instruction *instr,
           ref<MemoryLocation> loc = *(locations.begin());
 
           // Check the possible mismatch between Tracer-X and KLEE loaded value
-          std::pair<bool,
-                    std::map<ref<MemoryLocation>,
-                             std::pair<ref<VersionedValue>,
-                                       ref<VersionedValue> > >::const_iterator>
-          storedValue = globalFrame.findInConcreteStore(loc);
-          std::pair<ref<VersionedValue>, ref<VersionedValue> > target;
-
-          if (!storedValue.first) {
-            storedValue = globalFrame.findInSymbolicStore(loc);
-            if (storedValue.first) {
-              target = storedValue.second->second;
-            }
-          } else {
-            target = storedValue.second->second;
-          }
-
-          if (target.second.isNull()) {
-            for (std::vector<StoreFrame>::reverse_iterator
-                     stackIt = stack.rbegin(),
-                     stackIe = stack.rend();
-                 stackIt != stackIe; ++stackIt) {
-              storedValue = stackIt->findInConcreteStore(loc);
-              if (!storedValue.first) {
-                storedValue = stackIt->findInSymbolicStore(loc);
-                if (storedValue.first) {
-                  target = storedValue.second->second;
-                  break;
-                }
-              } else {
-                target = storedValue.second->second;
-              }
-            }
-          }
+          std::pair<ref<VersionedValue>, ref<VersionedValue> > target =
+              readStore(loc);
 
           if (!target.second.isNull() &&
               valueExpr != target.second->getExpression()) {
@@ -1209,15 +1190,8 @@ void Dependency::execute(llvm::Instruction *instr,
       for (std::set<ref<MemoryLocation> >::iterator li = locations.begin(),
                                                     le = locations.end();
            li != le; ++li) {
-        std::pair<ref<VersionedValue>, ref<VersionedValue> > addressValuePair;
-
-        if (!stack.empty()) {
-          addressValuePair = stack.back().read(*li);
-        }
-        if (addressValuePair.first.isNull() ||
-            addressValuePair.second.isNull()) {
-          addressValuePair = globalFrame.read(*li);
-        }
+        std::pair<ref<VersionedValue>, ref<VersionedValue> > addressValuePair =
+            readStore(*li);
 
         // Build the loaded value
         ref<VersionedValue> loadedValue =

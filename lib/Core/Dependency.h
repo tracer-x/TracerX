@@ -237,6 +237,10 @@ namespace klee {
     ref<VersionedValue> getLatestValueForMarking(llvm::Value *val,
                                                  ref<Expr> expr);
 
+    /// \brief Read from memory location
+    std::pair<ref<VersionedValue>, ref<VersionedValue> >
+    readStore(ref<MemoryLocation> loc);
+
     /// \brief Newly relate an location with its stored value
     void updateStore(ref<MemoryLocation> loc, ref<VersionedValue> address,
                      ref<VersionedValue> value);
