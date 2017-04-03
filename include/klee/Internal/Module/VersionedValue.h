@@ -282,7 +282,7 @@ public:
   }
 
   /// \brief Adjust the offset bound for interpolation (a.k.a. slackening)
-  void adjustOffsetBound(ref<VersionedValue> checkedAddress,
+  bool adjustOffsetBound(ref<VersionedValue> checkedAddress,
                          std::set<ref<Expr> > &bounds);
 
   bool hasConstantAddress() const { return llvm::isa<ConstantExpr>(address); }

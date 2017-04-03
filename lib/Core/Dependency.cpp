@@ -786,6 +786,8 @@ void Dependency::markPointerFlow(ref<VersionedValue> target,
                                  ref<VersionedValue> checkedAddress,
                                  std::set<ref<Expr> > &bounds,
                                  const std::string &reason) const {
+  bool boundUpdated = false;
+
   if (target.isNull())
     return;
 
@@ -795,9 +797,15 @@ void Dependency::markPointerFlow(ref<VersionedValue> target,
     for (std::set<ref<MemoryLocation> >::iterator it = locations.begin(),
                                                   ie = locations.end();
          it != ie; ++it) {
-      (*it)->adjustOffsetBound(checkedAddress, bounds);
+      boundUpdated = (*it)->adjustOffsetBound(checkedAddress, bounds);
     }
   }
+
+  // Bound is not updated, this means that better bound has been found
+  // previously
+  if (!boundUpdated)
+    return;
+
   target->setAsCore(reason);
 
   // Compute the direct pointer flow dependency
