@@ -53,18 +53,23 @@ void StoreFrame::updateStore(ref<MemoryLocation> loc,
                              ref<VersionedValue> address,
                              ref<VersionedValue> value) {
 
+  StoreFrame *frame = findFrame(loc);
+
+  assert(frame && "frame not found");
+
   // We copy the store to update on demand, only when this function is invoked
-  if (source) {
-    concretelyAddressedStore = source->concretelyAddressedStore;
-    symbolicallyAddressedStore = source->symbolicallyAddressedStore;
-    source = 0;
+  if (frame->source) {
+    frame->concretelyAddressedStore = frame->source->concretelyAddressedStore;
+    frame->symbolicallyAddressedStore =
+        frame->source->symbolicallyAddressedStore;
+    frame->source = 0;
   }
 
   if (loc->hasConstantAddress()) {
-    concretelyAddressedStore[loc] =
+    (frame->concretelyAddressedStore)[loc] =
         std::pair<ref<VersionedValue>, ref<VersionedValue> >(address, value);
   } else {
-    symbolicallyAddressedStore[loc] =
+    (frame->symbolicallyAddressedStore)[loc] =
         std::pair<ref<VersionedValue>, ref<VersionedValue> >(address, value);
   }
 }
@@ -74,19 +79,24 @@ StoreFrame::read(ref<MemoryLocation> address) {
   std::map<
       ref<MemoryLocation>,
       std::pair<ref<VersionedValue>, ref<VersionedValue> > >::const_iterator it;
+
+  StoreFrame *frame = findFrame(address);
+
+  assert(frame && "frame not found");
+
   if (address->hasConstantAddress()) {
     const std::map<ref<MemoryLocation>,
                    std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
-    concreteStore =
-        (source ? source->concretelyAddressedStore : concretelyAddressedStore);
+    concreteStore = (frame->source ? frame->source->concretelyAddressedStore
+                                   : frame->concretelyAddressedStore);
     it = concreteStore.find(address);
     if (it != concreteStore.end())
       return it->second;
   } else {
     const std::map<ref<MemoryLocation>,
                    std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
-    symbolicStore = (source ? source->symbolicallyAddressedStore
-                            : symbolicallyAddressedStore);
+    symbolicStore = (frame->source ? frame->source->symbolicallyAddressedStore
+                                   : frame->symbolicallyAddressedStore);
     it = symbolicStore.find(address);
     // FIXME: Here we assume that the expressions have to exactly be the
     // same expression object. More properly, this should instead add an
@@ -94,9 +104,6 @@ StoreFrame::read(ref<MemoryLocation> address) {
     if (it != symbolicStore.end())
       return it->second;
   }
-
-  if (parent)
-    return parent->read(address);
 
   std::pair<ref<VersionedValue>, ref<VersionedValue> > dummyReturnValue;
   return dummyReturnValue;
