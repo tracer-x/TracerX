@@ -16,6 +16,30 @@ using namespace klee;
 
 namespace klee {
 
+StoreFrame *StoreFrame::findFrame(const ref<MemoryLocation> loc) {
+  std::vector<llvm::Instruction *> callHistory =
+      loc->getContext()->getCallHistory();
+  const uint64_t historyHeight = callHistory.size();
+
+  if (height < historyHeight)
+    return 0;
+
+  StoreFrame *current = this;
+  for (uint64_t i = height; i > historyHeight; --i) {
+    current = current->parent;
+  }
+
+  // Strictly speaking, we need to check that all elements match, but here we
+  // just do a quick check that the top callsites match.
+  if (current->callsite == 0 && callHistory.empty())
+    return current;
+
+  if (current->callsite == callHistory.back())
+    return current;
+
+  return 0;
+}
+
 std::pair<bool, std::map<ref<MemoryLocation>,
                          std::pair<ref<VersionedValue>,
                                    ref<VersionedValue> > >::const_iterator>
