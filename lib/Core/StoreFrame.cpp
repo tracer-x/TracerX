@@ -71,8 +71,6 @@ void StoreFrame::updateStore(ref<MemoryLocation> loc,
 
 std::pair<ref<VersionedValue>, ref<VersionedValue> >
 StoreFrame::read(ref<MemoryLocation> address) {
-  std::pair<ref<VersionedValue>, ref<VersionedValue> > ret;
-
   std::map<
       ref<MemoryLocation>,
       std::pair<ref<VersionedValue>, ref<VersionedValue> > >::const_iterator it;
@@ -83,7 +81,7 @@ StoreFrame::read(ref<MemoryLocation> address) {
         (source ? source->concretelyAddressedStore : concretelyAddressedStore);
     it = concreteStore.find(address);
     if (it != concreteStore.end())
-      ret = it->second;
+      return it->second;
   } else {
     const std::map<ref<MemoryLocation>,
                    std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
@@ -94,9 +92,14 @@ StoreFrame::read(ref<MemoryLocation> address) {
     // same expression object. More properly, this should instead add an
     // ite constraint onto the path condition.
     if (it != symbolicStore.end())
-      ret = it->second;
+      return it->second;
   }
-  return ret;
+
+  if (parent)
+    return parent->read(address);
+
+  std::pair<ref<VersionedValue>, ref<VersionedValue> > dummyReturnValue;
+  return dummyReturnValue;
 }
 
 void StoreFrame::getConcreteStore(
