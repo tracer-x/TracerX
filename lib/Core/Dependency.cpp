@@ -1618,17 +1618,21 @@ void Dependency::bindReturnValue(llvm::CallInst *site,
                                  std::vector<llvm::Instruction *> &callHistory,
                                  llvm::Instruction *i, ref<Expr> returnValue) {
   llvm::ReturnInst *retInst = llvm::dyn_cast<llvm::ReturnInst>(i);
-  if (site && retInst &&
-      retInst->getReturnValue() // For functions returning void
-      ) {
-    ref<VersionedValue> value =
-        getLatestValue(retInst->getReturnValue(), callHistory, returnValue);
-    if (!callHistory.empty()) {
+  if (site && retInst) {
+    if (retInst->getReturnValue()) {
+      // For functions returning non-void
+      ref<VersionedValue> value =
+          getLatestValue(retInst->getReturnValue(), callHistory, returnValue);
+      if (!callHistory.empty()) {
+        callHistory.pop_back();
+      }
+      if (!value.isNull())
+        addDependency(value,
+                      getNewVersionedValue(site, callHistory, returnValue));
+    } else if (!callHistory.empty()) {
+      // For functions returning void
       callHistory.pop_back();
     }
-    if (!value.isNull())
-      addDependency(value,
-                    getNewVersionedValue(site, callHistory, returnValue));
   }
 
   // Pop the stack frame
