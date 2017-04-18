@@ -39,15 +39,20 @@ class StoreFrame {
   /// \brief The call site this frame belongs to
   llvm::Instruction *callsite;
 
+  /// \brief The height of this frame on the stack
+  uint64_t height;
+
   /// \brief Constructor
   StoreFrame(StoreFrame *_parent, llvm::Instruction *_callsite,
-             StoreFrame *_source)
-      : parent(_parent), source(_source), callsite(_callsite) {}
+             uint64_t _height, StoreFrame *_source)
+      : parent(_parent), source(_source), callsite(_callsite), height(_height) {
+  }
 
   static StoreFrame *replicateRecursively(StoreFrame *current) {
     if (current == 0)
       return 0;
-    StoreFrame *ret = new StoreFrame(0, current->callsite, current);
+    StoreFrame *ret =
+        new StoreFrame(0, current->callsite, current->height, current);
     ret->parent = replicateRecursively(current->parent);
     return ret;
   }
@@ -61,8 +66,8 @@ public:
   }
 
   static StoreFrame *create(StoreFrame *parent, llvm::Instruction *site,
-                            StoreFrame *source = 0) {
-    return new StoreFrame(parent, site, source);
+                            uint64_t height, StoreFrame *source = 0) {
+    return new StoreFrame(parent, site, height, source);
   }
 
   /// \brief Replicating the stack
@@ -102,6 +107,8 @@ public:
   read(ref<MemoryLocation> address);
 
   StoreFrame *getParent() const { return parent; }
+
+  uint64_t getHeight() const { return height; }
 
   void print(llvm::raw_ostream &stream) const { print(stream, ""); }
 
