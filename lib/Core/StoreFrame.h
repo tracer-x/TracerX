@@ -36,14 +36,18 @@ class StoreFrame {
   /// \brief Non-hollow source of this frame, which stores concrete data
   StoreFrame *source;
 
+  /// \brief The call site this frame belongs to
+  llvm::Instruction *callsite;
+
   /// \brief Constructor
-  StoreFrame(StoreFrame *_parent, StoreFrame *_source)
-      : parent(_parent), source(_source) {}
+  StoreFrame(StoreFrame *_parent, llvm::Instruction *_callsite,
+             StoreFrame *_source)
+      : parent(_parent), source(_source), callsite(_callsite) {}
 
   static StoreFrame *replicateRecursively(StoreFrame *current) {
     if (current == 0)
       return 0;
-    StoreFrame *ret = new StoreFrame(0, current);
+    StoreFrame *ret = new StoreFrame(0, current->callsite, current);
     ret->parent = replicateRecursively(current->parent);
     return ret;
   }
@@ -56,8 +60,9 @@ public:
     symbolicallyAddressedStore.clear();
   }
 
-  static StoreFrame *create(StoreFrame *parent, StoreFrame *source = 0) {
-    return new StoreFrame(parent, source);
+  static StoreFrame *create(StoreFrame *parent, llvm::Instruction *site,
+                            StoreFrame *source = 0) {
+    return new StoreFrame(parent, site, source);
   }
 
   /// \brief Replicating the stack
