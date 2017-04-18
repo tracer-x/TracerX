@@ -77,7 +77,10 @@ void StoreFrame::updateStore(ref<MemoryLocation> loc,
                              ref<VersionedValue> address,
                              ref<VersionedValue> value) {
 
-  StoreFrame *frame = findFrame(loc);
+  StoreFrame *frame = this;
+
+  if (!loc->isGlobal())
+    frame = findFrame(loc);
 
   assert(frame && "frame not found");
 
@@ -104,7 +107,10 @@ StoreFrame::read(ref<MemoryLocation> address) {
       ref<MemoryLocation>,
       std::pair<ref<VersionedValue>, ref<VersionedValue> > >::const_iterator it;
 
-  StoreFrame *frame = findFrame(address);
+  StoreFrame *frame = this;
+
+  if (!address->isGlobal())
+    frame = findFrame(address);
 
   assert(frame && "frame not found");
 

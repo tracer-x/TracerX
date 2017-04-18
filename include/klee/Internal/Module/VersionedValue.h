@@ -23,10 +23,12 @@
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Instruction.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/IR/Value.h>
 #else
 #include <llvm/BasicBlock.h>
 #include <llvm/Instruction.h>
+#include <llvm/Instructions.h>
 #include <llvm/Value.h>
 #endif
 
@@ -185,10 +187,30 @@ private:
     bool unknownBase = false;
 
     globalFlag = true;
-    if (const llvm::Instruction *inst =
+    if (llvm::Instruction *inst =
             llvm::dyn_cast<llvm::Instruction>(_context->getValue())) {
       if (inst->getParent() && inst->getParent()->getParent()) {
-        globalFlag = false;
+        // Heap-allocated memory is considered global, and to be recorded in
+        // global frame. Here we test if the allocation was a call to *alloc and
+        // getenv functions.
+        if (llvm::CallInst *ci = llvm::dyn_cast<llvm::CallInst>(inst)) {
+          // Here we determine if this was a call to *alloc or getenv functions
+          // from the LLVM source of the call instruction instead of
+          // llvm::Function::getName(). This is to circumvent segmentation fault
+          // issue when libc is not linked.
+          std::string buf;
+          llvm::raw_string_ostream stream(buf);
+          ci->print(stream);
+          stream.flush();
+          if (buf.find("@malloc(") == std::string::npos &&
+              buf.find("@realloc(") == std::string::npos &&
+              buf.find("@calloc(") == std::string::npos &&
+              buf.find("@getenv(") == std::string::npos) {
+            globalFlag = false;
+          }
+        } else {
+          globalFlag = false;
+        }
       }
     }
 
