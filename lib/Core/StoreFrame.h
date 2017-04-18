@@ -56,8 +56,8 @@ public:
     symbolicallyAddressedStore.clear();
   }
 
-  static StoreFrame *create(StoreFrame *_parent, StoreFrame *_source = 0) {
-    return new StoreFrame(_parent, _source);
+  static StoreFrame *create(StoreFrame *parent, StoreFrame *source = 0) {
+    return new StoreFrame(parent, source);
   }
 
   /// \brief Replicating the stack
