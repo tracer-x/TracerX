@@ -40,39 +40,6 @@ StoreFrame *StoreFrame::findFrame(const ref<MemoryLocation> loc) {
   return 0;
 }
 
-std::pair<bool, std::map<ref<MemoryLocation>,
-                         std::pair<ref<VersionedValue>,
-                                   ref<VersionedValue> > >::const_iterator>
-StoreFrame::findInConcreteStore(ref<MemoryLocation> loc) const {
-  std::pair<bool, std::map<ref<MemoryLocation>,
-                           std::pair<ref<VersionedValue>,
-                                     ref<VersionedValue> > >::const_iterator>
-  ret;
-  const std::map<ref<MemoryLocation>,
-                 std::pair<ref<VersionedValue>, ref<VersionedValue> > > &store =
-      (source ? source->concretelyAddressedStore : concretelyAddressedStore);
-  ret.second = store.find(loc);
-  ret.first = (ret.second != store.end());
-  return ret;
-}
-
-std::pair<bool, std::map<ref<MemoryLocation>,
-                         std::pair<ref<VersionedValue>,
-                                   ref<VersionedValue> > >::const_iterator>
-StoreFrame::findInSymbolicStore(ref<MemoryLocation> loc) const {
-  std::pair<bool, std::map<ref<MemoryLocation>,
-                           std::pair<ref<VersionedValue>,
-                                     ref<VersionedValue> > >::const_iterator>
-  ret;
-  const std::map<ref<MemoryLocation>,
-                 std::pair<ref<VersionedValue>, ref<VersionedValue> > > &store =
-      (source ? source->symbolicallyAddressedStore
-              : symbolicallyAddressedStore);
-  ret.second = store.find(loc);
-  ret.first = (ret.second != store.end());
-  return ret;
-}
-
 void StoreFrame::updateStore(ref<MemoryLocation> loc,
                              ref<VersionedValue> address,
                              ref<VersionedValue> value) {
