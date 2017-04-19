@@ -23,9 +23,9 @@ class StoredAddress {
 public:
   unsigned refCount;
 
+private:
   ref<MemoryLocation> loc;
 
-private:
   StoredAddress(ref<MemoryLocation> _loc) : refCount(0), loc(_loc) {}
 
 public:
@@ -33,6 +33,10 @@ public:
     ref<StoredAddress> ret(new StoredAddress(loc));
     return ret;
   }
+
+  ref<AllocationContext> getContext() { return loc->getContext(); }
+
+  ref<Expr> getOffset() { return loc->getOffset(); }
 
   /// \brief The comparator of this class' objects. This member function is
   /// weaker than standard comparator for MemoryLocation in that it does not
@@ -44,6 +48,17 @@ public:
   /// different paths may have different allocation ids.
   int compare(const StoredAddress &other) const {
     return loc->weakCompare(*(other.loc.get()));
+  }
+
+  void print(llvm::raw_ostream &stream) const { print(stream, ""); }
+
+  void print(llvm::raw_ostream &stream, const std::string &prefix) const {
+    loc->print(stream, prefix);
+  }
+
+  void dump() const {
+    print(llvm::errs());
+    llvm::errs() << "\n";
   }
 };
 
