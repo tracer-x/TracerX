@@ -173,6 +173,9 @@ namespace klee {
     /// \brief The global frame
     GlobalStoreFrame *globalFrame;
 
+    /// \brief The heap frame
+    HeapStoreFrame *heapFrame;
+
     /// \brief The stack
     StackStoreFrame *stack;
 

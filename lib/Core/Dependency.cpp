@@ -518,11 +518,18 @@ ref<VersionedValue> Dependency::getLatestValueForMarking(llvm::Value *val,
 std::pair<ref<VersionedValue>, ref<VersionedValue> >
 Dependency::readStore(ref<MemoryLocation> loc) {
   std::pair<ref<VersionedValue>, ref<VersionedValue> > ret;
-  if (loc->getContext()->ty != AllocationContext::LOCAL) {
-    return globalFrame->read(loc);
+
+  switch (loc->getContext()->ty) {
+  case AllocationContext::LOCAL: {
+    if (stack) {
+      return stack->read(loc);
+    }
+    break;
   }
-  if (stack) {
-    return stack->read(loc);
+  case AllocationContext::GLOBAL: { return globalFrame->read(loc); }
+  case AllocationContext::HEAP: { return heapFrame->read(loc); }
+  default:
+    break;
   }
   return ret;
 }
@@ -534,19 +541,8 @@ void Dependency::updateStore(ref<MemoryLocation> loc,
            std::pair<ref<VersionedValue>, ref<VersionedValue> > > concreteStore,
       symbolicStore;
 
-  if (loc->getContext()->ty != AllocationContext::LOCAL) {
-    if (debugSubsumptionLevel >= 3) {
-      std::string msg;
-      llvm::raw_string_ostream stream(msg);
-      globalFrame->print(stream);
-      stream << "with address:\n";
-      loc->print(stream);
-      stream.flush();
-
-      klee_message("Storing into global frame:\n%s", msg.c_str());
-    }
-    globalFrame->updateStore(loc, address, value);
-  } else {
+  switch (loc->getContext()->ty) {
+  case AllocationContext::LOCAL: {
     if (stack == 0) {
       stack = StackStoreFrame::create(0, 0, 0);
     }
@@ -561,6 +557,38 @@ void Dependency::updateStore(ref<MemoryLocation> loc,
       klee_message("Storing into local frame:\n%s", msg.c_str());
     }
     stack->updateStore(loc, address, value);
+    break;
+  }
+  case AllocationContext::GLOBAL: {
+    if (debugSubsumptionLevel >= 3) {
+      std::string msg;
+      llvm::raw_string_ostream stream(msg);
+      globalFrame->print(stream);
+      stream << "with address:\n";
+      loc->print(stream);
+      stream.flush();
+
+      klee_message("Storing into global frame:\n%s", msg.c_str());
+    }
+    globalFrame->updateStore(loc, address, value);
+    break;
+  }
+  case AllocationContext::HEAP: {
+    if (debugSubsumptionLevel >= 3) {
+      std::string msg;
+      llvm::raw_string_ostream stream(msg);
+      heapFrame->print(stream);
+      stream << "with address:\n";
+      loc->print(stream);
+      stream.flush();
+
+      klee_message("Storing into heap:\n%s", msg.c_str());
+    }
+    heapFrame->updateStore(loc, address, value);
+    break;
+  }
+  default:
+    break;
   }
 }
 
@@ -809,6 +837,7 @@ void Dependency::populateArgumentValuesList(
 Dependency::Dependency(Dependency *_parent, llvm::DataLayout *_targetData)
     : parent(_parent),
       globalFrame(GlobalStoreFrame::create(_parent ? _parent->globalFrame : 0)),
+      heapFrame(HeapStoreFrame::create(_parent ? _parent->heapFrame : 0)),
       targetData(_targetData) {
   if (_parent) {
     stack = (_parent->stack ? _parent->stack->replicate() : 0);
@@ -831,6 +860,12 @@ Dependency::~Dependency() {
   if (globalFrame) {
     delete globalFrame;
     globalFrame = 0;
+  }
+
+  // Delete the heap frame
+  if (heapFrame) {
+    delete heapFrame;
+    heapFrame = 0;
   }
 
   // Delete the stack
@@ -1693,6 +1728,9 @@ void Dependency::print(llvm::raw_ostream &stream,
 
   stream << tabs << "------------- Global Frame ---------------\n";
   globalFrame->print(stream, tabs);
+
+  stream << tabs << "----------------- Heap -------------------\n";
+  heapFrame->print(stream, tabs);
 
   if (parent) {
     stream << tabs << "--------- Parent Dependencies ----------\n";
