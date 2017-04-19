@@ -50,6 +50,51 @@ void AllocationContext::print(llvm::raw_ostream &stream,
 
 /**/
 
+void StoredAddress::print(llvm::raw_ostream &stream,
+                          const std::string &prefix) const {
+  std::string tabsNext = appendTab(prefix);
+
+  stream << prefix << "function/value: ";
+  if (outputFunctionName(context->getValue(), stream))
+    stream << "/";
+  context->getValue()->print(stream);
+  stream << "\n";
+
+  stream << prefix << "stack:\n";
+  for (std::vector<llvm::Instruction *>::const_reverse_iterator
+           it = context->getCallHistory().rbegin(),
+           ib = it, ie = context->getCallHistory().rend();
+       it != ie; ++it) {
+    stream << tabsNext;
+    (*it)->print(stream);
+    stream << "\n";
+  }
+  stream << prefix << "offset";
+  if (!llvm::isa<ConstantExpr>(this->offset))
+    stream << " (symbolic)";
+  stream << ": ";
+  offset->print(stream);
+  stream << "\n";
+  stream << prefix << "type: ";
+  switch (context->ty) {
+  case AllocationContext::LOCAL:
+    stream << "local\n";
+    break;
+  case AllocationContext::GLOBAL:
+    stream << "global\n";
+    break;
+  case AllocationContext::HEAP:
+    stream << "heap\n";
+    break;
+  default:
+    stream << "(unknown)\n";
+  }
+  stream << prefix
+         << "pointer to location object: " << reinterpret_cast<uintptr_t>(this);
+}
+
+/**/
+
 void MemoryLocation::adjustOffsetBound(ref<VersionedValue> checkedAddress,
                                        std::set<ref<Expr> > &_bounds) {
   std::set<ref<MemoryLocation> > locations = checkedAddress->getLocations();
@@ -67,7 +112,8 @@ void MemoryLocation::adjustOffsetBound(ref<VersionedValue> checkedAddress,
          it2 != ie2; ++it2) {
       ref<Expr> checkedOffset = (*it2)->getOffset();
       if (ConstantExpr *c = llvm::dyn_cast<ConstantExpr>(checkedOffset)) {
-        if (ConstantExpr *o = llvm::dyn_cast<ConstantExpr>(offset)) {
+        if (ConstantExpr *o =
+                llvm::dyn_cast<ConstantExpr>(storedAddress->offset)) {
           if (ConstantExpr *b = llvm::dyn_cast<ConstantExpr>(*it1)) {
             uint64_t offsetInt = o->getZExtValue();
             uint64_t newBound =
@@ -95,8 +141,8 @@ void MemoryLocation::adjustOffsetBound(ref<VersionedValue> checkedAddress,
         }
       }
 
-      symbolicOffsetBounds.insert(
-          SubExpr::create(*it1, SubExpr::create(checkedOffset, offset)));
+      symbolicOffsetBounds.insert(SubExpr::create(
+          *it1, SubExpr::create(checkedOffset, storedAddress->offset)));
     }
   }
 }
@@ -107,37 +153,29 @@ MemoryLocation::create(ref<MemoryLocation> loc,
   ref<Expr> _address(
       ShadowArray::getShadowExpression(loc->address, replacements)),
       _base(ShadowArray::getShadowExpression(loc->base, replacements)),
-      _offset(ShadowArray::getShadowExpression(loc->offset, replacements));
-  ref<MemoryLocation> ret(new MemoryLocation(
-      loc->context, _address, _base, _offset, loc->size, loc->allocationId));
+      _offset(ShadowArray::getShadowExpression(loc->storedAddress->offset,
+                                               replacements));
+  ref<MemoryLocation> ret(new MemoryLocation(loc->storedAddress->context,
+                                             _address, _base, _offset,
+                                             loc->size, loc->allocationId));
   return ret;
+}
+
+ref<StoredAddress>
+MemoryLocation::getStoredAddress(std::set<const Array *> &replacements) const {
+  ref<Expr> _offset(
+      ShadowArray::getShadowExpression(storedAddress->offset, replacements));
+  return StoredAddress::create(storedAddress->context, _offset,
+                               storedAddress->isConcrete,
+                               storedAddress->concreteOffset);
 }
 
 void MemoryLocation::print(llvm::raw_ostream &stream,
                            const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
-  stream << prefix << "function/value: ";
-  if (outputFunctionName(context->getValue(), stream))
-    stream << "/";
-  context->getValue()->print(stream);
-  stream << "\n";
+  storedAddress->print(stream, prefix);
 
-  stream << prefix << "stack:\n";
-  for (std::vector<llvm::Instruction *>::const_reverse_iterator
-           it = context->getCallHistory().rbegin(),
-           ib = it, ie = context->getCallHistory().rend();
-       it != ie; ++it) {
-    stream << tabsNext;
-    (*it)->print(stream);
-    stream << "\n";
-  }
-  stream << prefix << "offset";
-  if (!llvm::isa<ConstantExpr>(this->offset))
-    stream << " (symbolic)";
-  stream << ": ";
-  offset->print(stream);
-  stream << "\n";
   stream << prefix << "address";
   if (!llvm::isa<ConstantExpr>(this->address))
     stream << " (symbolic)";
@@ -150,23 +188,7 @@ void MemoryLocation::print(llvm::raw_ostream &stream,
   stream << ": ";
   base->print(stream);
   stream << "\n";
-  stream << prefix << "type: ";
-  switch (context->ty) {
-  case AllocationContext::LOCAL:
-    stream << "local\n";
-    break;
-  case AllocationContext::GLOBAL:
-    stream << "global\n";
-    break;
-  case AllocationContext::HEAP:
-    stream << "heap\n";
-    break;
-  default:
-    stream << "(unknown)\n";
-  }
   stream << prefix << "allocation id: " << allocationId << "\n";
-  stream << prefix
-         << "pointer to location object: " << reinterpret_cast<uintptr_t>(this);
 }
 
 /**/

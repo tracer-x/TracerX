@@ -88,18 +88,18 @@ void GlobalStoreFrame::getConcreteStore(
 
     if (!coreOnly) {
       const llvm::Value *base = it->first->getContext()->getValue();
-      concreteStore[base][StoredAddress::create(it->first)] =
+      concreteStore[base][it->first->getStoredAddress()] =
           StoredValue::create(it->second.second);
     } else if (it->second.second->isCore()) {
       // An address is in the core if it stores a value that is in the core
       const llvm::Value *base = it->first->getContext()->getValue();
 #ifdef ENABLE_Z3
       if (!NoExistential) {
-        concreteStore[base][StoredAddress::create(it->first)] =
+        concreteStore[base][it->first->getStoredAddress()] =
             StoredValue::create(it->second.second, replacements);
       } else
 #endif
-        concreteStore[base][StoredAddress::create(it->first)] =
+        concreteStore[base][it->first->getStoredAddress()] =
             StoredValue::create(it->second.second);
     }
   }
@@ -129,7 +129,7 @@ void GlobalStoreFrame::getSymbolicStore(
     if (!coreOnly) {
       llvm::Value *base = it->first->getContext()->getValue();
       symbolicStore[base].push_back(
-          TxAddressValuePair(StoredAddress::create(it->first),
+          TxAddressValuePair(it->first->getStoredAddress(),
                              StoredValue::create(it->second.second)));
     } else if (it->second.second->isCore()) {
       // An address is in the core if it stores a value that is in the core
@@ -137,13 +137,12 @@ void GlobalStoreFrame::getSymbolicStore(
 #ifdef ENABLE_Z3
       if (!NoExistential) {
         symbolicStore[base].push_back(TxAddressValuePair(
-            StoredAddress::create(
-                MemoryLocation::create(it->first, replacements)),
+            it->first->getStoredAddress(replacements),
             StoredValue::create(it->second.second, replacements)));
       } else
 #endif
         symbolicStore[base].push_back(
-            TxAddressValuePair(StoredAddress::create(it->first),
+            TxAddressValuePair(it->first->getStoredAddress(),
                                StoredValue::create(it->second.second)));
     }
   }
@@ -283,18 +282,18 @@ void HeapStoreFrame::getConcreteStore(
 
     if (!coreOnly) {
       const llvm::Value *base = it->first->getContext()->getValue();
-      concreteStore[base][StoredAddress::create(it->first)] =
+      concreteStore[base][it->first->getStoredAddress()] =
           StoredValue::create(it->second.second);
     } else if (it->second.second->isCore()) {
       // An address is in the core if it stores a value that is in the core
       const llvm::Value *base = it->first->getContext()->getValue();
 #ifdef ENABLE_Z3
       if (!NoExistential) {
-        concreteStore[base][StoredAddress::create(it->first)] =
+        concreteStore[base][it->first->getStoredAddress()] =
             StoredValue::create(it->second.second, replacements);
       } else
 #endif
-        concreteStore[base][StoredAddress::create(it->first)] =
+        concreteStore[base][it->first->getStoredAddress()] =
             StoredValue::create(it->second.second);
     }
   }
@@ -324,7 +323,7 @@ void HeapStoreFrame::getSymbolicStore(
     if (!coreOnly) {
       llvm::Value *base = it->first->getContext()->getValue();
       symbolicStore[base].push_back(
-          TxAddressValuePair(StoredAddress::create(it->first),
+          TxAddressValuePair(it->first->getStoredAddress(),
                              StoredValue::create(it->second.second)));
     } else if (it->second.second->isCore()) {
       // An address is in the core if it stores a value that is in the core
@@ -332,13 +331,12 @@ void HeapStoreFrame::getSymbolicStore(
 #ifdef ENABLE_Z3
       if (!NoExistential) {
         symbolicStore[base].push_back(TxAddressValuePair(
-            StoredAddress::create(
-                MemoryLocation::create(it->first, replacements)),
+            it->first->getStoredAddress(replacements),
             StoredValue::create(it->second.second, replacements)));
       } else
 #endif
         symbolicStore[base].push_back(
-            TxAddressValuePair(StoredAddress::create(it->first),
+            TxAddressValuePair(it->first->getStoredAddress(),
                                StoredValue::create(it->second.second)));
     }
   }
@@ -517,18 +515,18 @@ void StackStoreFrame::getConcreteStore(
 
     if (!coreOnly) {
       const llvm::Value *base = it->first->getContext()->getValue();
-      concreteStore[base][StoredAddress::create(it->first)] =
+      concreteStore[base][it->first->getStoredAddress()] =
           StoredValue::create(it->second.second);
     } else if (it->second.second->isCore()) {
       // An address is in the core if it stores a value that is in the core
       const llvm::Value *base = it->first->getContext()->getValue();
 #ifdef ENABLE_Z3
       if (!NoExistential) {
-        concreteStore[base][StoredAddress::create(it->first)] =
+        concreteStore[base][it->first->getStoredAddress()] =
             StoredValue::create(it->second.second, replacements);
       } else
 #endif
-        concreteStore[base][StoredAddress::create(it->first)] =
+        concreteStore[base][it->first->getStoredAddress()] =
             StoredValue::create(it->second.second);
     }
   }
@@ -558,7 +556,7 @@ void StackStoreFrame::getSymbolicStore(
     if (!coreOnly) {
       llvm::Value *base = it->first->getContext()->getValue();
       symbolicStore[base].push_back(
-          TxAddressValuePair(StoredAddress::create(it->first),
+          TxAddressValuePair(it->first->getStoredAddress(),
                              StoredValue::create(it->second.second)));
     } else if (it->second.second->isCore()) {
       // An address is in the core if it stores a value that is in the core
@@ -566,13 +564,12 @@ void StackStoreFrame::getSymbolicStore(
 #ifdef ENABLE_Z3
       if (!NoExistential) {
         symbolicStore[base].push_back(TxAddressValuePair(
-            StoredAddress::create(
-                MemoryLocation::create(it->first, replacements)),
+            it->first->getStoredAddress(replacements),
             StoredValue::create(it->second.second, replacements)));
       } else
 #endif
         symbolicStore[base].push_back(
-            TxAddressValuePair(StoredAddress::create(it->first),
+            TxAddressValuePair(it->first->getStoredAddress(),
                                StoredValue::create(it->second.second)));
     }
   }

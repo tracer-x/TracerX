@@ -16,52 +16,6 @@
 
 namespace klee {
 
-/// \brief The address to be stored as an index in the subsumption table. This
-/// class wraps a memory location, supplying weaker address equality comparison
-/// for the purpose of subsumption checking
-class StoredAddress {
-public:
-  unsigned refCount;
-
-private:
-  ref<MemoryLocation> loc;
-
-  StoredAddress(ref<MemoryLocation> _loc) : refCount(0), loc(_loc) {}
-
-public:
-  static ref<StoredAddress> create(ref<MemoryLocation> loc) {
-    ref<StoredAddress> ret(new StoredAddress(loc));
-    return ret;
-  }
-
-  ref<AllocationContext> getContext() { return loc->getContext(); }
-
-  ref<Expr> getOffset() { return loc->getOffset(); }
-
-  /// \brief The comparator of this class' objects. This member function is
-  /// weaker than standard comparator for MemoryLocation in that it does not
-  /// check for the equality of allocation id. Allocation id is used in
-  /// MemoryLocation (member variable MemoryLocation#allocationId) for the
-  /// purpose of distinguishing memory allocations of the same callsite and call
-  /// history, but of different loop iterations. This does not make sense when
-  /// comparing states for subsumption as in subsumption, related allocations in
-  /// different paths may have different allocation ids.
-  int compare(const StoredAddress &other) const {
-    return loc->weakCompare(*(other.loc.get()));
-  }
-
-  void print(llvm::raw_ostream &stream) const { print(stream, ""); }
-
-  void print(llvm::raw_ostream &stream, const std::string &prefix) const {
-    loc->print(stream, prefix);
-  }
-
-  void dump() const {
-    print(llvm::errs());
-    llvm::errs() << "\n";
-  }
-};
-
 /// \brief A processed form of a value to be stored in the subsumption table
 class StoredValue {
 public:
