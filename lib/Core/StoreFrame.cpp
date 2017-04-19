@@ -16,7 +16,7 @@ using namespace klee;
 
 namespace klee {
 
-StoreFrame *StoreFrame::findFrame(const ref<MemoryLocation> loc) {
+StackStoreFrame *StackStoreFrame::findFrame(const ref<MemoryLocation> loc) {
   std::vector<llvm::Instruction *> callHistory =
       loc->getContext()->getCallHistory();
   const uint64_t historyHeight = callHistory.size();
@@ -24,7 +24,7 @@ StoreFrame *StoreFrame::findFrame(const ref<MemoryLocation> loc) {
   if (height < historyHeight)
     return 0;
 
-  StoreFrame *current = this;
+  StackStoreFrame *current = this;
   for (uint64_t i = height; i > historyHeight; --i) {
     current = current->parent;
   }
@@ -40,11 +40,11 @@ StoreFrame *StoreFrame::findFrame(const ref<MemoryLocation> loc) {
   return 0;
 }
 
-void StoreFrame::updateStore(ref<MemoryLocation> loc,
-                             ref<VersionedValue> address,
-                             ref<VersionedValue> value) {
+void StackStoreFrame::updateStore(ref<MemoryLocation> loc,
+                                  ref<VersionedValue> address,
+                                  ref<VersionedValue> value) {
 
-  StoreFrame *frame = this;
+  StackStoreFrame *frame = this;
 
   if (!loc->isGlobal())
     frame = findFrame(loc);
@@ -69,12 +69,12 @@ void StoreFrame::updateStore(ref<MemoryLocation> loc,
 }
 
 std::pair<ref<VersionedValue>, ref<VersionedValue> >
-StoreFrame::read(ref<MemoryLocation> address) {
+StackStoreFrame::read(ref<MemoryLocation> address) {
   std::map<
       ref<MemoryLocation>,
       std::pair<ref<VersionedValue>, ref<VersionedValue> > >::const_iterator it;
 
-  StoreFrame *frame = this;
+  StackStoreFrame *frame = this;
 
   if (!address->isGlobal())
     frame = findFrame(address);
@@ -106,7 +106,7 @@ StoreFrame::read(ref<MemoryLocation> address) {
   return dummyReturnValue;
 }
 
-void StoreFrame::getConcreteStore(
+void StackStoreFrame::getConcreteStore(
     const std::vector<llvm::Instruction *> &callHistory,
     std::set<const Array *> &replacements, bool coreOnly,
     TxConcreteStore &concreteStore) const {
@@ -145,7 +145,7 @@ void StoreFrame::getConcreteStore(
   }
 }
 
-void StoreFrame::getSymbolicStore(
+void StackStoreFrame::getSymbolicStore(
     const std::vector<llvm::Instruction *> &callHistory,
     std::set<const Array *> &replacements, bool coreOnly,
     TxSymbolicStore &symbolicStore) const {
@@ -189,8 +189,8 @@ void StoreFrame::getSymbolicStore(
   }
 }
 
-void StoreFrame::print(llvm::raw_ostream &stream,
-                       const std::string &prefix) const {
+void StackStoreFrame::print(llvm::raw_ostream &stream,
+                            const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
   std::string tabsNextNext = appendTab(tabsNext);
 

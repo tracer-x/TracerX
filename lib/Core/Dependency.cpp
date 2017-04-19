@@ -329,7 +329,7 @@ void Dependency::getStoredExpressions(
   globalFrame->getSymbolicStore(callHistory, replacements, coreOnly,
                                 _symbolicallyAddressedStore);
 
-  StoreFrame *s = stack;
+  StackStoreFrame *s = stack;
   while (s != 0) {
     s->getConcreteStore(callHistory, replacements, coreOnly,
                         _concretelyAddressedStore);
@@ -548,7 +548,7 @@ void Dependency::updateStore(ref<MemoryLocation> loc,
     globalFrame->updateStore(loc, address, value);
   } else {
     if (stack == 0) {
-      stack = StoreFrame::create(0, 0, 0);
+      stack = StackStoreFrame::create(0, 0, 0);
     }
     if (debugSubsumptionLevel >= 3) {
       std::string msg;
@@ -807,7 +807,7 @@ void Dependency::populateArgumentValuesList(
 }
 
 Dependency::Dependency(Dependency *_parent, llvm::DataLayout *_targetData)
-    : parent(_parent), globalFrame(StoreFrame::create(
+    : parent(_parent), globalFrame(StackStoreFrame::create(
                            0, 0, 0, _parent ? _parent->globalFrame : 0)),
       targetData(_targetData) {
   if (_parent) {
@@ -828,7 +828,7 @@ Dependency::Dependency(Dependency *_parent, llvm::DataLayout *_targetData)
 
 Dependency::~Dependency() {
   // Delete the stack
-  StoreFrame::clearRecursively(stack);
+  StackStoreFrame::clearRecursively(stack);
   stack = 0;
 
   // Delete valuesMap
@@ -1611,7 +1611,7 @@ Dependency::bindCallArguments(llvm::Instruction *i,
   }
 
   // Push the stack frame before doing anything else
-  stack = StoreFrame::create(stack, site, stack->getHeight() + 1);
+  stack = StackStoreFrame::create(stack, site, stack->getHeight() + 1);
 }
 
 void Dependency::bindReturnValue(llvm::CallInst *site,
@@ -1636,7 +1636,7 @@ void Dependency::bindReturnValue(llvm::CallInst *site,
   }
 
   // Pop the stack frame
-  StoreFrame *s = stack;
+  StackStoreFrame *s = stack;
   if (s) {
     stack = s->getParent();
     delete s;
@@ -1677,7 +1677,7 @@ void Dependency::print(llvm::raw_ostream &stream,
                        const unsigned paddingAmount) const {
   std::string tabs = makeTabs(paddingAmount);
 
-  StoreFrame *s = stack;
+  StackStoreFrame *s = stack;
   while (s) {
     stream << tabs << "------------- Stack Frame ---------------\n";
     s->print(stream, tabs);

@@ -20,6 +20,42 @@ namespace klee {
 
 /// \brief Class defining local and global frames of store
 class StoreFrame {
+  // DO NOT IMPLEMENT.
+  StoreFrame(const StoreFrame &);
+  void operator=(const StoreFrame &);
+
+protected:
+  StoreFrame() {}
+
+public:
+  virtual ~StoreFrame() {}
+
+  virtual void
+  getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
+                   std::set<const Array *> &replacements, bool coreOnly,
+                   TxConcreteStore &concreteStore) const;
+
+  virtual void
+  getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
+                   std::set<const Array *> &replacements, bool coreOnly,
+                   TxSymbolicStore &symbolicStore) const;
+
+  virtual void updateStore(ref<MemoryLocation> loc, ref<VersionedValue> address,
+                           ref<VersionedValue> value);
+
+  virtual std::pair<ref<VersionedValue>, ref<VersionedValue> >
+  read(ref<MemoryLocation> address);
+
+  virtual void print(llvm::raw_ostream &stream) const;
+
+  virtual void print(llvm::raw_ostream &stream,
+                     const std::string &prefix) const;
+
+  virtual void dump() const;
+};
+
+/// \brief Class defining local and global frames of store
+class StackStoreFrame : public StoreFrame {
   /// \brief The mapping of concrete locations to stored value
   std::map<ref<MemoryLocation>,
            std::pair<ref<VersionedValue>, ref<VersionedValue> > >
@@ -31,10 +67,10 @@ class StoreFrame {
   symbolicallyAddressedStore;
 
   /// \brief The previous frame lower in the stack
-  StoreFrame *parent;
+  StackStoreFrame *parent;
 
   /// \brief Non-hollow source of this frame, which stores concrete data
-  StoreFrame *source;
+  StackStoreFrame *source;
 
   /// \brief The call site this frame belongs to
   llvm::Instruction *callsite;
@@ -43,40 +79,40 @@ class StoreFrame {
   uint64_t height;
 
   /// \brief Constructor
-  StoreFrame(StoreFrame *_parent, llvm::Instruction *_callsite,
-             uint64_t _height, StoreFrame *_source)
+  StackStoreFrame(StackStoreFrame *_parent, llvm::Instruction *_callsite,
+                  uint64_t _height, StackStoreFrame *_source)
       : parent(_parent), source(_source), callsite(_callsite), height(_height) {
   }
 
-  StoreFrame *findFrame(const ref<MemoryLocation> loc);
+  StackStoreFrame *findFrame(const ref<MemoryLocation> loc);
 
-  static StoreFrame *replicateRecursively(StoreFrame *current) {
+  static StackStoreFrame *replicateRecursively(StackStoreFrame *current) {
     if (current == 0)
       return 0;
-    StoreFrame *ret =
-        new StoreFrame(0, current->callsite, current->height, current);
+    StackStoreFrame *ret =
+        new StackStoreFrame(0, current->callsite, current->height, current);
     ret->parent = replicateRecursively(current->parent);
     return ret;
   }
 
 public:
-
-  ~StoreFrame() {
+  ~StackStoreFrame() {
     // Delete the locally-constructed relations
     concretelyAddressedStore.clear();
     symbolicallyAddressedStore.clear();
   }
 
-  static StoreFrame *create(StoreFrame *parent, llvm::Instruction *site,
-                            uint64_t height, StoreFrame *source = 0) {
-    return new StoreFrame(parent, site, height, source);
+  static StackStoreFrame *create(StackStoreFrame *parent,
+                                 llvm::Instruction *site, uint64_t height,
+                                 StackStoreFrame *source = 0) {
+    return new StackStoreFrame(parent, site, height, source);
   }
 
   /// \brief Replicating the stack
-  StoreFrame *replicate() { return replicateRecursively(this); }
+  StackStoreFrame *replicate() { return replicateRecursively(this); }
 
   /// \brief Clearing the stack
-  static void clearRecursively(StoreFrame *frame) {
+  static void clearRecursively(StackStoreFrame *frame) {
     if (!frame)
       return;
     clearRecursively(frame->parent);
@@ -98,7 +134,7 @@ public:
   std::pair<ref<VersionedValue>, ref<VersionedValue> >
   read(ref<MemoryLocation> address);
 
-  StoreFrame *getParent() const { return parent; }
+  StackStoreFrame *getParent() const { return parent; }
 
   uint64_t getHeight() const { return height; }
 
