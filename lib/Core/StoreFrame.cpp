@@ -238,11 +238,9 @@ StackStoreFrame *StackStoreFrame::findFrame(const ref<MemoryLocation> loc) {
 void StackStoreFrame::updateStore(ref<MemoryLocation> loc,
                                   ref<VersionedValue> address,
                                   ref<VersionedValue> value) {
+  assert(!loc->isGlobal() && "location should not be global");
 
-  StackStoreFrame *frame = this;
-
-  if (!loc->isGlobal())
-    frame = findFrame(loc);
+  StackStoreFrame *frame = findFrame(loc);
 
   assert(frame && "frame not found");
 
@@ -269,10 +267,9 @@ StackStoreFrame::read(ref<MemoryLocation> address) {
       ref<MemoryLocation>,
       std::pair<ref<VersionedValue>, ref<VersionedValue> > >::const_iterator it;
 
-  StackStoreFrame *frame = this;
+  assert(!address->isGlobal() && "location should not be global");
 
-  if (!address->isGlobal())
-    frame = findFrame(address);
+  StackStoreFrame *frame = findFrame(address);
 
   assert(frame && "frame not found");
 
