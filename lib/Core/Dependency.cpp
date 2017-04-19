@@ -827,6 +827,12 @@ Dependency::Dependency(Dependency *_parent, llvm::DataLayout *_targetData)
 }
 
 Dependency::~Dependency() {
+  // Delete the global frame
+  if (globalFrame) {
+    delete globalFrame;
+    globalFrame = 0;
+  }
+
   // Delete the stack
   StackStoreFrame::clearRecursively(stack);
   stack = 0;
