@@ -50,6 +50,12 @@ void AllocationContext::print(llvm::raw_ostream &stream,
 
 /**/
 
+ref<StoredAddress> StoredAddress::copyWithNewVariables(
+    std::set<const Array *> &replacements) const {
+  ref<Expr> _offset(ShadowArray::getShadowExpression(offset, replacements));
+  return StoredAddress::create(context, _offset, isConcrete, concreteOffset);
+}
+
 void StoredAddress::print(llvm::raw_ostream &stream,
                           const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
@@ -159,15 +165,6 @@ MemoryLocation::create(ref<MemoryLocation> loc,
                                              _address, _base, _offset,
                                              loc->size, loc->allocationId));
   return ret;
-}
-
-ref<StoredAddress>
-MemoryLocation::getStoredAddress(std::set<const Array *> &replacements) const {
-  ref<Expr> _offset(
-      ShadowArray::getShadowExpression(storedAddress->offset, replacements));
-  return StoredAddress::create(storedAddress->context, _offset,
-                               storedAddress->isConcrete,
-                               storedAddress->concreteOffset);
 }
 
 void MemoryLocation::print(llvm::raw_ostream &stream,

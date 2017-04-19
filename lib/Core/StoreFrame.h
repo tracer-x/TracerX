@@ -57,12 +57,12 @@ public:
 /// \brief Class for global store frame
 class GlobalStoreFrame : public StoreFrame {
   /// \brief The mapping of concrete locations to stored value
-  std::map<ref<MemoryLocation>,
+  std::map<ref<StoredAddress>,
            std::pair<ref<VersionedValue>, ref<VersionedValue> > >
   concretelyAddressedStore;
 
   /// \brief The mapping of symbolic locations to stored value
-  std::map<ref<MemoryLocation>,
+  std::map<ref<StoredAddress>,
            std::pair<ref<VersionedValue>, ref<VersionedValue> > >
   symbolicallyAddressedStore;
 

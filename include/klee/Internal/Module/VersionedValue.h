@@ -216,6 +216,14 @@ public:
 
   ref<Expr> getOffset() { return offset; }
 
+  bool
+  contextIsPrefixOf(const std::vector<llvm::Instruction *> &callHistory) const {
+    return context->isPrefixOf(callHistory);
+  }
+
+  ref<StoredAddress>
+  copyWithNewVariables(std::set<const Array *> &replacements) const;
+
   /// \brief The comparator of this class' objects. This member function is
   /// weaker than standard comparator for MemoryLocation in that it does not
   /// check for the equality of allocation id. Allocation id is used in
@@ -387,7 +395,9 @@ public:
   ref<StoredAddress> getStoredAddress() const { return storedAddress; }
 
   ref<StoredAddress>
-  getStoredAddress(std::set<const Array *> &replacements) const;
+  getStoredAddress(std::set<const Array *> &replacements) const {
+    return storedAddress->copyWithNewVariables(replacements);
+  }
 
   int compare(const MemoryLocation &other) const {
     int res = storedAddress->compare(*(other.storedAddress.get()));
