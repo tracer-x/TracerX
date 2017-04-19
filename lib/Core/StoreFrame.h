@@ -163,12 +163,12 @@ public:
 /// \brief Class defining local and global frames of store
 class StackStoreFrame : public StoreFrame {
   /// \brief The mapping of concrete locations to stored value
-  std::map<ref<MemoryLocation>,
+  std::map<ref<StoredAddress>,
            std::pair<ref<VersionedValue>, ref<VersionedValue> > >
   concretelyAddressedStore;
 
   /// \brief The mapping of symbolic locations to stored value
-  std::map<ref<MemoryLocation>,
+  std::map<ref<StoredAddress>,
            std::pair<ref<VersionedValue>, ref<VersionedValue> > >
   symbolicallyAddressedStore;
 
@@ -190,7 +190,7 @@ class StackStoreFrame : public StoreFrame {
       : parent(_parent), source(_source), callsite(_callsite), height(_height) {
   }
 
-  StackStoreFrame *findFrame(const ref<MemoryLocation> loc);
+  StackStoreFrame *findFrame(const ref<StoredAddress> loc);
 
   static StackStoreFrame *replicateRecursively(StackStoreFrame *current) {
     if (current == 0)
