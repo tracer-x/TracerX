@@ -171,7 +171,7 @@ namespace klee {
     std::vector<ref<VersionedValue> > argumentValuesList;
 
     /// \brief The global frame
-    StackStoreFrame *globalFrame;
+    GlobalStoreFrame *globalFrame;
 
     /// \brief The stack
     StackStoreFrame *stack;

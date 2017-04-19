@@ -807,8 +807,8 @@ void Dependency::populateArgumentValuesList(
 }
 
 Dependency::Dependency(Dependency *_parent, llvm::DataLayout *_targetData)
-    : parent(_parent), globalFrame(StackStoreFrame::create(
-                           0, 0, 0, _parent ? _parent->globalFrame : 0)),
+    : parent(_parent),
+      globalFrame(GlobalStoreFrame::create(_parent ? _parent->globalFrame : 0)),
       targetData(_targetData) {
   if (_parent) {
     stack = (_parent->stack ? _parent->stack->replicate() : 0);

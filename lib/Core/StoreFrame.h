@@ -54,6 +54,59 @@ public:
   virtual void dump() const;
 };
 
+/// \brief Class for global store frame
+class GlobalStoreFrame : public StoreFrame {
+  /// \brief The mapping of concrete locations to stored value
+  std::map<ref<MemoryLocation>,
+           std::pair<ref<VersionedValue>, ref<VersionedValue> > >
+  concretelyAddressedStore;
+
+  /// \brief The mapping of symbolic locations to stored value
+  std::map<ref<MemoryLocation>,
+           std::pair<ref<VersionedValue>, ref<VersionedValue> > >
+  symbolicallyAddressedStore;
+
+  /// \brief Non-hollow source of this frame, which stores concrete data
+  GlobalStoreFrame *source;
+
+  /// \brief Constructor
+  GlobalStoreFrame(GlobalStoreFrame *_source) : source(_source) {}
+
+public:
+  ~GlobalStoreFrame() {
+    // Delete the locally-constructed relations
+    concretelyAddressedStore.clear();
+    symbolicallyAddressedStore.clear();
+  }
+
+  static GlobalStoreFrame *create(GlobalStoreFrame *source = 0) {
+    return new GlobalStoreFrame(source);
+  }
+
+  void getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
+                        std::set<const Array *> &replacements, bool coreOnly,
+                        TxConcreteStore &concreteStore) const;
+
+  void getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
+                        std::set<const Array *> &replacements, bool coreOnly,
+                        TxSymbolicStore &symbolicStore) const;
+
+  void updateStore(ref<MemoryLocation> loc, ref<VersionedValue> address,
+                   ref<VersionedValue> value);
+
+  std::pair<ref<VersionedValue>, ref<VersionedValue> >
+  read(ref<MemoryLocation> address);
+
+  void print(llvm::raw_ostream &stream) const { print(stream, ""); }
+
+  void print(llvm::raw_ostream &stream, const std::string &prefix) const;
+
+  void dump() const {
+    print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+};
+
 /// \brief Class defining local and global frames of store
 class StackStoreFrame : public StoreFrame {
   /// \brief The mapping of concrete locations to stored value
