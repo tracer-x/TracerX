@@ -518,7 +518,7 @@ ref<VersionedValue> Dependency::getLatestValueForMarking(llvm::Value *val,
 std::pair<ref<VersionedValue>, ref<VersionedValue> >
 Dependency::readStore(ref<MemoryLocation> loc) {
   std::pair<ref<VersionedValue>, ref<VersionedValue> > ret;
-  if (loc->isGlobal()) {
+  if (loc->getContext()->ty != AllocationContext::LOCAL) {
     return globalFrame->read(loc);
   }
   if (stack) {
@@ -534,7 +534,7 @@ void Dependency::updateStore(ref<MemoryLocation> loc,
            std::pair<ref<VersionedValue>, ref<VersionedValue> > > concreteStore,
       symbolicStore;
 
-  if (loc->isGlobal()) {
+  if (loc->getContext()->ty != AllocationContext::LOCAL) {
     if (debugSubsumptionLevel >= 3) {
       std::string msg;
       llvm::raw_string_ostream stream(msg);

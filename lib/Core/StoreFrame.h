@@ -123,7 +123,7 @@ class HeapStoreFrame : public StoreFrame {
   HeapStoreFrame *source;
 
   /// \brief Constructor
-  HeapStoreFrame(GlobalStoreFrame *_source) : source(_source) {}
+  HeapStoreFrame(HeapStoreFrame *_source) : source(_source) {}
 
 public:
   ~HeapStoreFrame() {
@@ -132,7 +132,7 @@ public:
     symbolicallyAddressedStore.clear();
   }
 
-  static HeapStoreFrame *create(GlobalStoreFrame *source = 0) {
+  static HeapStoreFrame *create(HeapStoreFrame *source = 0) {
     return new HeapStoreFrame(source);
   }
 

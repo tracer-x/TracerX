@@ -150,7 +150,20 @@ void MemoryLocation::print(llvm::raw_ostream &stream,
   stream << ": ";
   base->print(stream);
   stream << "\n";
-  stream << prefix << "global: " << (globalFlag ? "yes" : "no") << "\n";
+  stream << prefix << "type: ";
+  switch (context->ty) {
+  case AllocationContext::LOCAL:
+    stream << "local\n";
+    break;
+  case AllocationContext::GLOBAL:
+    stream << "global\n";
+    break;
+  case AllocationContext::HEAP:
+    stream << "heap\n";
+    break;
+  default:
+    stream << "(unknown)\n";
+  }
   stream << prefix << "allocation id: " << allocationId << "\n";
   stream << prefix
          << "pointer to location object: " << reinterpret_cast<uintptr_t>(this);

@@ -43,6 +43,12 @@ class AllocationContext {
 public:
   unsigned refCount;
 
+  enum Type {
+    LOCAL,
+    GLOBAL,
+    HEAP
+  } ty;
+
 private:
   /// \brief The location of the allocation's LLVM value
   llvm::Value *value;
@@ -50,9 +56,9 @@ private:
   /// \brief The call history by which the allocation is reached
   std::vector<llvm::Instruction *> callHistory;
 
-  AllocationContext(llvm::Value *_value,
+  AllocationContext(Type _ty, llvm::Value *_value,
                     const std::vector<llvm::Instruction *> &_callHistory)
-      : refCount(0), value(_value), callHistory(_callHistory) {}
+      : refCount(0), ty(_ty), value(_value), callHistory(_callHistory) {}
 
 public:
   ~AllocationContext() { callHistory.clear(); }
@@ -60,7 +66,36 @@ public:
   static ref<AllocationContext>
   create(llvm::Value *_value,
          const std::vector<llvm::Instruction *> &_callHistory) {
-    ref<AllocationContext> ret(new AllocationContext(_value, _callHistory));
+    Type ty = GLOBAL;
+
+    if (llvm::Instruction *inst = llvm::dyn_cast<llvm::Instruction>(_value)) {
+      if (inst->getParent() && inst->getParent()->getParent()) {
+        // Heap-allocated memory is considered global, and to be recorded in
+        // global frame. Here we test if the allocation was a call to *alloc and
+        // getenv functions.
+        if (llvm::CallInst *ci = llvm::dyn_cast<llvm::CallInst>(inst)) {
+          // Here we determine if this was a call to *alloc or getenv functions
+          // from the LLVM source of the call instruction instead of
+          // llvm::Function::getName(). This is to circumvent segmentation fault
+          // issue when libc is not linked.
+          std::string buf;
+          llvm::raw_string_ostream stream(buf);
+          ci->print(stream);
+          stream.flush();
+          if (buf.find("@malloc(") != std::string::npos ||
+              buf.find("@realloc(") != std::string::npos ||
+              buf.find("@calloc(") != std::string::npos) {
+            ty = HEAP;
+          } else if (buf.find("@getenv(") != std::string::npos) {
+            ty = GLOBAL;
+          }
+        } else {
+          ty = LOCAL;
+        }
+      }
+    }
+
+    ref<AllocationContext> ret(new AllocationContext(ty, _value, _callHistory));
     return ret;
   }
 
@@ -176,43 +211,12 @@ private:
   /// \brief The allocation id
   uintptr_t allocationId;
 
-  /// \brief Indicates that this address is global
-  bool globalFlag;
-
   MemoryLocation(ref<AllocationContext> _context, ref<Expr> &_address,
                  ref<Expr> &_base, ref<Expr> &_offset, uint64_t _size,
                  uintptr_t _allocationId = 0)
       : refCount(0), context(_context), offset(_offset),
         concreteOffsetBound(_size), size(_size) {
     bool unknownBase = false;
-
-    globalFlag = true;
-    if (llvm::Instruction *inst =
-            llvm::dyn_cast<llvm::Instruction>(_context->getValue())) {
-      if (inst->getParent() && inst->getParent()->getParent()) {
-        // Heap-allocated memory is considered global, and to be recorded in
-        // global frame. Here we test if the allocation was a call to *alloc and
-        // getenv functions.
-        if (llvm::CallInst *ci = llvm::dyn_cast<llvm::CallInst>(inst)) {
-          // Here we determine if this was a call to *alloc or getenv functions
-          // from the LLVM source of the call instruction instead of
-          // llvm::Function::getName(). This is to circumvent segmentation fault
-          // issue when libc is not linked.
-          std::string buf;
-          llvm::raw_string_ostream stream(buf);
-          ci->print(stream);
-          stream.flush();
-          if (buf.find("@malloc(") == std::string::npos &&
-              buf.find("@realloc(") == std::string::npos &&
-              buf.find("@calloc(") == std::string::npos &&
-              buf.find("@getenv(") == std::string::npos) {
-            globalFlag = false;
-          }
-        } else {
-          globalFlag = false;
-        }
-      }
-    }
 
     isConcrete = false;
     if (ConstantExpr *co = llvm::dyn_cast<ConstantExpr>(_offset)) {
@@ -361,8 +365,6 @@ public:
   ref<Expr> getOffset() const { return offset; }
 
   uint64_t getSize() const { return size; }
-
-  bool isGlobal() const { return globalFlag; }
 
   /// \brief Print the content of the object to the LLVM error stream
   void dump() const {
