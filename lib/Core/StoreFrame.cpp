@@ -36,17 +36,17 @@ void GlobalStoreFrame::updateStore(ref<MemoryLocation> loc,
 }
 
 std::pair<ref<VersionedValue>, ref<VersionedValue> >
-GlobalStoreFrame::read(ref<MemoryLocation> address) {
+GlobalStoreFrame::read(ref<MemoryLocation> loc) {
   std::map<
       ref<MemoryLocation>,
       std::pair<ref<VersionedValue>, ref<VersionedValue> > >::const_iterator it;
 
-  if (address->hasConstantAddress()) {
+  if (loc->hasConstantAddress()) {
     const std::map<ref<MemoryLocation>,
                    std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
     concreteStore =
         (source ? source->concretelyAddressedStore : concretelyAddressedStore);
-    it = concreteStore.find(address);
+    it = concreteStore.find(loc);
     if (it != concreteStore.end())
       return it->second;
   } else {
@@ -54,7 +54,7 @@ GlobalStoreFrame::read(ref<MemoryLocation> address) {
                    std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
     symbolicStore = (source ? source->symbolicallyAddressedStore
                             : symbolicallyAddressedStore);
-    it = symbolicStore.find(address);
+    it = symbolicStore.find(loc);
     // FIXME: Here we assume that the expressions have to exactly be the
     // same expression object. More properly, this should instead add an
     // ite constraint onto the path condition.
@@ -262,23 +262,23 @@ void StackStoreFrame::updateStore(ref<MemoryLocation> loc,
 }
 
 std::pair<ref<VersionedValue>, ref<VersionedValue> >
-StackStoreFrame::read(ref<MemoryLocation> address) {
+StackStoreFrame::read(ref<MemoryLocation> loc) {
   std::map<
       ref<MemoryLocation>,
       std::pair<ref<VersionedValue>, ref<VersionedValue> > >::const_iterator it;
 
-  assert(!address->isGlobal() && "location should not be global");
+  assert(!loc->isGlobal() && "location should not be global");
 
-  StackStoreFrame *frame = findFrame(address);
+  StackStoreFrame *frame = findFrame(loc);
 
   assert(frame && "frame not found");
 
-  if (address->hasConstantAddress()) {
+  if (loc->hasConstantAddress()) {
     const std::map<ref<MemoryLocation>,
                    std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
     concreteStore = (frame->source ? frame->source->concretelyAddressedStore
                                    : frame->concretelyAddressedStore);
-    it = concreteStore.find(address);
+    it = concreteStore.find(loc);
     if (it != concreteStore.end())
       return it->second;
   } else {
@@ -286,7 +286,7 @@ StackStoreFrame::read(ref<MemoryLocation> address) {
                    std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
     symbolicStore = (frame->source ? frame->source->symbolicallyAddressedStore
                                    : frame->symbolicallyAddressedStore);
-    it = symbolicStore.find(address);
+    it = symbolicStore.find(loc);
     // FIXME: Here we assume that the expressions have to exactly be the
     // same expression object. More properly, this should instead add an
     // ite constraint onto the path condition.

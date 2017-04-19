@@ -44,7 +44,7 @@ public:
                            ref<VersionedValue> value);
 
   virtual std::pair<ref<VersionedValue>, ref<VersionedValue> >
-  read(ref<MemoryLocation> address);
+  read(ref<MemoryLocation> loc);
 
   virtual void print(llvm::raw_ostream &stream) const;
 
@@ -95,7 +95,7 @@ public:
                    ref<VersionedValue> value);
 
   std::pair<ref<VersionedValue>, ref<VersionedValue> >
-  read(ref<MemoryLocation> address);
+  read(ref<MemoryLocation> loc);
 
   void print(llvm::raw_ostream &stream) const { print(stream, ""); }
 
@@ -185,7 +185,7 @@ public:
                    ref<VersionedValue> value);
 
   std::pair<ref<VersionedValue>, ref<VersionedValue> >
-  read(ref<MemoryLocation> address);
+  read(ref<MemoryLocation> loc);
 
   StackStoreFrame *getParent() const { return parent; }
 
