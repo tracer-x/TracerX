@@ -996,9 +996,8 @@ ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
 
 bool SubsumptionTableEntry::subsumed(
     TimingSolver *solver, ExecutionState &state, double timeout,
-    Dependency::ConcreteStore &concretelyAddressedStore,
-    Dependency::SymbolicStore &symbolicallyAddressedStore,
-    int debugSubsumptionLevel) {
+    TxConcreteStore &concretelyAddressedStore,
+    TxSymbolicStore &symbolicallyAddressedStore, int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
   // Tell the solver implementation that we are checking for subsumption for
   // collecting statistics of solver calls.
@@ -1024,15 +1023,14 @@ bool SubsumptionTableEntry::subsumed(
     TimerStatIncrementer t(concreteStoreExpressionBuildTime);
 
     // Build constraints from concrete-address interpolant store
-    for (Dependency::ConcreteStore::const_iterator
-             it1 = concreteAddressStore.begin(),
-             ie1 = concreteAddressStore.end();
+    for (TxConcreteStore::const_iterator it1 = concreteAddressStore.begin(),
+                                         ie1 = concreteAddressStore.end();
          it1 != ie1; ++it1) {
 
-      const Dependency::ConcreteStoreMap &tabledConcreteMap = it1->second;
-      const Dependency::ConcreteStoreMap &stateConcreteMap =
+      const TxConcreteStoreMap &tabledConcreteMap = it1->second;
+      const TxConcreteStoreMap &stateConcreteMap =
           concretelyAddressedStore[it1->first];
-      const Dependency::SymbolicStoreMap &stateSymbolicMap =
+      const TxSymbolicStoreMap &stateSymbolicMap =
           symbolicallyAddressedStore[it1->first];
 
       // If the current state does not constrain the same base, subsumption
@@ -1047,9 +1045,8 @@ bool SubsumptionTableEntry::subsumed(
         return false;
       }
 
-      for (Dependency::ConcreteStoreMap::const_iterator
-               it2 = tabledConcreteMap.begin(),
-               ie2 = tabledConcreteMap.end();
+      for (TxConcreteStoreMap::const_iterator it2 = tabledConcreteMap.begin(),
+                                              ie2 = tabledConcreteMap.end();
            it2 != ie2; ++it2) {
 
         // The address is not constrained by the current state, therefore
@@ -1065,7 +1062,7 @@ bool SubsumptionTableEntry::subsumed(
               msg1 += " (with successful memory bound checks)";
             }
 
-            it2->first->loc->print(stream, padding);
+            it2->first->print(stream, padding);
             stream.flush();
             klee_message("#%lu=>#%lu: Check failure as memory region in the "
                          "table does not exist in the state%s:\n%s",
@@ -1153,7 +1150,7 @@ bool SubsumptionTableEntry::subsumed(
                   std::string msg3;
                   llvm::raw_string_ostream stream1(msg3);
 
-                  it2->first->loc->print(stream1, makeTabs(1));
+                  it2->first->print(stream1, makeTabs(1));
                   stream1.flush();
 
                   klee_message("with value stored in address:\n%s",
@@ -1180,7 +1177,7 @@ bool SubsumptionTableEntry::subsumed(
                 std::string msg3;
                 llvm::raw_string_ostream stream1(msg3);
 
-                it2->first->loc->print(stream1, makeTabs(1));
+                it2->first->print(stream1, makeTabs(1));
                 stream1.flush();
 
                 klee_message("with value stored in address:\n%s", msg3.c_str());
@@ -1190,20 +1187,20 @@ bool SubsumptionTableEntry::subsumed(
         }
 
         if (!stateSymbolicMap.empty()) {
-          const ref<Expr> tabledConcreteOffset = it2->first->loc->getOffset();
+          const ref<Expr> tabledConcreteOffset = it2->first->getOffset();
           ref<Expr> conjunction;
 
-          for (Dependency::SymbolicStoreMap::const_iterator
+          for (TxSymbolicStoreMap::const_iterator
                    it3 = stateSymbolicMap.begin(),
                    ie3 = stateSymbolicMap.end();
                it3 != ie3; ++it3) {
 
             // We make sure the context part of the addresses (the allocation
             // site and the call history) are equivalent.
-            if (it2->first->loc->getContext() != it3->first->loc->getContext())
+            if (it2->first->getContext() != it3->first->getContext())
               continue;
 
-            ref<Expr> stateSymbolicOffset = it3->first->loc->getOffset();
+            ref<Expr> stateSymbolicOffset = it3->first->getOffset();
             ref<Expr> newTerm;
 
             stateValue = it3->second;
@@ -1290,36 +1287,33 @@ bool SubsumptionTableEntry::subsumed(
   {
     TimerStatIncrementer t(symbolicStoreExpressionBuildTime);
     // Build constraints from symbolic-address interpolant store
-    for (Dependency::SymbolicStore::const_iterator
-             it1 = symbolicAddressStore.begin(),
-             ie1 = symbolicAddressStore.end();
+    for (TxSymbolicStore::const_iterator it1 = symbolicAddressStore.begin(),
+                                         ie1 = symbolicAddressStore.end();
          it1 != ie1; ++it1) {
-      const Dependency::SymbolicStoreMap &tabledSymbolicMap = it1->second;
-      const Dependency::ConcreteStoreMap &stateConcreteMap =
+      const TxSymbolicStoreMap &tabledSymbolicMap = it1->second;
+      const TxConcreteStoreMap &stateConcreteMap =
           concretelyAddressedStore[it1->first];
-      const Dependency::SymbolicStoreMap &stateSymbolicMap =
+      const TxSymbolicStoreMap &stateSymbolicMap =
           symbolicallyAddressedStore[it1->first];
 
       ref<Expr> conjunction;
 
-      for (Dependency::SymbolicStoreMap::const_iterator
-               it2 = tabledSymbolicMap.begin(),
-               ie2 = tabledSymbolicMap.end();
+      for (TxSymbolicStoreMap::const_iterator it2 = tabledSymbolicMap.begin(),
+                                              ie2 = tabledSymbolicMap.end();
            it2 != ie2; ++it2) {
-        ref<Expr> tabledSymbolicOffset = it2->first->loc->getOffset();
+        ref<Expr> tabledSymbolicOffset = it2->first->getOffset();
         ref<StoredValue> tabledValue = it2->second;
 
-        for (Dependency::ConcreteStoreMap::const_iterator
-                 it3 = stateConcreteMap.begin(),
-                 ie3 = stateConcreteMap.end();
+        for (TxConcreteStoreMap::const_iterator it3 = stateConcreteMap.begin(),
+                                                ie3 = stateConcreteMap.end();
              it3 != ie3; ++it3) {
 
           // We make sure the context part of the addresses (the allocation
           // site and the call history) are equivalent.
-          if (it2->first->loc->getContext() != it3->first->loc->getContext())
+          if (it2->first->getContext() != it3->first->getContext())
             continue;
 
-          ref<Expr> stateConcreteOffset = it3->first->loc->getOffset();
+          ref<Expr> stateConcreteOffset = it3->first->getOffset();
           ref<StoredValue> stateValue = it3->second;
           ref<Expr> newTerm;
 
@@ -1371,17 +1365,16 @@ bool SubsumptionTableEntry::subsumed(
           }
         }
 
-        for (Dependency::SymbolicStoreMap::const_iterator
-                 it3 = stateSymbolicMap.begin(),
-                 ie3 = stateSymbolicMap.end();
+        for (TxSymbolicStoreMap::const_iterator it3 = stateSymbolicMap.begin(),
+                                                ie3 = stateSymbolicMap.end();
              it3 != ie3; ++it3) {
 
           // We make sure the context part of the addresses (the allocation
           // site and the call history) are equivalent.
-          if (it2->first->loc->getContext() != it3->first->loc->getContext())
+          if (it2->first->getContext() != it3->first->getContext())
             continue;
 
-          ref<Expr> stateSymbolicOffset = it3->first->loc->getOffset();
+          ref<Expr> stateSymbolicOffset = it3->first->getOffset();
           ref<StoredValue> stateValue = it3->second;
           ref<Expr> newTerm;
 
@@ -1775,18 +1768,18 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
 
   if (!concreteAddressStore.empty()) {
     stream << prefix << "concrete store = [\n";
-    for (Dependency::ConcreteStore::const_iterator
-             is1 = concreteAddressStore.begin(),
-             ie1 = concreteAddressStore.end(), it1 = is1;
+    for (TxConcreteStore::const_iterator is1 = concreteAddressStore.begin(),
+                                         ie1 = concreteAddressStore.end(),
+                                         it1 = is1;
          it1 != ie1; ++it1) {
-      for (Dependency::ConcreteStoreMap::const_iterator
-               is2 = it1->second.begin(),
-               ie2 = it1->second.end(), it2 = is2;
+      for (TxConcreteStoreMap::const_iterator is2 = it1->second.begin(),
+                                              ie2 = it1->second.end(),
+                                              it2 = is2;
            it2 != ie2; ++it2) {
         if (it1 != is1 || it2 != is2)
           stream << tabsNext << "------------------------------------------\n";
         stream << tabsNext << "address:\n";
-        it2->first->loc->print(stream, tabsNextNext);
+        it2->first->print(stream, tabsNextNext);
         stream << "\n";
         stream << tabsNext << "content:\n";
         it2->second->print(stream, tabsNextNext);
@@ -1798,18 +1791,18 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
 
   if (!symbolicAddressStore.empty()) {
     stream << prefix << "symbolic store = [\n";
-    for (Dependency::SymbolicStore::const_iterator
-             is1 = symbolicAddressStore.begin(),
-             ie1 = symbolicAddressStore.end(), it1 = is1;
+    for (TxSymbolicStore::const_iterator is1 = symbolicAddressStore.begin(),
+                                         ie1 = symbolicAddressStore.end(),
+                                         it1 = is1;
          it1 != ie1; ++it1) {
-      for (Dependency::SymbolicStoreMap::const_iterator
-               is2 = it1->second.begin(),
-               ie2 = it1->second.end(), it2 = is2;
+      for (TxSymbolicStoreMap::const_iterator is2 = it1->second.begin(),
+                                              ie2 = it1->second.end(),
+                                              it2 = is2;
            it2 != ie2; ++it2) {
         if (it1 != is1 || it2 != is2)
           stream << tabsNext << "------------------------------------------\n";
         stream << tabsNext << "address:\n";
-        it2->first->loc->print(stream, tabsNextNext);
+        it2->first->print(stream, tabsNextNext);
         stream << "\n";
         stream << tabsNext << "content:\n";
         it2->second->print(stream, tabsNextNext);
@@ -2029,8 +2022,8 @@ bool SubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
 
   if (iterPair.first != iterPair.second) {
 
-    Dependency::ConcreteStore concretelyAddressedStore;
-    Dependency::SymbolicStore symbolicallyAddressedStore;
+    TxConcreteStore concretelyAddressedStore;
+    TxSymbolicStore symbolicallyAddressedStore;
 
     txTreeNode->getStoredExpressions(txTreeNode->entryCallHistory,
                                      concretelyAddressedStore,
@@ -2510,8 +2503,8 @@ void TxTreeNode::bindReturnValue(llvm::CallInst *site, llvm::Instruction *inst,
 
 void TxTreeNode::getStoredExpressions(
     const std::vector<llvm::Instruction *> &_callHistory,
-    Dependency::ConcreteStore &concretelyAddressedStore,
-    Dependency::SymbolicStore &symbolicallyAddressedStore) const {
+    TxConcreteStore &concretelyAddressedStore,
+    TxSymbolicStore &symbolicallyAddressedStore) const {
   TimerStatIncrementer t(getStoredExpressionsTime);
   std::set<const Array *> dummyReplacements;
 
@@ -2527,8 +2520,8 @@ void TxTreeNode::getStoredExpressions(
 void TxTreeNode::getStoredCoreExpressions(
     const std::vector<llvm::Instruction *> &_callHistory,
     std::set<const Array *> &replacements,
-    Dependency::ConcreteStore &concretelyAddressedStore,
-    Dependency::SymbolicStore &symbolicallyAddressedStore) const {
+    TxConcreteStore &concretelyAddressedStore,
+    TxSymbolicStore &symbolicallyAddressedStore) const {
   TimerStatIncrementer t(getStoredCoreExpressionsTime);
 
   // Since a program point index is a first statement in a basic block,

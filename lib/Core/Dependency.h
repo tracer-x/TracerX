@@ -17,6 +17,9 @@
 #ifndef KLEE_DEPENDENCY_H
 #define KLEE_DEPENDENCY_H
 
+#include "StoreFrame.h"
+#include "TxInterpolantTypes.h"
+
 #include "klee/Config/Version.h"
 #include "klee/Internal/Module/VersionedValue.h"
 
@@ -37,134 +40,6 @@
 #include <vector>
 
 namespace klee {
-
-/// \brief The address to be stored as an index in the subsumption table. This
-/// class wraps a memory location, supplying weaker address equality comparison
-/// for the purpose of subsumption checking
-class StoredAddress {
-public:
-  unsigned refCount;
-
-  ref<MemoryLocation> loc;
-
-private:
-  StoredAddress(ref<MemoryLocation> _loc) : refCount(0), loc(_loc) {}
-
-public:
-  static ref<StoredAddress> create(ref<MemoryLocation> loc) {
-    ref<StoredAddress> ret(new StoredAddress(loc));
-    return ret;
-  }
-
-  /// \brief The comparator of this class' objects. This member function is
-  /// weaker than standard comparator for MemoryLocation in that it does not
-  /// check for the equality of allocation id. Allocation id is used in
-  /// MemoryLocation (member variable MemoryLocation#allocationId) for the
-  /// purpose of distinguishing memory allocations of the same callsite and call
-  /// history, but of different loop iterations. This does not make sense when
-  /// comparing states for subsumption as in subsumption, related allocations in
-  /// different paths may have different allocation ids.
-  int compare(const StoredAddress &other) const {
-    return loc->weakCompare(*(other.loc.get()));
-  }
-};
-
-  /// \brief A processed form of a value to be stored in the subsumption table
-  class StoredValue {
-  public:
-    unsigned refCount;
-
-  private:
-    ref<Expr> expr;
-
-    /// \brief In case the stored value was a pointer, then this should be a
-    /// non-empty map mapping of allocation sites to the set of offset bounds.
-    /// This constitutes the weakest liberal precondition of the memory checks
-    /// against which the offsets of the pointer values of the current state are
-    /// to be checked against.
-    std::map<const llvm::Value *, std::set<ref<Expr> > > allocationBounds;
-
-    /// \brief In case the stored value was a pointer, then this should be a
-    /// non-empty map mapping of allocation sites to the set of offsets. This is
-    /// the offset values of the current state to be checked against the offset
-    /// bounds.
-    std::map<const llvm::Value *, std::set<ref<Expr> > > allocationOffsets;
-
-    /// \brief The id of this object
-    uint64_t id;
-
-    /// \brief The LLVM value of this object
-    llvm::Value *value;
-
-    /// \brief Do not use bound in subsumption check
-    bool doNotUseBound;
-
-    /// \brief Reason this was stored as needed value
-    std::set<std::string> coreReasons;
-
-    void init(ref<VersionedValue> vvalue, std::set<const Array *> &replacements,
-              const std::set<std::string> &coreReasons, bool shadowing = false);
-
-    StoredValue(ref<VersionedValue> vvalue,
-                std::set<const Array *> &replacements,
-                const std::set<std::string> &coreReasons) {
-      init(vvalue, replacements, coreReasons, true);
-    }
-
-    StoredValue(ref<VersionedValue> vvalue,
-                const std::set<std::string> &coreReasons) {
-      std::set<const Array *> dummyReplacements;
-      init(vvalue, dummyReplacements, coreReasons);
-    }
-
-  public:
-    static ref<StoredValue> create(ref<VersionedValue> vvalue,
-                                   std::set<const Array *> &replacements) {
-      ref<StoredValue> sv(
-          new StoredValue(vvalue, replacements, vvalue->getReasons()));
-      return sv;
-    }
-
-    static ref<StoredValue> create(ref<VersionedValue> vvalue) {
-      ref<StoredValue> sv(new StoredValue(vvalue, vvalue->getReasons()));
-      return sv;
-    }
-
-    ~StoredValue() {}
-
-    int compare(const StoredValue other) const {
-      if (id == other.id)
-        return 0;
-      if (id < other.id)
-        return -1;
-      return 1;
-    }
-
-    bool useBound() { return !doNotUseBound; }
-
-    bool isPointer() const { return !allocationBounds.empty(); }
-
-    ref<Expr> getBoundsCheck(ref<StoredValue> svalue,
-                             std::set<ref<Expr> > &bounds,
-                             int debugSubsumptionLevel) const;
-
-    ref<Expr> getExpression() const { return expr; }
-
-    const std::set<ref<Expr> > &getBounds(llvm::Value *value) const {
-      return allocationBounds.at(value);
-    }
-
-    llvm::Value *getValue() const { return value; }
-
-    void print(llvm::raw_ostream &stream) const;
-
-    void print(llvm::raw_ostream &stream, const std::string &prefix) const;
-
-    void dump() const {
-      print(llvm::errs());
-      llvm::errs() << "\n";
-    }
-  };
 
   /// \brief Computation of memory regions the unsatisfiability core depends
   /// upon, which is used to compute the interpolant stored in the table.
@@ -288,13 +163,6 @@ public:
   /// \see MemoryLocation
   class Dependency {
 
-  public:
-    typedef std::pair<ref<StoredAddress>, ref<StoredValue> > AddressValuePair;
-    typedef std::map<ref<StoredAddress>, ref<StoredValue> > ConcreteStoreMap;
-    typedef std::vector<AddressValuePair> SymbolicStoreMap;
-    typedef std::map<const llvm::Value *, ConcreteStoreMap> ConcreteStore;
-    typedef std::map<const llvm::Value *, SymbolicStoreMap> SymbolicStore;
-
   private:
     /// \brief Previous path condition
     Dependency *parent;
@@ -302,15 +170,14 @@ public:
     /// \brief Argument values to be passed onto callee
     std::vector<ref<VersionedValue> > argumentValuesList;
 
-    /// \brief The mapping of concrete locations to stored value
-    std::map<ref<MemoryLocation>,
-             std::pair<ref<VersionedValue>, ref<VersionedValue> > >
-    concretelyAddressedStore;
+    /// \brief The global frame
+    GlobalStoreFrame *globalFrame;
 
-    /// \brief The mapping of symbolic locations to stored value
-    std::map<ref<MemoryLocation>,
-             std::pair<ref<VersionedValue>, ref<VersionedValue> > >
-    symbolicallyAddressedStore;
+    /// \brief The heap frame
+    HeapStoreFrame *heapFrame;
+
+    /// \brief The stack
+    StackStoreFrame *stack;
 
     /// \brief The store of the versioned values
     std::map<llvm::Value *, std::vector<ref<VersionedValue> > > valuesMap;
@@ -372,6 +239,10 @@ public:
     /// \brief Gets the latest pointer value for marking
     ref<VersionedValue> getLatestValueForMarking(llvm::Value *val,
                                                  ref<Expr> expr);
+
+    /// \brief Read from memory location
+    std::pair<ref<VersionedValue>, ref<VersionedValue> >
+    readStore(ref<MemoryLocation> loc);
 
     /// \brief Newly relate an location with its stored value
     void updateStore(ref<MemoryLocation> loc, ref<VersionedValue> address,
@@ -451,7 +322,7 @@ public:
                        std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
             store,
         std::set<const Array *> &replacements, bool coreOnly,
-        Dependency::ConcreteStore &concreteStore) const;
+        TxConcreteStore &concreteStore) const;
 
     void getSymbolicStore(
         const std::vector<llvm::Instruction *> &callHistory,
@@ -459,11 +330,11 @@ public:
                        std::pair<ref<VersionedValue>, ref<VersionedValue> > > &
             store,
         std::set<const Array *> &replacements, bool coreOnly,
-        Dependency::SymbolicStore &symbolicStore) const;
+        TxSymbolicStore &symbolicStore) const;
 
   public:
     /// \brief This is for dynamic setting up of debug messages.
-    int debugSubsumptionLevel;
+    uint64_t debugSubsumptionLevel;
 
     /// \brief Flag to display debug information on the state.
     uint64_t debugStateLevel;
@@ -517,8 +388,8 @@ public:
     void
     getStoredExpressions(const std::vector<llvm::Instruction *> &callHistory,
                          std::set<const Array *> &replacements, bool coreOnly,
-                         ConcreteStore &_concretelyAddressedStore,
-                         SymbolicStore &_symbolicallyAddressedStore);
+                         TxConcreteStore &_concretelyAddressedStore,
+                         TxSymbolicStore &_symbolicallyAddressedStore);
 
     /// \brief Record call arguments in a function call
     void bindCallArguments(llvm::Instruction *instr,
