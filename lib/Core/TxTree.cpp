@@ -2290,7 +2290,7 @@ std::string TxTree::getInterpolationStat() {
   printTimeStat(stream);
   stream << "KLEE: done: TxTreeNode method execution times (ms):\n";
   TxTreeNode::printTimeStat(stream);
-  //printing node count
+  // printing node count
   TxTreeNode::printNodeCntStat(stream);
   return stream.str();
 }
@@ -2582,8 +2582,8 @@ void TxTreeNode::printTimeStat(std::stringstream &stream) {
 }
 
 void TxTreeNode::printNodeCntStat(std::stringstream &stream) {
-  stream << "KLEE: done: total visited nodes = "
-  	     << TxTreeGraph::nodeCount << "\n";
+  stream << "KLEE: done: total visited nodes = " << TxTreeGraph::nodeCount
+         << "\n";
 }
 
 TxTreeNode::TxTreeNode(TxTreeNode *_parent, llvm::DataLayout *_targetData)
