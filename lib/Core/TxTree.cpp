@@ -51,6 +51,8 @@ std::string TxTreeGraph::NumberedEdge::render() const {
 
 /**/
 
+uint64_t TxTreeGraph::nodeCount = 1;
+
 TxTreeGraph *TxTreeGraph::instance = 0;
 
 std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
@@ -211,6 +213,8 @@ TxTreeGraph::~TxTreeGraph() {
 
 void TxTreeGraph::addChildren(TxTreeNode *parent, TxTreeNode *falseChild,
                               TxTreeNode *trueChild) {
+  nodeCount += 2;
+
   if (!OUTPUT_INTERPOLATION_TREE)
     return;
 
@@ -2286,6 +2290,8 @@ std::string TxTree::getInterpolationStat() {
   printTimeStat(stream);
   stream << "KLEE: done: TxTreeNode method execution times (ms):\n";
   TxTreeNode::printTimeStat(stream);
+  //printing node count
+  TxTreeNode::printNodeCntStat(stream);
   return stream.str();
 }
 
@@ -2573,6 +2579,11 @@ void TxTreeNode::printTimeStat(std::stringstream &stream) {
          << ((double)getStoredExpressionsTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     getStoredCoreExpressions = "
          << ((double)getStoredCoreExpressionsTime.getValue()) / 1000 << "\n";
+}
+
+void TxTreeNode::printNodeCntStat(std::stringstream &stream) {
+  stream << "KLEE: done: total visited nodes = "
+  	     << TxTreeGraph::nodeCount << "\n";
 }
 
 TxTreeNode::TxTreeNode(TxTreeNode *_parent, llvm::DataLayout *_targetData)
