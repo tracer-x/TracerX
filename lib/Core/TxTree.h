@@ -601,9 +601,6 @@ private:
   /// \brief for printing member function running time statistics
   static void printTimeStat(std::stringstream &stream);
 
-  /// \brief for printing number of visited nodes
-  static void printNodeCntStat(std::stringstream &stream);
-
   void execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args,
                bool symbolicExecutionError);
 
