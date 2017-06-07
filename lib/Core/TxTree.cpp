@@ -51,6 +51,8 @@ std::string TxTreeGraph::NumberedEdge::render() const {
 
 /**/
 
+uint64_t TxTreeGraph::nodeCount = 1;
+
 TxTreeGraph *TxTreeGraph::instance = 0;
 
 std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
@@ -211,6 +213,8 @@ TxTreeGraph::~TxTreeGraph() {
 
 void TxTreeGraph::addChildren(TxTreeNode *parent, TxTreeNode *falseChild,
                               TxTreeNode *trueChild) {
+  nodeCount += 2;
+
   if (!OUTPUT_INTERPOLATION_TREE)
     return;
 
@@ -2280,12 +2284,15 @@ std::string TxTree::inTwoDecimalPoints(const double n) {
 
 std::string TxTree::getInterpolationStat() {
   std::stringstream stream;
+  stream << "KLEE: done: Total reduced symbolic execution tree nodes = "
+		 << TxTreeGraph::nodeCount  << "\n";
   stream << "\nKLEE: done: Subsumption statistics\n";
   printTableStat(stream);
-  stream << "KLEE: done: TxTree method execution times (ms):\n";
+  stream << "\nKLEE: done: TxTree method execution times (ms):\n";
   printTimeStat(stream);
-  stream << "KLEE: done: TxTreeNode method execution times (ms):\n";
+  stream << "\nKLEE: done: TxTreeNode method execution times (ms):\n";
   TxTreeNode::printTimeStat(stream);
+  // printing node count
   return stream.str();
 }
 

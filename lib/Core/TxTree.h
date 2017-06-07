@@ -138,6 +138,8 @@ class TxTreeGraph {
   ~TxTreeGraph();
 
 public:
+  static uint64_t nodeCount;
+
   static void initialize(TxTreeNode *root) {
     if (!OUTPUT_INTERPOLATION_TREE)
       return;
