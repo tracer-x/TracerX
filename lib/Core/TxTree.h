@@ -875,7 +875,12 @@ public:
   void setCurrentINode(ExecutionState &state);
 
   /// \brief Deletes the Tracer-X tree node
-  void remove(TxTreeNode *node);
+  ///
+  /// \param node The Tracer-X tree node to delete
+  /// \param dumping Indicates whether we are dumping the states at the point
+  /// KLEE itself is about to terminate. Here we should not create subsumption
+  /// table entry.
+  void remove(TxTreeNode *node, bool dumping);
 
   /// \brief Invokes the subsumption check
   bool subsumptionCheck(TimingSolver *solver, ExecutionState &state,
