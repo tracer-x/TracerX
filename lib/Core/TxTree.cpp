@@ -2358,8 +2358,7 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
     // As the node is about to be deleted, it must have been completely
     // traversed, hence the correct time to table the interpolant.
     if (!dumping && !node->isSubsumed && node->storable) {
-      int debugSubsumptionLevel =
-          currentTxTreeNode->dependency->debugSubsumptionLevel;
+      int debugSubsumptionLevel = node->dependency->debugSubsumptionLevel;
 
       if (debugSubsumptionLevel >= 2) {
         klee_message("Storing entry for Node #%lu, Program Point %lu",
