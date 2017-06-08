@@ -2348,11 +2348,8 @@ void TxTree::setCurrentINode(ExecutionState &state) {
   TxTreeGraph::setCurrentNode(state, currentTxTreeNode->nodeSequenceNumber);
 }
 
-void TxTree::remove(TxTreeNode *node) {
+void TxTree::remove(TxTreeNode *node, bool dumping) {
 #ifdef ENABLE_Z3
-  int debugSubsumptionLevel =
-      currentTxTreeNode->dependency->debugSubsumptionLevel;
-
   TimerStatIncrementer t(removeTime);
   assert(!node->left && !node->right);
   do {
@@ -2360,7 +2357,10 @@ void TxTree::remove(TxTreeNode *node) {
 
     // As the node is about to be deleted, it must have been completely
     // traversed, hence the correct time to table the interpolant.
-    if (!node->isSubsumed && node->storable) {
+    if (!dumping && !node->isSubsumed && node->storable) {
+      int debugSubsumptionLevel =
+          currentTxTreeNode->dependency->debugSubsumptionLevel;
+
       if (debugSubsumptionLevel >= 2) {
         klee_message("Storing entry for Node #%lu, Program Point %lu",
                      node->getNodeSequenceNumber(), node->getProgramPoint());
