@@ -1515,41 +1515,38 @@ void Dependency::executeMemoryOperation(
     }
     }
 
-    if (SpecialFunctionBoundInterpolation) {
+    if (BOUND_INTERPOLATION(instr)) {
       // Limit interpolation to only within function tracerx_check
       ref<TxStateValue> val(getLatestValueForMarking(addressOperand, address));
       if (llvm::isa<llvm::LoadInst>(instr) && !val->getLocations().empty()) {
-        if (instr->getParent()->getParent()->getName().str() ==
-            "tracerx_check") {
-          std::set<ref<TxStateAddress> > locations(val->getLocations());
-          for (std::set<ref<TxStateAddress> >::iterator it = locations.begin(),
-                                                        ie = locations.end();
-               it != ie; ++it) {
-            if (llvm::ConstantExpr *ce = llvm::dyn_cast<llvm::ConstantExpr>(
-                    (*it)->getContext()->getValue())) {
-              if (ce->getOpcode() == llvm::Instruction::GetElementPtr) {
-                std::string reason = "";
-                if (debugSubsumptionLevel >= 1) {
-                  llvm::raw_string_ostream stream(reason);
-                  stream << "pointer use [";
-                  if (instr->getParent()->getParent()) {
-                    stream << instr->getParent()->getParent()->getName().str()
-                           << ": ";
-                  }
-                  if (llvm::MDNode *n = instr->getMetadata("dbg")) {
-                    llvm::DILocation loc(n);
-                    stream << "Line " << loc.getLineNumber();
-                  }
-                  stream << "]";
-                  stream.flush();
+        std::set<ref<TxStateAddress> > locations(val->getLocations());
+        for (std::set<ref<TxStateAddress> >::iterator it = locations.begin(),
+                                                      ie = locations.end();
+             it != ie; ++it) {
+          if (llvm::ConstantExpr *ce = llvm::dyn_cast<llvm::ConstantExpr>(
+                  (*it)->getContext()->getValue())) {
+            if (ce->getOpcode() == llvm::Instruction::GetElementPtr) {
+              std::string reason = "";
+              if (debugSubsumptionLevel >= 1) {
+                llvm::raw_string_ostream stream(reason);
+                stream << "pointer use [";
+                if (instr->getParent()->getParent()) {
+                  stream << instr->getParent()->getParent()->getName().str()
+                         << ": ";
                 }
-                if (ExactAddressInterpolant) {
-                  markAllValues(addressOperand, address, reason);
-                } else {
-                  markAllPointerValues(addressOperand, address, reason);
+                if (llvm::MDNode *n = instr->getMetadata("dbg")) {
+                  llvm::DILocation loc(n);
+                  stream << "Line " << loc.getLineNumber();
                 }
-                break;
+                stream << "]";
+                stream.flush();
               }
+              if (ExactAddressInterpolant) {
+                markAllValues(addressOperand, address, reason);
+              } else {
+                markAllPointerValues(addressOperand, address, reason);
+              }
+              break;
             }
           }
         }
