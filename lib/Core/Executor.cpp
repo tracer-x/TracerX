@@ -4024,8 +4024,7 @@ void Executor::runFunctionAsMain(Function *f,
 
 #ifdef ENABLE_Z3
     // Print interpolation time statistics
-    if (InterpolationStat)
-      interpreterHandler->assignSubsumptionStats(TxTree::getInterpolationStat());
+    interpreterHandler->assignSubsumptionStats(TxTree::getInterpolationStat());
 #endif
   }
 
