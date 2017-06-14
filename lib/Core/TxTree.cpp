@@ -1181,8 +1181,8 @@ bool SubsumptionTableEntry::subsumed(
                            nodeSequenceNumber, msg.c_str());
             }
             return false;
-          } else if (!NoBoundInterpolation && tabledValue->isPointer() &&
-                     stateValue->isPointer()) {
+          } else if (Dependency::boundInterpolation() &&
+                     tabledValue->isPointer() && stateValue->isPointer()) {
             if (!ExactAddressInterpolant && tabledValue->useBound()) {
               std::set<ref<Expr> > bounds;
               ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
@@ -1313,8 +1313,8 @@ bool SubsumptionTableEntry::subsumed(
                   ConstantExpr::create(0, Expr::Bool),
                   EqExpr::create(tabledConcreteOffset, stateSymbolicOffset));
 
-            } else if (!NoBoundInterpolation && tabledValue->isPointer() &&
-                       stateValue->isPointer()) {
+            } else if (Dependency::boundInterpolation() &&
+                       tabledValue->isPointer() && stateValue->isPointer()) {
               if (!ExactAddressInterpolant && tabledValue->useBound()) {
                 std::set<ref<Expr> > bounds;
                 ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
@@ -1446,8 +1446,8 @@ bool SubsumptionTableEntry::subsumed(
             newTerm = EqExpr::create(
                 ConstantExpr::create(0, Expr::Bool),
                 EqExpr::create(tabledSymbolicOffset, stateConcreteOffset));
-          } else if (!NoBoundInterpolation && tabledValue->isPointer() &&
-                     stateValue->isPointer()) {
+          } else if (Dependency::boundInterpolation() &&
+                     tabledValue->isPointer() && stateValue->isPointer()) {
             if (!ExactAddressInterpolant && tabledValue->useBound()) {
               std::set<ref<Expr> > bounds;
               ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
@@ -1528,8 +1528,8 @@ bool SubsumptionTableEntry::subsumed(
             newTerm = EqExpr::create(
                 ConstantExpr::create(0, Expr::Bool),
                 EqExpr::create(tabledSymbolicOffset, stateSymbolicOffset));
-          } else if (!NoBoundInterpolation && tabledValue->isPointer() &&
-                     stateValue->isPointer()) {
+          } else if (Dependency::boundInterpolation() &&
+                     tabledValue->isPointer() && stateValue->isPointer()) {
             if (!ExactAddressInterpolant && tabledValue->useBound()) {
               std::set<ref<Expr> > bounds;
               ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
@@ -1783,7 +1783,7 @@ bool SubsumptionTableEntry::subsumed(
                        nodeSequenceNumber, msg.c_str());
         }
 
-        if (!NoBoundInterpolation && !ExactAddressInterpolant) {
+        if (Dependency::boundInterpolation() && !ExactAddressInterpolant) {
           // We build memory bounds interpolants from pointer values
           std::string reason = "";
           if (debugSubsumptionLevel >= 1) {
@@ -1843,7 +1843,7 @@ bool SubsumptionTableEntry::subsumed(
       // We create path condition marking structure and mark core constraints
       state.txTreeNode->unsatCoreInterpolation(unsatCore);
 
-      if (!NoBoundInterpolation && !ExactAddressInterpolant) {
+      if (Dependency::boundInterpolation() && !ExactAddressInterpolant) {
         // We build memory bounds interpolants from pointer values
         std::string reason = "";
         if (debugSubsumptionLevel >= 1) {
