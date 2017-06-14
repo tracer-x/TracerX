@@ -1493,7 +1493,7 @@ void Dependency::executeMemoryOperation(
     // important when the user wants to get the skeleton tree.
     return;
 
-  if (!NoBoundInterpolation && inBounds) {
+  if (BOUND_INTERPOLATION(instr) && inBounds) {
     // The bounds check has been proven valid, we keep the dependency on the
     // address. Calling va_start within a variadic function also triggers memory
     // operation, but we ignored it here as this method is only called when load
@@ -1515,7 +1515,7 @@ void Dependency::executeMemoryOperation(
     }
     }
 
-    if (BOUND_INTERPOLATION(instr)) {
+    if (SpecialFunctionBoundInterpolation) {
       // Limit interpolation to only within function tracerx_check
       ref<TxStateValue> val(getLatestValueForMarking(addressOperand, address));
       if (llvm::isa<llvm::LoadInst>(instr) && !val->getLocations().empty()) {

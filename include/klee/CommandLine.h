@@ -11,9 +11,10 @@
 
 #ifdef ENABLE_Z3
 #define BOUND_INTERPOLATION(instr)                                             \
-  (SpecialFunctionBoundInterpolation &&((instr)->getParent()) &&               \
-   ((instr)->getParent()->getParent()) &&                                      \
-   ((instr)->getParent()->getParent()->getName().str() == "tracerx_check"))
+  (!SpecialFunctionBoundInterpolation ||                                       \
+   ((instr) && ((instr)->getParent()) &&                                       \
+    ((instr)->getParent()->getParent()) &&                                     \
+    ((instr)->getParent()->getParent()->getName().str() == "tracerx_check")))
 #ifdef ENABLE_STP
 #define INTERPOLATION_ENABLED (CoreSolverToUse == Z3_SOLVER && !NoInterpolation)
 #else
