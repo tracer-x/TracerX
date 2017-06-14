@@ -444,6 +444,9 @@ namespace klee {
                               std::set<ref<Expr> > &bounds,
                               const std::string &reason);
 
+    /// \brief Tests if bound interpolation shold be enabled
+    static bool boundInterpolation(llvm::Value *val = 0);
+
     /// \brief Print the content of the object to the LLVM error stream
     void dump() const {
       this->print(llvm::errs());

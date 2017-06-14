@@ -3709,7 +3709,7 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
 
     bool inBounds;
 #ifdef ENABLE_Z3
-    if (NoBoundCheck) {
+    if (!Dependency::boundInterpolation(target->inst)) {
         // No Bounds check is needed to be performed. So, inBounds is set to
         // be true. This is used when the user wants to get the skeleton tree.
         inBounds = true;

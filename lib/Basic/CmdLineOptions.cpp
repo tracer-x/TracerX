@@ -138,17 +138,6 @@ llvm::cl::opt<int> DebugSubsumption(
                    "higher the more (default=0 (off))."),
     llvm::cl::init(0));
 
-llvm::cl::opt<bool> NoBoundCheck(
-    "no-bound-check",
-    llvm::cl::desc("This option disables memory access out-of-bound check."),
-    llvm::cl::init(false));
-
-llvm::cl::opt<bool> NoBoundInterpolation(
-    "no-bound-interpolation",
-    llvm::cl::desc("This option disables the generation of interpolant from "
-                   "each successful out-of-bound check: It may result in loss "
-                   "of error report(s)"));
-
 llvm::cl::opt<bool> ExactAddressInterpolant(
     "exact-address-interpolant",
     llvm::cl::desc("This option uses exact address for interpolating "
