@@ -1493,7 +1493,7 @@ void Dependency::executeMemoryOperation(
     // important when the user wants to get the skeleton tree.
     return;
 
-  if (BOUND_INTERPOLATION(instr) && inBounds) {
+  if (boundInterpolation(instr) && inBounds) {
     // The bounds check has been proven valid, we keep the dependency on the
     // address. Calling va_start within a variadic function also triggers memory
     // operation, but we ignored it here as this method is only called when load
@@ -1656,6 +1656,23 @@ void Dependency::markAllPointerValues(llvm::Value *val, ref<Expr> address,
   markPointerFlow(value, value, bounds, reason);
 }
 
+/// \brief Tests if bound interpolation shold be enabled
+bool Dependency::boundInterpolation(llvm::Value *val) {
+  if (SpecialFunctionBoundInterpolation) {
+    if (!val)
+      return true;
+
+    if (llvm::Instruction *instr = llvm::dyn_cast<llvm::Instruction>(val)) {
+      if (instr->getParent() && instr->getParent()->getParent() &&
+          instr->getParent()->getParent()->getName().str() == "tracerx_check")
+        return true;
+    }
+    return false;
+  }
+  return true;
+}
+
+/// \brief Print the content of the object to the LLVM error stream
 void Dependency::print(llvm::raw_ostream &stream) const {
   this->print(stream, 0);
 }
