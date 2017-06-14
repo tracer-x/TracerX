@@ -618,10 +618,7 @@ void Dependency::addDependencyViaExternalFunction(
   if (source.isNull() || target.isNull())
     return;
 
-#ifdef ENABLE_Z3
-  if (!NoBoundInterpolation) {
-    std::set<ref<TxStateAddress> > locations = source->getLocations();
-    if (!locations.empty()) {
+  if (!source->getLocations().empty()) {
       std::string reason = "";
       if (debugSubsumptionLevel >= 1) {
         llvm::raw_string_ostream stream(reason);
@@ -633,9 +630,7 @@ void Dependency::addDependencyViaExternalFunction(
         stream.flush();
       }
       markPointerFlow(source, source, reason);
-    }
   }
-#endif
 
   // Add new location to the target in case of pointer return value
   llvm::Type *t = target->getValue()->getType();
