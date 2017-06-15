@@ -50,7 +50,6 @@ public:
   virtual void
   incTotalInstructionsOnSubsumption(unsigned currentInstruction) = 0;
   virtual void incSubsumptionTermination() = 0;
-  virtual void incSubsumptionTerminationTest() = 0;
   virtual void incEarlyTermination() = 0;
   virtual void incEarlyTerminationTest() = 0;
   virtual void incErrorTermination() = 0;

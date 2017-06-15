@@ -100,11 +100,6 @@ llvm::cl::opt<bool> OutputTree(
                    "format. At present, this feature is only available when "
                    "Z3 is compiled in and interpolation is enabled."));
 
-llvm::cl::opt<bool> NoSubsumedTest(
-    "no-subsumed-test",
-    llvm::cl::desc("Disables generation of test cases for subsumed paths."),
-    llvm::cl::init(false));
-
 llvm::cl::opt<bool> NoExistential(
     "no-existential",
     llvm::cl::desc(
