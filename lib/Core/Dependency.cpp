@@ -332,7 +332,7 @@ void Dependency::getStoredExpressions(
 ref<TxStateValue>
 Dependency::getLatestValue(llvm::Value *value,
                            const std::vector<llvm::Instruction *> &callHistory,
-                           ref<Expr> valueExpr, bool constraint) {
+                           ref<Expr> valueExpr, bool allowInconsistency) {
   assert(value && !valueExpr.isNull() && "value cannot be null");
   if (llvm::ConstantExpr *cvalue = llvm::dyn_cast<llvm::ConstantExpr>(value)) {
     switch (cvalue->getOpcode()) {
@@ -366,7 +366,7 @@ Dependency::getLatestValue(llvm::Value *value,
     }
     case llvm::Instruction::BitCast: {
       return getLatestValue(cvalue->getOperand(0), callHistory, valueExpr,
-                            constraint);
+                            allowInconsistency);
     }
     default:
       break;
@@ -382,38 +382,8 @@ Dependency::getLatestValue(llvm::Value *value,
   if (llvm::isa<llvm::Constant>(value) && !llvm::isa<llvm::GlobalValue>(value))
     return getNewTxStateValue(value, callHistory, valueExpr);
 
-  std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
-  valuesMapIter = valuesMap.find(value);
-
-  if (valuesMapIter != valuesMap.end()) {
-    // Slight complication here that the latest version of an LLVM
-    // value may not be at the end of the vector; it is possible other
-    // values in a call stack has been appended to the vector, before
-    // the function returned, so the end part of the vector contains
-    // local values in a call already returned. To resolve this issue,
-    // here we naively search for values with equivalent expression.
-    std::vector<ref<TxStateValue> > &allValues = valuesMapIter->second;
-
-    // In case this was for adding constraints, simply assume the
-    // latest value is the one. This is due to the difficulty in
-    // that the constraint in valueExpr is already processed into
-    // a different syntax.
-    if (constraint)
-      return allValues.back();
-
-    for (std::vector<ref<TxStateValue> >::reverse_iterator
-             it = allValues.rbegin(),
-             ie = allValues.rend();
-         it != ie; ++it) {
-      ref<Expr> e = (*it)->getExpression();
-      if (e == valueExpr)
-        return *it;
-    }
-  }
-
-  ref<TxStateValue> ret = 0;
-  if (parent)
-    ret = parent->getLatestValue(value, callHistory, valueExpr, constraint);
+  ref<TxStateValue> ret =
+      getLatestValueNoConstantCheck(value, valueExpr, allowInconsistency);
 
   if (ret.isNull()) {
     if (llvm::GlobalValue *gv = llvm::dyn_cast<llvm::GlobalValue>(value)) {
@@ -444,12 +414,14 @@ Dependency::getLatestValue(llvm::Value *value,
   return ret;
 }
 
-ref<TxStateValue>
-Dependency::getLatestValueNoConstantCheck(llvm::Value *value,
-                                          ref<Expr> valueExpr) {
+ref<TxStateValue> Dependency::getLatestValueNoConstantCheck(
+    llvm::Value *value, ref<Expr> valueExpr, bool allowInconsistency) const {
   assert(value && "value cannot be null");
 
-  if (valuesMap.find(value) != valuesMap.end()) {
+  std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::const_iterator
+  valuesMapIter = valuesMap.find(value);
+
+  if (valuesMapIter != valuesMap.end()) {
     if (!valueExpr.isNull()) {
       // Slight complication here that the latest version of an LLVM
       // value may not be at the end of the vector; it is possible other
@@ -457,9 +429,16 @@ Dependency::getLatestValueNoConstantCheck(llvm::Value *value,
       // the function returned, so the end part of the vector contains
       // local values in a call already returned. To resolve this issue,
       // here we naively search for values with equivalent expression.
-      std::vector<ref<TxStateValue> > allValues = valuesMap[value];
+      const std::vector<ref<TxStateValue> > &allValues = valuesMapIter->second;
 
-      for (std::vector<ref<TxStateValue> >::reverse_iterator
+      // In case this was for adding constraints, simply assume the
+      // latest value is the one without checking for its consistency. This is
+      // due to the difficulty in that the constraint in valueExpr is already
+      // processed into a different syntax (a negation of the original value).
+      if (allowInconsistency)
+        return allValues.back();
+
+      for (std::vector<ref<TxStateValue> >::const_reverse_iterator
                it = allValues.rbegin(),
                ie = allValues.rend();
            it != ie; ++it) {
@@ -468,12 +447,13 @@ Dependency::getLatestValueNoConstantCheck(llvm::Value *value,
           return *it;
       }
     } else {
-      return valuesMap[value].back();
+      return valuesMapIter->second.back();
     }
   }
 
   if (parent)
-    return parent->getLatestValueNoConstantCheck(value, valueExpr);
+    return parent->getLatestValueNoConstantCheck(value, valueExpr,
+                                                 allowInconsistency);
 
   return 0;
 }

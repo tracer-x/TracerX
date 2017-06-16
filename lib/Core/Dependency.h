@@ -242,8 +242,9 @@ namespace klee {
 
     /// \brief Gets the latest version of the location, but without checking
     /// for whether the value is constant or not.
-    ref<TxStateValue> getLatestValueNoConstantCheck(llvm::Value *value,
-                                                    ref<Expr> expr);
+    ref<TxStateValue>
+    getLatestValueNoConstantCheck(llvm::Value *value, ref<Expr> expr,
+                                  bool allowInconsistency = false) const;
 
     /// \brief Gets the latest pointer value for marking
     ref<TxStateValue> getLatestValueForMarking(llvm::Value *val,
@@ -368,7 +369,7 @@ namespace klee {
     ref<TxStateValue>
     getLatestValue(llvm::Value *value,
                    const std::vector<llvm::Instruction *> &callHistory,
-                   ref<Expr> valueExpr, bool constraint = false);
+                   ref<Expr> valueExpr, bool allowInconsistency = false);
 
     /// \brief Abstract dependency state transition with argument(s)
     void execute(llvm::Instruction *instr,
