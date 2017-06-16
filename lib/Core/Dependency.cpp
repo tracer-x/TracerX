@@ -382,14 +382,17 @@ Dependency::getLatestValue(llvm::Value *value,
   if (llvm::isa<llvm::Constant>(value) && !llvm::isa<llvm::GlobalValue>(value))
     return getNewTxStateValue(value, callHistory, valueExpr);
 
-  if (valuesMap.find(value) != valuesMap.end()) {
+  std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
+  valuesMapIter = valuesMap.find(value);
+
+  if (valuesMapIter != valuesMap.end()) {
     // Slight complication here that the latest version of an LLVM
     // value may not be at the end of the vector; it is possible other
     // values in a call stack has been appended to the vector, before
     // the function returned, so the end part of the vector contains
     // local values in a call already returned. To resolve this issue,
     // here we naively search for values with equivalent expression.
-    std::vector<ref<TxStateValue> > allValues = valuesMap[value];
+    std::vector<ref<TxStateValue> > &allValues = valuesMapIter->second;
 
     // In case this was for adding constraints, simply assume the
     // latest value is the one. This is due to the difficulty in
