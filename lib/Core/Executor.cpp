@@ -3699,24 +3699,14 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
     ref<Expr> offset = mo->getOffsetExpr(address);
     ref<Expr> boundsCheck = mo->getBoundsCheckOffset(offset, bytes);
 
-
     bool inBounds;
-#ifdef ENABLE_Z3
-    if (!Dependency::boundInterpolation(target->inst)) {
-        // No Bounds check is needed to be performed. So, inBounds is set to
-        // be true. This is used when the user wants to get the skeleton tree.
-        inBounds = true;
-    } else
-#endif
-    {
-      solver->setTimeout(coreSolverTimeout);
-      bool success = solver->mustBeTrue(state, boundsCheck, inBounds);
-      solver->setTimeout(0);
-      if (!success) {
-        state.pc = state.prevPC;
-        terminateStateEarly(state, "Query timed out (bounds check).");
-        return;
-      }
+    solver->setTimeout(coreSolverTimeout);
+    bool success = solver->mustBeTrue(state, boundsCheck, inBounds);
+    solver->setTimeout(0);
+    if (!success) {
+      state.pc = state.prevPC;
+      terminateStateEarly(state, "Query timed out (bounds check).");
+      return;
     }
 
     if (inBounds) {
