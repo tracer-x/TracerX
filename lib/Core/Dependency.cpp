@@ -1798,7 +1798,12 @@ ref<TxStateValue> Dependency::evalConstantExpr(
     addDependency(op1, ret);
     return ret;
   }
-  case llvm::Instruction::BitCast: { return op1; }
+  case llvm::Instruction::BitCast: {
+    ref<Expr> expr = op1Expr;
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
 
   case llvm::Instruction::IntToPtr: {
     ref<Expr> expr = op1Expr->ZExt(targetData->getTypeSizeInBits(type));
