@@ -525,7 +525,7 @@ void Dependency::addDependencyIntToPtr(ref<TxStateValue> source,
 
   std::set<ref<TxStateAddress> > locations = source->getLocations();
   ref<Expr> targetExpr(ZExtExpr::create(target->getExpression(),
-                                        Expr::createPointer(0)->getWidth()));
+                                        Context::get().getPointerWidth()));
   for (std::set<ref<TxStateAddress> >::iterator it = locations.begin(),
                                                 ie = locations.end();
        it != ie; ++it) {
