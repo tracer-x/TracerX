@@ -15,11 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "Dependency.h"
+#include "Context.h"
 #include "ShadowArray.h"
 #include "TxPrintUtil.h"
 
 #include "klee/CommandLine.h"
 #include "klee/Internal/Support/ErrorHandling.h"
+#include "klee/util/GetElementPtrTypeIterator.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
@@ -1610,6 +1612,214 @@ bool Dependency::boundInterpolation(llvm::Value *val) {
     return false;
   }
   return true;
+}
+
+ref<ConstantExpr> Dependency::evalConstant(const llvm::Constant *c) {
+  if (const llvm::ConstantExpr *ce = llvm::dyn_cast<llvm::ConstantExpr>(c)) {
+    return evalConstantExpr(ce);
+  } else {
+    if (const llvm::ConstantInt *ci = llvm::dyn_cast<llvm::ConstantInt>(c)) {
+      return ConstantExpr::alloc(ci->getValue());
+    } else if (const llvm::ConstantFP *cf =
+                   llvm::dyn_cast<llvm::ConstantFP>(c)) {
+      return ConstantExpr::alloc(cf->getValueAPF().bitcastToAPInt());
+    } else if (const llvm::GlobalValue *gv =
+                   llvm::dyn_cast<llvm::GlobalValue>(c)) {
+      return globalAddresses->find(gv)->second;
+    } else if (llvm::isa<llvm::ConstantPointerNull>(c)) {
+      return Expr::createPointer(0);
+    } else if (llvm::isa<llvm::UndefValue>(c) ||
+               llvm::isa<llvm::ConstantAggregateZero>(c)) {
+      return ConstantExpr::create(0,
+                                  targetData->getTypeSizeInBits(c->getType()));
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 1)
+    } else if (const llvm::ConstantDataSequential *cds =
+                   llvm::dyn_cast<llvm::ConstantDataSequential>(c)) {
+      std::vector<ref<Expr> > kids;
+      for (unsigned i = 0, e = cds->getNumElements(); i != e; ++i) {
+        ref<Expr> kid = evalConstant(cds->getElementAsConstant(i));
+        kids.push_back(kid);
+      }
+      ref<Expr> res = ConcatExpr::createN(kids.size(), kids.data());
+      return cast<ConstantExpr>(res);
+#endif
+    } else if (const llvm::ConstantStruct *cs =
+                   llvm::dyn_cast<llvm::ConstantStruct>(c)) {
+      const llvm::StructLayout *sl = targetData->getStructLayout(cs->getType());
+      llvm::SmallVector<ref<Expr>, 4> kids;
+      for (unsigned i = cs->getNumOperands(); i != 0; --i) {
+        unsigned op = i - 1;
+        ref<Expr> kid = evalConstant(cs->getOperand(op));
+
+        uint64_t thisOffset = sl->getElementOffsetInBits(op),
+                 nextOffset = (op == cs->getNumOperands() - 1)
+                                  ? sl->getSizeInBits()
+                                  : sl->getElementOffsetInBits(op + 1);
+        if (nextOffset - thisOffset > kid->getWidth()) {
+          uint64_t paddingWidth = nextOffset - thisOffset - kid->getWidth();
+          kids.push_back(ConstantExpr::create(0, paddingWidth));
+        }
+
+        kids.push_back(kid);
+      }
+      ref<Expr> res = ConcatExpr::createN(kids.size(), kids.data());
+      return cast<ConstantExpr>(res);
+    } else if (const llvm::ConstantArray *ca =
+                   llvm::dyn_cast<llvm::ConstantArray>(c)) {
+      llvm::SmallVector<ref<Expr>, 4> kids;
+      for (unsigned i = ca->getNumOperands(); i != 0; --i) {
+        unsigned op = i - 1;
+        ref<Expr> kid = evalConstant(ca->getOperand(op));
+        kids.push_back(kid);
+      }
+      ref<Expr> res = ConcatExpr::createN(kids.size(), kids.data());
+      return cast<ConstantExpr>(res);
+    } else {
+      // Constant{Vector}
+      llvm::report_fatal_error("invalid argument to evalConstant()");
+    }
+  }
+}
+
+ref<ConstantExpr> Dependency::evalConstantExpr(const llvm::ConstantExpr *ce) {
+  LLVM_TYPE_Q llvm::Type *type = ce->getType();
+
+  ref<ConstantExpr> op1(0), op2(0), op3(0);
+  int numOperands = ce->getNumOperands();
+
+  if (numOperands > 0)
+    op1 = evalConstant(ce->getOperand(0));
+  if (numOperands > 1)
+    op2 = evalConstant(ce->getOperand(1));
+  if (numOperands > 2)
+    op3 = evalConstant(ce->getOperand(2));
+
+  switch (ce->getOpcode()) {
+  default:
+    ce->dump();
+    llvm::errs() << "error: unknown ConstantExpr type\n"
+                 << "opcode: " << ce->getOpcode() << "\n";
+    abort();
+
+  case llvm::Instruction::Trunc:
+    return op1->Extract(0, targetData->getTypeSizeInBits(type));
+  case llvm::Instruction::ZExt:
+    return op1->ZExt(targetData->getTypeSizeInBits(type));
+  case llvm::Instruction::SExt:
+    return op1->SExt(targetData->getTypeSizeInBits(type));
+  case llvm::Instruction::Add:
+    return op1->Add(op2);
+  case llvm::Instruction::Sub:
+    return op1->Sub(op2);
+  case llvm::Instruction::Mul:
+    return op1->Mul(op2);
+  case llvm::Instruction::SDiv:
+    return op1->SDiv(op2);
+  case llvm::Instruction::UDiv:
+    return op1->UDiv(op2);
+  case llvm::Instruction::SRem:
+    return op1->SRem(op2);
+  case llvm::Instruction::URem:
+    return op1->URem(op2);
+  case llvm::Instruction::And:
+    return op1->And(op2);
+  case llvm::Instruction::Or:
+    return op1->Or(op2);
+  case llvm::Instruction::Xor:
+    return op1->Xor(op2);
+  case llvm::Instruction::Shl:
+    return op1->Shl(op2);
+  case llvm::Instruction::LShr:
+    return op1->LShr(op2);
+  case llvm::Instruction::AShr:
+    return op1->AShr(op2);
+  case llvm::Instruction::BitCast:
+    return op1;
+
+  case llvm::Instruction::IntToPtr:
+    return op1->ZExt(targetData->getTypeSizeInBits(type));
+
+  case llvm::Instruction::PtrToInt:
+    return op1->ZExt(targetData->getTypeSizeInBits(type));
+
+  case llvm::Instruction::GetElementPtr: {
+    ref<ConstantExpr> base = op1->ZExt(Context::get().getPointerWidth());
+
+    for (gep_type_iterator ii = gep_type_begin(ce), ie = gep_type_end(ce);
+         ii != ie; ++ii) {
+      ref<ConstantExpr> addend =
+          ConstantExpr::alloc(0, Context::get().getPointerWidth());
+
+      if (LLVM_TYPE_Q llvm::StructType *st =
+              llvm::dyn_cast<llvm::StructType>(*ii)) {
+        const llvm::StructLayout *sl = targetData->getStructLayout(st);
+        const llvm::ConstantInt *ci = cast<llvm::ConstantInt>(ii.getOperand());
+
+        addend = ConstantExpr::alloc(
+            sl->getElementOffset((unsigned)ci->getZExtValue()),
+            Context::get().getPointerWidth());
+      } else {
+        const llvm::SequentialType *set = cast<llvm::SequentialType>(*ii);
+        ref<ConstantExpr> index =
+            evalConstant(cast<llvm::Constant>(ii.getOperand()));
+        unsigned elementSize =
+            targetData->getTypeStoreSize(set->getElementType());
+
+        index = index->ZExt(Context::get().getPointerWidth());
+        addend = index->Mul(
+            ConstantExpr::alloc(elementSize, Context::get().getPointerWidth()));
+      }
+
+      base = base->Add(addend);
+    }
+
+    return base;
+  }
+
+  case llvm::Instruction::ICmp: {
+    switch (ce->getPredicate()) {
+    default:
+      assert(0 && "unhandled ICmp predicate");
+    case llvm::ICmpInst::ICMP_EQ:
+      return op1->Eq(op2);
+    case llvm::ICmpInst::ICMP_NE:
+      return op1->Ne(op2);
+    case llvm::ICmpInst::ICMP_UGT:
+      return op1->Ugt(op2);
+    case llvm::ICmpInst::ICMP_UGE:
+      return op1->Uge(op2);
+    case llvm::ICmpInst::ICMP_ULT:
+      return op1->Ult(op2);
+    case llvm::ICmpInst::ICMP_ULE:
+      return op1->Ule(op2);
+    case llvm::ICmpInst::ICMP_SGT:
+      return op1->Sgt(op2);
+    case llvm::ICmpInst::ICMP_SGE:
+      return op1->Sge(op2);
+    case llvm::ICmpInst::ICMP_SLT:
+      return op1->Slt(op2);
+    case llvm::ICmpInst::ICMP_SLE:
+      return op1->Sle(op2);
+    }
+  }
+
+  case llvm::Instruction::Select:
+    return op1->isTrue() ? op2 : op3;
+
+  case llvm::Instruction::FAdd:
+  case llvm::Instruction::FSub:
+  case llvm::Instruction::FMul:
+  case llvm::Instruction::FDiv:
+  case llvm::Instruction::FRem:
+  case llvm::Instruction::FPTrunc:
+  case llvm::Instruction::FPExt:
+  case llvm::Instruction::UIToFP:
+  case llvm::Instruction::SIToFP:
+  case llvm::Instruction::FPToUI:
+  case llvm::Instruction::FPToSI:
+  case llvm::Instruction::FCmp:
+    assert(0 && "floating point ConstantExprs unsupported");
+  }
 }
 
 /// \brief Print the content of the object to the LLVM error stream

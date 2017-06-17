@@ -21,11 +21,13 @@
 #include "klee/Internal/Module/TxValues.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Value.h>
 #else
+#include <llvm/Constants.h>
 #include <llvm/Function.h>
 #include <llvm/Instruction.h>
 #include <llvm/Instructions.h>
@@ -244,6 +246,14 @@ namespace klee {
       vvalue->addLocation(TxStateAddress::create(loc, address, offset));
       return registerNewTxStateValue(value, vvalue);
     }
+
+    /// \brief Get a KLEE expression from a constant. This was shamelessly
+    /// copied from Executor::evalConstant.
+    ref<ConstantExpr> evalConstant(const llvm::Constant *c);
+
+    /// \brief Get a KLEE expression from a constant expression. This was
+    /// shamelessly copied from Executor::evalConstantExpr.
+    ref<ConstantExpr> evalConstantExpr(const llvm::ConstantExpr *ce);
 
     /// \brief Gets the latest version of the location, but without checking
     /// for whether the value is constant or not.
