@@ -2296,12 +2296,14 @@ std::string TxTree::getInterpolationStat() {
   return stream.str();
 }
 
-TxTree::TxTree(ExecutionState *_root, llvm::DataLayout *_targetData)
-    : targetData(_targetData) {
+TxTree::TxTree(
+    ExecutionState *_root, llvm::DataLayout *_targetData,
+    std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses)
+    : targetData(_targetData), globalAddresses(_globalAddresses) {
   currentTxTreeNode = 0;
   assert(_targetData && "target data layout not provided");
   if (!_root->txTreeNode) {
-    currentTxTreeNode = new TxTreeNode(0, _targetData);
+    currentTxTreeNode = new TxTreeNode(0, _targetData, _globalAddresses);
   }
   root = currentTxTreeNode;
 }
@@ -2581,12 +2583,15 @@ void TxTreeNode::printTimeStat(std::stringstream &stream) {
          << ((double)getStoredCoreExpressionsTime.getValue()) / 1000 << "\n";
 }
 
-TxTreeNode::TxTreeNode(TxTreeNode *_parent, llvm::DataLayout *_targetData)
+TxTreeNode::TxTreeNode(
+    TxTreeNode *_parent, llvm::DataLayout *_targetData,
+    std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses)
     : parent(_parent), left(0), right(0), programPoint(0),
       nodeSequenceNumber(nextNodeSequenceNumber++), storable(true),
       graph(_parent ? _parent->graph : 0),
       instructionsDepth(_parent ? _parent->instructionsDepth : 0),
-      targetData(_targetData), isSubsumed(false) {
+      targetData(_targetData), globalAddresses(_globalAddresses),
+      isSubsumed(false) {
 
   pathCondition = 0;
   if (_parent) {
@@ -2596,7 +2601,8 @@ TxTreeNode::TxTreeNode(TxTreeNode *_parent, llvm::DataLayout *_targetData)
   }
 
   // Inherit the abstract dependency or NULL
-  dependency = new Dependency(_parent ? _parent->dependency : 0, _targetData);
+  dependency = new Dependency(_parent ? _parent->dependency : 0, _targetData,
+                              _globalAddresses);
 }
 
 TxTreeNode::~TxTreeNode() {
@@ -2632,8 +2638,10 @@ void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
 void TxTreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
   TimerStatIncrementer t(splitTime);
   assert(left == 0 && right == 0);
-  leftData->txTreeNode = left = new TxTreeNode(this, targetData);
-  rightData->txTreeNode = right = new TxTreeNode(this, targetData);
+  leftData->txTreeNode = left =
+      new TxTreeNode(this, targetData, globalAddresses);
+  rightData->txTreeNode = right =
+      new TxTreeNode(this, targetData, globalAddresses);
 }
 
 void TxTreeNode::execute(llvm::Instruction *instr,

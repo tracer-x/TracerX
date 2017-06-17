@@ -578,6 +578,11 @@ private:
   /// \brief The data layout of the analysis target
   llvm::DataLayout *targetData;
 
+  /// Map of globals to their bound address. This also includes
+  /// globals that have no representative object (i.e. functions). This member
+  /// variable is just a pointer to the one in klee::Executor.
+  std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
+
 public:
   bool isSubsumed;
 
@@ -696,7 +701,9 @@ public:
   void print(llvm::raw_ostream &stream) const;
 
 private:
-  TxTreeNode(TxTreeNode *_parent, llvm::DataLayout *_targetData);
+  TxTreeNode(TxTreeNode *_parent, llvm::DataLayout *_targetData,
+             std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
+                 _globalAddresses);
 
   ~TxTreeNode();
 
@@ -824,6 +831,11 @@ class TxTree {
 
   llvm::DataLayout *targetData;
 
+  /// Map of globals to their bound address. This also includes
+  /// globals that have no representative object (i.e. functions). This member
+  /// variable is just a pointer to the one in klee::Executor.
+  std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
+
   void printNode(llvm::raw_ostream &stream, TxTreeNode *n,
                  std::string edges) const;
 
@@ -862,7 +874,9 @@ public:
   /// may not have been computed.
   static bool symbolicExecutionError;
 
-  TxTree(ExecutionState *_root, llvm::DataLayout *_targetData);
+  TxTree(ExecutionState *_root, llvm::DataLayout *_targetData,
+         std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
+             _globalAddresses);
 
   ~TxTree() { SubsumptionTable::clear(); }
 

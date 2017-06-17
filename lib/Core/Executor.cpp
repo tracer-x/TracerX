@@ -3989,7 +3989,7 @@ void Executor::runFunctionAsMain(Function *f,
   state->ptreeNode = processTree->root;
 
   if (INTERPOLATION_ENABLED) {
-    txTree = new TxTree(state, kmodule->targetData); // Added by Felicia
+    txTree = new TxTree(state, kmodule->targetData, &globalAddresses);
     state->txTreeNode = txTree->root;
     TxTreeGraph::initialize(txTree->root);
   }

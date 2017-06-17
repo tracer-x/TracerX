@@ -198,6 +198,11 @@ namespace klee {
     /// \brief The data layout of the analysis target program
     llvm::DataLayout *targetData;
 
+    /// Map of globals to their bound address. This also includes
+    /// globals that have no representative object (i.e. functions). This member
+    /// variable is just a pointer to the one in klee::Executor.
+    std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
+
     /// \brief Tests if a pointer points to a main function's argument
     static bool isMainArgument(const llvm::Value *loc);
 
@@ -360,7 +365,9 @@ namespace klee {
     /// \brief Flag to display debug information on the state.
     uint64_t debugStateLevel;
 
-    Dependency(Dependency *parent, llvm::DataLayout *_targetData);
+    Dependency(Dependency *parent, llvm::DataLayout *_targetData,
+               std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
+                   _globalAddresses);
 
     ~Dependency();
 

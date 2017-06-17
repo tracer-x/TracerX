@@ -757,8 +757,11 @@ void Dependency::populateArgumentValuesList(
   }
 }
 
-Dependency::Dependency(Dependency *parent, llvm::DataLayout *_targetData)
-    : parent(parent), targetData(_targetData) {
+Dependency::Dependency(
+    Dependency *parent, llvm::DataLayout *_targetData,
+    std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses)
+    : parent(parent), targetData(_targetData),
+      globalAddresses(_globalAddresses) {
   if (parent) {
     concretelyAddressedStore = parent->concretelyAddressedStore;
     concretelyAddressedStoreKeys = parent->concretelyAddressedStoreKeys;
