@@ -340,7 +340,7 @@ Dependency::getLatestValue(llvm::Value *value,
   ref<TxStateValue> ret;
 
   if (llvm::Constant *c = llvm::dyn_cast<llvm::Constant>(value)) {
-    ret = evalConstant(c);
+    ret = evalConstant(c, callHistory);
   } else {
     ret = getLatestValueNoConstantCheck(value, valueExpr, allowInconsistency);
   }
@@ -1678,19 +1678,22 @@ ref<TxStateValue> Dependency::evalConstantExpr(
   LLVM_TYPE_Q llvm::Type *type = ce->getType();
 
   ref<TxStateValue> op1(0), op2(0), op3(0);
+  ref<ConstantExpr> op1Expr(0), op2Expr(0), op3Expr(0);
 
   int numOperands = ce->getNumOperands();
 
-  if (numOperands > 0)
+  if (numOperands > 0) {
     op1 = evalConstant(ce->getOperand(0), callHistory);
-  if (numOperands > 1)
+    op1Expr = cast<ConstantExpr>(op1->getExpression());
+  }
+  if (numOperands > 1) {
     op2 = evalConstant(ce->getOperand(1), callHistory);
-  if (numOperands > 2)
+    op2Expr = cast<ConstantExpr>(op2->getExpression());
+  }
+  if (numOperands > 2) {
     op3 = evalConstant(ce->getOperand(2), callHistory);
-
-  ref<ConstantExpr> op1Expr(cast<ConstantExpr>(op1->getExpression())),
-      op2Expr(cast<ConstantExpr>(op2->getExpression())),
-      op3Expr(cast<ConstantExpr>(op3->getExpression()));
+    op3Expr = cast<ConstantExpr>(op3->getExpression());
+  }
 
   switch (ce->getOpcode()) {
   default:
