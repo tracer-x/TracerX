@@ -249,17 +249,27 @@ namespace klee {
 
     /// \brief Get a KLEE expression from a constant. This was shamelessly
     /// copied from Executor::evalConstant.
-    ref<ConstantExpr> evalConstant(const llvm::Constant *c);
+    ref<TxStateValue>
+    evalConstant(llvm::Constant *c,
+                 const std::vector<llvm::Instruction *> &callHistory);
 
     /// \brief Get a KLEE expression from a constant expression. This was
     /// shamelessly copied from Executor::evalConstantExpr.
-    ref<ConstantExpr> evalConstantExpr(const llvm::ConstantExpr *ce);
+    ref<TxStateValue>
+    evalConstantExpr(llvm::ConstantExpr *ce,
+                     const std::vector<llvm::Instruction *> &callHistory);
 
     /// \brief Gets the latest version of the location, but without checking
     /// for whether the value is constant or not.
     ref<TxStateValue>
     getLatestValueNoConstantCheck(llvm::Value *value, ref<Expr> expr,
                                   bool allowInconsistency = false) const;
+
+    /// \brief Find existing value or if not found immediately register a new
+    /// one.
+    inline ref<TxStateValue> getLatestValueNoConstantCheckOrCreate(
+        llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,
+        ref<Expr> expr);
 
     /// \brief Gets the latest pointer value for marking
     ref<TxStateValue> getLatestValueForMarking(llvm::Value *val,

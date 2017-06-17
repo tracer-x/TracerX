@@ -1614,34 +1614,64 @@ bool Dependency::boundInterpolation(llvm::Value *val) {
   return true;
 }
 
-ref<ConstantExpr> Dependency::evalConstant(const llvm::Constant *c) {
-  if (const llvm::ConstantExpr *ce = llvm::dyn_cast<llvm::ConstantExpr>(c)) {
-    return evalConstantExpr(ce);
+inline ref<TxStateValue> Dependency::getLatestValueNoConstantCheckOrCreate(
+    llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,
+    ref<Expr> expr) {
+  ref<TxStateValue> ret = getLatestValueNoConstantCheck(value, expr, true);
+  if (ret.isNull()) {
+    if (value->getType()->isPointerTy()) {
+      llvm::PointerType *ty = llvm::dyn_cast<llvm::PointerType>(
+          value->getType()->getPointerElementType());
+      uint64_t size = ty->isSized() ? targetData->getTypeStoreSize(ty) : 0;
+      return getNewPointerValue(value, callHistory, expr, size);
+    } else {
+      return getNewTxStateValue(value, callHistory, expr);
+    }
+  }
+  return ret;
+}
+
+ref<TxStateValue>
+Dependency::evalConstant(llvm::Constant *c,
+                         const std::vector<llvm::Instruction *> &callHistory) {
+  if (llvm::ConstantExpr *ce = llvm::dyn_cast<llvm::ConstantExpr>(c)) {
+    return evalConstantExpr(ce, callHistory);
   } else {
+    // We use empty call history for constants, since they are in a sense global
+    const std::vector<llvm::Instruction *> emptyCallHistory;
+
     if (const llvm::ConstantInt *ci = llvm::dyn_cast<llvm::ConstantInt>(c)) {
-      return ConstantExpr::alloc(ci->getValue());
+      return getLatestValueNoConstantCheckOrCreate(
+          c, emptyCallHistory, ConstantExpr::alloc(ci->getValue()));
     } else if (const llvm::ConstantFP *cf =
                    llvm::dyn_cast<llvm::ConstantFP>(c)) {
-      return ConstantExpr::alloc(cf->getValueAPF().bitcastToAPInt());
+      return getLatestValueNoConstantCheckOrCreate(
+          c, emptyCallHistory,
+          ConstantExpr::alloc(cf->getValueAPF().bitcastToAPInt()));
     } else if (const llvm::GlobalValue *gv =
                    llvm::dyn_cast<llvm::GlobalValue>(c)) {
-      return globalAddresses->find(gv)->second;
+      return getLatestValueNoConstantCheckOrCreate(
+          c, emptyCallHistory, globalAddresses->find(gv)->second);
     } else if (llvm::isa<llvm::ConstantPointerNull>(c)) {
-      return Expr::createPointer(0);
+      return getLatestValueNoConstantCheckOrCreate(c, emptyCallHistory,
+                                                   Expr::createPointer(0));
     } else if (llvm::isa<llvm::UndefValue>(c) ||
                llvm::isa<llvm::ConstantAggregateZero>(c)) {
-      return ConstantExpr::create(0,
-                                  targetData->getTypeSizeInBits(c->getType()));
+      return getLatestValueNoConstantCheckOrCreate(
+          c, emptyCallHistory,
+          ConstantExpr::create(0, targetData->getTypeSizeInBits(c->getType())));
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 1)
     } else if (const llvm::ConstantDataSequential *cds =
                    llvm::dyn_cast<llvm::ConstantDataSequential>(c)) {
       std::vector<ref<Expr> > kids;
       for (unsigned i = 0, e = cds->getNumElements(); i != e; ++i) {
-        ref<Expr> kid = evalConstant(cds->getElementAsConstant(i));
+        ref<Expr> kid = evalConstant(cds->getElementAsConstant(i),
+                                     emptyCallHistory)->getExpression();
         kids.push_back(kid);
       }
       ref<Expr> res = ConcatExpr::createN(kids.size(), kids.data());
-      return cast<ConstantExpr>(res);
+      return getLatestValueNoConstantCheckOrCreate(c, emptyCallHistory,
+                                                   cast<ConstantExpr>(res));
 #endif
     } else if (const llvm::ConstantStruct *cs =
                    llvm::dyn_cast<llvm::ConstantStruct>(c)) {
@@ -1649,7 +1679,8 @@ ref<ConstantExpr> Dependency::evalConstant(const llvm::Constant *c) {
       llvm::SmallVector<ref<Expr>, 4> kids;
       for (unsigned i = cs->getNumOperands(); i != 0; --i) {
         unsigned op = i - 1;
-        ref<Expr> kid = evalConstant(cs->getOperand(op));
+        ref<Expr> kid =
+            evalConstant(cs->getOperand(op), emptyCallHistory)->getExpression();
 
         uint64_t thisOffset = sl->getElementOffsetInBits(op),
                  nextOffset = (op == cs->getNumOperands() - 1)
@@ -1663,17 +1694,20 @@ ref<ConstantExpr> Dependency::evalConstant(const llvm::Constant *c) {
         kids.push_back(kid);
       }
       ref<Expr> res = ConcatExpr::createN(kids.size(), kids.data());
-      return cast<ConstantExpr>(res);
+      return getLatestValueNoConstantCheckOrCreate(c, emptyCallHistory,
+                                                   cast<ConstantExpr>(res));
     } else if (const llvm::ConstantArray *ca =
                    llvm::dyn_cast<llvm::ConstantArray>(c)) {
       llvm::SmallVector<ref<Expr>, 4> kids;
       for (unsigned i = ca->getNumOperands(); i != 0; --i) {
         unsigned op = i - 1;
-        ref<Expr> kid = evalConstant(ca->getOperand(op));
+        ref<Expr> kid =
+            evalConstant(ca->getOperand(op), emptyCallHistory)->getExpression();
         kids.push_back(kid);
       }
       ref<Expr> res = ConcatExpr::createN(kids.size(), kids.data());
-      return cast<ConstantExpr>(res);
+      return getLatestValueNoConstantCheckOrCreate(c, emptyCallHistory,
+                                                   cast<ConstantExpr>(res));
     } else {
       // Constant{Vector}
       llvm::report_fatal_error("invalid argument to evalConstant()");
@@ -1681,18 +1715,25 @@ ref<ConstantExpr> Dependency::evalConstant(const llvm::Constant *c) {
   }
 }
 
-ref<ConstantExpr> Dependency::evalConstantExpr(const llvm::ConstantExpr *ce) {
+ref<TxStateValue> Dependency::evalConstantExpr(
+    llvm::ConstantExpr *ce,
+    const std::vector<llvm::Instruction *> &callHistory) {
   LLVM_TYPE_Q llvm::Type *type = ce->getType();
 
-  ref<ConstantExpr> op1(0), op2(0), op3(0);
+  ref<TxStateValue> op1(0), op2(0), op3(0);
+
   int numOperands = ce->getNumOperands();
 
   if (numOperands > 0)
-    op1 = evalConstant(ce->getOperand(0));
+    op1 = evalConstant(ce->getOperand(0), callHistory);
   if (numOperands > 1)
-    op2 = evalConstant(ce->getOperand(1));
+    op2 = evalConstant(ce->getOperand(1), callHistory);
   if (numOperands > 2)
-    op3 = evalConstant(ce->getOperand(2));
+    op3 = evalConstant(ce->getOperand(2), callHistory);
+
+  ref<ConstantExpr> op1Expr(cast<ConstantExpr>(op1->getExpression())),
+      op2Expr(cast<ConstantExpr>(op2->getExpression())),
+      op3Expr(cast<ConstantExpr>(op3->getExpression()));
 
   switch (ce->getOpcode()) {
   default:
@@ -1701,52 +1742,124 @@ ref<ConstantExpr> Dependency::evalConstantExpr(const llvm::ConstantExpr *ce) {
                  << "opcode: " << ce->getOpcode() << "\n";
     abort();
 
-  case llvm::Instruction::Trunc:
-    return op1->Extract(0, targetData->getTypeSizeInBits(type));
-  case llvm::Instruction::ZExt:
-    return op1->ZExt(targetData->getTypeSizeInBits(type));
-  case llvm::Instruction::SExt:
-    return op1->SExt(targetData->getTypeSizeInBits(type));
-  case llvm::Instruction::Add:
-    return op1->Add(op2);
-  case llvm::Instruction::Sub:
-    return op1->Sub(op2);
-  case llvm::Instruction::Mul:
-    return op1->Mul(op2);
-  case llvm::Instruction::SDiv:
-    return op1->SDiv(op2);
-  case llvm::Instruction::UDiv:
-    return op1->UDiv(op2);
-  case llvm::Instruction::SRem:
-    return op1->SRem(op2);
-  case llvm::Instruction::URem:
-    return op1->URem(op2);
-  case llvm::Instruction::And:
-    return op1->And(op2);
-  case llvm::Instruction::Or:
-    return op1->Or(op2);
-  case llvm::Instruction::Xor:
-    return op1->Xor(op2);
-  case llvm::Instruction::Shl:
-    return op1->Shl(op2);
-  case llvm::Instruction::LShr:
-    return op1->LShr(op2);
-  case llvm::Instruction::AShr:
-    return op1->AShr(op2);
-  case llvm::Instruction::BitCast:
-    return op1;
+  case llvm::Instruction::Trunc: {
+    ref<Expr> expr = op1Expr->Extract(0, targetData->getTypeSizeInBits(type));
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::ZExt: {
+    ref<Expr> expr = op1Expr->ZExt(targetData->getTypeSizeInBits(type));
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::SExt: {
+    ref<Expr> expr = op1Expr->SExt(targetData->getTypeSizeInBits(type));
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::Add: {
+    ref<Expr> expr = op1Expr->Add(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::Sub: {
+    ref<Expr> expr = op1Expr->Sub(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::Mul: {
+    ref<Expr> expr = op1Expr->Mul(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::SDiv: {
+    ref<Expr> expr = op1Expr->SDiv(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::UDiv: {
+    ref<Expr> expr = op1Expr->UDiv(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::SRem: {
+    ref<Expr> expr = op1Expr->SRem(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::URem: {
+    ref<Expr> expr = op1Expr->URem(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::And: {
+    ref<Expr> expr = op1Expr->And(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::Or: {
+    ref<Expr> expr = op1Expr->Or(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::Xor: {
+    ref<Expr> expr = op1Expr->Xor(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::Shl: {
+    ref<Expr> expr = op1Expr->Shl(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::LShr: {
+    ref<Expr> expr = op1Expr->LShr(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::AShr: {
+    ref<Expr> expr = op1Expr->AShr(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::BitCast: { return op1; }
 
-  case llvm::Instruction::IntToPtr:
-    return op1->ZExt(targetData->getTypeSizeInBits(type));
-
-  case llvm::Instruction::PtrToInt:
-    return op1->ZExt(targetData->getTypeSizeInBits(type));
-
+  case llvm::Instruction::IntToPtr: {
+    ref<Expr> expr = op1Expr->ZExt(targetData->getTypeSizeInBits(type));
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::PtrToInt: {
+    ref<Expr> expr = op1Expr->ZExt(targetData->getTypeSizeInBits(type));
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
   case llvm::Instruction::GetElementPtr: {
-    ref<ConstantExpr> base = op1->ZExt(Context::get().getPointerWidth());
+    ref<ConstantExpr> base = op1Expr->ZExt(Context::get().getPointerWidth());
+    ref<ConstantExpr> offset =
+        ConstantExpr::alloc(0, Context::get().getPointerWidth());
 
     for (gep_type_iterator ii = gep_type_begin(ce), ie = gep_type_end(ce);
          ii != ie; ++ii) {
+      ;
       ref<ConstantExpr> addend =
           ConstantExpr::alloc(0, Context::get().getPointerWidth());
 
@@ -1760,8 +1873,9 @@ ref<ConstantExpr> Dependency::evalConstantExpr(const llvm::ConstantExpr *ce) {
             Context::get().getPointerWidth());
       } else {
         const llvm::SequentialType *set = cast<llvm::SequentialType>(*ii);
-        ref<ConstantExpr> index =
-            evalConstant(cast<llvm::Constant>(ii.getOperand()));
+        ref<ConstantExpr> index = cast<ConstantExpr>(
+            evalConstant(cast<llvm::Constant>(ii.getOperand()), callHistory)
+                ->getExpression());
         unsigned elementSize =
             targetData->getTypeStoreSize(set->getElementType());
 
@@ -1770,42 +1884,87 @@ ref<ConstantExpr> Dependency::evalConstantExpr(const llvm::ConstantExpr *ce) {
             ConstantExpr::alloc(elementSize, Context::get().getPointerWidth()));
       }
 
+      offset = offset->Add(addend);
       base = base->Add(addend);
     }
 
-    return base;
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, base);
+    addDependencyWithOffset(op1, ret, offset);
+    return ret;
   }
 
   case llvm::Instruction::ICmp: {
     switch (ce->getPredicate()) {
-    default:
-      assert(0 && "unhandled ICmp predicate");
-    case llvm::ICmpInst::ICMP_EQ:
-      return op1->Eq(op2);
-    case llvm::ICmpInst::ICMP_NE:
-      return op1->Ne(op2);
-    case llvm::ICmpInst::ICMP_UGT:
-      return op1->Ugt(op2);
-    case llvm::ICmpInst::ICMP_UGE:
-      return op1->Uge(op2);
-    case llvm::ICmpInst::ICMP_ULT:
-      return op1->Ult(op2);
-    case llvm::ICmpInst::ICMP_ULE:
-      return op1->Ule(op2);
-    case llvm::ICmpInst::ICMP_SGT:
-      return op1->Sgt(op2);
-    case llvm::ICmpInst::ICMP_SGE:
-      return op1->Sge(op2);
-    case llvm::ICmpInst::ICMP_SLT:
-      return op1->Slt(op2);
-    case llvm::ICmpInst::ICMP_SLE:
-      return op1->Sle(op2);
+    default: { assert(0 && "unhandled ICmp predicate"); }
+    case llvm::ICmpInst::ICMP_EQ: {
+      ref<Expr> expr = op1Expr->Eq(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_NE: {
+      ref<Expr> expr = op1Expr->Ne(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_UGT: {
+      ref<Expr> expr = op1Expr->Ugt(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_UGE: {
+      ref<Expr> expr = op1Expr->Uge(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_ULT: {
+      ref<Expr> expr = op1Expr->Ult(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_ULE: {
+      ref<Expr> expr = op1Expr->Ule(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_SGT: {
+      ref<Expr> expr = op1Expr->Sgt(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_SGE: {
+      ref<Expr> expr = op1Expr->Sge(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_SLT: {
+      ref<Expr> expr = op1Expr->Slt(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_SLE: {
+      ref<Expr> expr = op1Expr->Sle(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
     }
   }
 
-  case llvm::Instruction::Select:
-    return op1->isTrue() ? op2 : op3;
-
+  case llvm::Instruction::Select: {
+    ref<Expr> expr = op1Expr->isTrue() ? op2Expr : op3Expr;
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
   case llvm::Instruction::FAdd:
   case llvm::Instruction::FSub:
   case llvm::Instruction::FMul:
@@ -1817,8 +1976,9 @@ ref<ConstantExpr> Dependency::evalConstantExpr(const llvm::ConstantExpr *ce) {
   case llvm::Instruction::SIToFP:
   case llvm::Instruction::FPToUI:
   case llvm::Instruction::FPToSI:
-  case llvm::Instruction::FCmp:
+  case llvm::Instruction::FCmp: {
     assert(0 && "floating point ConstantExprs unsupported");
+  }
   }
 }
 
