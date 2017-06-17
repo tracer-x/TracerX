@@ -336,56 +336,14 @@ Dependency::getLatestValue(llvm::Value *value,
                            const std::vector<llvm::Instruction *> &callHistory,
                            ref<Expr> valueExpr, bool allowInconsistency) {
   assert(value && !valueExpr.isNull() && "value cannot be null");
-  if (llvm::ConstantExpr *cvalue = llvm::dyn_cast<llvm::ConstantExpr>(value)) {
-    switch (cvalue->getOpcode()) {
-    case llvm::Instruction::GetElementPtr: {
-      uint64_t offset = 0, size = 0;
 
-      // getelementptr may be cascading, so we loop
-      do {
-        if (cvalue->getNumOperands() >= 2) {
-          if (llvm::ConstantInt *idx =
-                  llvm::dyn_cast<llvm::ConstantInt>(cvalue->getOperand(1))) {
-            offset += idx->getLimitedValue();
-          }
-        }
-        llvm::Value *ptrOp = cvalue->getOperand(0);
-        llvm::Type *pointerElementType =
-            ptrOp->getType()->getPointerElementType();
+  ref<TxStateValue> ret;
 
-        size = pointerElementType->isSized()
-                   ? targetData->getTypeStoreSize(pointerElementType)
-                   : 0;
-
-        cvalue = llvm::dyn_cast<llvm::ConstantExpr>(ptrOp);
-      } while (cvalue &&
-               cvalue->getOpcode() == llvm::Instruction::GetElementPtr);
-      return getNewPointerValue(value, callHistory, valueExpr, size);
-    }
-    case llvm::Instruction::IntToPtr: {
-      // 0 signifies unknown size
-      return getNewPointerValue(value, callHistory, valueExpr, 0);
-    }
-    case llvm::Instruction::BitCast: {
-      return getLatestValue(cvalue->getOperand(0), callHistory, valueExpr,
-                            allowInconsistency);
-    }
-    default:
-      break;
-    }
+  if (llvm::Constant *c = llvm::dyn_cast<llvm::Constant>(value)) {
+    ret = evalConstant(c);
+  } else {
+    ret = getLatestValueNoConstantCheck(value, valueExpr, allowInconsistency);
   }
-
-  // A global value is a constant: Its value is constant throughout execution,
-  // but
-  // indeterministic. In case this was a non-global-value (normal) constant, we
-  // immediately return with a versioned value, as dependencies are not
-  // important. However, the dependencies of global values should be searched
-  // for in the ancestors (later) as they need to be consistent in an execution.
-  if (llvm::isa<llvm::Constant>(value) && !llvm::isa<llvm::GlobalValue>(value))
-    return getNewTxStateValue(value, callHistory, valueExpr);
-
-  ref<TxStateValue> ret =
-      getLatestValueNoConstantCheck(value, valueExpr, allowInconsistency);
 
   if (ret.isNull()) {
     if (llvm::GlobalValue *gv = llvm::dyn_cast<llvm::GlobalValue>(value)) {
@@ -1620,8 +1578,7 @@ inline ref<TxStateValue> Dependency::getLatestValueNoConstantCheckOrCreate(
   ref<TxStateValue> ret = getLatestValueNoConstantCheck(value, expr, true);
   if (ret.isNull()) {
     if (value->getType()->isPointerTy()) {
-      llvm::PointerType *ty = llvm::dyn_cast<llvm::PointerType>(
-          value->getType()->getPointerElementType());
+      llvm::Type *ty = value->getType()->getPointerElementType();
       uint64_t size = ty->isSized() ? targetData->getTypeStoreSize(ty) : 0;
       return getNewPointerValue(value, callHistory, expr, size);
     } else {
