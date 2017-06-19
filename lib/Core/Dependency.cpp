@@ -15,11 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "Dependency.h"
+#include "Context.h"
 #include "ShadowArray.h"
 #include "TxPrintUtil.h"
 
 #include "klee/CommandLine.h"
 #include "klee/Internal/Support/ErrorHandling.h"
+#include "klee/util/GetElementPtrTypeIterator.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
@@ -332,121 +334,29 @@ void Dependency::getStoredExpressions(
 ref<TxStateValue>
 Dependency::getLatestValue(llvm::Value *value,
                            const std::vector<llvm::Instruction *> &callHistory,
-                           ref<Expr> valueExpr, bool constraint) {
+                           ref<Expr> valueExpr, bool allowInconsistency) {
   assert(value && !valueExpr.isNull() && "value cannot be null");
-  if (llvm::ConstantExpr *cvalue = llvm::dyn_cast<llvm::ConstantExpr>(value)) {
-    switch (cvalue->getOpcode()) {
-    case llvm::Instruction::GetElementPtr: {
-      uint64_t offset = 0, size = 0;
 
-      // getelementptr may be cascading, so we loop
-      do {
-        if (cvalue->getNumOperands() >= 2) {
-          if (llvm::ConstantInt *idx =
-                  llvm::dyn_cast<llvm::ConstantInt>(cvalue->getOperand(1))) {
-            offset += idx->getLimitedValue();
-          }
-        }
-        llvm::Value *ptrOp = cvalue->getOperand(0);
-        llvm::Type *pointerElementType =
-            ptrOp->getType()->getPointerElementType();
+  ref<TxStateValue> ret;
 
-        size = pointerElementType->isSized()
-                   ? targetData->getTypeStoreSize(pointerElementType)
-                   : 0;
-
-        cvalue = llvm::dyn_cast<llvm::ConstantExpr>(ptrOp);
-      } while (cvalue &&
-               cvalue->getOpcode() == llvm::Instruction::GetElementPtr);
-      return getNewPointerValue(value, callHistory, valueExpr, size);
-    }
-    case llvm::Instruction::IntToPtr: {
-      // 0 signifies unknown size
-      return getNewPointerValue(value, callHistory, valueExpr, 0);
-    }
-    case llvm::Instruction::BitCast: {
-      return getLatestValue(cvalue->getOperand(0), callHistory, valueExpr,
-                            constraint);
-    }
-    default:
-      break;
-    }
+  if (llvm::Constant *c = llvm::dyn_cast<llvm::Constant>(value)) {
+    ref<TxStateValue> dummyBase;
+    ret = evalConstant(c, callHistory, dummyBase);
+  } else {
+    ret = getLatestValueNoConstantCheck(value, valueExpr, allowInconsistency);
   }
 
-  // A global value is a constant: Its value is constant throughout execution,
-  // but
-  // indeterministic. In case this was a non-global-value (normal) constant, we
-  // immediately return with a versioned value, as dependencies are not
-  // important. However, the dependencies of global values should be searched
-  // for in the ancestors (later) as they need to be consistent in an execution.
-  if (llvm::isa<llvm::Constant>(value) && !llvm::isa<llvm::GlobalValue>(value))
-    return getNewTxStateValue(value, callHistory, valueExpr);
-
-  if (valuesMap.find(value) != valuesMap.end()) {
-    // Slight complication here that the latest version of an LLVM
-    // value may not be at the end of the vector; it is possible other
-    // values in a call stack has been appended to the vector, before
-    // the function returned, so the end part of the vector contains
-    // local values in a call already returned. To resolve this issue,
-    // here we naively search for values with equivalent expression.
-    std::vector<ref<TxStateValue> > allValues = valuesMap[value];
-
-    // In case this was for adding constraints, simply assume the
-    // latest value is the one. This is due to the difficulty in
-    // that the constraint in valueExpr is already processed into
-    // a different syntax.
-    if (constraint)
-      return allValues.back();
-
-    for (std::vector<ref<TxStateValue> >::reverse_iterator
-             it = allValues.rbegin(),
-             ie = allValues.rend();
-         it != ie; ++it) {
-      ref<Expr> e = (*it)->getExpression();
-      if (e == valueExpr)
-        return *it;
-    }
-  }
-
-  ref<TxStateValue> ret = 0;
-  if (parent)
-    ret = parent->getLatestValue(value, callHistory, valueExpr, constraint);
-
-  if (ret.isNull()) {
-    if (llvm::GlobalValue *gv = llvm::dyn_cast<llvm::GlobalValue>(value)) {
-      // We could not find the global value: we register it anew.
-      if (gv->getType()->isPointerTy()) {
-        uint64_t size = 0;
-        if (gv->getType()->getPointerElementType()->isSized())
-          size = targetData->getTypeStoreSize(
-              gv->getType()->getPointerElementType());
-        ret = getNewPointerValue(value, callHistory, valueExpr, size);
-      } else {
-        ret = getNewTxStateValue(value, callHistory, valueExpr);
-      }
-    } else {
-      llvm::StringRef name(value->getName());
-      if (name.str() == "argc") {
-        ret = getNewTxStateValue(value, callHistory, valueExpr);
-      } else if (name.str() == "this" && value->getType()->isPointerTy()) {
-        // For C++ "this" variable that is not found
-        if (value->getType()->getPointerElementType()->isSized()) {
-          uint64_t size = targetData->getTypeStoreSize(
-              value->getType()->getPointerElementType());
-          ret = getNewPointerValue(value, callHistory, valueExpr, size);
-        }
-      }
-    }
-  }
   return ret;
 }
 
-ref<TxStateValue>
-Dependency::getLatestValueNoConstantCheck(llvm::Value *value,
-                                          ref<Expr> valueExpr) {
+ref<TxStateValue> Dependency::getLatestValueNoConstantCheck(
+    llvm::Value *value, ref<Expr> valueExpr, bool allowInconsistency) const {
   assert(value && "value cannot be null");
 
-  if (valuesMap.find(value) != valuesMap.end()) {
+  std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::const_iterator
+  valuesMapIter = valuesMap.find(value);
+
+  if (valuesMapIter != valuesMap.end()) {
     if (!valueExpr.isNull()) {
       // Slight complication here that the latest version of an LLVM
       // value may not be at the end of the vector; it is possible other
@@ -454,9 +364,16 @@ Dependency::getLatestValueNoConstantCheck(llvm::Value *value,
       // the function returned, so the end part of the vector contains
       // local values in a call already returned. To resolve this issue,
       // here we naively search for values with equivalent expression.
-      std::vector<ref<TxStateValue> > allValues = valuesMap[value];
+      const std::vector<ref<TxStateValue> > &allValues = valuesMapIter->second;
 
-      for (std::vector<ref<TxStateValue> >::reverse_iterator
+      // In case this was for adding constraints, simply assume the
+      // latest value is the one without checking for its consistency. This is
+      // due to the difficulty in that the constraint in valueExpr is already
+      // processed into a different syntax (a negation of the original value).
+      if (allowInconsistency)
+        return allValues.back();
+
+      for (std::vector<ref<TxStateValue> >::const_reverse_iterator
                it = allValues.rbegin(),
                ie = allValues.rend();
            it != ie; ++it) {
@@ -465,12 +382,13 @@ Dependency::getLatestValueNoConstantCheck(llvm::Value *value,
           return *it;
       }
     } else {
-      return valuesMap[value].back();
+      return valuesMapIter->second.back();
     }
   }
 
   if (parent)
-    return parent->getLatestValueNoConstantCheck(value, valueExpr);
+    return parent->getLatestValueNoConstantCheck(value, valueExpr,
+                                                 allowInconsistency);
 
   return 0;
 }
@@ -540,7 +458,7 @@ void Dependency::addDependencyIntToPtr(ref<TxStateValue> source,
 
   std::set<ref<TxStateAddress> > locations = source->getLocations();
   ref<Expr> targetExpr(ZExtExpr::create(target->getExpression(),
-                                        Expr::createPointer(0)->getWidth()));
+                                        Context::get().getPointerWidth()));
   for (std::set<ref<TxStateAddress> >::iterator it = locations.begin(),
                                                 ie = locations.end();
        it != ie; ++it) {
@@ -774,8 +692,11 @@ void Dependency::populateArgumentValuesList(
   }
 }
 
-Dependency::Dependency(Dependency *parent, llvm::DataLayout *_targetData)
-    : parent(parent), targetData(_targetData) {
+Dependency::Dependency(
+    Dependency *parent, llvm::DataLayout *_targetData,
+    std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses)
+    : parent(parent), targetData(_targetData),
+      globalAddresses(_globalAddresses) {
   if (parent) {
     concretelyAddressedStore = parent->concretelyAddressedStore;
     concretelyAddressedStoreKeys = parent->concretelyAddressedStoreKeys;
@@ -1505,50 +1426,14 @@ void Dependency::executeMemoryOperation(
     }
     }
 
-    if (SpecialFunctionBoundInterpolation) {
-      // Limit interpolation to only within function tracerx_check
-      ref<TxStateValue> val(getLatestValueForMarking(addressOperand, address));
-      if (llvm::isa<llvm::LoadInst>(instr) && !val->getLocations().empty()) {
-        std::set<ref<TxStateAddress> > locations(val->getLocations());
-        for (std::set<ref<TxStateAddress> >::iterator it = locations.begin(),
-                                                      ie = locations.end();
-             it != ie; ++it) {
-          if (llvm::ConstantExpr *ce = llvm::dyn_cast<llvm::ConstantExpr>(
-                  (*it)->getContext()->getValue())) {
-            if (ce->getOpcode() == llvm::Instruction::GetElementPtr) {
-              std::string reason = "";
-              if (debugSubsumptionLevel >= 1) {
-                llvm::raw_string_ostream stream(reason);
-                stream << "pointer use [";
-                if (instr->getParent()->getParent()) {
-                  stream << instr->getParent()->getParent()->getName().str()
-                         << ": ";
-                }
-                if (llvm::MDNode *n = instr->getMetadata("dbg")) {
-                  llvm::DILocation loc(n);
-                  stream << "Line " << loc.getLineNumber();
-                }
-                stream << "]";
-                stream.flush();
-              }
-              if (ExactAddressInterpolant) {
-                markAllValues(addressOperand, address, reason);
-              } else {
-                markAllPointerValues(addressOperand, address, reason);
-              }
-              break;
-            }
-          }
-        }
-      }
-    } else {
+    ref<TxStateValue> val(getLatestValueForMarking(addressOperand, address));
+    if (!val->getLocations().empty()) {
+      std::set<ref<TxStateAddress> > locations(val->getLocations());
       std::string reason = "";
-      if (debugSubsumptionLevel >= 1) {
+      if (debugSubsumptionLevel > 1) {
         llvm::raw_string_ostream stream(reason);
         stream << "pointer use [";
-        if (instr->getParent()->getParent()) {
-          stream << instr->getParent()->getParent()->getName().str() << ": ";
-        }
+        stream << instr->getParent()->getParent()->getName().str() << ": ";
         if (llvm::MDNode *n = instr->getMetadata("dbg")) {
           llvm::DILocation loc(n);
           stream << "Line " << loc.getLineNumber();
@@ -1660,6 +1545,410 @@ bool Dependency::boundInterpolation(llvm::Value *val) {
     return false;
   }
   return true;
+}
+
+inline ref<TxStateValue> Dependency::getLatestValueNoConstantCheckOrCreate(
+    llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,
+    ref<Expr> expr) {
+  ref<TxStateValue> ret = getLatestValueNoConstantCheck(value, expr, true);
+  if (ret.isNull()) {
+    if (value->getType()->isPointerTy()) {
+      llvm::Type *ty = value->getType()->getPointerElementType();
+      uint64_t size = ty->isSized() ? targetData->getTypeStoreSize(ty) : 0;
+      return getNewPointerValue(value, callHistory, expr, size);
+    } else {
+      return getNewTxStateValue(value, callHistory, expr);
+    }
+  }
+  return ret;
+}
+
+ref<TxStateValue>
+Dependency::evalConstant(llvm::Constant *c,
+                         const std::vector<llvm::Instruction *> &callHistory,
+                         ref<TxStateValue> &base) {
+  if (llvm::ConstantExpr *ce = llvm::dyn_cast<llvm::ConstantExpr>(c)) {
+    return evalConstantExpr(ce, callHistory, base);
+  } else {
+    // We use empty call history for constants, since they are in a sense global
+    const std::vector<llvm::Instruction *> emptyCallHistory;
+
+    if (const llvm::ConstantInt *ci = llvm::dyn_cast<llvm::ConstantInt>(c)) {
+      base = getLatestValueNoConstantCheckOrCreate(
+          c, emptyCallHistory, ConstantExpr::alloc(ci->getValue()));
+      return base;
+    } else if (const llvm::ConstantFP *cf =
+                   llvm::dyn_cast<llvm::ConstantFP>(c)) {
+      base = getLatestValueNoConstantCheckOrCreate(
+          c, emptyCallHistory,
+          ConstantExpr::alloc(cf->getValueAPF().bitcastToAPInt()));
+      return base;
+    } else if (const llvm::GlobalValue *gv =
+                   llvm::dyn_cast<llvm::GlobalValue>(c)) {
+      base = getLatestValueNoConstantCheckOrCreate(
+          c, emptyCallHistory, globalAddresses->find(gv)->second);
+      return base;
+    } else if (llvm::isa<llvm::ConstantPointerNull>(c)) {
+      base = getLatestValueNoConstantCheckOrCreate(c, emptyCallHistory,
+                                                   Expr::createPointer(0));
+      return base;
+    } else if (llvm::isa<llvm::UndefValue>(c) ||
+               llvm::isa<llvm::ConstantAggregateZero>(c)) {
+      base = getLatestValueNoConstantCheckOrCreate(
+          c, emptyCallHistory,
+          ConstantExpr::create(0, targetData->getTypeSizeInBits(c->getType())));
+      return base;
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 1)
+    } else if (const llvm::ConstantDataSequential *cds =
+                   llvm::dyn_cast<llvm::ConstantDataSequential>(c)) {
+      std::vector<ref<Expr> > kids;
+      for (unsigned i = 0, e = cds->getNumElements(); i != e; ++i) {
+        ref<TxStateValue> dummyBase;
+        ref<Expr> kid =
+            evalConstant(cds->getElementAsConstant(i), emptyCallHistory,
+                         dummyBase)->getExpression();
+        kids.push_back(kid);
+      }
+      base = getLatestValueNoConstantCheckOrCreate(
+          c, emptyCallHistory,
+          cast<ConstantExpr>(ConcatExpr::createN(kids.size(), kids.data())));
+      return base;
+#endif
+    } else if (const llvm::ConstantStruct *cs =
+                   llvm::dyn_cast<llvm::ConstantStruct>(c)) {
+      const llvm::StructLayout *sl = targetData->getStructLayout(cs->getType());
+      llvm::SmallVector<ref<Expr>, 4> kids;
+      for (unsigned i = cs->getNumOperands(); i != 0; --i) {
+        unsigned op = i - 1;
+        ref<TxStateValue> dummyBase;
+        ref<Expr> kid = evalConstant(cs->getOperand(op), emptyCallHistory,
+                                     dummyBase)->getExpression();
+
+        uint64_t thisOffset = sl->getElementOffsetInBits(op),
+                 nextOffset = (op == cs->getNumOperands() - 1)
+                                  ? sl->getSizeInBits()
+                                  : sl->getElementOffsetInBits(op + 1);
+        if (nextOffset - thisOffset > kid->getWidth()) {
+          uint64_t paddingWidth = nextOffset - thisOffset - kid->getWidth();
+          kids.push_back(ConstantExpr::create(0, paddingWidth));
+        }
+
+        kids.push_back(kid);
+      }
+      base = getLatestValueNoConstantCheckOrCreate(
+          c, emptyCallHistory,
+          cast<ConstantExpr>(ConcatExpr::createN(kids.size(), kids.data())));
+      return base;
+    } else if (const llvm::ConstantArray *ca =
+                   llvm::dyn_cast<llvm::ConstantArray>(c)) {
+      llvm::SmallVector<ref<Expr>, 4> kids;
+      for (unsigned i = ca->getNumOperands(); i != 0; --i) {
+        unsigned op = i - 1;
+        ref<TxStateValue> dummyBase;
+        ref<Expr> kid = evalConstant(ca->getOperand(op), emptyCallHistory,
+                                     dummyBase)->getExpression();
+        kids.push_back(kid);
+      }
+      base = getLatestValueNoConstantCheckOrCreate(
+          c, emptyCallHistory,
+          cast<ConstantExpr>(ConcatExpr::createN(kids.size(), kids.data())));
+      return base;
+    } else {
+      // Constant{Vector}
+      llvm::report_fatal_error("invalid argument to evalConstant()");
+    }
+  }
+}
+
+ref<TxStateValue> Dependency::evalConstantExpr(
+    llvm::ConstantExpr *ce, const std::vector<llvm::Instruction *> &callHistory,
+    ref<TxStateValue> &base) {
+  LLVM_TYPE_Q llvm::Type *type = ce->getType();
+
+  ref<TxStateValue> op1(0), op2(0), op3(0);
+  ref<ConstantExpr> op1Expr(0), op2Expr(0), op3Expr(0);
+
+  int numOperands = ce->getNumOperands();
+
+  if (numOperands > 0) {
+    op1 = evalConstant(ce->getOperand(0), callHistory, base);
+    op1Expr = cast<ConstantExpr>(op1->getExpression());
+  }
+  if (numOperands > 1) {
+    ref<TxStateValue> dummyBase;
+    op2 = evalConstant(ce->getOperand(1), callHistory, dummyBase);
+    op2Expr = cast<ConstantExpr>(op2->getExpression());
+  }
+  if (numOperands > 2) {
+    ref<TxStateValue> dummyBase;
+    op3 = evalConstant(ce->getOperand(2), callHistory, dummyBase);
+    op3Expr = cast<ConstantExpr>(op3->getExpression());
+  }
+
+  switch (ce->getOpcode()) {
+  default:
+    ce->dump();
+    llvm::errs() << "error: unknown ConstantExpr type\n"
+                 << "opcode: " << ce->getOpcode() << "\n";
+    abort();
+
+  case llvm::Instruction::Trunc: {
+    ref<Expr> expr = op1Expr->Extract(0, targetData->getTypeSizeInBits(type));
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::ZExt: {
+    ref<Expr> expr = op1Expr->ZExt(targetData->getTypeSizeInBits(type));
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::SExt: {
+    ref<Expr> expr = op1Expr->SExt(targetData->getTypeSizeInBits(type));
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::Add: {
+    ref<Expr> expr = op1Expr->Add(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::Sub: {
+    ref<Expr> expr = op1Expr->Sub(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::Mul: {
+    ref<Expr> expr = op1Expr->Mul(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::SDiv: {
+    ref<Expr> expr = op1Expr->SDiv(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::UDiv: {
+    ref<Expr> expr = op1Expr->UDiv(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::SRem: {
+    ref<Expr> expr = op1Expr->SRem(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::URem: {
+    ref<Expr> expr = op1Expr->URem(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::And: {
+    ref<Expr> expr = op1Expr->And(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::Or: {
+    ref<Expr> expr = op1Expr->Or(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::Xor: {
+    ref<Expr> expr = op1Expr->Xor(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::Shl: {
+    ref<Expr> expr = op1Expr->Shl(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::LShr: {
+    ref<Expr> expr = op1Expr->LShr(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::AShr: {
+    ref<Expr> expr = op1Expr->AShr(op2Expr);
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::BitCast: {
+    ref<Expr> expr = op1Expr;
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+
+  case llvm::Instruction::IntToPtr: {
+    ref<Expr> expr = op1Expr->ZExt(targetData->getTypeSizeInBits(type));
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::PtrToInt: {
+    ref<Expr> expr = op1Expr->ZExt(targetData->getTypeSizeInBits(type));
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::GetElementPtr: {
+    ref<ConstantExpr> op1Base = op1Expr->ZExt(Context::get().getPointerWidth());
+    ref<ConstantExpr> offset =
+        ConstantExpr::alloc(0, Context::get().getPointerWidth());
+
+    for (gep_type_iterator ii = gep_type_begin(ce), ie = gep_type_end(ce);
+         ii != ie; ++ii) {
+      ;
+      ref<ConstantExpr> addend =
+          ConstantExpr::alloc(0, Context::get().getPointerWidth());
+
+      if (LLVM_TYPE_Q llvm::StructType *st =
+              llvm::dyn_cast<llvm::StructType>(*ii)) {
+        const llvm::StructLayout *sl = targetData->getStructLayout(st);
+        const llvm::ConstantInt *ci = cast<llvm::ConstantInt>(ii.getOperand());
+
+        addend = ConstantExpr::alloc(
+            sl->getElementOffset((unsigned)ci->getZExtValue()),
+            Context::get().getPointerWidth());
+      } else {
+        const llvm::SequentialType *set = cast<llvm::SequentialType>(*ii);
+        ref<TxStateValue> dummyBase;
+        ref<ConstantExpr> index = cast<ConstantExpr>(
+            evalConstant(cast<llvm::Constant>(ii.getOperand()), callHistory,
+                         dummyBase)->getExpression());
+
+        // FIXME: The following is to handle the case of having -1 as the index.
+        // This means that we are actually referring to the base of the struct
+        // where the variable is a member of. Here we make an assumption that
+        // this was the innermost constant, which may not be true in all
+        // circumstances, but true in case of of the getelementptr expression
+        // appearing in test/Runtime/POSIX/DirConsistency.c.
+        if (index == ConstantExpr::alloc(-1, index->getWidth())) {
+          op1 = base;
+          op1Base = cast<ConstantExpr>(base->getExpression());
+          offset = ConstantExpr::alloc(0, Context::get().getPointerWidth());
+          continue;
+        }
+        unsigned elementSize =
+            targetData->getTypeStoreSize(set->getElementType());
+
+        index = index->ZExt(Context::get().getPointerWidth());
+        addend = index->Mul(
+            ConstantExpr::alloc(elementSize, Context::get().getPointerWidth()));
+      }
+
+      offset = offset->Add(addend);
+      op1Base = op1Base->Add(addend);
+    }
+
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, op1Base);
+    addDependencyWithOffset(op1, ret, offset);
+    return ret;
+  }
+
+  case llvm::Instruction::ICmp: {
+    switch (ce->getPredicate()) {
+    default: { assert(0 && "unhandled ICmp predicate"); }
+    case llvm::ICmpInst::ICMP_EQ: {
+      ref<Expr> expr = op1Expr->Eq(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_NE: {
+      ref<Expr> expr = op1Expr->Ne(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_UGT: {
+      ref<Expr> expr = op1Expr->Ugt(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_UGE: {
+      ref<Expr> expr = op1Expr->Uge(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_ULT: {
+      ref<Expr> expr = op1Expr->Ult(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_ULE: {
+      ref<Expr> expr = op1Expr->Ule(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_SGT: {
+      ref<Expr> expr = op1Expr->Sgt(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_SGE: {
+      ref<Expr> expr = op1Expr->Sge(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_SLT: {
+      ref<Expr> expr = op1Expr->Slt(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    case llvm::ICmpInst::ICMP_SLE: {
+      ref<Expr> expr = op1Expr->Sle(op2Expr);
+      ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+      addDependency(op1, ret);
+      return ret;
+    }
+    }
+  }
+
+  case llvm::Instruction::Select: {
+    ref<Expr> expr = op1Expr->isTrue() ? op2Expr : op3Expr;
+    ref<TxStateValue> ret = getNewTxStateValue(ce, callHistory, expr);
+    addDependency(op1, ret);
+    return ret;
+  }
+  case llvm::Instruction::FAdd:
+  case llvm::Instruction::FSub:
+  case llvm::Instruction::FMul:
+  case llvm::Instruction::FDiv:
+  case llvm::Instruction::FRem:
+  case llvm::Instruction::FPTrunc:
+  case llvm::Instruction::FPExt:
+  case llvm::Instruction::UIToFP:
+  case llvm::Instruction::SIToFP:
+  case llvm::Instruction::FPToUI:
+  case llvm::Instruction::FPToSI:
+  case llvm::Instruction::FCmp: {
+    assert(0 && "floating point ConstantExprs unsupported");
+  }
+  }
 }
 
 /// \brief Print the content of the object to the LLVM error stream

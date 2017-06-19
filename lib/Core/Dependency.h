@@ -21,11 +21,13 @@
 #include "klee/Internal/Module/TxValues.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Value.h>
 #else
+#include <llvm/Constants.h>
 #include <llvm/Function.h>
 #include <llvm/Instruction.h>
 #include <llvm/Instructions.h>
@@ -198,6 +200,11 @@ namespace klee {
     /// \brief The data layout of the analysis target program
     llvm::DataLayout *targetData;
 
+    /// Map of globals to their bound address. This also includes
+    /// globals that have no representative object (i.e. functions). This member
+    /// variable is just a pointer to the one in klee::Executor.
+    std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
+
     /// \brief Tests if a pointer points to a main function's argument
     static bool isMainArgument(const llvm::Value *loc);
 
@@ -240,10 +247,31 @@ namespace klee {
       return registerNewTxStateValue(value, vvalue);
     }
 
+    /// \brief Get a KLEE expression from a constant. This was shamelessly
+    /// copied from Executor::evalConstant.
+    ref<TxStateValue>
+    evalConstant(llvm::Constant *c,
+                 const std::vector<llvm::Instruction *> &callHistory,
+                 ref<TxStateValue> &base);
+
+    /// \brief Get a KLEE expression from a constant expression. This was
+    /// shamelessly copied from Executor::evalConstantExpr.
+    ref<TxStateValue>
+    evalConstantExpr(llvm::ConstantExpr *ce,
+                     const std::vector<llvm::Instruction *> &callHistory,
+                     ref<TxStateValue> &base);
+
     /// \brief Gets the latest version of the location, but without checking
     /// for whether the value is constant or not.
-    ref<TxStateValue> getLatestValueNoConstantCheck(llvm::Value *value,
-                                                    ref<Expr> expr);
+    ref<TxStateValue>
+    getLatestValueNoConstantCheck(llvm::Value *value, ref<Expr> expr,
+                                  bool allowInconsistency = false) const;
+
+    /// \brief Find existing value or if not found immediately register a new
+    /// one.
+    inline ref<TxStateValue> getLatestValueNoConstantCheckOrCreate(
+        llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,
+        ref<Expr> expr);
 
     /// \brief Gets the latest pointer value for marking
     ref<TxStateValue> getLatestValueForMarking(llvm::Value *val,
@@ -359,7 +387,9 @@ namespace klee {
     /// \brief Flag to display debug information on the state.
     uint64_t debugStateLevel;
 
-    Dependency(Dependency *parent, llvm::DataLayout *_targetData);
+    Dependency(Dependency *parent, llvm::DataLayout *_targetData,
+               std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
+                   _globalAddresses);
 
     ~Dependency();
 
@@ -368,7 +398,7 @@ namespace klee {
     ref<TxStateValue>
     getLatestValue(llvm::Value *value,
                    const std::vector<llvm::Instruction *> &callHistory,
-                   ref<Expr> valueExpr, bool constraint = false);
+                   ref<Expr> valueExpr, bool allowInconsistency = false);
 
     /// \brief Abstract dependency state transition with argument(s)
     void execute(llvm::Instruction *instr,
