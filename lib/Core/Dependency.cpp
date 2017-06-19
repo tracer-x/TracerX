@@ -346,32 +346,6 @@ Dependency::getLatestValue(llvm::Value *value,
     ret = getLatestValueNoConstantCheck(value, valueExpr, allowInconsistency);
   }
 
-  if (ret.isNull()) {
-    if (llvm::GlobalValue *gv = llvm::dyn_cast<llvm::GlobalValue>(value)) {
-      // We could not find the global value: we register it anew.
-      if (gv->getType()->isPointerTy()) {
-        uint64_t size = 0;
-        if (gv->getType()->getPointerElementType()->isSized())
-          size = targetData->getTypeStoreSize(
-              gv->getType()->getPointerElementType());
-        ret = getNewPointerValue(value, callHistory, valueExpr, size);
-      } else {
-        ret = getNewTxStateValue(value, callHistory, valueExpr);
-      }
-    } else {
-      llvm::StringRef name(value->getName());
-      if (name.str() == "argc") {
-        ret = getNewTxStateValue(value, callHistory, valueExpr);
-      } else if (name.str() == "this" && value->getType()->isPointerTy()) {
-        // For C++ "this" variable that is not found
-        if (value->getType()->getPointerElementType()->isSized()) {
-          uint64_t size = targetData->getTypeStoreSize(
-              value->getType()->getPointerElementType());
-          ret = getNewPointerValue(value, callHistory, valueExpr, size);
-        }
-      }
-    }
-  }
   return ret;
 }
 
