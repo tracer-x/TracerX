@@ -477,14 +477,19 @@ void Dependency::addDependencyWithOffset(ref<TxStateValue> source,
   if (source.isNull() || target.isNull())
     return;
 
+  ConstantExpr *de = llvm::dyn_cast<ConstantExpr>(offsetDelta);
+  uint64_t d = de ? de->getZExtValue() : 0;
+
+  // Do not build dependency when the index is negative. Tracer-X does not
+  // support negative indexing.
+  if (d > LLONG_MAX)
+    return;
+
   std::set<ref<TxStateAddress> > locations = source->getLocations();
   ref<Expr> targetExpr(target->getExpression());
 
   ConstantExpr *ce = llvm::dyn_cast<ConstantExpr>(targetExpr);
   uint64_t a = ce ? ce->getZExtValue() : 0;
-
-  ConstantExpr *de = llvm::dyn_cast<ConstantExpr>(offsetDelta);
-  uint64_t d = de ? de->getZExtValue() : 0;
 
   uint64_t nLocations = locations.size();
   uint64_t i = 0;
