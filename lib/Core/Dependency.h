@@ -251,15 +251,13 @@ namespace klee {
     /// copied from Executor::evalConstant.
     ref<TxStateValue>
     evalConstant(llvm::Constant *c,
-                 const std::vector<llvm::Instruction *> &callHistory,
-                 ref<TxStateValue> &base);
+                 const std::vector<llvm::Instruction *> &callHistory);
 
     /// \brief Get a KLEE expression from a constant expression. This was
     /// shamelessly copied from Executor::evalConstantExpr.
     ref<TxStateValue>
     evalConstantExpr(llvm::ConstantExpr *ce,
-                     const std::vector<llvm::Instruction *> &callHistory,
-                     ref<TxStateValue> &base);
+                     const std::vector<llvm::Instruction *> &callHistory);
 
     /// \brief Gets the latest version of the location, but without checking
     /// for whether the value is constant or not.
