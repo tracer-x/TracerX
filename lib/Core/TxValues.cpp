@@ -535,8 +535,20 @@ void TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
                 }
               }
 
-              assert(newBound > offsetInt && "incorrect bound");
-              concreteOffsetBound = newBound;
+              if (newBound > offsetInt) {
+                concreteOffsetBound = newBound;
+              } else {
+                // Incorrect bounds would pass this assertion, as long as the
+                // value of the checked offset is reasonable (non-negative). We
+                // need to pass some wrong bounds since Tracer-X is more
+                // conservative than KLEE: KLEE can still determine that memory
+                // access is valid as it happens to be in a valid region.
+                // Tracer-X, on the other hand, associates every pointer with a
+                // set of allocations, and the memory bound is violated whenever
+                // there is an access to a memory outside of the region
+                // associated with any of the allocations.
+                assert(c->getZExtValue() <= LLONG_MAX && "incorrect bound");
+              }
             }
             continue;
           }
