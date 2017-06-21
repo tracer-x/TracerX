@@ -1432,7 +1432,6 @@ void Dependency::executeMemoryOperation(
 
     ref<TxStateValue> val(getLatestValueForMarking(addressOperand, address));
     if (!val->getLocations().empty()) {
-      std::set<ref<TxStateAddress> > locations(val->getLocations());
       std::string reason = "";
       if (debugSubsumptionLevel > 1) {
         llvm::raw_string_ostream stream(reason);
