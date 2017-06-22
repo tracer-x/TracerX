@@ -680,10 +680,10 @@ public:
   void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore);
 
   /// \brief Memory bounds interpolation from a target address
-  void pointerValuesInterpolation(llvm::Value *value, ref<Expr> address,
+  bool pointerValuesInterpolation(llvm::Value *value, ref<Expr> address,
                                   std::set<ref<Expr> > &bounds,
                                   const std::string &reason) {
-    dependency->markAllPointerValues(value, address, bounds, reason);
+    return dependency->markAllPointerValues(value, address, bounds, reason);
   }
 
   /// \brief Exact pointer value interpolation from a target address
