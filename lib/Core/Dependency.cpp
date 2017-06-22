@@ -647,13 +647,16 @@ void Dependency::markPointerFlow(ref<TxStateValue> target,
   if (target->isCore())
     incrementDirectUseCount = false;
 
+  bool memoryError = false;
   if (target->canInterpolateBound()) {
     //  checkedAddress->dump();
     std::set<ref<TxStateAddress> > locations = target->getLocations();
     for (std::set<ref<TxStateAddress> >::iterator it = locations.begin(),
                                                   ie = locations.end();
          it != ie; ++it) {
-      (*it)->adjustOffsetBound(checkedAddress, bounds);
+      memoryError = (*it)->adjustOffsetBound(checkedAddress, bounds);
+      if (memoryError)
+        break;
     }
   }
   target->setAsCore(reason);
@@ -662,12 +665,23 @@ void Dependency::markPointerFlow(ref<TxStateValue> target,
   std::map<ref<TxStateValue>, ref<TxStateAddress> > sources =
       target->getSources();
 
-  for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::iterator
-           it = sources.begin(),
-           ie = sources.end();
-       it != ie; ++it) {
-    markPointerFlow(it->first, checkedAddress, bounds, reason,
-                    incrementDirectUseCount);
+  if (memoryError) {
+    // If memory error detected, we disable bounds interpolation (slackening) by
+    // calling markFlow instead of markPointerFlow
+    for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::iterator
+             it = sources.begin(),
+             ie = sources.end();
+         it != ie; ++it) {
+      markFlow(it->first, reason, incrementDirectUseCount);
+    }
+  } else {
+    for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::iterator
+             it = sources.begin(),
+             ie = sources.end();
+         it != ie; ++it) {
+      markPointerFlow(it->first, checkedAddress, bounds, reason,
+                      incrementDirectUseCount);
+    }
   }
 
   // We use normal marking with markFlow for load/store addresses
