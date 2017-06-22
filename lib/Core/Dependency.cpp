@@ -1542,15 +1542,15 @@ void Dependency::markAllValues(llvm::Value *val, ref<Expr> expr,
   markFlow(value, reason);
 }
 
-void Dependency::markAllPointerValues(llvm::Value *val, ref<Expr> address,
+bool Dependency::markAllPointerValues(llvm::Value *val, ref<Expr> address,
                                       std::set<ref<Expr> > &bounds,
                                       const std::string &reason) {
   ref<TxStateValue> value = getLatestValueForMarking(val, address);
 
   if (value.isNull())
-    return;
+    return false;
 
-  markPointerFlow(value, value, bounds, reason);
+  return markPointerFlow(value, value, bounds, reason);
 }
 
 /// \brief Tests if bound interpolation shold be enabled

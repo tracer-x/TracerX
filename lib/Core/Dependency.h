@@ -460,16 +460,18 @@ namespace klee {
                        const std::string &reason);
 
     /// \brief Given an LLVM value which is used as an address, retrieve all its
-    /// sources and mark them as in the core.
-    void markAllPointerValues(llvm::Value *val, ref<Expr> address,
+    /// sources and mark them as in the core. Returns true if bounds error was
+    /// detected; false otherwise.
+    bool markAllPointerValues(llvm::Value *val, ref<Expr> address,
                               const std::string &reason) {
       std::set<ref<Expr> > bounds;
-      markAllPointerValues(val, address, bounds, reason);
+      return markAllPointerValues(val, address, bounds, reason);
     }
 
     /// \brief Given an LLVM value which is used as an address, retrieve all its
-    /// sources and mark them as in the core.
-    void markAllPointerValues(llvm::Value *val, ref<Expr> address,
+    /// sources and mark them as in the core. Returns true if bounds error was
+    /// detected; false otherwise.
+    bool markAllPointerValues(llvm::Value *val, ref<Expr> address,
                               std::set<ref<Expr> > &bounds,
                               const std::string &reason);
 
