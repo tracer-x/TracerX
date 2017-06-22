@@ -633,13 +633,15 @@ void Dependency::markFlow(ref<TxStateValue> target, const std::string &reason,
   }
 }
 
-void Dependency::markPointerFlow(ref<TxStateValue> target,
+bool Dependency::markPointerFlow(ref<TxStateValue> target,
                                  ref<TxStateValue> checkedAddress,
                                  std::set<ref<Expr> > &bounds,
                                  const std::string &reason,
                                  bool incrementDirectUseCount) const {
+  bool memoryError = false;
+
   if (target.isNull())
-    return;
+    return memoryError;
 
   if (incrementDirectUseCount)
     target->incrementDirectUseCount();
@@ -647,7 +649,6 @@ void Dependency::markPointerFlow(ref<TxStateValue> target,
   if (target->isCore())
     incrementDirectUseCount = false;
 
-  bool memoryError = false;
   if (target->canInterpolateBound()) {
     //  checkedAddress->dump();
     std::set<ref<TxStateAddress> > locations = target->getLocations();
@@ -679,14 +680,18 @@ void Dependency::markPointerFlow(ref<TxStateValue> target,
              it = sources.begin(),
              ie = sources.end();
          it != ie; ++it) {
-      markPointerFlow(it->first, checkedAddress, bounds, reason,
-                      incrementDirectUseCount);
+      memoryError = markPointerFlow(it->first, checkedAddress, bounds, reason,
+                                    incrementDirectUseCount)
+                        ? true
+                        : memoryError;
     }
   }
 
   // We use normal marking with markFlow for load/store addresses
   markFlow(target->getLoadAddress(), reason, incrementDirectUseCount);
   markFlow(target->getStoreAddress(), reason, incrementDirectUseCount);
+
+  return memoryError;
 }
 
 void Dependency::populateArgumentValuesList(

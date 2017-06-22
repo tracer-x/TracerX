@@ -331,7 +331,8 @@ namespace klee {
 
     /// \brief Mark as core all the pointer values and that flows to the target;
     /// and adjust its offset bound for memory bounds interpolation (a.k.a.
-    /// slackening)
+    /// slackening). Returns true if memory bounds violation is detected; false
+    /// otherwise.
     void markPointerFlow(ref<TxStateValue> target,
                          ref<TxStateValue> checkedOffset,
                          const std::string &reason) const {
@@ -342,7 +343,7 @@ namespace klee {
     /// \brief Mark as core all the pointer values and that flows to the target;
     /// and adjust its offset bound for memory bounds interpolation (a.k.a.
     /// slackening)
-    void markPointerFlow(ref<TxStateValue> target,
+    bool markPointerFlow(ref<TxStateValue> target,
                          ref<TxStateValue> checkedOffset,
                          std::set<ref<Expr> > &bounds,
                          const std::string &reason,
