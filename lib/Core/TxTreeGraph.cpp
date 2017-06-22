@@ -113,10 +113,21 @@ std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
       stream << " ITP";
     stream << "\\l";
   }
-  if (node->memoryError) {
-    stream << "OUT-OF-BOUND: " << node->memoryErrorLocation << "\\l";
-  } else if (node->assertionError) {
-    stream << "ASSERTION FAIL: " << node->assertionErrorLocation << "\\l";
+  switch (node->errorType) {
+  case ASSERTION: {
+    stream << "ASSERTION FAIL: " << node->errorLocation << "\\l";
+    break;
+  }
+  case MEMORY: {
+    stream << "OUT-OF-BOUND: " << node->errorLocation << "\\l";
+    break;
+  }
+  case GENERIC: {
+    stream << "GENERIC FAIL: " << node->errorLocation << "\\l";
+    break;
+  }
+  case NONE:
+  default: { break; }
   }
   if (node->subsumed) {
     stream << "(subsumed)\\l";
@@ -316,10 +327,10 @@ void TxTreeGraph::setMemoryError(ExecutionState &state) {
     return;
 
   TxTreeGraph::Node *node = instance->txTreeNodeMap[state.txTreeNode];
-  node->memoryError = true;
+  node->errorType = MEMORY;
 
-  node->memoryErrorLocation = "";
-  llvm::raw_string_ostream out(node->memoryErrorLocation);
+  node->errorLocation = "";
+  llvm::raw_string_ostream out(node->errorLocation);
   if (llvm::MDNode *n = state.pc->inst->getMetadata("dbg")) {
     // Display the line, char position of this instruction
     llvm::DILocation loc(n);
@@ -342,10 +353,10 @@ void TxTreeGraph::setAssertionError(ExecutionState &state) {
     return;
 
   TxTreeGraph::Node *node = instance->txTreeNodeMap[state.txTreeNode];
-  node->assertionError = true;
+  node->errorType = ASSERTION;
 
-  node->assertionErrorLocation = "";
-  llvm::raw_string_ostream out(node->assertionErrorLocation);
+  node->errorLocation = "";
+  llvm::raw_string_ostream out(node->errorLocation);
   if (llvm::MDNode *n = state.pc->inst->getMetadata("dbg")) {
     // Display the line, char position of this instruction
     llvm::DILocation loc(n);

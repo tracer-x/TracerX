@@ -36,6 +36,13 @@ class TxTreeNode;
 /// \brief The interpolation tree graph for outputting to .dot file.
 class TxTreeGraph {
 
+  enum Error {
+    ASSERTION,
+    MEMORY,
+    GENERIC,
+    NONE
+  };
+
   /// \brief Global tree graph instance
   static TxTreeGraph *instance;
 
@@ -62,17 +69,11 @@ class TxTreeGraph {
     /// \brief Human-readable identifier of this node
     std::string name;
 
-    /// \brief Flag to indicate memory out-of-bound error within this node
-    bool memoryError;
+    /// \brief Location information of the error
+    std::string errorLocation;
 
-    /// \brief Location information of the memory out-of-bound error
-    std::string memoryErrorLocation;
-
-    /// \brief Flag to indicate assertion error within this node
-    bool assertionError;
-
-    /// \brief Location information of the assertion error
-    std::string assertionErrorLocation;
+    /// \brief The error type, of type Error
+    Error errorType;
 
     /// \brief Flag to indicate if this node belongs to a path to memory error.
     /// Note that memoryError or assertionError implies errorPath.
@@ -80,8 +81,8 @@ class TxTreeGraph {
 
     Node()
         : nodeSequenceNumber(0), internalNodeId(0), parent(0), falseTarget(0),
-          trueTarget(0), subsumed(false), memoryError(false),
-          assertionError(false), errorPath(false) {}
+          trueTarget(0), subsumed(false), errorType(TxTreeGraph::NONE),
+          errorPath(false) {}
 
     ~Node() {
       if (falseTarget)
