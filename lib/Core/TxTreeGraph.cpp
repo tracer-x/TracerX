@@ -322,38 +322,13 @@ void TxTreeGraph::setAsCore(PathCondition *pathCondition) {
       .second = true;
 }
 
-void TxTreeGraph::setMemoryError(ExecutionState &state) {
+void TxTreeGraph::setError(ExecutionState &state,
+                           TxTreeGraph::Error errorType) {
   if (!OUTPUT_INTERPOLATION_TREE)
     return;
 
   TxTreeGraph::Node *node = instance->txTreeNodeMap[state.txTreeNode];
-  node->errorType = MEMORY;
-
-  node->errorLocation = "";
-  llvm::raw_string_ostream out(node->errorLocation);
-  if (llvm::MDNode *n = state.pc->inst->getMetadata("dbg")) {
-    // Display the line, char position of this instruction
-    llvm::DILocation loc(n);
-    unsigned line = loc.getLineNumber();
-    llvm::StringRef file = loc.getFilename();
-    out << file << ":" << line << "\n";
-  } else {
-    state.pc->inst->print(out);
-  }
-
-  // Mark the path as leading to memory error
-  while (node) {
-    node->errorPath = true;
-    node = node->parent;
-  }
-}
-
-void TxTreeGraph::setAssertionError(ExecutionState &state) {
-  if (!OUTPUT_INTERPOLATION_TREE)
-    return;
-
-  TxTreeGraph::Node *node = instance->txTreeNodeMap[state.txTreeNode];
-  node->errorType = ASSERTION;
+  node->errorType = errorType;
 
   node->errorLocation = "";
   llvm::raw_string_ostream out(node->errorLocation);

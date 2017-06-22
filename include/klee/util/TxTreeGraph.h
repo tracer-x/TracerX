@@ -36,6 +36,7 @@ class TxTreeNode;
 /// \brief The interpolation tree graph for outputting to .dot file.
 class TxTreeGraph {
 
+public:
   enum Error {
     ASSERTION,
     MEMORY,
@@ -43,6 +44,7 @@ class TxTreeGraph {
     NONE
   };
 
+private:
   /// \brief Global tree graph instance
   static TxTreeGraph *instance;
 
@@ -172,9 +174,7 @@ public:
 
   static void setAsCore(PathCondition *pathCondition);
 
-  static void setMemoryError(ExecutionState &state);
-
-  static void setAssertionError(ExecutionState &state);
+  static void setError(ExecutionState &state, TxTreeGraph::Error errorType);
 
   /// \brief Save the graph
   static void save(std::string dotFileName);
