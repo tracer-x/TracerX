@@ -3720,9 +3720,14 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
           wos->write(offset, value);
 
           // Update dependency
-          if (INTERPOLATION_ENABLED && target)
-            txTree->executeMemoryOperation(target->inst, value, address,
-                                           inBounds);
+          if (INTERPOLATION_ENABLED && target &&
+              txTree->executeMemoryOperation(target->inst, value, address,
+                                             inBounds)) {
+            // Memory error according to Tracer-X
+            terminateStateOnError(state, "memory error: out of bound pointer",
+                                  Ptr, NULL, getAddressInfo(state, address));
+            TxTreeGraph::setMemoryError(state);
+          }
         }          
       } else {
         ref<Expr> result = os->read(offset, type);
@@ -3733,9 +3738,14 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
         bindLocal(target, state, result);
 
         // Update dependency
-        if (INTERPOLATION_ENABLED && target)
-          txTree->executeMemoryOperation(target->inst, result, address,
-                                         inBounds);
+        if (INTERPOLATION_ENABLED && target &&
+            txTree->executeMemoryOperation(target->inst, result, address,
+                                           inBounds)) {
+          // Memory error according to Tracer-X
+          terminateStateOnError(state, "memory error: out of bound pointer",
+                                Ptr, NULL, getAddressInfo(state, address));
+          TxTreeGraph::setMemoryError(state);
+        }
       }
 
       return;
@@ -3773,18 +3783,20 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
           wos->write(mo->getOffsetExpr(address), value);
 
           // Update dependency
-          if (INTERPOLATION_ENABLED && target)
-            TxTree::executeMemoryOperationOnNode(
-                bound->txTreeNode, target->inst, value, address, false);
+          if (INTERPOLATION_ENABLED && target &&
+              TxTree::executeMemoryOperationOnNode(
+                  bound->txTreeNode, target->inst, value, address, false))
+            incomplete = false;
         }
       } else {
         ref<Expr> result = os->read(mo->getOffsetExpr(address), type);
         bindLocal(target, *bound, result);
 
         // Update dependency
-        if (INTERPOLATION_ENABLED && target)
-          TxTree::executeMemoryOperationOnNode(bound->txTreeNode, target->inst,
-                                               result, address, false);
+        if (INTERPOLATION_ENABLED && target &&
+            TxTree::executeMemoryOperationOnNode(
+                bound->txTreeNode, target->inst, result, address, false))
+          incomplete = false;
       }
     }
 
