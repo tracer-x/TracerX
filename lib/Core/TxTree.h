@@ -679,7 +679,8 @@ public:
   /// relevant values on the dependency graph, given an unsatistiability core.
   void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore);
 
-  /// \brief Memory bounds interpolation from a target address
+  /// \brief Memory bounds interpolation from a target address. Returns true if
+  /// memory bounds check fails somehow.
   bool pointerValuesInterpolation(llvm::Value *value, ref<Expr> address,
                                   std::set<ref<Expr> > &bounds,
                                   const std::string &reason) {

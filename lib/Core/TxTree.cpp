@@ -1656,9 +1656,11 @@ bool SubsumptionTableEntry::subsumed(
                it = corePointerValues.begin(),
                ie = corePointerValues.end();
            it != ie; ++it) {
-        state.txTreeNode->pointerValuesInterpolation(it->first->getValue(),
-                                                     it->first->getExpression(),
-                                                     it->second, reason);
+        bool memoryError = state.txTreeNode->pointerValuesInterpolation(
+            it->first->getValue(), it->first->getExpression(), it->second,
+            reason);
+        assert(!memoryError &&
+               "interpolation should not result in memory error");
       }
 
       for (std::set<ref<TxInterpolantValue> >::iterator
@@ -1809,9 +1811,11 @@ bool SubsumptionTableEntry::subsumed(
                    it = corePointerValues.begin(),
                    ie = corePointerValues.end();
                it != ie; ++it) {
-            state.txTreeNode->pointerValuesInterpolation(
+            bool memoryError = state.txTreeNode->pointerValuesInterpolation(
                 it->first->getValue(), it->first->getExpression(), it->second,
                 reason);
+            assert(!memoryError &&
+                   "interpolation should not result in memory error");
           }
         }
         return true;
@@ -1868,9 +1872,11 @@ bool SubsumptionTableEntry::subsumed(
                  it = corePointerValues.begin(),
                  ie = corePointerValues.end();
              it != ie; ++it) {
-          state.txTreeNode->pointerValuesInterpolation(
+          bool memoryError = state.txTreeNode->pointerValuesInterpolation(
               it->first->getValue(), it->first->getExpression(), it->second,
               reason);
+          assert(!memoryError &&
+                 "interpolation should not result in memory error");
         }
       }
 
