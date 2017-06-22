@@ -498,8 +498,9 @@ public:
     return 3;
   }
 
-  /// \brief Adjust the offset bound for interpolation (a.k.a. slackening)
-  void adjustOffsetBound(ref<TxStateValue> checkedAddress,
+  /// \brief Adjust the offset bound for interpolation (a.k.a. slackening).
+  /// Returns true if a memory bound violation is detected, and false if not.
+  bool adjustOffsetBound(ref<TxStateValue> checkedAddress,
                          std::set<ref<Expr> > &bounds);
 
   bool hasConstantAddress() const { return llvm::isa<ConstantExpr>(address); }
