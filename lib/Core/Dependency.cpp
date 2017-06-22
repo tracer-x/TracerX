@@ -1421,10 +1421,11 @@ void Dependency::executePHI(llvm::Instruction *instr,
   }
 }
 
-void Dependency::executeMemoryOperation(
+bool Dependency::executeMemoryOperation(
     llvm::Instruction *instr,
     const std::vector<llvm::Instruction *> &callHistory,
     std::vector<ref<Expr> > &args, bool inBounds, bool symbolicExecutionError) {
+  bool ret = false;
   execute(instr, callHistory, args, symbolicExecutionError);
 #ifdef ENABLE_Z3
   if (boundInterpolation(instr) && inBounds) {
@@ -1466,11 +1467,12 @@ void Dependency::executeMemoryOperation(
       if (ExactAddressInterpolant) {
         markAllValues(addressOperand, address, reason);
       } else {
-        markAllPointerValues(addressOperand, address, reason);
+        ret = markAllPointerValues(addressOperand, address, reason);
       }
     }
   }
 #endif
+  return ret;
 }
 
 void

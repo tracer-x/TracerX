@@ -947,15 +947,17 @@ public:
                   ref<Expr> valueExpr);
 
   /// \brief For executing memory operations, called by
-  /// Executor::executeMemoryOperation
-  void executeMemoryOperation(llvm::Instruction *instr, ref<Expr> value,
+  /// Executor::executeMemoryOperation. Returns true if memory bounds violation
+  /// was detected; false otherwise.
+  bool executeMemoryOperation(llvm::Instruction *instr, ref<Expr> value,
                               ref<Expr> address, bool inBounds) {
-    executeMemoryOperationOnNode(currentTxTreeNode, instr, value, address,
-                                 inBounds);
+    return executeMemoryOperationOnNode(currentTxTreeNode, instr, value,
+                                        address, inBounds);
   }
 
-  /// \brief Internal method for executing memory operations
-  static void executeMemoryOperationOnNode(TxTreeNode *node,
+  /// \brief Internal method for executing memory operations. Returns true if
+  /// memory bounds violation was detected, false otherwise.
+  static bool executeMemoryOperationOnNode(TxTreeNode *node,
                                            llvm::Instruction *instr,
                                            ref<Expr> value, ref<Expr> address,
                                            bool inBounds) {
@@ -963,9 +965,10 @@ public:
     std::vector<ref<Expr> > args;
     args.push_back(value);
     args.push_back(address);
-    node->dependency->executeMemoryOperation(instr, node->callHistory, args,
-                                             inBounds, symbolicExecutionError);
+    bool ret = node->dependency->executeMemoryOperation(
+        instr, node->callHistory, args, inBounds, symbolicExecutionError);
     symbolicExecutionError = false;
+    return ret;
   }
 
   /// \brief General member function for executing an instruction for building

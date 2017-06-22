@@ -415,8 +415,9 @@ namespace klee {
                     const std::vector<llvm::Instruction *> &callHistory,
                     ref<Expr> valueExpr, bool symbolicExecutionError);
 
-    /// \brief Execute memory operation (load/store)
-    void
+    /// \brief Execute memory operation (load/store). Returns true if memory
+    /// bounds violation was detected, false otherwise.
+    bool
     executeMemoryOperation(llvm::Instruction *instr,
                            const std::vector<llvm::Instruction *> &callHistory,
                            std::vector<ref<Expr> > &args, bool inBounds,
