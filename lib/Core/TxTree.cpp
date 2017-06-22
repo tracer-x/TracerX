@@ -18,7 +18,6 @@
 #include "Dependency.h"
 #include "ShadowArray.h"
 #include "TimingSolver.h"
-#include "TxPrintUtil.h"
 
 #include <klee/CommandLine.h>
 #include <klee/Expr.h>
@@ -26,6 +25,7 @@
 #include <klee/SolverStats.h>
 #include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ExprPPrinter.h>
+#include <klee/util/TxPrintUtil.h>
 #include <fstream>
 #include <vector>
 

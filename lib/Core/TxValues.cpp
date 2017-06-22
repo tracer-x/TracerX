@@ -17,10 +17,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "ShadowArray.h"
-#include "TxPrintUtil.h"
 
 #include "klee/Internal/Module/TxValues.h"
 #include "klee/Internal/Support/ErrorHandling.h"
+#include "klee/util/TxPrintUtil.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include <llvm/IR/Type.h>

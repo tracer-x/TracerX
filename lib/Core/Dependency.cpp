@@ -17,11 +17,11 @@
 #include "Dependency.h"
 #include "Context.h"
 #include "ShadowArray.h"
-#include "TxPrintUtil.h"
 
 #include "klee/CommandLine.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "klee/util/GetElementPtrTypeIterator.h"
+#include "klee/util/TxPrintUtil.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
