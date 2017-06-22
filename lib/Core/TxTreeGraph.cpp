@@ -322,7 +322,7 @@ void TxTreeGraph::setAsCore(PathCondition *pathCondition) {
       .second = true;
 }
 
-void TxTreeGraph::setError(ExecutionState &state,
+void TxTreeGraph::setError(const ExecutionState &state,
                            TxTreeGraph::Error errorType) {
   if (!OUTPUT_INTERPOLATION_TREE)
     return;

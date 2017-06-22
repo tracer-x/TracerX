@@ -174,7 +174,8 @@ public:
 
   static void setAsCore(PathCondition *pathCondition);
 
-  static void setError(ExecutionState &state, TxTreeGraph::Error errorType);
+  static void setError(const ExecutionState &state,
+                       TxTreeGraph::Error errorType);
 
   /// \brief Save the graph
   static void save(std::string dotFileName);
