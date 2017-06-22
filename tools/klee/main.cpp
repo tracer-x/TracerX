@@ -545,6 +545,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
   if (errorMessage && ExitOnError) {
     llvm::errs() << "EXITING ON ERROR:\n" << errorMessage << "\n";
     if (INTERPOLATION_ENABLED) {
+      TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
       TxTreeGraph::save(getOutputFilename("tree.dot"));
       TxTreeGraph::deallocate();
     }
