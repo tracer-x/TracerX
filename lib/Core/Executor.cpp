@@ -3806,7 +3806,7 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
       terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
                             NULL, getAddressInfo(*unbound, address));
 
-      TxTreeGraph::setMemoryError(state);
+      TxTreeGraph::setMemoryError(*unbound);
     }
   }
 }
