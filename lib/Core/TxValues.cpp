@@ -439,7 +439,7 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
       stream << "\n";
       stream << prefix << "[";
       it->first->print(stream);
-      stream << "<={";
+      stream << "<{";
       for (std::set<ref<Expr> >::const_iterator it1 = it->second.begin(),
                                                 is1 = it1,
                                                 ie1 = it->second.end();
