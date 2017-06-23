@@ -331,7 +331,8 @@ namespace klee {
 
     /// \brief Mark as core all the pointer values and that flows to the target;
     /// and adjust its offset bound for memory bounds interpolation (a.k.a.
-    /// slackening)
+    /// slackening). Returns true if memory bounds violation is detected; false
+    /// otherwise.
     void markPointerFlow(ref<TxStateValue> target,
                          ref<TxStateValue> checkedOffset,
                          const std::string &reason) const {
@@ -342,7 +343,7 @@ namespace klee {
     /// \brief Mark as core all the pointer values and that flows to the target;
     /// and adjust its offset bound for memory bounds interpolation (a.k.a.
     /// slackening)
-    void markPointerFlow(ref<TxStateValue> target,
+    bool markPointerFlow(ref<TxStateValue> target,
                          ref<TxStateValue> checkedOffset,
                          std::set<ref<Expr> > &bounds,
                          const std::string &reason,
@@ -414,8 +415,9 @@ namespace klee {
                     const std::vector<llvm::Instruction *> &callHistory,
                     ref<Expr> valueExpr, bool symbolicExecutionError);
 
-    /// \brief Execute memory operation (load/store)
-    void
+    /// \brief Execute memory operation (load/store). Returns true if memory
+    /// bounds violation was detected, false otherwise.
+    bool
     executeMemoryOperation(llvm::Instruction *instr,
                            const std::vector<llvm::Instruction *> &callHistory,
                            std::vector<ref<Expr> > &args, bool inBounds,
@@ -459,16 +461,18 @@ namespace klee {
                        const std::string &reason);
 
     /// \brief Given an LLVM value which is used as an address, retrieve all its
-    /// sources and mark them as in the core.
-    void markAllPointerValues(llvm::Value *val, ref<Expr> address,
+    /// sources and mark them as in the core. Returns true if bounds error was
+    /// detected; false otherwise.
+    bool markAllPointerValues(llvm::Value *val, ref<Expr> address,
                               const std::string &reason) {
       std::set<ref<Expr> > bounds;
-      markAllPointerValues(val, address, bounds, reason);
+      return markAllPointerValues(val, address, bounds, reason);
     }
 
     /// \brief Given an LLVM value which is used as an address, retrieve all its
-    /// sources and mark them as in the core.
-    void markAllPointerValues(llvm::Value *val, ref<Expr> address,
+    /// sources and mark them as in the core. Returns true if bounds error was
+    /// detected; false otherwise.
+    bool markAllPointerValues(llvm::Value *val, ref<Expr> address,
                               std::set<ref<Expr> > &bounds,
                               const std::string &reason);
 

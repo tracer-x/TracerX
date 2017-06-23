@@ -17,10 +17,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "ShadowArray.h"
-#include "TxPrintUtil.h"
 
 #include "klee/Internal/Module/TxValues.h"
 #include "klee/Internal/Support/ErrorHandling.h"
+#include "klee/util/TxPrintUtil.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include <llvm/IR/Type.h>
@@ -495,7 +495,7 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
 
 /**/
 
-void TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
+bool TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
                                        std::set<ref<Expr> > &_bounds) {
   std::set<ref<TxStateAddress> > locations = checkedAddress->getLocations();
   std::set<ref<Expr> > bounds(_bounds);
@@ -548,6 +548,7 @@ void TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
                 // there is an access to a memory outside of the region
                 // associated with any of the allocations.
                 assert(c->getZExtValue() <= LLONG_MAX && "incorrect bound");
+                return true;
               }
             }
             continue;
@@ -559,6 +560,7 @@ void TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
           SubExpr::create(*it1, SubExpr::create(checkedOffset, getOffset())));
     }
   }
+  return false;
 }
 
 ref<TxStateAddress>

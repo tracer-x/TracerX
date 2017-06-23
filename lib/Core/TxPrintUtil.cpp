@@ -12,8 +12,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
-
-#include "TxPrintUtil.h"
+#include "klee/util/TxPrintUtil.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include <llvm/IR/BasicBlock.h>

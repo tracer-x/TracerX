@@ -22,6 +22,7 @@
 #include "klee/Internal/System/Time.h"
 #include "klee/Internal/Support/PrintVersion.h"
 #include "klee/Internal/Support/ErrorHandling.h"
+#include "klee/util/TxTreeGraph.h"
 
 #if LLVM_VERSION_CODE > LLVM_VERSION(3, 2)
 #include "llvm/IR/Constants.h"
@@ -543,6 +544,11 @@ void KleeHandler::processTestCase(const ExecutionState &state,
                                   const char *errorSuffix) {
   if (errorMessage && ExitOnError) {
     llvm::errs() << "EXITING ON ERROR:\n" << errorMessage << "\n";
+    if (INTERPOLATION_ENABLED) {
+      TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
+      TxTreeGraph::save(getOutputFilename("tree.dot"));
+      TxTreeGraph::deallocate();
+    }
     exit(1);
   }
 

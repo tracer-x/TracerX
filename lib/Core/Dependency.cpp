@@ -17,11 +17,11 @@
 #include "Dependency.h"
 #include "Context.h"
 #include "ShadowArray.h"
-#include "TxPrintUtil.h"
 
 #include "klee/CommandLine.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "klee/util/GetElementPtrTypeIterator.h"
+#include "klee/util/TxPrintUtil.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
@@ -633,13 +633,15 @@ void Dependency::markFlow(ref<TxStateValue> target, const std::string &reason,
   }
 }
 
-void Dependency::markPointerFlow(ref<TxStateValue> target,
+bool Dependency::markPointerFlow(ref<TxStateValue> target,
                                  ref<TxStateValue> checkedAddress,
                                  std::set<ref<Expr> > &bounds,
                                  const std::string &reason,
                                  bool incrementDirectUseCount) const {
+  bool memoryError = false;
+
   if (target.isNull())
-    return;
+    return memoryError;
 
   if (incrementDirectUseCount)
     target->incrementDirectUseCount();
@@ -653,7 +655,9 @@ void Dependency::markPointerFlow(ref<TxStateValue> target,
     for (std::set<ref<TxStateAddress> >::iterator it = locations.begin(),
                                                   ie = locations.end();
          it != ie; ++it) {
-      (*it)->adjustOffsetBound(checkedAddress, bounds);
+      memoryError = (*it)->adjustOffsetBound(checkedAddress, bounds);
+      if (memoryError)
+        break;
     }
   }
   target->setAsCore(reason);
@@ -662,17 +666,32 @@ void Dependency::markPointerFlow(ref<TxStateValue> target,
   std::map<ref<TxStateValue>, ref<TxStateAddress> > sources =
       target->getSources();
 
-  for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::iterator
-           it = sources.begin(),
-           ie = sources.end();
-       it != ie; ++it) {
-    markPointerFlow(it->first, checkedAddress, bounds, reason,
-                    incrementDirectUseCount);
+  if (memoryError) {
+    // If memory error detected, we disable bounds interpolation (slackening) by
+    // calling markFlow instead of markPointerFlow
+    for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::iterator
+             it = sources.begin(),
+             ie = sources.end();
+         it != ie; ++it) {
+      markFlow(it->first, reason, incrementDirectUseCount);
+    }
+  } else {
+    for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::iterator
+             it = sources.begin(),
+             ie = sources.end();
+         it != ie; ++it) {
+      memoryError = markPointerFlow(it->first, checkedAddress, bounds, reason,
+                                    incrementDirectUseCount)
+                        ? true
+                        : memoryError;
+    }
   }
 
   // We use normal marking with markFlow for load/store addresses
   markFlow(target->getLoadAddress(), reason, incrementDirectUseCount);
   markFlow(target->getStoreAddress(), reason, incrementDirectUseCount);
+
+  return memoryError;
 }
 
 void Dependency::populateArgumentValuesList(
@@ -1402,10 +1421,11 @@ void Dependency::executePHI(llvm::Instruction *instr,
   }
 }
 
-void Dependency::executeMemoryOperation(
+bool Dependency::executeMemoryOperation(
     llvm::Instruction *instr,
     const std::vector<llvm::Instruction *> &callHistory,
     std::vector<ref<Expr> > &args, bool inBounds, bool symbolicExecutionError) {
+  bool ret = false;
   execute(instr, callHistory, args, symbolicExecutionError);
 #ifdef ENABLE_Z3
   if (boundInterpolation(instr) && inBounds) {
@@ -1447,11 +1467,12 @@ void Dependency::executeMemoryOperation(
       if (ExactAddressInterpolant) {
         markAllValues(addressOperand, address, reason);
       } else {
-        markAllPointerValues(addressOperand, address, reason);
+        ret = markAllPointerValues(addressOperand, address, reason);
       }
     }
   }
 #endif
+  return ret;
 }
 
 void
@@ -1523,15 +1544,15 @@ void Dependency::markAllValues(llvm::Value *val, ref<Expr> expr,
   markFlow(value, reason);
 }
 
-void Dependency::markAllPointerValues(llvm::Value *val, ref<Expr> address,
+bool Dependency::markAllPointerValues(llvm::Value *val, ref<Expr> address,
                                       std::set<ref<Expr> > &bounds,
                                       const std::string &reason) {
   ref<TxStateValue> value = getLatestValueForMarking(val, address);
 
   if (value.isNull())
-    return;
+    return false;
 
-  markPointerFlow(value, value, bounds, reason);
+  return markPointerFlow(value, value, bounds, reason);
 }
 
 /// \brief Tests if bound interpolation shold be enabled

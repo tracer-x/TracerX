@@ -23,7 +23,6 @@
 #include "TimingSolver.h"
 #include "UserSearcher.h"
 #include "ExecutorTimerInfo.h"
-#include "TxPrintUtil.h"
 
 #include "klee/ExecutionState.h"
 #include "klee/Expr.h"
@@ -36,6 +35,7 @@
 #include "klee/util/ExprSMTLIBPrinter.h"
 #include "klee/util/ExprUtil.h"
 #include "klee/util/GetElementPtrTypeIterator.h"
+#include "klee/util/TxPrintUtil.h"
 #include "klee/Config/Version.h"
 #include "klee/Internal/ADT/KTest.h"
 #include "klee/Internal/ADT/RNG.h"
@@ -3277,7 +3277,9 @@ void Executor::terminateStateOnError(ExecutionState &state,
     interpreterHandler->incInstructionsDepthOnErrorTermination(
         state.txTreeNode->getInstructionsDepth());
     if (termReason == Executor::Assert) {
-      TxTreeGraph::setAssertionError(state);
+      TxTreeGraph::setError(state, TxTreeGraph::ASSERTION);
+    } else {
+      TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
     }
   }
 
@@ -3720,9 +3722,14 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
           wos->write(offset, value);
 
           // Update dependency
-          if (INTERPOLATION_ENABLED && target)
-            txTree->executeMemoryOperation(target->inst, value, address,
-                                           inBounds);
+          if (INTERPOLATION_ENABLED && target &&
+              txTree->executeMemoryOperation(target->inst, value, address,
+                                             inBounds)) {
+            // Memory error according to Tracer-X
+            terminateStateOnError(state, "memory error: out of bound pointer",
+                                  Ptr, NULL, getAddressInfo(state, address));
+            TxTreeGraph::setError(state, TxTreeGraph::MEMORY);
+          }
         }          
       } else {
         ref<Expr> result = os->read(offset, type);
@@ -3733,9 +3740,14 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
         bindLocal(target, state, result);
 
         // Update dependency
-        if (INTERPOLATION_ENABLED && target)
-          txTree->executeMemoryOperation(target->inst, result, address,
-                                         inBounds);
+        if (INTERPOLATION_ENABLED && target &&
+            txTree->executeMemoryOperation(target->inst, result, address,
+                                           inBounds)) {
+          // Memory error according to Tracer-X
+          terminateStateOnError(state, "memory error: out of bound pointer",
+                                Ptr, NULL, getAddressInfo(state, address));
+          TxTreeGraph::setError(state, TxTreeGraph::MEMORY);
+        }
       }
 
       return;
@@ -3773,18 +3785,20 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
           wos->write(mo->getOffsetExpr(address), value);
 
           // Update dependency
-          if (INTERPOLATION_ENABLED && target)
-            TxTree::executeMemoryOperationOnNode(
-                bound->txTreeNode, target->inst, value, address, false);
+          if (INTERPOLATION_ENABLED && target &&
+              TxTree::executeMemoryOperationOnNode(
+                  bound->txTreeNode, target->inst, value, address, false))
+            incomplete = false;
         }
       } else {
         ref<Expr> result = os->read(mo->getOffsetExpr(address), type);
         bindLocal(target, *bound, result);
 
         // Update dependency
-        if (INTERPOLATION_ENABLED && target)
-          TxTree::executeMemoryOperationOnNode(bound->txTreeNode, target->inst,
-                                               result, address, false);
+        if (INTERPOLATION_ENABLED && target &&
+            TxTree::executeMemoryOperationOnNode(
+                bound->txTreeNode, target->inst, result, address, false))
+          incomplete = false;
       }
     }
 
@@ -3806,7 +3820,7 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
       terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
                             NULL, getAddressInfo(*unbound, address));
 
-      TxTreeGraph::setMemoryError(state);
+      TxTreeGraph::setError(*unbound, TxTreeGraph::MEMORY);
     }
   }
 }
