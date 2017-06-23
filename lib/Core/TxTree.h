@@ -30,14 +30,7 @@
 
 #include "llvm/Support/raw_ostream.h"
 
-using namespace llvm;
-
 namespace klee {
-class ExecutionState;
-
-class PathCondition;
-
-class SubsumptionTableEntry;
 
 /// \brief A node in a singly-linked list of conditions which constitute the
 /// path condition.
