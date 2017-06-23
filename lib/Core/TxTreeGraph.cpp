@@ -101,7 +101,11 @@ std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
   } else {
     // The internal node id must have been set earlier
     assert(node->internalNodeId && "id for internal node must have been set");
-    stream << "Internal node " << node->internalNodeId << ": ";
+    if (node->falseTarget || node->trueTarget) {
+      stream << "Internal node " << node->internalNodeId << ": ";
+    } else {
+      stream << "Unvisited node: ";
+    }
   }
   stream << "\\l";
   for (std::map<PathCondition *, std::pair<std::string, bool> >::const_iterator
