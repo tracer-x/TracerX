@@ -123,6 +123,12 @@ private:
   std::vector<TxTreeGraph::NumberedEdge *> subsumptionEdges;
   std::map<PathCondition *, TxTreeGraph::Node *> pathConditionMap;
 
+  /// \brief The set of known leaves
+  std::set<TxTreeGraph::Node *> leaves;
+
+  /// \brief Maps leaves to leaf ids
+  std::map<TxTreeGraph::Node *, uint64_t> leafToLeafSequenceNumber;
+
   uint64_t subsumptionEdgeNumber;
 
   uint64_t internalNodeId;

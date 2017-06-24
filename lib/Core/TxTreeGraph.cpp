@@ -135,6 +135,13 @@ std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
   }
   if (node->subsumed) {
     stream << "(subsumed)\\l";
+  } else {
+    std::map<TxTreeGraph::Node *, uint64_t>::iterator it =
+        leafToLeafSequenceNumber.find(node);
+    if (it != leafToLeafSequenceNumber.end()) {
+      // This node is a leaf
+      stream << "(terminal #" << it->second << ")\\l";
+    }
   }
   if (node->falseTarget || node->trueTarget)
     stream << "|{<s0>F|<s1>T}";
@@ -198,6 +205,29 @@ std::string TxTreeGraph::render() {
     stream << (*it)->render() << "\n";
   }
 
+  // Compute leaf indices (TxTreeGraph::leafToNumber)
+  std::map<uint64_t, TxTreeGraph::Node *> sequenceNumberToNode;
+  std::vector<uint64_t> leafSequenceNumbers;
+  for (std::set<TxTreeGraph::Node *>::iterator it = leaves.begin(),
+                                               ie = leaves.end();
+       it != ie; ++it) {
+    // We skip internal nodes with zero sequence number
+    if ((*it)->nodeSequenceNumber) {
+      uint64_t nodeSequenceNumber = (*it)->nodeSequenceNumber;
+      sequenceNumberToNode[nodeSequenceNumber] = *it;
+      leafSequenceNumbers.push_back(nodeSequenceNumber);
+    }
+  }
+  std::sort(leafSequenceNumbers.begin(), leafSequenceNumbers.end());
+  leafToLeafSequenceNumber.clear();
+  uint64_t leafId = 0;
+  for (std::vector<uint64_t>::iterator it = leafSequenceNumbers.begin(),
+                                       ie = leafSequenceNumbers.end();
+       it != ie; ++it) {
+    TxTreeGraph::Node *node = sequenceNumberToNode[*it];
+    leafToLeafSequenceNumber[node] = ++leafId;
+  }
+
   res = "digraph search_tree {\n";
   res += recurseRender(root);
   res += stream.str();
@@ -209,6 +239,7 @@ TxTreeGraph::TxTreeGraph(TxTreeNode *_root)
     : subsumptionEdgeNumber(0), internalNodeId(0) {
   root = TxTreeGraph::Node::createNode();
   txTreeNodeMap[_root] = root;
+  leaves.insert(root);
 }
 
 TxTreeGraph::~TxTreeGraph() {
@@ -224,6 +255,10 @@ TxTreeGraph::~TxTreeGraph() {
     delete *it;
   }
   subsumptionEdges.clear();
+
+  leaves.clear();
+
+  leafToLeafSequenceNumber.clear();
 }
 
 void TxTreeGraph::addChildren(TxTreeNode *parent, TxTreeNode *falseChild,
@@ -243,6 +278,10 @@ void TxTreeGraph::addChildren(TxTreeNode *parent, TxTreeNode *falseChild,
   parentNode->trueTarget->parent = parentNode;
   instance->txTreeNodeMap[falseChild] = parentNode->falseTarget;
   instance->txTreeNodeMap[trueChild] = parentNode->trueTarget;
+
+  instance->leaves.erase(parentNode);
+  instance->leaves.insert(parentNode->falseTarget);
+  instance->leaves.insert(parentNode->trueTarget);
 }
 
 void TxTreeGraph::setCurrentNode(ExecutionState &state,
