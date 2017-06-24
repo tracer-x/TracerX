@@ -118,9 +118,9 @@ std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
     stream << "\\l";
   }
   std::map<uint64_t, uint64_t>::const_iterator it =
-      interestingInstructionCount.find(node->nodeSequenceNumber);
-  if (it != interestingInstructionCount.end()) {
-    stream << "interesting call(s): " << it->second << "\\l";
+      markAddition.find(node->nodeSequenceNumber);
+  if (it != markAddition.end()) {
+    stream << "mark(s): " << it->second << "\\l";
   }
   switch (node->errorType) {
   case ASSERTION: {
@@ -265,7 +265,7 @@ TxTreeGraph::~TxTreeGraph() {
 
   leafToLeafSequenceNumber.clear();
 
-  interestingInstructionCount.clear();
+  markAddition.clear();
 }
 
 void TxTreeGraph::addChildren(TxTreeNode *parent, TxTreeNode *falseChild,
@@ -318,13 +318,13 @@ void TxTreeGraph::setCurrentNode(ExecutionState &state,
     node->nodeSequenceNumber = _nodeSequenceNumber;
   }
 
-  // Increase the interesting instruction count when there is a return from a
-  // function named tracerx_mark.
+  // Increase the mark addition count when there is a return from a function
+  // named tracerx_mark.
   if (llvm::ReturnInst *ri = llvm::dyn_cast<llvm::ReturnInst>(state.pc->inst)) {
     if (ri->getParent()) {
       if (llvm::Function *f = ri->getParent()->getParent()) {
         if (f->getName().str() == "tracerx_mark") {
-          (instance->interestingInstructionCount[node->nodeSequenceNumber])++;
+          (instance->markAddition[node->nodeSequenceNumber])++;
         }
       }
     }

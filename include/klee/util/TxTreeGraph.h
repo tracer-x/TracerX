@@ -129,10 +129,10 @@ private:
   /// \brief Maps leaves to leaf ids
   std::map<TxTreeGraph::Node *, uint64_t> leafToLeafSequenceNumber;
 
-  /// \brief The number of interesting instruction executed while processing a
-  /// node: The interesting instruction is a return from a function named
-  /// tracerx_mark.
-  std::map<uint64_t, uint64_t> interestingInstructionCount;
+  /// \brief The addition to the number of interesting instruction executed
+  /// while processing a node: The interesting instruction is a return from a
+  /// function named tracerx_mark.
+  std::map<uint64_t, uint64_t> markAddition;
 
   uint64_t subsumptionEdgeNumber;
 
