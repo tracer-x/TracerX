@@ -1,4 +1,4 @@
-//===-- TxTreeGraph.h - Tracer-X tree DOT graph -----------------*- C++ -*-===//
+//===-- TxTreeGraph.cpp - Tracer-X tree DOT graph ---------------*- C++ -*-===//
 //
 //               The Tracer-X KLEE Symbolic Virtual Machine
 //
