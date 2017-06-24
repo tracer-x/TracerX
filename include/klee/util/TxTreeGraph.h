@@ -81,10 +81,19 @@ private:
     /// Note that memoryError or assertionError implies errorPath.
     bool errorPath;
 
-    Node()
+    /// \brief The number of marked instruction visited along the path. A marked
+    /// instruction is a return from a function named tracerx_mark.
+    uint64_t markCount;
+
+    /// \brief The addition to the number of interesting instruction executed
+    /// while processing a node: The interesting instruction is a return from a
+    /// function named tracerx_mark.
+    uint64_t markAddition;
+
+    Node(uint64_t _markCount)
         : nodeSequenceNumber(0), internalNodeId(0), parent(0), falseTarget(0),
           trueTarget(0), subsumed(false), errorType(TxTreeGraph::NONE),
-          errorPath(false) {}
+          errorPath(false), markCount(_markCount), markAddition(0) {}
 
     ~Node() {
       if (falseTarget)
@@ -96,7 +105,9 @@ private:
       pathConditionTable.clear();
     }
 
-    static TxTreeGraph::Node *createNode() { return new TxTreeGraph::Node(); }
+    static TxTreeGraph::Node *createNode(uint64_t markCount) {
+      return new TxTreeGraph::Node(markCount);
+    }
   };
 
   class NumberedEdge {
@@ -128,11 +139,6 @@ private:
 
   /// \brief Maps leaves to leaf ids
   std::map<TxTreeGraph::Node *, uint64_t> leafToLeafSequenceNumber;
-
-  /// \brief The addition to the number of interesting instruction executed
-  /// while processing a node: The interesting instruction is a return from a
-  /// function named tracerx_mark.
-  std::map<uint64_t, uint64_t> markAddition;
 
   uint64_t subsumptionEdgeNumber;
 

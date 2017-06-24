@@ -117,10 +117,12 @@ std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
       stream << " ITP";
     stream << "\\l";
   }
-  std::map<uint64_t, uint64_t>::const_iterator it =
-      markAddition.find(node->nodeSequenceNumber);
-  if (it != markAddition.end()) {
-    stream << "mark(s): " << it->second << "\\l";
+  if (node->markCount) {
+    stream << "mark(s): " << node->markCount;
+    if (node->markAddition) {
+      stream << " (+" << node->markAddition << ")";
+    }
+    stream << "\\l";
   }
   switch (node->errorType) {
   case ASSERTION: {
@@ -242,7 +244,7 @@ std::string TxTreeGraph::render() {
 
 TxTreeGraph::TxTreeGraph(TxTreeNode *_root)
     : subsumptionEdgeNumber(0), internalNodeId(0) {
-  root = TxTreeGraph::Node::createNode();
+  root = TxTreeGraph::Node::createNode(0);
   txTreeNodeMap[_root] = root;
   leaves.insert(root);
 }
@@ -264,8 +266,6 @@ TxTreeGraph::~TxTreeGraph() {
   leaves.clear();
 
   leafToLeafSequenceNumber.clear();
-
-  markAddition.clear();
 }
 
 void TxTreeGraph::addChildren(TxTreeNode *parent, TxTreeNode *falseChild,
@@ -279,9 +279,10 @@ void TxTreeGraph::addChildren(TxTreeNode *parent, TxTreeNode *falseChild,
 
   TxTreeGraph::Node *parentNode = instance->txTreeNodeMap[parent];
 
-  parentNode->falseTarget = TxTreeGraph::Node::createNode();
+  parentNode->falseTarget =
+      TxTreeGraph::Node::createNode(parentNode->markCount);
   parentNode->falseTarget->parent = parentNode;
-  parentNode->trueTarget = TxTreeGraph::Node::createNode();
+  parentNode->trueTarget = TxTreeGraph::Node::createNode(parentNode->markCount);
   parentNode->trueTarget->parent = parentNode;
   instance->txTreeNodeMap[falseChild] = parentNode->falseTarget;
   instance->txTreeNodeMap[trueChild] = parentNode->trueTarget;
@@ -324,7 +325,8 @@ void TxTreeGraph::setCurrentNode(ExecutionState &state,
     if (ri->getParent()) {
       if (llvm::Function *f = ri->getParent()->getParent()) {
         if (f->getName().str() == "tracerx_mark") {
-          (instance->markAddition[node->nodeSequenceNumber])++;
+          (node->markCount)++;
+          (node->markAddition)++;
         }
       }
     }
