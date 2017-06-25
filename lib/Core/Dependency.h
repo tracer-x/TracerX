@@ -193,10 +193,6 @@ namespace klee {
     /// \brief The store of the versioned values
     std::map<llvm::Value *, std::vector<ref<TxStateValue> > > valuesMap;
 
-    /// \brief Locations of this node and its ancestors that are needed for
-    /// the core and dominates other locations.
-    std::set<ref<TxStateAddress> > coreLocations;
-
     /// \brief The data layout of the analysis target program
     llvm::DataLayout *targetData;
 
