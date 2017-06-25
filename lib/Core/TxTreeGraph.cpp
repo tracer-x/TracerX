@@ -1,4 +1,4 @@
-//===-- TxTreeGraph.h - Tracer-X tree DOT graph -----------------*- C++ -*-===//
+//===-- TxTreeGraph.cpp - Tracer-X tree DOT graph ---------------*- C++ -*-===//
 //
 //               The Tracer-X KLEE Symbolic Virtual Machine
 //
@@ -117,6 +117,13 @@ std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
       stream << " ITP";
     stream << "\\l";
   }
+  if (node->markCount) {
+    stream << "mark(s): " << node->markCount;
+    if (node->markAddition) {
+      stream << " (+" << node->markAddition << ")";
+    }
+    stream << "\\l";
+  }
   switch (node->errorType) {
   case ASSERTION: {
     stream << "ASSERTION FAIL: " << node->errorLocation << "\\l";
@@ -135,6 +142,13 @@ std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
   }
   if (node->subsumed) {
     stream << "(subsumed)\\l";
+  } else {
+    std::map<TxTreeGraph::Node *, uint64_t>::iterator it =
+        leafToLeafSequenceNumber.find(node);
+    if (it != leafToLeafSequenceNumber.end()) {
+      // This node is a leaf
+      stream << "(terminal #" << it->second << ")\\l";
+    }
   }
   if (node->falseTarget || node->trueTarget)
     stream << "|{<s0>F|<s1>T}";
@@ -198,6 +212,29 @@ std::string TxTreeGraph::render() {
     stream << (*it)->render() << "\n";
   }
 
+  // Compute leaf indices (TxTreeGraph::leafToNumber)
+  std::map<uint64_t, TxTreeGraph::Node *> sequenceNumberToNode;
+  std::vector<uint64_t> leafSequenceNumbers;
+  for (std::set<TxTreeGraph::Node *>::iterator it = leaves.begin(),
+                                               ie = leaves.end();
+       it != ie; ++it) {
+    // We skip internal nodes with zero sequence number
+    if ((*it)->nodeSequenceNumber) {
+      uint64_t nodeSequenceNumber = (*it)->nodeSequenceNumber;
+      sequenceNumberToNode[nodeSequenceNumber] = *it;
+      leafSequenceNumbers.push_back(nodeSequenceNumber);
+    }
+  }
+  std::sort(leafSequenceNumbers.begin(), leafSequenceNumbers.end());
+  leafToLeafSequenceNumber.clear();
+  uint64_t leafId = 0;
+  for (std::vector<uint64_t>::iterator it = leafSequenceNumbers.begin(),
+                                       ie = leafSequenceNumbers.end();
+       it != ie; ++it) {
+    TxTreeGraph::Node *node = sequenceNumberToNode[*it];
+    leafToLeafSequenceNumber[node] = ++leafId;
+  }
+
   res = "digraph search_tree {\n";
   res += recurseRender(root);
   res += stream.str();
@@ -207,8 +244,9 @@ std::string TxTreeGraph::render() {
 
 TxTreeGraph::TxTreeGraph(TxTreeNode *_root)
     : subsumptionEdgeNumber(0), internalNodeId(0) {
-  root = TxTreeGraph::Node::createNode();
+  root = TxTreeGraph::Node::createNode(0);
   txTreeNodeMap[_root] = root;
+  leaves.insert(root);
 }
 
 TxTreeGraph::~TxTreeGraph() {
@@ -224,6 +262,10 @@ TxTreeGraph::~TxTreeGraph() {
     delete *it;
   }
   subsumptionEdges.clear();
+
+  leaves.clear();
+
+  leafToLeafSequenceNumber.clear();
 }
 
 void TxTreeGraph::addChildren(TxTreeNode *parent, TxTreeNode *falseChild,
@@ -237,12 +279,17 @@ void TxTreeGraph::addChildren(TxTreeNode *parent, TxTreeNode *falseChild,
 
   TxTreeGraph::Node *parentNode = instance->txTreeNodeMap[parent];
 
-  parentNode->falseTarget = TxTreeGraph::Node::createNode();
+  parentNode->falseTarget =
+      TxTreeGraph::Node::createNode(parentNode->markCount);
   parentNode->falseTarget->parent = parentNode;
-  parentNode->trueTarget = TxTreeGraph::Node::createNode();
+  parentNode->trueTarget = TxTreeGraph::Node::createNode(parentNode->markCount);
   parentNode->trueTarget->parent = parentNode;
   instance->txTreeNodeMap[falseChild] = parentNode->falseTarget;
   instance->txTreeNodeMap[trueChild] = parentNode->trueTarget;
+
+  instance->leaves.erase(parentNode);
+  instance->leaves.insert(parentNode->falseTarget);
+  instance->leaves.insert(parentNode->trueTarget);
 }
 
 void TxTreeGraph::setCurrentNode(ExecutionState &state,
@@ -270,6 +317,19 @@ void TxTreeGraph::setCurrentNode(ExecutionState &state,
     }
     node->name = out.str();
     node->nodeSequenceNumber = _nodeSequenceNumber;
+  }
+
+  // Increase the mark addition count when there is a return from a function
+  // named tracerx_mark.
+  if (llvm::ReturnInst *ri = llvm::dyn_cast<llvm::ReturnInst>(state.pc->inst)) {
+    if (ri->getParent()) {
+      if (llvm::Function *f = ri->getParent()->getParent()) {
+        if (f->getName().str() == "tracerx_mark") {
+          (node->markCount)++;
+          (node->markAddition)++;
+        }
+      }
+    }
   }
 }
 
