@@ -50,7 +50,7 @@ void Dependency::removeAddressValue(
     Dependency::InterpolantStore &concreteStore,
     std::set<const Array *> &replacements, bool coreOnly) const {
   std::map<ref<TxStateAddress>, ref<TxStateValue> > _concreteStore;
-  std::set<ref<TxStateAddress> > addressesToRemove;
+  std::set<ref<TxStateAddress> > addressToBeReplaced;
 
   for (std::map<ref<TxStateAddress>, ref<TxStateValue> >::iterator
            it = simpleStore.begin(),
@@ -67,7 +67,7 @@ void Dependency::removeAddressValue(
            it2 != ie2; ++it2) {
         it1 = simpleStore.find(*it2);
         if (it1 != simpleStore.end()) {
-          addressesToRemove.insert(*it2);
+          addressToBeReplaced.insert(*it2);
           // Found the address in the map;
           _concreteStore[keyAddress->copyWithIndirectionCountIncrement()] =
               it1->second;
@@ -78,7 +78,7 @@ void Dependency::removeAddressValue(
   }
 
   std::set<ref<TxStateAddress> >::iterator addressesToRemoveEnd =
-      addressesToRemove.end();
+      addressToBeReplaced.end();
 
   // FIXME: Perhaps it is more efficient to iterate on
   // Dependency::concretelyAddressedStoreKeys earlier.
@@ -89,7 +89,7 @@ void Dependency::removeAddressValue(
     std::map<ref<TxStateAddress>, ref<TxStateValue> >::iterator it1 =
         simpleStore.find(*it);
     if (it1 != simpleStore.end() &&
-        addressesToRemove.find(it1->first) == addressesToRemoveEnd) {
+        addressToBeReplaced.find(it1->first) == addressesToRemoveEnd) {
       const llvm::Value *base = it1->first->getValue();
       ref<TxInterpolantAddress> address =
           it1->first->getInterpolantStyleAddress();
@@ -110,8 +110,10 @@ void Dependency::removeAddressValue(
       }
     }
 
-    it1 = _concreteStore.find(*it);
-    if (it1 != _concreteStore.end()) {
+    for (std::map<ref<TxStateAddress>, ref<TxStateValue> >::iterator
+             it1 = _concreteStore.begin(),
+             ie1 = _concreteStore.end();
+         it1 != ie1; ++it1) {
       const llvm::Value *base = it1->first->getValue();
       ref<TxInterpolantAddress> address =
           it1->first->getInterpolantStyleAddress();
