@@ -349,8 +349,7 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
       interpreterHandler->getOutputFilename(ALL_QUERIES_PC_FILE_NAME),
       interpreterHandler->getOutputFilename(SOLVER_QUERIES_PC_FILE_NAME));
 
-  this->solver =
-      new TimingSolver(solver, EqualitySubstitution && !INTERPOLATION_ENABLED);
+  this->solver = new TimingSolver(solver, EqualitySubstitution);
   memory = new MemoryManager(&arrayCache);
 
   if (optionIsSet(DebugPrintInstructions, FILE_ALL) ||
