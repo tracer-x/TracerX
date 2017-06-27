@@ -55,6 +55,7 @@ TimingSolver::buildCachedUnsatCore(const ExecutionState &state,
               ++unsatIt;
             }
             cachedUnsatCore.push_back(*it);
+            ++constraintIndex;
             continue;
           }
         } else if (unsatIt == unsatItEnd) {
