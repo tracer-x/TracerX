@@ -62,7 +62,7 @@ TimingSolver::buildCachedUnsatCore(const ExecutionState &state,
           break;
         }
 
-        if (*it == *unsatIt) {
+        if (unsatIt != unsatItEnd && *it == *unsatIt) {
           ++unsatIt;
           cachedUnsatCore.push_back(*it);
         }
