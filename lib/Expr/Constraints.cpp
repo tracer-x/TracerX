@@ -58,22 +58,21 @@ public:
 
 class ExprReplaceVisitor2 : public ExprVisitor {
 private:
-  const std::map<ref<Expr>, std::pair<ref<Expr>, unsigned> > &replacements;
+  const std::map<ref<Expr>, std::pair<ref<Expr>, ref<Expr> > > &replacements;
 
-  std::set<unsigned> usedEqualities;
+  std::set<ref<Expr> > usedEqualities;
 
 public:
-  ExprReplaceVisitor2(
-      const std::map<ref<Expr>, std::pair<ref<Expr>, unsigned> > &_replacements)
+  ExprReplaceVisitor2(const std::map<
+      ref<Expr>, std::pair<ref<Expr>, ref<Expr> > > &_replacements)
       : ExprVisitor(true), replacements(_replacements) {}
 
-  void getCore(std::vector<unsigned> &core) {
+  void getCore(std::vector<ref<Expr> > &core) {
     core.insert(core.begin(), usedEqualities.begin(), usedEqualities.end());
-    std::sort(core.begin(), core.end());
   }
 
   Action visitExprPost(const Expr &e) {
-    std::map<ref<Expr>, std::pair<ref<Expr>, unsigned> >::const_iterator it =
+    std::map<ref<Expr>, std::pair<ref<Expr>, ref<Expr> > >::const_iterator it =
         replacements.find(ref<Expr>(const_cast<Expr *>(&e)));
     if (it!=replacements.end()) {
       usedEqualities.insert(it->second.second);
@@ -110,35 +109,29 @@ void ConstraintManager::simplifyForValidConstraint(ref<Expr> e) {
 }
 
 ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
-  std::vector<unsigned> simplificationCore;
+  std::vector<ref<Expr> > simplificationCore;
   return simplifyExpr(e, simplificationCore);
 }
 
 ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e,
-                                          std::vector<unsigned> &core) const {
+                                          std::vector<ref<Expr> > &core) const {
   if (isa<ConstantExpr>(e))
     return e;
 
-  std::map<ref<Expr>, std::pair<ref<Expr>, unsigned> > equalities;
+  std::map<ref<Expr>, std::pair<ref<Expr>, ref<Expr> > > equalities;
 
-  unsigned constraintIndex = 0;
   for (ConstraintManager::constraints_ty::const_iterator 
          it = constraints.begin(), ie = constraints.end(); it != ie; ++it) {
     if (const EqExpr *ee = dyn_cast<EqExpr>(*it)) {
       if (isa<ConstantExpr>(ee->left)) {
-        equalities.insert(std::make_pair(
-            ee->right, std::make_pair(ee->left, constraintIndex)));
+        equalities[ee->right] = std::make_pair(ee->left, *it);
       } else {
-        equalities.insert(std::make_pair(
-            *it, std::make_pair(ConstantExpr::alloc(1, Expr::Bool),
-                                constraintIndex)));
+        equalities[*it] =
+            std::make_pair(ConstantExpr::alloc(1, Expr::Bool), *it);
       }
     } else {
-      equalities.insert(
-          std::make_pair(*it, std::make_pair(ConstantExpr::alloc(1, Expr::Bool),
-                                             constraintIndex)));
+      equalities[*it] = std::make_pair(ConstantExpr::alloc(1, Expr::Bool), *it);
     }
-    ++constraintIndex;
   }
 
   ExprReplaceVisitor2 visitor(equalities);

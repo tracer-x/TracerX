@@ -24,11 +24,6 @@ namespace klee {
   class TimingSolver {
     std::vector<ref<Expr> > cachedUnsatCore;
 
-    void buildCachedUnsatCore(const ExecutionState &state);
-
-    void buildCachedUnsatCore(const ExecutionState &state,
-                              std::vector<unsigned> &simplificationCore);
-
   public:
     Solver *solver;
     bool simplifyExprs;
