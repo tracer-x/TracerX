@@ -28,14 +28,15 @@ IncompleteSolver::negatePartialValidity(PartialValidity pv) {
   }
 }
 
-IncompleteSolver::PartialValidity 
-IncompleteSolver::computeValidity(const Query& query) {
-  PartialValidity trueResult = computeTruth(query);
+IncompleteSolver::PartialValidity
+IncompleteSolver::computeValidity(const Query &query,
+                                  std::vector<ref<Expr> > &unsatCore) {
+  PartialValidity trueResult = computeTruth(query, unsatCore);
 
   if (trueResult == MustBeTrue) {
     return MustBeTrue;
   } else {
-    PartialValidity falseResult = computeTruth(query.negateExpr());
+    PartialValidity falseResult = computeTruth(query.negateExpr(), unsatCore);
 
     if (falseResult == MustBeTrue) {
       return MustBeFalse;
@@ -69,21 +70,24 @@ StagedSolverImpl::~StagedSolverImpl() {
   delete secondary;
 }
 
-bool StagedSolverImpl::computeTruth(const Query& query, bool &isValid) {
-  IncompleteSolver::PartialValidity trueResult = primary->computeTruth(query); 
-  
+bool StagedSolverImpl::computeTruth(const Query &query, bool &isValid,
+                                    std::vector<ref<Expr> > &unsatCore) {
+  IncompleteSolver::PartialValidity trueResult =
+      primary->computeTruth(query, unsatCore);
+
   if (trueResult != IncompleteSolver::None) {
     isValid = (trueResult == IncompleteSolver::MustBeTrue);
     return true;
-  } 
+  }
 
-  return secondary->impl->computeTruth(query, isValid);
+  return secondary->impl->computeTruth(query, isValid, unsatCore);
 }
 
-bool StagedSolverImpl::computeValidity(const Query& query,
-                                       Solver::Validity &result) {
+bool StagedSolverImpl::computeValidity(const Query &query,
+                                       Solver::Validity &result,
+                                       std::vector<ref<Expr> > &unsatCore) {
   bool tmp;
-  switch(primary->computeValidity(query)) {
+  switch (primary->computeValidity(query, unsatCore)) {
   case IncompleteSolver::MustBeTrue: 
     result = Solver::True;
     break;
@@ -94,17 +98,17 @@ bool StagedSolverImpl::computeValidity(const Query& query,
     result = Solver::Unknown;
     break;
   case IncompleteSolver::MayBeTrue:
-    if (!secondary->impl->computeTruth(query, tmp))
+    if (!secondary->impl->computeTruth(query, tmp, unsatCore))
       return false;
     result = tmp ? Solver::True : Solver::Unknown;
     break;
   case IncompleteSolver::MayBeFalse:
-    if (!secondary->impl->computeTruth(query.negateExpr(), tmp))
+    if (!secondary->impl->computeTruth(query.negateExpr(), tmp, unsatCore))
       return false;
     result = tmp ? Solver::False : Solver::Unknown;
     break;
   default:
-    if (!secondary->impl->computeValidity(query, result))
+    if (!secondary->impl->computeValidity(query, result, unsatCore))
       return false;
     break;
   }
@@ -120,18 +124,16 @@ bool StagedSolverImpl::computeValue(const Query& query,
   return secondary->impl->computeValue(query, result);
 }
 
-bool 
-StagedSolverImpl::computeInitialValues(const Query& query,
-                                       const std::vector<const Array*> 
-                                         &objects,
-                                       std::vector< std::vector<unsigned char> >
-                                         &values,
-                                       bool &hasSolution) {
-  if (primary->computeInitialValues(query, objects, values, hasSolution))
+bool StagedSolverImpl::computeInitialValues(
+    const Query &query, const std::vector<const Array *> &objects,
+    std::vector<std::vector<unsigned char> > &values, bool &hasSolution,
+    std::vector<ref<Expr> > &unsatCore) {
+  if (primary->computeInitialValues(query, objects, values, hasSolution,
+                                    unsatCore))
     return true;
-  
+
   return secondary->impl->computeInitialValues(query, objects, values,
-                                               hasSolution);
+                                               hasSolution, unsatCore);
 }
 
 SolverImpl::SolverRunStatus StagedSolverImpl::getOperationStatusCode() {

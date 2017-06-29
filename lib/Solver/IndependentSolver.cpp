@@ -399,35 +399,40 @@ public:
     : solver(_solver) {}
   ~IndependentSolver() { delete solver; }
 
-  bool computeTruth(const Query&, bool &isValid);
-  bool computeValidity(const Query&, Solver::Validity &result);
+  bool computeTruth(const Query &, bool &isValid,
+                    std::vector<ref<Expr> > &unsatCore);
+  bool computeValidity(const Query &, Solver::Validity &result,
+                       std::vector<ref<Expr> > &unsatCore);
   bool computeValue(const Query&, ref<Expr> &result);
-  bool computeInitialValues(const Query& query,
-                            const std::vector<const Array*> &objects,
-                            std::vector< std::vector<unsigned char> > &values,
-                            bool &hasSolution);
+  bool computeInitialValues(const Query &query,
+                            const std::vector<const Array *> &objects,
+                            std::vector<std::vector<unsigned char> > &values,
+                            bool &hasSolution,
+                            std::vector<ref<Expr> > &unsatCore);
   SolverRunStatus getOperationStatusCode();
   char *getConstraintLog(const Query&);
   void setCoreSolverTimeout(double timeout);
-  std::vector<ref<Expr> > &getUnsatCore() { return solver->getUnsatCore(); }
 };
+
   
-bool IndependentSolver::computeValidity(const Query& query,
-                                        Solver::Validity &result) {
+bool IndependentSolver::computeValidity(const Query &query,
+                                        Solver::Validity &result,
+                                        std::vector<ref<Expr> > &unsatCore) {
   std::vector< ref<Expr> > required;
   IndependentElementSet eltsClosure =
     getIndependentConstraints(query, required);
   ConstraintManager tmp(required);
-  return solver->impl->computeValidity(Query(tmp, query.expr), result);
+  return solver->impl->computeValidity(Query(tmp, query.expr), result,
+                                       unsatCore);
 }
 
-bool IndependentSolver::computeTruth(const Query& query, bool &isValid) {
+bool IndependentSolver::computeTruth(const Query &query, bool &isValid,
+                                     std::vector<ref<Expr> > &unsatCore) {
   std::vector< ref<Expr> > required;
   IndependentElementSet eltsClosure = 
     getIndependentConstraints(query, required);
   ConstraintManager tmp(required);
-  return solver->impl->computeTruth(Query(tmp, query.expr), 
-                                    isValid);
+  return solver->impl->computeTruth(Query(tmp, query.expr), isValid, unsatCore);
 }
 
 bool IndependentSolver::computeValue(const Query& query, ref<Expr> &result) {
@@ -475,10 +480,10 @@ bool assertCreatedPointEvaluatesToTrue(
   return cast<ConstantExpr>(q)->isTrue();
 }
 
-bool IndependentSolver::computeInitialValues(const Query& query,
-                                             const std::vector<const Array*> &objects,
-                                             std::vector< std::vector<unsigned char> > &values,
-                                             bool &hasSolution){
+bool IndependentSolver::computeInitialValues(
+    const Query &query, const std::vector<const Array *> &objects,
+    std::vector<std::vector<unsigned char> > &values, bool &hasSolution,
+    std::vector<ref<Expr> > &unsatCore) {
   // We assume the query has a solution except proven differently
   // This is important in case we don't have any constraints but
   // we need initial values for requested array objects.
@@ -500,8 +505,9 @@ bool IndependentSolver::computeInitialValues(const Query& query,
     }
     ConstraintManager tmp(it->exprs);
     std::vector<std::vector<unsigned char> > tempValues;
-    if (!solver->impl->computeInitialValues(Query(tmp, ConstantExpr::alloc(0, Expr::Bool)),
-                                            arraysInFactor, tempValues, hasSolution)){
+    if (!solver->impl->computeInitialValues(
+             Query(tmp, ConstantExpr::alloc(0, Expr::Bool)), arraysInFactor,
+             tempValues, hasSolution, unsatCore)) {
       values.clear();
       delete factors;
       return false;

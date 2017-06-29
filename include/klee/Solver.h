@@ -84,8 +84,9 @@ namespace klee {
     /// Solver::Unknown
     ///
     /// \return True on success.
-    bool evaluate(const Query&, Validity &result);
-  
+    bool evaluate(const Query &, Validity &result,
+                  std::vector<ref<Expr> > &unsatCore);
+
     /// mustBeTrue - Determine if the expression is provably true.
     /// 
     /// This evaluates the following logical formula:
@@ -183,9 +184,10 @@ namespace klee {
     // FIXME: This API is lame. We should probably just provide an API which
     // returns an Assignment object, then clients can get out whatever values
     // they want. This also allows us to optimize the representation.
-    bool getInitialValues(const Query&, 
-                          const std::vector<const Array*> &objects,
-                          std::vector< std::vector<unsigned char> > &result);
+    bool getInitialValues(const Query &,
+                          const std::vector<const Array *> &objects,
+                          std::vector<std::vector<unsigned char> > &result,
+                          std::vector<ref<Expr> > &unsatCore);
 
     /// getRange - Compute a tight range of possible values for a given
     /// expression.
@@ -201,14 +203,6 @@ namespace klee {
     
     virtual char *getConstraintLog(const Query& query);
     virtual void setCoreSolverTimeout(double timeout);
-
-    /// getUnsatCore - get the unsatisfiability core. Beware that the unsat core
-    /// is only available with certain solvers, e.g., Z3, and even so, may not
-    /// be always available in unsatisfiability cases when wrapped in e.g.,
-    /// IncompleteSolver (which may replace the core Z3 solver).
-    ///
-    /// \return Vector of ref<Expr>
-    virtual std::vector<ref<Expr> > &getUnsatCore();
   };
 
   #ifdef ENABLE_STP
@@ -255,7 +249,8 @@ namespace klee {
 
     /// directComputeValidity - Compute validity directly without other
     /// layers of solving
-    bool directComputeValidity(const Query &query, Solver::Validity &result);
+    bool directComputeValidity(const Query &query, Solver::Validity &result,
+                               std::vector<ref<Expr> > &unsatCore);
   };
   #endif // ENABLE_Z3
 

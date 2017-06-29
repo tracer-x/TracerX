@@ -124,10 +124,11 @@ void QueryLoggingSolver::flushBuffer() {
   flushBufferConditionally(writeToFile);
 }
 
-bool QueryLoggingSolver::computeTruth(const Query &query, bool &isValid) {
+bool QueryLoggingSolver::computeTruth(const Query &query, bool &isValid,
+                                      std::vector<ref<Expr> > &unsatCore) {
   startQuery(query, "Truth");
 
-  bool success = solver->impl->computeTruth(query, isValid);
+  bool success = solver->impl->computeTruth(query, isValid, unsatCore);
 
   finishQuery(success);
 
@@ -143,10 +144,11 @@ bool QueryLoggingSolver::computeTruth(const Query &query, bool &isValid) {
 }
 
 bool QueryLoggingSolver::computeValidity(const Query &query,
-                                         Solver::Validity &result) {
+                                         Solver::Validity &result,
+                                         std::vector<ref<Expr> > &unsatCore) {
   startQuery(query, "Validity");
 
-  bool success = solver->impl->computeValidity(query, result);
+  bool success = solver->impl->computeValidity(query, result, unsatCore);
 
   finishQuery(success);
 
@@ -180,11 +182,12 @@ bool QueryLoggingSolver::computeValue(const Query &query, ref<Expr> &result) {
 
 bool QueryLoggingSolver::computeInitialValues(
     const Query &query, const std::vector<const Array *> &objects,
-    std::vector<std::vector<unsigned char> > &values, bool &hasSolution) {
+    std::vector<std::vector<unsigned char> > &values, bool &hasSolution,
+    std::vector<ref<Expr> > &unsatCore) {
   startQuery(query, "InitialValues", 0, &objects);
 
-  bool success =
-      solver->impl->computeInitialValues(query, objects, values, hasSolution);
+  bool success = solver->impl->computeInitialValues(query, objects, values,
+                                                    hasSolution, unsatCore);
 
   finishQuery(success);
 

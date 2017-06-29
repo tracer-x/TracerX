@@ -971,12 +971,14 @@ public:
   FastCexSolver();
   ~FastCexSolver();
 
-  IncompleteSolver::PartialValidity computeTruth(const Query&);  
+  IncompleteSolver::PartialValidity
+  computeTruth(const Query &, std::vector<ref<Expr> > &unsatCore);
   bool computeValue(const Query&, ref<Expr> &result);
-  bool computeInitialValues(const Query&,
-                            const std::vector<const Array*> &objects,
-                            std::vector< std::vector<unsigned char> > &values,
-                            bool &hasSolution);
+  bool computeInitialValues(const Query &,
+                            const std::vector<const Array *> &objects,
+                            std::vector<std::vector<unsigned char> > &values,
+                            bool &hasSolution,
+                            std::vector<ref<Expr> > &unsatCore);
 };
 
 FastCexSolver::FastCexSolver() { }
@@ -997,8 +999,8 @@ FastCexSolver::~FastCexSolver() { }
 /// constraints were proven valid or invalid.
 ///
 /// \return - True if the propogation was able to prove validity or invalidity.
-static bool propogateValues(const Query& query, CexData &cd, 
-                            bool checkExpr, bool &isValid) {
+static bool propogateValues(const Query &query, CexData &cd, bool checkExpr,
+                            bool &isValid, std::vector<ref<Expr> > &unsatCore) {
   for (ConstraintManager::const_iterator it = query.constraints.begin(), 
          ie = query.constraints.end(); it != ie; ++it) {
     cd.propogatePossibleValue(*it, 1);
@@ -1045,12 +1047,13 @@ static bool propogateValues(const Query& query, CexData &cd,
   return false;
 }
 
-IncompleteSolver::PartialValidity 
-FastCexSolver::computeTruth(const Query& query) {
+IncompleteSolver::PartialValidity
+FastCexSolver::computeTruth(const Query &query,
+                            std::vector<ref<Expr> > &unsatCore) {
   CexData cd;
 
   bool isValid;
-  bool success = propogateValues(query, cd, true, isValid);
+  bool success = propogateValues(query, cd, true, isValid, unsatCore);
 
   if (!success)
     return IncompleteSolver::None;
@@ -1062,7 +1065,8 @@ bool FastCexSolver::computeValue(const Query& query, ref<Expr> &result) {
   CexData cd;
 
   bool isValid;
-  bool success = propogateValues(query, cd, false, isValid);
+  std::vector<ref<Expr> > unsatCore;
+  bool success = propogateValues(query, cd, false, isValid, unsatCore);
 
   // Check if propogation wasn't able to determine anything.
   if (!success)
@@ -1084,17 +1088,14 @@ bool FastCexSolver::computeValue(const Query& query, ref<Expr> &result) {
   }
 }
 
-bool
-FastCexSolver::computeInitialValues(const Query& query,
-                                    const std::vector<const Array*>
-                                      &objects,
-                                    std::vector< std::vector<unsigned char> >
-                                      &values,
-                                    bool &hasSolution) {
+bool FastCexSolver::computeInitialValues(
+    const Query &query, const std::vector<const Array *> &objects,
+    std::vector<std::vector<unsigned char> > &values, bool &hasSolution,
+    std::vector<ref<Expr> > &unsatCore) {
   CexData cd;
 
   bool isValid;
-  bool success = propogateValues(query, cd, true, isValid);
+  bool success = propogateValues(query, cd, true, isValid, unsatCore);
 
   // Check if propogation wasn't able to determine anything.
   if (!success)

@@ -22,8 +22,6 @@ namespace klee {
   /// TimingSolver - A simple class which wraps a solver and handles
   /// tracking the statistics that we care about.
   class TimingSolver {
-    std::vector<ref<Expr> > cachedUnsatCore;
-
   public:
     Solver *solver;
     bool simplifyExprs;
@@ -48,7 +46,8 @@ namespace klee {
       return solver->getConstraintLog(query);
     }
 
-    bool evaluate(const ExecutionState&, ref<Expr>, Solver::Validity &result);
+    bool evaluate(const ExecutionState &, ref<Expr>, Solver::Validity &result,
+                  std::vector<ref<Expr> > &unsatCore);
 
     bool mustBeTrue(const ExecutionState&, ref<Expr>, bool &result);
 
@@ -61,13 +60,13 @@ namespace klee {
     bool getValue(const ExecutionState &, ref<Expr> expr, 
                   ref<ConstantExpr> &result);
 
-    bool getInitialValues(const ExecutionState&, 
-                          const std::vector<const Array*> &objects,
-                          std::vector< std::vector<unsigned char> > &result);
+    bool getInitialValues(const ExecutionState &,
+                          const std::vector<const Array *> &objects,
+                          std::vector<std::vector<unsigned char> > &result,
+                          std::vector<ref<Expr> > &unsatCore);
 
     std::pair< ref<Expr>, ref<Expr> >
     getRange(const ExecutionState&, ref<Expr> query);
-    std::vector<ref<Expr> > &getUnsatCore();
   };
 
 }

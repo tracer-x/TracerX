@@ -1385,10 +1385,9 @@ bool SubsumptionTableEntry::subsumed(
           // the solver call as satisfiability check of the body of the query
           // expression.
           ConstraintManager constraints;
-          ref<ConstantExpr> tmpExpr;
 
           ref<Expr> falseExpr = ConstantExpr::create(0, Expr::Bool);
-          constraints.addConstraint(EqExpr::create(falseExpr, expr->getKid(0)));
+          constraints.addConstraint(expr->getKid(0));
 
           if (debugSubsumptionLevel >= 2) {
             klee_message("Querying for satisfiability check:\n%s",
@@ -1424,9 +1423,8 @@ bool SubsumptionTableEntry::subsumed(
           Z3Solver *z3solver = new Z3Solver();
           z3solver->setCoreSolverTimeout(timeout);
           success = z3solver->directComputeValidity(
-              Query(state.constraints, expr), result);
+              Query(state.constraints, expr), result, unsatCore);
           z3solver->setCoreSolverTimeout(0);
-          unsatCore = z3solver->getUnsatCore();
           delete z3solver;
 
           if (!success || result != Solver::True)
@@ -1443,13 +1441,11 @@ bool SubsumptionTableEntry::subsumed(
         // We call the solver in the standard way if the
         // formula is unquantified.
         solver->setTimeout(timeout);
-        success = solver->evaluate(state, expr, result);
+        success = solver->evaluate(state, expr, result, unsatCore);
         solver->setTimeout(0);
 
         if (!success || result != Solver::True)
           return false;
-
-        unsatCore = solver->getUnsatCore();
       }
     } else {
       // expr is a constant expression
@@ -2079,10 +2075,9 @@ TxTree::split(TxTreeNode *parent, ExecutionState *left, ExecutionState *right) {
   return ret;
 }
 
-void TxTree::markPathCondition(ExecutionState &state, TimingSolver *solver) {
+void TxTree::markPathCondition(ExecutionState &state, TimingSolver *solver,
+                               std::vector<ref<Expr> > &unsatCore) {
   TimerStatIncrementer t(markPathConditionTime);
-  const std::vector<ref<Expr> > &unsatCore = solver->getUnsatCore();
-
   int debugSubsumptionLevel =
       currentTxTreeNode->dependency->debugSubsumptionLevel;
 
