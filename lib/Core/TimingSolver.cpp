@@ -40,17 +40,16 @@ bool TimingSolver::evaluate(const ExecutionState &state, ref<Expr> expr,
   if (simplifyExprs)
     expr = state.constraints.simplifyExpr(expr, simplificationCore);
 
+  unsatCore.clear();
+
   bool success =
       solver->evaluate(Query(state.constraints, expr), result, unsatCore);
   if (INTERPOLATION_ENABLED) {
     if (result != Solver::Unknown) {
-      if (unsatCore.empty() && simplifyExprs) {
-        unsatCore.clear();
+      if (simplifyExprs) {
         unsatCore.insert(unsatCore.begin(), simplificationCore.begin(),
                          simplificationCore.end());
       }
-    } else {
-      unsatCore.clear();
     }
   }
 
