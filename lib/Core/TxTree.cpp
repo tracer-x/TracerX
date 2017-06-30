@@ -1369,7 +1369,7 @@ bool SubsumptionTableEntry::subsumed(
       return false;
     }
 
-    Z3Solver *z3solver = 0;
+    std::vector<ref<Expr> > unsatCore;
 
     // We call the solver only when the simplified query expression is not a
     // constant and no contradictory unary constraints found from
@@ -1379,16 +1379,6 @@ bool SubsumptionTableEntry::subsumed(
         if (debugSubsumptionLevel >= 2) {
           klee_message("Existentials not empty");
         }
-
-        // Instantiate a new Z3 solver to make sure we use Z3
-        // without pre-solving optimizations. It would be nice
-        // in the future to just run solver->evaluate so that
-        // the optimizations can be used, but this requires
-        // handling of quantified expressions by KLEE's pre-solving
-        // procedure, which does not exist currently.
-        z3solver = new Z3Solver();
-
-        z3solver->setCoreSolverTimeout(timeout);
 
         if (exprHasNoFreeVariables) {
           // In case the query expression has no free variables, we reformulate
@@ -1406,8 +1396,18 @@ bool SubsumptionTableEntry::subsumed(
                              constraints, falseExpr).c_str());
           }
 
-          success = z3solver->getValue(Query(constraints, falseExpr), tmpExpr);
-          result = success ? Solver::True : Solver::Unknown;
+          bool noSolution;
+          solver->setTimeout(timeout);
+          success = solver->solver->mustBeTrue(Query(constraints, falseExpr),
+                                               noSolution);
+          solver->setTimeout(0);
+
+          if (!success || noSolution)
+            return false;
+
+          // We can return here as there is no need to compute the
+          // interpolation.
+          return true;
         } else {
           if (debugSubsumptionLevel >= 2) {
             klee_message("Querying for subsumption check:\n%s",
@@ -1415,11 +1415,24 @@ bool SubsumptionTableEntry::subsumed(
                              state.constraints, expr).c_str());
           }
 
+          // Instantiate a new Z3 solver to make sure we use Z3
+          // without pre-solving optimizations. It would be nice
+          // in the future to just run solver->evaluate so that
+          // the optimizations can be used, but this requires
+          // handling of quantified expressions by KLEE's pre-solving
+          // procedure, which does not exist currently.
+          Z3Solver *z3solver = new Z3Solver();
+          z3solver->setCoreSolverTimeout(timeout);
           success = z3solver->directComputeValidity(
               Query(state.constraints, expr), result);
+          z3solver->setCoreSolverTimeout(0);
+          unsatCore = z3solver->getUnsatCore();
+          delete z3solver;
+
+          if (!success || result != Solver::True)
+            return false;
         }
 
-        z3solver->setCoreSolverTimeout(0);
 
       } else {
         if (debugSubsumptionLevel >= 2) {
@@ -1432,6 +1445,11 @@ bool SubsumptionTableEntry::subsumed(
         solver->setTimeout(timeout);
         success = solver->evaluate(state, expr, result);
         solver->setTimeout(0);
+
+        if (!success || result != Solver::True)
+          return false;
+
+        unsatCore = solver->getUnsatCore();
       }
     } else {
       // expr is a constant expression
@@ -1490,10 +1508,6 @@ bool SubsumptionTableEntry::subsumed(
       return false;
     }
 
-    if (success && result == Solver::True) {
-      const std::vector<ref<Expr> > &unsatCore =
-          (z3solver ? z3solver->getUnsatCore() : solver->getUnsatCore());
-
       // State subsumed, we mark needed constraints on the
       // path condition.
       if (debugSubsumptionLevel >= 1) {
@@ -1543,21 +1557,6 @@ bool SubsumptionTableEntry::subsumed(
       }
 
       return true;
-    }
-
-    // Here the solver could not decide that the subsumption is valid. It may
-    // have decided invalidity, however, CexCachingSolver::computeValidity,
-    // which was eventually called from solver->evaluate is conservative, where
-    // it returns Solver::Unknown even in case when invalidity is established by
-    // the solver.
-    if (z3solver)
-      delete z3solver;
-
-    if (debugSubsumptionLevel >= 1) {
-      klee_message(
-          "#%lu=>#%lu: Check failure as solver did not decide validity",
-          state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
-    }
   }
 #endif /* ENABLE_Z3 */
   return false;
