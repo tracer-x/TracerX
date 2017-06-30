@@ -2105,21 +2105,8 @@ void TxTree::markPathCondition(ExecutionState &state, TimingSolver *solver,
                                                  unknownExpression, reason);
   }
 
-  PathCondition *pc = currentTxTreeNode->pathCondition;
-
-  if (pc != 0) {
-    for (std::vector<ref<Expr> >::const_iterator it = unsatCore.begin(),
-                                                 ie = unsatCore.end();
-         it != ie; ++it) {
-      for (; pc != 0; pc = pc->cdr()) {
-        if (pc->car().compare(it->get()) == 0) {
-          pc->setAsCore(debugSubsumptionLevel);
-          pc = pc->cdr();
-          break;
-        }
-      }
-    }
-  }
+  // We create path condition marking structure and mark core constraints
+  currentTxTreeNode->unsatCoreInterpolation(unsatCore);
 }
 
 void TxTree::execute(llvm::Instruction *instr) {
