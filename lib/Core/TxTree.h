@@ -281,18 +281,18 @@ class SubsumptionTableEntry {
   ///
   /// \return false if there is contradictory equality constraints between state
   /// constraints and query expression, otherwise, return true.
-  static bool detectConflictPrimitives(ExecutionState &state, ref<Expr> query);
+  static bool detectConflictPrimitives(ExecutionState &state, ref<Expr> expr);
 
   /// \brief Get a conjunction of equalities that are top-level conjuncts in the
   /// query.
   ///
   /// \param conjunction The output conjunction of top-level conjuncts in the
   /// query expression.
-  /// \param query The query expression.
+  /// \param expr The query expression.
   /// \return false if there is an equality conjunct that is simplifiable to
   /// false, true otherwise.
-  static bool fetchQueryEqualityConjuncts(std::vector<ref<Expr> > &conjunction,
-                                          ref<Expr> query);
+  static bool fetchExprEqualityConjucts(std::vector<ref<Expr> > &conjunction,
+                                        ref<Expr> expr);
 
   static ref<Expr> simplifyArithmeticBody(ref<Expr> existsExpr,
                                           bool &hasExistentialsOnly);

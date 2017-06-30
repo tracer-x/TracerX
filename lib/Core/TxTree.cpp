@@ -643,12 +643,12 @@ SubsumptionTableEntry::removeUnsubstituted(std::set<const Array *> &variables,
 }
 
 bool SubsumptionTableEntry::detectConflictPrimitives(ExecutionState &state,
-                                                     ref<Expr> query) {
-  if (llvm::isa<ExistsExpr>(query))
+                                                     ref<Expr> expr) {
+  if (llvm::isa<ExistsExpr>(expr))
     return true;
 
   std::vector<ref<Expr> > conjunction;
-  if (!fetchQueryEqualityConjuncts(conjunction, query)) {
+  if (!fetchExprEqualityConjucts(conjunction, expr)) {
     return false;
   }
 
@@ -664,17 +664,17 @@ bool SubsumptionTableEntry::detectConflictPrimitives(ExecutionState &state,
          it2 != ie2; ++it2) {
 
       ref<Expr> stateConstraintExpr = it1->get();
-      ref<Expr> queryExpr = it2->get();
+      ref<Expr> exprEqConstraint = it2->get();
 
-      if (stateConstraintExpr != queryExpr &&
+      if (stateConstraintExpr != exprEqConstraint &&
           (llvm::isa<EqExpr>(stateConstraintExpr) ||
-           llvm::isa<EqExpr>(queryExpr))) {
+           llvm::isa<EqExpr>(exprEqConstraint))) {
 
         if (stateConstraintExpr ==
                 EqExpr::create(ConstantExpr::create(0, Expr::Bool),
-                               queryExpr) ||
+                               exprEqConstraint) ||
             EqExpr::create(ConstantExpr::create(0, Expr::Bool),
-                           stateConstraintExpr) == queryExpr) {
+                           stateConstraintExpr) == exprEqConstraint) {
           return false;
         }
       }
@@ -684,27 +684,27 @@ bool SubsumptionTableEntry::detectConflictPrimitives(ExecutionState &state,
   return true;
 }
 
-bool SubsumptionTableEntry::fetchQueryEqualityConjuncts(
-    std::vector<ref<Expr> > &conjunction, ref<Expr> query) {
+bool SubsumptionTableEntry::fetchExprEqualityConjucts(
+    std::vector<ref<Expr> > &conjunction, ref<Expr> expr) {
 
-  if (!llvm::isa<AndExpr>(query)) {
-    if (query->getKind() == Expr::Eq) {
+  if (!llvm::isa<AndExpr>(expr)) {
+    if (expr->getKind() == Expr::Eq) {
 
-      EqExpr *equality = llvm::dyn_cast<EqExpr>(query);
+      EqExpr *equality = llvm::dyn_cast<EqExpr>(expr);
 
       if (llvm::isa<ConstantExpr>(equality->getKid(0)) &&
           llvm::isa<ConstantExpr>(equality->getKid(1)) &&
           equality->getKid(0) != equality->getKid(1)) {
         return false;
       } else {
-        conjunction.push_back(query);
+        conjunction.push_back(expr);
       }
     }
     return true;
   }
 
-  return fetchQueryEqualityConjuncts(conjunction, query->getKid(0)) &&
-         fetchQueryEqualityConjuncts(conjunction, query->getKid(1));
+  return fetchExprEqualityConjucts(conjunction, expr->getKid(0)) &&
+         fetchExprEqualityConjucts(conjunction, expr->getKid(1));
 }
 
 ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
@@ -1263,24 +1263,24 @@ bool SubsumptionTableEntry::subsumed(
   }
 
   Solver::Validity result;
-  ref<Expr> query;
+  ref<Expr> expr; // The query expression
 
   {
     TimerStatIncrementer t(solverAccessTime);
 
-    // Here we build the query, after which it is always a conjunction of
-    // the interpolant and the state equality constraints. Here we call
-    // AndExpr::alloc instead of AndExpr::create as we need to guarantee that
-    // the resulting expression is an AndExpr, otherwise simplifyExistsExpr
+    // Here we build the query expression, after which it is always a
+    // conjunction of the interpolant and the state equality constraints. Here
+    // we call AndExpr::alloc instead of AndExpr::create as we need to guarantee
+    // that the resulting expression is an AndExpr, otherwise simplifyExistsExpr
     // would not work.
     if (!interpolant.isNull()) {
-      query = !stateEqualityConstraints.isNull()
-                  ? AndExpr::alloc(interpolant, stateEqualityConstraints)
-                  : AndExpr::alloc(interpolant,
-                                   ConstantExpr::create(1, Expr::Bool));
+      expr = !stateEqualityConstraints.isNull()
+                 ? AndExpr::alloc(interpolant, stateEqualityConstraints)
+                 : AndExpr::alloc(interpolant,
+                                  ConstantExpr::create(1, Expr::Bool));
     } else if (!stateEqualityConstraints.isNull()) {
-      query = AndExpr::alloc(ConstantExpr::create(1, Expr::Bool),
-                             stateEqualityConstraints);
+      expr = AndExpr::alloc(ConstantExpr::create(1, Expr::Bool),
+                            stateEqualityConstraints);
     } else {
       // Here both the interpolant constraints and state equality
       // constraints are empty, therefore everything gets subsumed
@@ -1335,21 +1335,21 @@ bool SubsumptionTableEntry::subsumed(
       return true;
     }
 
-    bool queryHasNoFreeVariables = false;
+    bool exprHasNoFreeVariables = false;
 
     if (!existentials.empty()) {
-      ref<Expr> existsExpr = ExistsExpr::create(existentials, query);
+      ref<Expr> existsExpr = ExistsExpr::create(existentials, expr);
       if (debugSubsumptionLevel >= 2) {
         klee_message("Before simplification:\n%s",
                      PrettyExpressionBuilder::constructQuery(
                          state.constraints, existsExpr).c_str());
       }
-      query = simplifyExistsExpr(existsExpr, queryHasNoFreeVariables);
+      expr = simplifyExistsExpr(existsExpr, exprHasNoFreeVariables);
     }
 
-    // If query simplification result was false, we quickly fail without calling
-    // the solver
-    if (query->isFalse()) {
+    // If query expression simplification result was false, we quickly fail
+    // without calling the solver
+    if (expr->isFalse()) {
       if (debugSubsumptionLevel >= 1) {
         klee_message("#%lu=>#%lu: Check failure as consequent is unsatisfiable",
                      state.txTreeNode->getNodeSequenceNumber(),
@@ -1360,7 +1360,7 @@ bool SubsumptionTableEntry::subsumed(
 
     bool success = false;
 
-    if (!detectConflictPrimitives(state, query)) {
+    if (!detectConflictPrimitives(state, expr)) {
       if (debugSubsumptionLevel >= 1) {
         klee_message(
             "#%lu=>#%lu: Check failure as contradictory equalities detected",
@@ -1371,11 +1371,11 @@ bool SubsumptionTableEntry::subsumed(
 
     Z3Solver *z3solver = 0;
 
-    // We call the solver only when the simplified query is not a constant and
-    // no contradictory unary constraints found from solvingUnaryConstraints
-    // method.
-    if (!llvm::isa<ConstantExpr>(query)) {
-      if (!existentials.empty() && llvm::isa<ExistsExpr>(query)) {
+    // We call the solver only when the simplified query expression is not a
+    // constant and no contradictory unary constraints found from
+    // solvingUnaryConstraints method.
+    if (!llvm::isa<ConstantExpr>(expr)) {
+      if (!existentials.empty() && llvm::isa<ExistsExpr>(expr)) {
         if (debugSubsumptionLevel >= 2) {
           klee_message("Existentials not empty");
         }
@@ -1390,16 +1390,15 @@ bool SubsumptionTableEntry::subsumed(
 
         z3solver->setCoreSolverTimeout(timeout);
 
-        if (queryHasNoFreeVariables) {
-          // In case the query has no free variables, we reformulate
-          // the solver call as satisfiability check of the body of
-          // the query.
+        if (exprHasNoFreeVariables) {
+          // In case the query expression has no free variables, we reformulate
+          // the solver call as satisfiability check of the body of the query
+          // expression.
           ConstraintManager constraints;
           ref<ConstantExpr> tmpExpr;
 
           ref<Expr> falseExpr = ConstantExpr::create(0, Expr::Bool);
-          constraints.addConstraint(
-              EqExpr::create(falseExpr, query->getKid(0)));
+          constraints.addConstraint(EqExpr::create(falseExpr, expr->getKid(0)));
 
           if (debugSubsumptionLevel >= 2) {
             klee_message("Querying for satisfiability check:\n%s",
@@ -1413,11 +1412,11 @@ bool SubsumptionTableEntry::subsumed(
           if (debugSubsumptionLevel >= 2) {
             klee_message("Querying for subsumption check:\n%s",
                          PrettyExpressionBuilder::constructQuery(
-                             state.constraints, query).c_str());
+                             state.constraints, expr).c_str());
           }
 
           success = z3solver->directComputeValidity(
-              Query(state.constraints, query), result);
+              Query(state.constraints, expr), result);
         }
 
         z3solver->setCoreSolverTimeout(0);
@@ -1426,25 +1425,26 @@ bool SubsumptionTableEntry::subsumed(
         if (debugSubsumptionLevel >= 2) {
           klee_message("Querying for subsumption check:\n%s",
                        PrettyExpressionBuilder::constructQuery(
-                           state.constraints, query).c_str());
+                           state.constraints, expr).c_str());
         }
         // We call the solver in the standard way if the
         // formula is unquantified.
         solver->setTimeout(timeout);
-        success = solver->evaluate(state, query, result);
+        success = solver->evaluate(state, expr, result);
         solver->setTimeout(0);
       }
     } else {
-      // query is a constant expression
-      if (query->isTrue()) {
+      // expr is a constant expression
+      if (expr->isTrue()) {
         if (debugSubsumptionLevel >= 1) {
           std::string msg = "";
           if (!corePointerValues.empty()) {
             msg += " (with successful memory bound checks)";
           }
-          klee_message("#%lu=>#%lu: Check success as query is true%s",
-                       state.txTreeNode->getNodeSequenceNumber(),
-                       nodeSequenceNumber, msg.c_str());
+          klee_message(
+              "#%lu=>#%lu: Check success as query expression is true%s",
+              state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber,
+              msg.c_str());
         }
 
         if (Dependency::boundInterpolation() && !ExactAddressInterpolant) {
@@ -1483,9 +1483,9 @@ bool SubsumptionTableEntry::subsumed(
         return true;
       }
       if (debugSubsumptionLevel >= 1) {
-        klee_message("#%lu=>#%lu: Check failure as query is non-true",
-                     state.txTreeNode->getNodeSequenceNumber(),
-                     nodeSequenceNumber);
+        klee_message(
+            "#%lu=>#%lu: Check failure as query expression is non-true",
+            state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
       }
       return false;
     }
