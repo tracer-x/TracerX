@@ -1,4 +1,4 @@
-//===--- TxPrintUtil.h - Memory location dependency -------------*- C++ -*-===//
+//===--- TxPrintUtil.h - Utilities for formatting output --------*- C++ -*-===//
 //
 //               The Tracer-X KLEE Symbolic Virtual Machine
 //
