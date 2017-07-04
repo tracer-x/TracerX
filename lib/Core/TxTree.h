@@ -227,9 +227,9 @@ class SubsumptionTableEntry {
 
   ref<Expr> interpolant;
 
-  Dependency::InterpolantStore concreteAddressStore;
+  TxStore::TopInterpolantStore concreteAddressStore;
 
-  Dependency::InterpolantStore symbolicAddressStore;
+  TxStore::TopInterpolantStore symbolicAddressStore;
 
   std::set<const Array *> existentials;
 
@@ -329,8 +329,8 @@ public:
   ~SubsumptionTableEntry();
 
   bool subsumed(TimingSolver *solver, ExecutionState &state, double timeout,
-                Dependency::InterpolantStore &concretelyAddressedStore,
-                Dependency::InterpolantStore &symbolicallyAddressedStore,
+                TxStore::TopInterpolantStore &concretelyAddressedStore,
+                TxStore::TopInterpolantStore &symbolicallyAddressedStore,
                 int debugSubsumptionLevel);
 
   /// Tests if the argument is a variable. A variable here is defined to be
@@ -497,8 +497,8 @@ public:
   /// part indexed by symbolic expressions.
   void getStoredExpressions(
       const std::vector<llvm::Instruction *> &callHistory,
-      Dependency::InterpolantStore &concretelyAddressedStore,
-      Dependency::InterpolantStore &symbolicallyAddressedStore) const;
+      TxStore::TopInterpolantStore &concretelyAddressedStore,
+      TxStore::TopInterpolantStore &symbolicallyAddressedStore) const;
 
   /// \brief This retrieves the allocations known at this state, and the
   /// expressions stored in the allocations, as long as the allocation is
@@ -514,8 +514,8 @@ public:
   void getStoredCoreExpressions(
       const std::vector<llvm::Instruction *> &callHistory,
       std::set<const Array *> &replacements,
-      Dependency::InterpolantStore &concretelyAddressedStore,
-      Dependency::InterpolantStore &symbolicallyAddressedStore) const;
+      TxStore::TopInterpolantStore &concretelyAddressedStore,
+      TxStore::TopInterpolantStore &symbolicallyAddressedStore) const;
 
   void incInstructionsDepth();
 
