@@ -24,47 +24,75 @@
 
 namespace klee {
 
+class TxStoreEntry {
+public:
+  unsigned refCount;
+
+private:
+  ref<TxStateAddress> address;
+
+  ref<TxStateValue> addressValue;
+
+  ref<TxStateValue> content;
+
+public:
+  TxStoreEntry(ref<TxStateAddress> _address, ref<TxStateValue> _addressValue,
+               ref<TxStateValue> _content)
+      : refCount(0), address(_address), addressValue(_addressValue),
+        content(_content) {}
+
+  ~TxStoreEntry() {}
+
+  ref<TxInterpolantAddress> getIndex() {
+    return address->getInterpolantStyleAddress();
+  }
+
+  ref<TxStateAddress> getAddress() { return address; }
+
+  ref<TxStateValue> getAddressValue() { return addressValue; }
+
+  ref<TxStateValue> getContent() { return content; }
+};
+
 class TxStore {
 public:
   typedef std::map<ref<TxInterpolantAddress>, ref<TxInterpolantValue> >
   LowerInterpolantStore;
   typedef std::map<const llvm::Value *, LowerInterpolantStore>
   TopInterpolantStore;
-  typedef std::map<ref<TxStateAddress>,
-                   std::pair<ref<TxStateValue>, ref<TxStateValue> > >
-  StateStore;
+  typedef std::map<ref<TxInterpolantAddress>, ref<TxStoreEntry> > StateStore;
 
 private:
   /// \brief The mapping of concrete locations to stored value
   StateStore concretelyAddressedStore;
 
   /// \brief Ordered keys of the concretely-addressed store.
-  std::vector<ref<TxStateAddress> > concretelyAddressedStoreKeys;
+  std::vector<ref<TxInterpolantAddress> > concretelyAddressedStoreKeys;
 
   /// \brief The mapping of symbolic locations to stored value
   StateStore symbolicallyAddressedStore;
 
   /// \brief Ordered keys of the symbolically-addressed store.
-  std::vector<ref<TxStateAddress> > symbolicallyAddressedStoreKeys;
+  std::vector<ref<TxInterpolantAddress> > symbolicallyAddressedStoreKeys;
 
   void removeAddressValue(
-      std::map<ref<TxStateAddress>, ref<TxStateValue> > &simpleStore,
+      std::map<ref<TxInterpolantAddress>, ref<TxStateValue> > &simpleStore,
       TopInterpolantStore &concreteStore, std::set<const Array *> &replacements,
       bool coreOnly) const;
 
-  void
-  getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
-                   const StateStore &store,
-                   const std::vector<ref<TxStateAddress> > &orderedStoreKeys,
-                   std::set<const Array *> &replacements, bool coreOnly,
-                   TopInterpolantStore &concreteStore) const;
+  void getConcreteStore(
+      const std::vector<llvm::Instruction *> &callHistory,
+      const StateStore &store,
+      const std::vector<ref<TxInterpolantAddress> > &orderedStoreKeys,
+      std::set<const Array *> &replacements, bool coreOnly,
+      TopInterpolantStore &concreteStore) const;
 
-  void
-  getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
-                   const StateStore &store,
-                   const std::vector<ref<TxStateAddress> > &orderedStoreKeys,
-                   std::set<const Array *> &replacements, bool coreOnly,
-                   TopInterpolantStore &symbolicStore) const;
+  void getSymbolicStore(
+      const std::vector<llvm::Instruction *> &callHistory,
+      const StateStore &store,
+      const std::vector<ref<TxInterpolantAddress> > &orderedStoreKeys,
+      std::set<const Array *> &replacements, bool coreOnly,
+      TopInterpolantStore &symbolicStore) const;
 
 public:
   /// \brief Constructor for an empty store.
@@ -86,7 +114,7 @@ public:
   }
 
   StateStore::iterator concreteFind(ref<TxStateAddress> loc) {
-    return concretelyAddressedStore.find(loc);
+    return concretelyAddressedStore.find(loc->getInterpolantStyleAddress());
   }
 
   StateStore::iterator concreteBegin() {
@@ -96,7 +124,7 @@ public:
   StateStore::iterator concreteEnd() { return concretelyAddressedStore.end(); }
 
   StateStore::iterator symbolicFind(ref<TxStateAddress> loc) {
-    return symbolicallyAddressedStore.find(loc);
+    return symbolicallyAddressedStore.find(loc->getInterpolantStyleAddress());
   }
 
   StateStore::iterator symbolicBegin() {

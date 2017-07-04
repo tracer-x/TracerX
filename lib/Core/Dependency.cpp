@@ -736,29 +736,27 @@ void Dependency::execute(llvm::Instruction *instr,
           ref<TxStateAddress> loc = *(locations.begin());
 
           // Check the possible mismatch between Tracer-X and KLEE loaded value
-          std::map<ref<TxStateAddress>,
-                   std::pair<ref<TxStateValue>, ref<TxStateValue> > >::iterator
-          storeIt = store.concreteFind(loc);
-          std::pair<ref<TxStateValue>, ref<TxStateValue> > target;
+          TxStore::StateStore::iterator storeIt = store.concreteFind(loc);
+          ref<TxStoreEntry> target;
 
           if (storeIt == store.concreteEnd()) {
             storeIt = store.symbolicFind(loc);
             if (storeIt != store.symbolicEnd()) {
-                target = storeIt->second;
+              target = storeIt->second;
               }
           } else {
               target = storeIt->second;
           }
 
-          if (!target.second.isNull() &&
-              valueExpr != target.second->getExpression()) {
+          if (!target.isNull() &&
+              valueExpr != target->getContent()->getExpression()) {
             // Print a warning when the expressions mismatch, unless when the
             // expression comes from klee_make_symbolic in a loop, as the
             // expected expression recorded in Tracer-X shadow memory may be
             // outdated, and the expression that comes from KLEE is the updated
             // one from klee_make_symbolic.
-            llvm::CallInst *ci =
-                llvm::dyn_cast<llvm::CallInst>(target.second->getValue());
+            llvm::CallInst *ci = llvm::dyn_cast<llvm::CallInst>(
+                target->getContent()->getValue());
             if (ci) {
               // Here we determine if this was a call to klee_make_symbolic from
               // the LLVM source of the call instruction instead of
@@ -772,7 +770,7 @@ void Dependency::execute(llvm::Instruction *instr,
                 std::string msg;
                 llvm::raw_string_ostream s2(msg);
                 s2 << "Loaded value ";
-                target.second->getExpression()->print(s2);
+                target->getContent()->getExpression()->print(s2);
                 s2 << " should be ";
                 valueExpr->print(s2);
                 s2.flush();
@@ -822,11 +820,9 @@ void Dependency::execute(llvm::Instruction *instr,
       for (std::set<ref<TxStateAddress> >::iterator li = locations.begin(),
                                                     le = locations.end();
            li != le; ++li) {
-        std::pair<ref<TxStateValue>, ref<TxStateValue> > addressValuePair;
+        ref<TxStoreEntry> addressValuePair;
 
-        std::map<ref<TxStateAddress>,
-                 std::pair<ref<TxStateValue>, ref<TxStateValue> > >::iterator
-        storeIter;
+        TxStore::StateStore::iterator storeIter;
         if ((*li)->hasConstantAddress()) {
           storeIter = store.concreteFind(*li);
           if (storeIter != store.concreteEnd()) {
@@ -844,21 +840,22 @@ void Dependency::execute(llvm::Instruction *instr,
 
         // Build the loaded value
         ref<TxStateValue> loadedValue =
-            (addressValuePair.second.isNull() ||
-             addressValuePair.second->getLocations().empty()) &&
+            (addressValuePair.isNull() ||
+             addressValuePair->getContent()->getLocations().empty()) &&
                     loadedType->isPointerTy()
                 ? getNewPointerValue(instr, callHistory, valueExpr, 0)
                 : getNewTxStateValue(instr, callHistory, valueExpr);
 
-        if (addressValuePair.second.isNull() ||
+        if (addressValuePair.isNull() ||
             loadedValue->getExpression() !=
-                addressValuePair.second->getExpression()) {
+                addressValuePair->getContent()->getExpression()) {
           // We could not find the stored value, create a new one.
           store.updateStoreWithLoadedValue(*li, addressValue, loadedValue);
         } else {
-          addDependencyViaLocation(addressValuePair.second, loadedValue, *li);
+          addDependencyViaLocation(addressValuePair->getContent(), loadedValue,
+                                   *li);
           loadedValue->setLoadAddress(addressValue);
-          loadedValue->setStoreAddress(addressValuePair.first);
+          loadedValue->setStoreAddress(addressValuePair->getAddressValue());
         }
       }
       break;

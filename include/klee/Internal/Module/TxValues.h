@@ -171,6 +171,13 @@ private:
   /// stored in x.
   uint64_t indirectionCount;
 
+  /// \brief The copy constructor.
+  TxInterpolantAddress(const TxInterpolantAddress &src)
+      : refCount(0), context(src.context), offset(src.offset),
+        isConcrete(src.isConcrete), concreteOffset(src.concreteOffset),
+        indirectionCount(src.indirectionCount) {}
+
+  /// \brief The normal constructor.
   TxInterpolantAddress(ref<AllocationContext> _context, ref<Expr> _offset)
       : refCount(0), context(_context), offset(_offset), indirectionCount(0) {
     isConcrete = false;
@@ -194,6 +201,19 @@ public:
   ref<AllocationContext> getContext() const { return context; }
 
   ref<Expr> getOffset() const { return offset; }
+
+  bool
+  contextIsPrefixOf(const std::vector<llvm::Instruction *> &callHistory) const {
+    return getContext()->isPrefixOf(callHistory);
+  }
+
+  /// \brief Copy this address, but increment the indirection count
+  ref<TxInterpolantAddress> copyWithIndirectionCountIncrement() {
+    TxInterpolantAddress copy = *this;
+    copy.indirectionCount++;
+    ref<TxInterpolantAddress> ret(&copy);
+    return ret;
+  }
 
   /// \brief The comparator of this class' objects. This member function checks
   /// for the equality of TxInterpolantAddress#indirectionCount member variables
@@ -468,20 +488,6 @@ public:
   }
 
   llvm::Value *getValue() const { return interpolantStyleAddress->getBase(); }
-
-  /// \brief Copy this address, but increment the indirection count
-  ref<TxStateAddress> copyWithIndirectionCountIncrement() {
-    ref<Expr> offset = interpolantStyleAddress->getOffset();
-    ref<TxStateAddress> ret(new TxStateAddress(
-        interpolantStyleAddress->getContext(), address, base, offset, size));
-    ret->interpolantStyleAddress->incrementIndirectionCount();
-    return ret;
-  }
-
-  bool
-  contextIsPrefixOf(const std::vector<llvm::Instruction *> &callHistory) const {
-    return getContext()->isPrefixOf(callHistory);
-  }
 
   int compare(const TxStateAddress &other) const {
     int res = interpolantStyleAddress->compare(
