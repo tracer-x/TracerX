@@ -130,8 +130,7 @@ void TxStore::removeAddressValue(
 
 void TxStore::getConcreteStore(
     const std::vector<llvm::Instruction *> &callHistory,
-    const std::map<ref<TxStateAddress>,
-                   std::pair<ref<TxStateValue>, ref<TxStateValue> > > &store,
+    const StateStore &store,
     const std::vector<ref<TxStateAddress> > &orderedStoreKeys,
     std::set<const Array *> &replacements, bool coreOnly,
     TopInterpolantStore &concreteStore) const {
@@ -236,8 +235,7 @@ void TxStore::getConcreteStore(
 
 void TxStore::getSymbolicStore(
     const std::vector<llvm::Instruction *> &callHistory,
-    const std::map<ref<TxStateAddress>,
-                   std::pair<ref<TxStateValue>, ref<TxStateValue> > > &store,
+    const StateStore &store,
     const std::vector<ref<TxStateAddress> > &orderedStoreKeys,
     std::set<const Array *> &replacements, bool coreOnly,
     TopInterpolantStore &symbolicStore) const {
