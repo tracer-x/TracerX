@@ -78,14 +78,12 @@ private:
   void getConcreteStore(
       const std::vector<llvm::Instruction *> &callHistory,
       const StateStore &store,
-      const std::vector<ref<TxInterpolantAddress> > &orderedStoreKeys,
       std::set<const Array *> &replacements, bool coreOnly,
       TopInterpolantStore &concreteStore) const;
 
   void getSymbolicStore(
       const std::vector<llvm::Instruction *> &callHistory,
       const StateStore &store,
-      const std::vector<ref<TxInterpolantAddress> > &orderedStoreKeys,
       std::set<const Array *> &replacements, bool coreOnly,
       TopInterpolantStore &symbolicStore) const;
 
@@ -96,16 +94,12 @@ public:
   /// \brief The copy constructor of this class.
   TxStore(const TxStore &src)
       : concretelyAddressedStore(src.concretelyAddressedStore),
-        concretelyAddressedStoreKeys(src.concretelyAddressedStoreKeys),
-        symbolicallyAddressedStore(src.symbolicallyAddressedStore),
-        symbolicallyAddressedStoreKeys(src.symbolicallyAddressedStoreKeys) {}
+        symbolicallyAddressedStore(src.symbolicallyAddressedStore) {}
 
   ~TxStore() {
     // Delete the locally-constructed relations
     concretelyAddressedStore.clear();
-    concretelyAddressedStoreKeys.clear();
     symbolicallyAddressedStore.clear();
-    symbolicallyAddressedStoreKeys.clear();
   }
 
   StateStore::iterator concreteFind(ref<TxStateAddress> loc) {

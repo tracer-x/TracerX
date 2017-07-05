@@ -29,18 +29,15 @@ void TxStore::getStoredExpressions(
     std::set<const Array *> &replacements, bool coreOnly,
     TopInterpolantStore &_concretelyAddressedStore,
     TopInterpolantStore &_symbolicallyAddressedStore) {
-  getConcreteStore(callHistory, concretelyAddressedStore,
-                   concretelyAddressedStoreKeys, replacements, coreOnly,
-                   _concretelyAddressedStore);
-  getSymbolicStore(callHistory, symbolicallyAddressedStore,
-                   symbolicallyAddressedStoreKeys, replacements, coreOnly,
-                   _symbolicallyAddressedStore);
+  getConcreteStore(callHistory, concretelyAddressedStore, replacements,
+                   coreOnly, _concretelyAddressedStore);
+  getSymbolicStore(callHistory, symbolicallyAddressedStore, replacements,
+                   coreOnly, _symbolicallyAddressedStore);
 }
 
 void TxStore::getConcreteStore(
     const std::vector<llvm::Instruction *> &callHistory,
     const StateStore &store,
-    const std::vector<ref<TxInterpolantAddress> > &orderedStoreKeys,
     std::set<const Array *> &replacements, bool coreOnly,
     TopInterpolantStore &concreteStore) const {
   for (StateStore::const_iterator it = store.begin(), ie = store.end();
@@ -78,7 +75,6 @@ void TxStore::getConcreteStore(
 void TxStore::getSymbolicStore(
     const std::vector<llvm::Instruction *> &callHistory,
     const StateStore &store,
-    const std::vector<ref<TxInterpolantAddress> > &orderedStoreKeys,
     std::set<const Array *> &replacements, bool coreOnly,
     TopInterpolantStore &symbolicStore) const {
   for (StateStore::const_iterator it = store.begin(), ie = store.end();
@@ -126,11 +122,9 @@ void TxStore::updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
   if (loc->hasConstantAddress()) {
     concretelyAddressedStore[loc->getInterpolantStyleAddress()] =
         ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
-    concretelyAddressedStoreKeys.push_back(loc->getInterpolantStyleAddress());
   } else {
     symbolicallyAddressedStore[loc->getInterpolantStyleAddress()] =
         ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
-    symbolicallyAddressedStoreKeys.push_back(loc->getInterpolantStyleAddress());
   }
 }
 
