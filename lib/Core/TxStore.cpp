@@ -1,5 +1,4 @@
-//===-- TxStore.cpp - A view of program memory -------------------*- C++
-//-*-===//
+//===-- TxStore.cpp - A view of program memory ------------------*- C++ -*-===//
 //
 //               The Tracer-X KLEE Symbolic Virtual Machine
 //
