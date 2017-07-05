@@ -150,9 +150,11 @@ void TxStore::getConcreteStore(
     if (it->second.second.isNull())
       continue;
 
-    _concreteStore[it->first] = it->second.second;
-    if (coreOnly && it->second.second->isCore()) {
+    if (!coreOnly) {
+      _concreteStore[it->first] = it->second.second;
+    } else if (it->second.second->isCore()) {
       // An address is in the core if it stores a value that is in the core
+      _concreteStore[it->first] = it->second.second;
       useCount[it->second.second] = it->second.second->getDirectUseCount();
     }
   }
