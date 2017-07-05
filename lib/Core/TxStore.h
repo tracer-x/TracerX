@@ -75,11 +75,6 @@ private:
   /// \brief Ordered keys of the symbolically-addressed store.
   std::vector<ref<TxInterpolantAddress> > symbolicallyAddressedStoreKeys;
 
-  void removeAddressValue(
-      std::map<ref<TxInterpolantAddress>, ref<TxStateValue> > &simpleStore,
-      TopInterpolantStore &concreteStore, std::set<const Array *> &replacements,
-      bool coreOnly) const;
-
   void getConcreteStore(
       const std::vector<llvm::Instruction *> &callHistory,
       const StateStore &store,

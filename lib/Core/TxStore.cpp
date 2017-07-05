@@ -37,106 +37,12 @@ void TxStore::getStoredExpressions(
                    _symbolicallyAddressedStore);
 }
 
-void TxStore::removeAddressValue(
-    std::map<ref<TxInterpolantAddress>, ref<TxStateValue> > &simpleStore,
-    TopInterpolantStore &concreteStore, std::set<const Array *> &replacements,
-    bool coreOnly) const {
-  std::map<ref<TxInterpolantAddress>, ref<TxStateValue> > _concreteStore;
-  std::set<ref<TxInterpolantAddress> > addressToBeReplaced;
-
-  for (std::map<ref<TxInterpolantAddress>, ref<TxStateValue> >::iterator
-           it = simpleStore.begin(),
-           ie = simpleStore.end();
-       it != ie; ++it) {
-    ref<TxInterpolantAddress> keyAddress = it->first;
-    const std::set<ref<TxStateAddress> > &addresses =
-        it->second->getLocations();
-    if (addresses.size() > 0) {
-      std::map<ref<TxInterpolantAddress>, ref<TxStateValue> >::iterator it1;
-      for (std::set<ref<TxStateAddress> >::const_iterator
-               it2 = addresses.begin(),
-               ie2 = addresses.end();
-           it2 != ie2; ++it2) {
-        it1 = simpleStore.find((*it2)->getInterpolantStyleAddress());
-        if (it1 != simpleStore.end()) {
-          addressToBeReplaced.insert((*it2)->getInterpolantStyleAddress());
-          // Found the address in the map;
-          _concreteStore[keyAddress->copyWithIndirectionCountIncrement()] =
-              it1->second;
-          break;
-        }
-      }
-    }
-  }
-
-  std::set<ref<TxInterpolantAddress> >::iterator addressesToRemoveEnd =
-      addressToBeReplaced.end();
-
-  // FIXME: Perhaps it is more efficient to iterate on
-  // concretelyAddressedStoreKeys earlier.
-  for (std::vector<ref<TxInterpolantAddress> >::const_reverse_iterator
-           it = concretelyAddressedStoreKeys.rbegin(),
-           ie = concretelyAddressedStoreKeys.rend();
-       it != ie; ++it) {
-
-    std::map<ref<TxInterpolantAddress>, ref<TxStateValue> >::iterator it1 =
-        simpleStore.find(*it);
-    if (it1 != simpleStore.end() &&
-        addressToBeReplaced.find(it1->first) == addressesToRemoveEnd) {
-      const llvm::Value *base = it1->first->getContext()->getValue();
-      ref<TxInterpolantAddress> address = it1->first;
-      std::map<ref<TxInterpolantAddress>, ref<TxInterpolantValue> > &
-      addressValueMap = concreteStore[base];
-      if (addressValueMap.find(address) == addressValueMap.end()) {
-        ref<TxInterpolantValue> storedValue;
-#ifdef ENABLE_Z3
-        if (coreOnly && !NoExistential) {
-          storedValue = it1->second->getInterpolantStyleValue(replacements);
-        } else {
-          storedValue = it1->second->getInterpolantStyleValue();
-        }
-#else
-        storedValue = it1->second->getInterpolantStyleValue();
-#endif
-        addressValueMap[address] = storedValue;
-      }
-    }
-
-    for (std::map<ref<TxInterpolantAddress>, ref<TxStateValue> >::iterator
-             it1 = _concreteStore.begin(),
-             ie1 = _concreteStore.end();
-         it1 != ie1; ++it1) {
-      const llvm::Value *base = it1->first->getContext()->getValue();
-      ref<TxInterpolantAddress> address = it1->first;
-      std::map<ref<TxInterpolantAddress>, ref<TxInterpolantValue> > &
-      addressValueMap = concreteStore[base];
-      if (addressValueMap.find(address) == addressValueMap.end()) {
-        ref<TxInterpolantValue> storedValue;
-#ifdef ENABLE_Z3
-        if (coreOnly && !NoExistential) {
-          storedValue = it1->second->getInterpolantStyleValue(replacements);
-        } else {
-          storedValue = it1->second->getInterpolantStyleValue();
-        }
-#else
-        storedValue = it1->second->getInterpolantStyleValue();
-#endif
-        addressValueMap[address] = storedValue;
-      }
-    }
-  }
-}
-
 void TxStore::getConcreteStore(
     const std::vector<llvm::Instruction *> &callHistory,
     const StateStore &store,
     const std::vector<ref<TxInterpolantAddress> > &orderedStoreKeys,
     std::set<const Array *> &replacements, bool coreOnly,
     TopInterpolantStore &concreteStore) const {
-  std::map<ref<TxInterpolantAddress>, ref<TxStateValue> > _concreteStore;
-
-  std::map<ref<TxStateValue>, uint64_t> useCount;
-
   for (StateStore::const_iterator it = store.begin(), ie = store.end();
        it != ie; ++it) {
     if (!it->first->contextIsPrefixOf(callHistory))
@@ -146,88 +52,26 @@ void TxStore::getConcreteStore(
       continue;
 
     if (!coreOnly) {
-      _concreteStore[it->first] = it->second->getContent();
+      LowerInterpolantStore &map =
+          concreteStore[it->first->getContext()->getValue()];
+      map[it->first] = it->second->getContent()->getInterpolantStyleValue();
     } else if (it->second->getContent()->isCore()) {
       // An address is in the core if it stores a value that is in the core
-      _concreteStore[it->first] = it->second->getContent();
-      useCount[it->second->getAddressValue()] =
-          it->second->getContent()->getDirectUseCount();
-    }
-  }
-
-  if (coreOnly) {
-    std::map<ref<TxInterpolantAddress>, ref<TxStateValue> > __concreteStore;
-
-    //    llvm::errs() << "STEP0:\n";
-    //    for (std::map<ref<TxStateAddress>, ref<TxStateValue> >::iterator
-    //             it = _concreteStore.begin(),
-    //             ie = _concreteStore.end();
-    //         it != ie; ++it) {
-    //      llvm::errs() << "-----------------------------\n";
-    //      it->first->dump();
-    //      it->second->dump();
-    //    }
-
-    // The following performs computation of values that are dominated by other
-    // values, wrt. flow to the interpolant / unsat core.
-    for (std::map<ref<TxStateValue>, uint64_t>::iterator it = useCount.begin(),
-                                                         ie = useCount.end();
-         it != ie; ++it) {
-      std::map<ref<TxStateValue>, uint64_t>::iterator mapIter;
-      const std::map<ref<TxStateValue>, ref<TxStateAddress> > &sources =
-          it->first->getSources();
-      for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::const_iterator
-               it1 = sources.begin(),
-               ie1 = sources.end();
-           it1 != ie1; ++it1) {
-        mapIter = useCount.find(it1->first);
-        if (mapIter != useCount.end() && mapIter->second > 0)
-          --(mapIter->second);
+      LowerInterpolantStore &map =
+          concreteStore[it->first->getContext()->getValue()];
+#ifdef ENABLE_Z3
+      if (!NoExistential) {
+        map[it->first] =
+            it->second->getContent()->getInterpolantStyleValue(replacements);
+      } else {
+        map[it->first] = it->second->getContent()->getInterpolantStyleValue();
       }
+#else
+      map[it->first] =
+          it->second->second->getContent()->getInterpolantStyleValue(
+              replacements);
+#endif
     }
-
-    // Copy only values whose use count not reduced to zero
-    for (std::map<ref<TxInterpolantAddress>, ref<TxStateValue> >::iterator
-             it = _concreteStore.begin(),
-             ie = _concreteStore.end();
-         it != ie; ++it) {
-      std::map<ref<TxStateValue>, uint64_t>::iterator it1 =
-          useCount.find(it->second);
-      if (it1 != useCount.end() && it1->second > 0)
-        __concreteStore[it->first] = it->second;
-    }
-
-    //    llvm::errs() << "STEP1:\n";
-    //    for (std::map<ref<TxStateAddress>, ref<TxStateValue> >::iterator
-    //             it = __concreteStore.begin(),
-    //             ie = __concreteStore.end();
-    //         it != ie; ++it) {
-    //      llvm::errs() << "-----------------------------\n";
-    //      it->first->dump();
-    //      it->second->dump();
-    //    }
-
-    removeAddressValue(__concreteStore, concreteStore, replacements, true);
-
-    //    llvm::errs() << "AFTER:\n";
-    //    for (Dependency::InterpolantStore::iterator it =
-    // concreteStore.begin(),
-    //                                                ie = concreteStore.end();
-    //         it != ie; ++it) {
-    //      std::map<ref<TxInterpolantAddress>, ref<TxInterpolantValue> >
-    //      addressValueMap = it->second;
-    //      for (std::map<ref<TxInterpolantAddress>,
-    //                    ref<TxInterpolantValue> >::iterator
-    //               it1 = addressValueMap.begin(),
-    //               ie1 = addressValueMap.end();
-    //           it1 != ie1; ++it1) {
-    //        llvm::errs() << "-----------------------------\n";
-    //        it1->first->dump();
-    //        it1->second->dump();
-    //      }
-    //    }
-  } else {
-    removeAddressValue(_concreteStore, concreteStore, replacements, false);
   }
 }
 
@@ -237,48 +81,35 @@ void TxStore::getSymbolicStore(
     const std::vector<ref<TxInterpolantAddress> > &orderedStoreKeys,
     std::set<const Array *> &replacements, bool coreOnly,
     TopInterpolantStore &symbolicStore) const {
-  for (std::vector<ref<TxInterpolantAddress> >::const_reverse_iterator
-           it = orderedStoreKeys.rbegin(),
-           ie = orderedStoreKeys.rend();
+  for (StateStore::const_iterator it = store.begin(), ie = store.end();
        it != ie; ++it) {
-    StateStore::const_iterator it1 = store.find(*it);
-    if (it1 == store.end())
+    if (!it->first->contextIsPrefixOf(callHistory))
       continue;
 
-    if (!it1->first->contextIsPrefixOf(callHistory))
-      continue;
-
-    if (it1->second.isNull())
+    if (it->second.isNull())
       continue;
 
     if (!coreOnly) {
-      const llvm::Value *base = it1->first->getContext()->getValue();
-      ref<TxInterpolantAddress> address = it1->first;
-      std::map<ref<TxInterpolantAddress>, ref<TxInterpolantValue> > &
-      addressValueMap = symbolicStore[base];
-      if (addressValueMap.find(address) == addressValueMap.end()) {
-        addressValueMap[address] =
-            it1->second->getContent()->getInterpolantStyleValue();
-      }
-    } else if (it1->second->getContent()->isCore()) {
+      LowerInterpolantStore &map =
+          symbolicStore[it->first->getContext()->getValue()];
+      map[it->first] = it->second->getContent()->getInterpolantStyleValue();
+    } else if (it->second->getContent()->isCore()) {
       // An address is in the core if it stores a value that is in the core
-      const llvm::Value *base = it1->first->getContext()->getValue();
-      ref<TxInterpolantAddress> address = it1->first;
-      std::map<ref<TxInterpolantAddress>, ref<TxInterpolantValue> > &
-      addressValueMap = symbolicStore[base];
-      if (addressValueMap.find(address) == addressValueMap.end()) {
+      LowerInterpolantStore &map =
+          symbolicStore[it->first->getContext()->getValue()];
 #ifdef ENABLE_Z3
-        if (!NoExistential) {
-          address =
-              TxStateAddress::create(it1->second->getAddress(), replacements)
-                  ->getInterpolantStyleAddress();
-          addressValueMap[address] =
-              it1->second->getContent()->getInterpolantStyleValue(replacements);
-        } else
-#endif
-          addressValueMap[address] =
-              it1->second->getContent()->getInterpolantStyleValue();
+      if (!NoExistential) {
+        ref<TxInterpolantAddress> address =
+            TxStateAddress::create(it->second->getAddress(), replacements)
+                ->getInterpolantStyleAddress();
+        map[address] =
+            it->second->getContent()->getInterpolantStyleValue(replacements);
+      } else {
+        map[it->first] = it->second->getContent()->getInterpolantStyleValue();
       }
+#else
+      map[it->first] = it->second->getContent()->getInterpolantStyleValue();
+#endif
     }
   }
 }
