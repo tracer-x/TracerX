@@ -248,9 +248,10 @@ namespace klee {
 
     /// \brief Find existing value or if not found immediately register a new
     /// one.
-    inline ref<TxStateValue> getLatestValueNoConstantCheckOrCreate(
-        llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,
-        ref<Expr> expr);
+    inline ref<TxStateValue>
+    createConstantValue(llvm::Value *value,
+                        const std::vector<llvm::Instruction *> &callHistory,
+                        ref<Expr> expr);
 
     /// \brief Gets the latest pointer value for marking
     ref<TxStateValue> getLatestValueForMarking(llvm::Value *val,

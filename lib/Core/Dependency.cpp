@@ -1272,20 +1272,15 @@ bool Dependency::boundInterpolation(llvm::Value *val) {
   return true;
 }
 
-inline ref<TxStateValue> Dependency::getLatestValueNoConstantCheckOrCreate(
+inline ref<TxStateValue> Dependency::createConstantValue(
     llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,
     ref<Expr> expr) {
-  ref<TxStateValue> ret = getLatestValueNoConstantCheck(value, expr, true);
-  if (ret.isNull()) {
-    if (value->getType()->isPointerTy()) {
+  if (value->getType()->isPointerTy()) {
       llvm::Type *ty = value->getType()->getPointerElementType();
       uint64_t size = ty->isSized() ? targetData->getTypeStoreSize(ty) : 0;
       return getNewPointerValue(value, callHistory, expr, size);
-    } else {
-      return getNewTxStateValue(value, callHistory, expr);
-    }
   }
-  return ret;
+  return getNewTxStateValue(value, callHistory, expr);
 }
 
 ref<TxStateValue>
@@ -1298,23 +1293,22 @@ Dependency::evalConstant(llvm::Constant *c,
     const std::vector<llvm::Instruction *> emptyCallHistory;
 
     if (const llvm::ConstantInt *ci = llvm::dyn_cast<llvm::ConstantInt>(c)) {
-      return getLatestValueNoConstantCheckOrCreate(
-          c, emptyCallHistory, ConstantExpr::alloc(ci->getValue()));
+      return createConstantValue(c, emptyCallHistory,
+                                 ConstantExpr::alloc(ci->getValue()));
     } else if (const llvm::ConstantFP *cf =
                    llvm::dyn_cast<llvm::ConstantFP>(c)) {
-      return getLatestValueNoConstantCheckOrCreate(
+      return createConstantValue(
           c, emptyCallHistory,
           ConstantExpr::alloc(cf->getValueAPF().bitcastToAPInt()));
     } else if (const llvm::GlobalValue *gv =
                    llvm::dyn_cast<llvm::GlobalValue>(c)) {
-      return getLatestValueNoConstantCheckOrCreate(
-          c, emptyCallHistory, globalAddresses->find(gv)->second);
+      return createConstantValue(c, emptyCallHistory,
+                                 globalAddresses->find(gv)->second);
     } else if (llvm::isa<llvm::ConstantPointerNull>(c)) {
-      return getLatestValueNoConstantCheckOrCreate(c, emptyCallHistory,
-                                                   Expr::createPointer(0));
+      return createConstantValue(c, emptyCallHistory, Expr::createPointer(0));
     } else if (llvm::isa<llvm::UndefValue>(c) ||
                llvm::isa<llvm::ConstantAggregateZero>(c)) {
-      return getLatestValueNoConstantCheckOrCreate(
+      return createConstantValue(
           c, emptyCallHistory,
           ConstantExpr::create(0, targetData->getTypeSizeInBits(c->getType())));
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 1)
@@ -1326,7 +1320,7 @@ Dependency::evalConstant(llvm::Constant *c,
                                      emptyCallHistory)->getExpression();
         kids.push_back(kid);
       }
-      return getLatestValueNoConstantCheckOrCreate(
+      return createConstantValue(
           c, emptyCallHistory,
           cast<ConstantExpr>(ConcatExpr::createN(kids.size(), kids.data())));
 #endif
@@ -1350,7 +1344,7 @@ Dependency::evalConstant(llvm::Constant *c,
 
         kids.push_back(kid);
       }
-      return getLatestValueNoConstantCheckOrCreate(
+      return createConstantValue(
           c, emptyCallHistory,
           cast<ConstantExpr>(ConcatExpr::createN(kids.size(), kids.data())));
     } else if (const llvm::ConstantArray *ca =
@@ -1362,7 +1356,7 @@ Dependency::evalConstant(llvm::Constant *c,
             evalConstant(ca->getOperand(op), emptyCallHistory)->getExpression();
         kids.push_back(kid);
       }
-      return getLatestValueNoConstantCheckOrCreate(
+      return createConstantValue(
           c, emptyCallHistory,
           cast<ConstantExpr>(ConcatExpr::createN(kids.size(), kids.data())));
     } else {
