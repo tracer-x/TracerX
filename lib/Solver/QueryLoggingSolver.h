@@ -64,17 +64,19 @@ public:
   virtual ~QueryLoggingSolver();
 
   /// implementation of the SolverImpl interface
-  bool computeTruth(const Query &query, bool &isValid);
-  bool computeValidity(const Query &query, Solver::Validity &result);
+  bool computeTruth(const Query &query, bool &isValid,
+                    std::vector<ref<Expr> > &unsatCore);
+  bool computeValidity(const Query &query, Solver::Validity &result,
+                       std::vector<ref<Expr> > &unsatCore);
   bool computeValue(const Query &query, ref<Expr> &result);
   bool computeInitialValues(const Query &query,
                             const std::vector<const Array *> &objects,
                             std::vector<std::vector<unsigned char> > &values,
-                            bool &hasSolution);
+                            bool &hasSolution,
+                            std::vector<ref<Expr> > &unsatCore);
   SolverRunStatus getOperationStatusCode();
   char *getConstraintLog(const Query &);
   void setCoreSolverTimeout(double timeout);
-  std::vector<ref<Expr> > &getUnsatCore() { return solver->getUnsatCore(); }
 };
 
 #endif /* KLEE_QUERYLOGGINGSOLVER_H */

@@ -799,7 +799,8 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
   // ExprPPrinter::printQuery(llvm::errs(), current.constraints, condition);
 
   solver->setTimeout(timeout);
-  bool success = solver->evaluate(current, condition, res);
+  std::vector<ref<Expr> > unsatCore;
+  bool success = solver->evaluate(current, condition, res, unsatCore);
   solver->setTimeout(0);
 
   if (!success) {
@@ -907,7 +908,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       // Validity proof succeeded of a query: antecedent -> consequent.
       // We then extract the unsatisfiability core of antecedent and not
       // consequent as the Craig interpolant.
-      txTree->markPathCondition(current, solver);
+      txTree->markPathCondition(current, solver, unsatCore);
     }
 
     return StatePair(&current, 0);
@@ -922,7 +923,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       // Falsity proof succeeded of a query: antecedent -> consequent,
       // which means that antecedent -> not(consequent) is valid. In this
       // case also we extract the unsat core of the proof
-      txTree->markPathCondition(current, solver);
+      txTree->markPathCondition(current, solver, unsatCore);
     }
 
     return StatePair(0, &current);
@@ -1144,7 +1145,7 @@ ref<Expr> Executor::toUnique(const ExecutionState &state,
     ref<ConstantExpr> value;
     bool isTrue = false;
 
-    solver->setTimeout(coreSolverTimeout);      
+    solver->setTimeout(coreSolverTimeout); 
     if (solver->getValue(state, e, value) &&
         solver->mustBeTrue(state, EqExpr::create(e, value), isTrue) &&
         isTrue)
@@ -4106,7 +4107,7 @@ bool Executor::getSymbolicSolution(const ExecutionState &state,
       bool mustBeTrue;
       // Attempt to bound byte to constraints held in cexPreferences
       bool success = solver->mustBeTrue(tmp, Expr::createIsZero(*pi), 
-					mustBeTrue);
+                                       mustBeTrue);
       // If it isn't possible to constrain this particular byte in the desired
       // way (normally this would mean that the byte can't be constrained to
       // be between 0 and 127 without making the entire constraint list UNSAT)
@@ -4121,9 +4122,10 @@ bool Executor::getSymbolicSolution(const ExecutionState &state,
 
   std::vector< std::vector<unsigned char> > values;
   std::vector<const Array*> objects;
+  std::vector<ref<Expr> > unsatCore;
   for (unsigned i = 0; i != state.symbolics.size(); ++i)
     objects.push_back(state.symbolics[i].second);
-  bool success = solver->getInitialValues(tmp, objects, values);
+  bool success = solver->getInitialValues(tmp, objects, values, unsatCore);
   solver->setTimeout(0);
   if (!success) {
     klee_warning("unable to compute initial values (invalid constraints?)!");

@@ -43,6 +43,8 @@ public:
 
   ref<Expr> simplifyExpr(ref<Expr> e) const;
 
+  ref<Expr> simplifyExpr(ref<Expr> e, std::vector<ref<Expr> > &core) const;
+
   void addConstraint(ref<Expr> e);
   
   bool empty() const {

@@ -643,12 +643,12 @@ SubsumptionTableEntry::removeUnsubstituted(std::set<const Array *> &variables,
 }
 
 bool SubsumptionTableEntry::detectConflictPrimitives(ExecutionState &state,
-                                                     ref<Expr> query) {
-  if (llvm::isa<ExistsExpr>(query))
+                                                     ref<Expr> expr) {
+  if (llvm::isa<ExistsExpr>(expr))
     return true;
 
   std::vector<ref<Expr> > conjunction;
-  if (!fetchQueryEqualityConjuncts(conjunction, query)) {
+  if (!fetchExprEqualityConjucts(conjunction, expr)) {
     return false;
   }
 
@@ -664,17 +664,17 @@ bool SubsumptionTableEntry::detectConflictPrimitives(ExecutionState &state,
          it2 != ie2; ++it2) {
 
       ref<Expr> stateConstraintExpr = it1->get();
-      ref<Expr> queryExpr = it2->get();
+      ref<Expr> exprEqConstraint = it2->get();
 
-      if (stateConstraintExpr != queryExpr &&
+      if (stateConstraintExpr != exprEqConstraint &&
           (llvm::isa<EqExpr>(stateConstraintExpr) ||
-           llvm::isa<EqExpr>(queryExpr))) {
+           llvm::isa<EqExpr>(exprEqConstraint))) {
 
         if (stateConstraintExpr ==
                 EqExpr::create(ConstantExpr::create(0, Expr::Bool),
-                               queryExpr) ||
+                               exprEqConstraint) ||
             EqExpr::create(ConstantExpr::create(0, Expr::Bool),
-                           stateConstraintExpr) == queryExpr) {
+                           stateConstraintExpr) == exprEqConstraint) {
           return false;
         }
       }
@@ -684,27 +684,27 @@ bool SubsumptionTableEntry::detectConflictPrimitives(ExecutionState &state,
   return true;
 }
 
-bool SubsumptionTableEntry::fetchQueryEqualityConjuncts(
-    std::vector<ref<Expr> > &conjunction, ref<Expr> query) {
+bool SubsumptionTableEntry::fetchExprEqualityConjucts(
+    std::vector<ref<Expr> > &conjunction, ref<Expr> expr) {
 
-  if (!llvm::isa<AndExpr>(query)) {
-    if (query->getKind() == Expr::Eq) {
+  if (!llvm::isa<AndExpr>(expr)) {
+    if (expr->getKind() == Expr::Eq) {
 
-      EqExpr *equality = llvm::dyn_cast<EqExpr>(query);
+      EqExpr *equality = llvm::dyn_cast<EqExpr>(expr);
 
       if (llvm::isa<ConstantExpr>(equality->getKid(0)) &&
           llvm::isa<ConstantExpr>(equality->getKid(1)) &&
           equality->getKid(0) != equality->getKid(1)) {
         return false;
       } else {
-        conjunction.push_back(query);
+        conjunction.push_back(expr);
       }
     }
     return true;
   }
 
-  return fetchQueryEqualityConjuncts(conjunction, query->getKid(0)) &&
-         fetchQueryEqualityConjuncts(conjunction, query->getKid(1));
+  return fetchExprEqualityConjucts(conjunction, expr->getKid(0)) &&
+         fetchExprEqualityConjucts(conjunction, expr->getKid(1));
 }
 
 ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
@@ -749,8 +749,8 @@ ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
 
 bool SubsumptionTableEntry::subsumed(
     TimingSolver *solver, ExecutionState &state, double timeout,
-    Dependency::InterpolantStore &concretelyAddressedStore,
-    Dependency::InterpolantStore &symbolicallyAddressedStore,
+    TxStore::TopInterpolantStore &concretelyAddressedStore,
+    TxStore::TopInterpolantStore &symbolicallyAddressedStore,
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
   // Tell the solver implementation that we are checking for subsumption for
@@ -779,15 +779,15 @@ bool SubsumptionTableEntry::subsumed(
     TimerStatIncrementer t(concreteStoreExpressionBuildTime);
 
     // Build constraints from concrete-address interpolant store
-    for (Dependency::InterpolantStore::const_iterator
+    for (TxStore::TopInterpolantStore::const_iterator
              it1 = concreteAddressStore.begin(),
              ie1 = concreteAddressStore.end();
          it1 != ie1; ++it1) {
 
-      const Dependency::InterpolantStoreMap &tabledConcreteMap = it1->second;
-      const Dependency::InterpolantStoreMap &stateConcreteMap =
+      const TxStore::LowerInterpolantStore &tabledConcreteMap = it1->second;
+      const TxStore::LowerInterpolantStore &stateConcreteMap =
           concretelyAddressedStore[it1->first];
-      const Dependency::InterpolantStoreMap &stateSymbolicMap =
+      const TxStore::LowerInterpolantStore &stateSymbolicMap =
           symbolicallyAddressedStore[it1->first];
 
       // If the current state does not constrain the same base, subsumption
@@ -802,7 +802,7 @@ bool SubsumptionTableEntry::subsumed(
         return false;
       }
 
-      for (Dependency::InterpolantStoreMap::const_iterator
+      for (TxStore::LowerInterpolantStore::const_iterator
                it2 = tabledConcreteMap.begin(),
                ie2 = tabledConcreteMap.end();
            it2 != ie2; ++it2) {
@@ -952,7 +952,7 @@ bool SubsumptionTableEntry::subsumed(
           const ref<Expr> tabledConcreteOffset = it2->first->getOffset();
           ref<Expr> conjunction;
 
-          for (Dependency::InterpolantStoreMap::const_iterator
+          for (TxStore::LowerInterpolantStore::const_iterator
                    it3 = stateSymbolicMap.begin(),
                    ie3 = stateSymbolicMap.end();
                it3 != ie3; ++it3) {
@@ -1068,26 +1068,26 @@ bool SubsumptionTableEntry::subsumed(
   {
     TimerStatIncrementer t(symbolicStoreExpressionBuildTime);
     // Build constraints from symbolic-address interpolant store
-    for (Dependency::InterpolantStore::const_iterator
+    for (TxStore::TopInterpolantStore::const_iterator
              it1 = symbolicAddressStore.begin(),
              ie1 = symbolicAddressStore.end();
          it1 != ie1; ++it1) {
-      const Dependency::InterpolantStoreMap &tabledSymbolicMap = it1->second;
-      const Dependency::InterpolantStoreMap &stateConcreteMap =
+      const TxStore::LowerInterpolantStore &tabledSymbolicMap = it1->second;
+      const TxStore::LowerInterpolantStore &stateConcreteMap =
           concretelyAddressedStore[it1->first];
-      const Dependency::InterpolantStoreMap &stateSymbolicMap =
+      const TxStore::LowerInterpolantStore &stateSymbolicMap =
           symbolicallyAddressedStore[it1->first];
 
       ref<Expr> conjunction;
 
-      for (Dependency::InterpolantStoreMap::const_iterator
+      for (TxStore::LowerInterpolantStore::const_iterator
                it2 = tabledSymbolicMap.begin(),
                ie2 = tabledSymbolicMap.end();
            it2 != ie2; ++it2) {
         ref<Expr> tabledSymbolicOffset = it2->first->getOffset();
         ref<TxInterpolantValue> tabledValue = it2->second;
 
-        for (Dependency::InterpolantStoreMap::const_iterator
+        for (TxStore::LowerInterpolantStore::const_iterator
                  it3 = stateConcreteMap.begin(),
                  ie3 = stateConcreteMap.end();
              it3 != ie3; ++it3) {
@@ -1169,7 +1169,7 @@ bool SubsumptionTableEntry::subsumed(
           }
         }
 
-        for (Dependency::InterpolantStoreMap::const_iterator
+        for (TxStore::LowerInterpolantStore::const_iterator
                  it3 = stateSymbolicMap.begin(),
                  ie3 = stateSymbolicMap.end();
              it3 != ie3; ++it3) {
@@ -1263,24 +1263,24 @@ bool SubsumptionTableEntry::subsumed(
   }
 
   Solver::Validity result;
-  ref<Expr> query;
+  ref<Expr> expr; // The query expression
 
   {
     TimerStatIncrementer t(solverAccessTime);
 
-    // Here we build the query, after which it is always a conjunction of
-    // the interpolant and the state equality constraints. Here we call
-    // AndExpr::alloc instead of AndExpr::create as we need to guarantee that
-    // the resulting expression is an AndExpr, otherwise simplifyExistsExpr
+    // Here we build the query expression, after which it is always a
+    // conjunction of the interpolant and the state equality constraints. Here
+    // we call AndExpr::alloc instead of AndExpr::create as we need to guarantee
+    // that the resulting expression is an AndExpr, otherwise simplifyExistsExpr
     // would not work.
     if (!interpolant.isNull()) {
-      query = !stateEqualityConstraints.isNull()
-                  ? AndExpr::alloc(interpolant, stateEqualityConstraints)
-                  : AndExpr::alloc(interpolant,
-                                   ConstantExpr::create(1, Expr::Bool));
+      expr = !stateEqualityConstraints.isNull()
+                 ? AndExpr::alloc(interpolant, stateEqualityConstraints)
+                 : AndExpr::alloc(interpolant,
+                                  ConstantExpr::create(1, Expr::Bool));
     } else if (!stateEqualityConstraints.isNull()) {
-      query = AndExpr::alloc(ConstantExpr::create(1, Expr::Bool),
-                             stateEqualityConstraints);
+      expr = AndExpr::alloc(ConstantExpr::create(1, Expr::Bool),
+                            stateEqualityConstraints);
     } else {
       // Here both the interpolant constraints and state equality
       // constraints are empty, therefore everything gets subsumed
@@ -1335,21 +1335,21 @@ bool SubsumptionTableEntry::subsumed(
       return true;
     }
 
-    bool queryHasNoFreeVariables = false;
+    bool exprHasNoFreeVariables = false;
 
     if (!existentials.empty()) {
-      ref<Expr> existsExpr = ExistsExpr::create(existentials, query);
+      ref<Expr> existsExpr = ExistsExpr::create(existentials, expr);
       if (debugSubsumptionLevel >= 2) {
         klee_message("Before simplification:\n%s",
                      PrettyExpressionBuilder::constructQuery(
                          state.constraints, existsExpr).c_str());
       }
-      query = simplifyExistsExpr(existsExpr, queryHasNoFreeVariables);
+      expr = simplifyExistsExpr(existsExpr, exprHasNoFreeVariables);
     }
 
-    // If query simplification result was false, we quickly fail without calling
-    // the solver
-    if (query->isFalse()) {
+    // If query expression simplification result was false, we quickly fail
+    // without calling the solver
+    if (expr->isFalse()) {
       if (debugSubsumptionLevel >= 1) {
         klee_message("#%lu=>#%lu: Check failure as consequent is unsatisfiable",
                      state.txTreeNode->getNodeSequenceNumber(),
@@ -1360,7 +1360,7 @@ bool SubsumptionTableEntry::subsumed(
 
     bool success = false;
 
-    if (!detectConflictPrimitives(state, query)) {
+    if (!detectConflictPrimitives(state, expr)) {
       if (debugSubsumptionLevel >= 1) {
         klee_message(
             "#%lu=>#%lu: Check failure as contradictory equalities detected",
@@ -1369,37 +1369,25 @@ bool SubsumptionTableEntry::subsumed(
       return false;
     }
 
-    Z3Solver *z3solver = 0;
+    std::vector<ref<Expr> > unsatCore;
 
-    // We call the solver only when the simplified query is not a constant and
-    // no contradictory unary constraints found from solvingUnaryConstraints
-    // method.
-    if (!llvm::isa<ConstantExpr>(query)) {
-      if (!existentials.empty() && llvm::isa<ExistsExpr>(query)) {
+    // We call the solver only when the simplified query expression is not a
+    // constant and no contradictory unary constraints found from
+    // solvingUnaryConstraints method.
+    if (!llvm::isa<ConstantExpr>(expr)) {
+      if (!existentials.empty() && llvm::isa<ExistsExpr>(expr)) {
         if (debugSubsumptionLevel >= 2) {
           klee_message("Existentials not empty");
         }
 
-        // Instantiate a new Z3 solver to make sure we use Z3
-        // without pre-solving optimizations. It would be nice
-        // in the future to just run solver->evaluate so that
-        // the optimizations can be used, but this requires
-        // handling of quantified expressions by KLEE's pre-solving
-        // procedure, which does not exist currently.
-        z3solver = new Z3Solver();
-
-        z3solver->setCoreSolverTimeout(timeout);
-
-        if (queryHasNoFreeVariables) {
-          // In case the query has no free variables, we reformulate
-          // the solver call as satisfiability check of the body of
-          // the query.
+        if (exprHasNoFreeVariables) {
+          // In case the query expression has no free variables, we reformulate
+          // the solver call as satisfiability check of the body of the query
+          // expression.
           ConstraintManager constraints;
-          ref<ConstantExpr> tmpExpr;
 
           ref<Expr> falseExpr = ConstantExpr::create(0, Expr::Bool);
-          constraints.addConstraint(
-              EqExpr::create(falseExpr, query->getKid(0)));
+          constraints.addConstraint(expr->getKid(0));
 
           if (debugSubsumptionLevel >= 2) {
             klee_message("Querying for satisfiability check:\n%s",
@@ -1407,44 +1395,70 @@ bool SubsumptionTableEntry::subsumed(
                              constraints, falseExpr).c_str());
           }
 
-          success = z3solver->getValue(Query(constraints, falseExpr), tmpExpr);
-          result = success ? Solver::True : Solver::Unknown;
+          bool noSolution;
+          solver->setTimeout(timeout);
+          success = solver->solver->mustBeTrue(Query(constraints, falseExpr),
+                                               noSolution);
+          solver->setTimeout(0);
+
+          if (!success || noSolution)
+            return false;
+
+          // We can return here as there is no need to compute the
+          // interpolation.
+          return true;
         } else {
           if (debugSubsumptionLevel >= 2) {
             klee_message("Querying for subsumption check:\n%s",
                          PrettyExpressionBuilder::constructQuery(
-                             state.constraints, query).c_str());
+                             state.constraints, expr).c_str());
           }
 
+          // Instantiate a new Z3 solver to make sure we use Z3
+          // without pre-solving optimizations. It would be nice
+          // in the future to just run solver->evaluate so that
+          // the optimizations can be used, but this requires
+          // handling of quantified expressions by KLEE's pre-solving
+          // procedure, which does not exist currently.
+          Z3Solver *z3solver = new Z3Solver();
+          z3solver->setCoreSolverTimeout(timeout);
           success = z3solver->directComputeValidity(
-              Query(state.constraints, query), result);
+              Query(state.constraints, expr), result, unsatCore);
+          z3solver->setCoreSolverTimeout(0);
+          delete z3solver;
+
+          if (!success || result != Solver::True)
+            return false;
         }
 
-        z3solver->setCoreSolverTimeout(0);
 
       } else {
         if (debugSubsumptionLevel >= 2) {
           klee_message("Querying for subsumption check:\n%s",
                        PrettyExpressionBuilder::constructQuery(
-                           state.constraints, query).c_str());
+                           state.constraints, expr).c_str());
         }
         // We call the solver in the standard way if the
         // formula is unquantified.
         solver->setTimeout(timeout);
-        success = solver->evaluate(state, query, result);
+        success = solver->evaluate(state, expr, result, unsatCore);
         solver->setTimeout(0);
+
+        if (!success || result != Solver::True)
+          return false;
       }
     } else {
-      // query is a constant expression
-      if (query->isTrue()) {
+      // expr is a constant expression
+      if (expr->isTrue()) {
         if (debugSubsumptionLevel >= 1) {
           std::string msg = "";
           if (!corePointerValues.empty()) {
             msg += " (with successful memory bound checks)";
           }
-          klee_message("#%lu=>#%lu: Check success as query is true%s",
-                       state.txTreeNode->getNodeSequenceNumber(),
-                       nodeSequenceNumber, msg.c_str());
+          klee_message(
+              "#%lu=>#%lu: Check success as query expression is true%s",
+              state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber,
+              msg.c_str());
         }
 
         if (Dependency::boundInterpolation() && !ExactAddressInterpolant) {
@@ -1483,16 +1497,12 @@ bool SubsumptionTableEntry::subsumed(
         return true;
       }
       if (debugSubsumptionLevel >= 1) {
-        klee_message("#%lu=>#%lu: Check failure as query is non-true",
-                     state.txTreeNode->getNodeSequenceNumber(),
-                     nodeSequenceNumber);
+        klee_message(
+            "#%lu=>#%lu: Check failure as query expression is non-true",
+            state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
       }
       return false;
     }
-
-    if (success && result == Solver::True) {
-      const std::vector<ref<Expr> > &unsatCore =
-          (z3solver ? z3solver->getUnsatCore() : solver->getUnsatCore());
 
       // State subsumed, we mark needed constraints on the
       // path condition.
@@ -1543,21 +1553,6 @@ bool SubsumptionTableEntry::subsumed(
       }
 
       return true;
-    }
-
-    // Here the solver could not decide that the subsumption is valid. It may
-    // have decided invalidity, however, CexCachingSolver::computeValidity,
-    // which was eventually called from solver->evaluate is conservative, where
-    // it returns Solver::Unknown even in case when invalidity is established by
-    // the solver.
-    if (z3solver)
-      delete z3solver;
-
-    if (debugSubsumptionLevel >= 1) {
-      klee_message(
-          "#%lu=>#%lu: Check failure as solver did not decide validity",
-          state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
-    }
   }
 #endif /* ENABLE_Z3 */
   return false;
@@ -1590,11 +1585,11 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
 
   if (!concreteAddressStore.empty()) {
     stream << prefix << "concrete store = [\n";
-    for (Dependency::InterpolantStore::const_iterator
+    for (TxStore::TopInterpolantStore::const_iterator
              is1 = concreteAddressStore.begin(),
              ie1 = concreteAddressStore.end(), it1 = is1;
          it1 != ie1; ++it1) {
-      for (Dependency::InterpolantStoreMap::const_iterator
+      for (TxStore::LowerInterpolantStore::const_iterator
                is2 = it1->second.begin(),
                ie2 = it1->second.end(), it2 = is2;
            it2 != ie2; ++it2) {
@@ -1613,11 +1608,11 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
 
   if (!symbolicAddressStore.empty()) {
     stream << prefix << "symbolic store = [\n";
-    for (Dependency::InterpolantStore::const_iterator
+    for (TxStore::TopInterpolantStore::const_iterator
              is1 = symbolicAddressStore.begin(),
              ie1 = symbolicAddressStore.end(), it1 = is1;
          it1 != ie1; ++it1) {
-      for (Dependency::InterpolantStoreMap::const_iterator
+      for (TxStore::LowerInterpolantStore::const_iterator
                is2 = it1->second.begin(),
                ie2 = it1->second.end(), it2 = is2;
            it2 != ie2; ++it2) {
@@ -1844,8 +1839,8 @@ bool SubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
 
   if (iterPair.first != iterPair.second) {
 
-    Dependency::InterpolantStore concretelyAddressedStore;
-    Dependency::InterpolantStore symbolicallyAddressedStore;
+    TxStore::TopInterpolantStore concretelyAddressedStore;
+    TxStore::TopInterpolantStore symbolicallyAddressedStore;
 
     txTreeNode->getStoredExpressions(txTreeNode->entryCallHistory,
                                      concretelyAddressedStore,
@@ -2080,10 +2075,9 @@ TxTree::split(TxTreeNode *parent, ExecutionState *left, ExecutionState *right) {
   return ret;
 }
 
-void TxTree::markPathCondition(ExecutionState &state, TimingSolver *solver) {
+void TxTree::markPathCondition(ExecutionState &state, TimingSolver *solver,
+                               std::vector<ref<Expr> > &unsatCore) {
   TimerStatIncrementer t(markPathConditionTime);
-  const std::vector<ref<Expr> > &unsatCore = solver->getUnsatCore();
-
   int debugSubsumptionLevel =
       currentTxTreeNode->dependency->debugSubsumptionLevel;
 
@@ -2111,21 +2105,8 @@ void TxTree::markPathCondition(ExecutionState &state, TimingSolver *solver) {
                                                  unknownExpression, reason);
   }
 
-  PathCondition *pc = currentTxTreeNode->pathCondition;
-
-  if (pc != 0) {
-    for (std::vector<ref<Expr> >::const_iterator it = unsatCore.begin(),
-                                                 ie = unsatCore.end();
-         it != ie; ++it) {
-      for (; pc != 0; pc = pc->cdr()) {
-        if (pc->car().compare(it->get()) == 0) {
-          pc->setAsCore(debugSubsumptionLevel);
-          pc = pc->cdr();
-          break;
-        }
-      }
-    }
-  }
+  // We create path condition marking structure and mark core constraints
+  currentTxTreeNode->unsatCoreInterpolation(unsatCore);
 }
 
 void TxTree::execute(llvm::Instruction *instr) {
@@ -2338,8 +2319,8 @@ void TxTreeNode::bindReturnValue(llvm::CallInst *site, llvm::Instruction *inst,
 
 void TxTreeNode::getStoredExpressions(
     const std::vector<llvm::Instruction *> &_callHistory,
-    Dependency::InterpolantStore &concretelyAddressedStore,
-    Dependency::InterpolantStore &symbolicallyAddressedStore) const {
+    TxStore::TopInterpolantStore &concretelyAddressedStore,
+    TxStore::TopInterpolantStore &symbolicallyAddressedStore) const {
   TimerStatIncrementer t(getStoredExpressionsTime);
   std::set<const Array *> dummyReplacements;
 
@@ -2355,8 +2336,8 @@ void TxTreeNode::getStoredExpressions(
 void TxTreeNode::getStoredCoreExpressions(
     const std::vector<llvm::Instruction *> &_callHistory,
     std::set<const Array *> &replacements,
-    Dependency::InterpolantStore &concretelyAddressedStore,
-    Dependency::InterpolantStore &symbolicallyAddressedStore) const {
+    TxStore::TopInterpolantStore &concretelyAddressedStore,
+    TxStore::TopInterpolantStore &symbolicallyAddressedStore) const {
   TimerStatIncrementer t(getStoredCoreExpressionsTime);
 
   // Since a program point index is a first statement in a basic block,

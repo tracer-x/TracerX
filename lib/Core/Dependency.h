@@ -17,6 +17,8 @@
 #ifndef KLEE_DEPENDENCY_H
 #define KLEE_DEPENDENCY_H
 
+#include "TxStore.h"
+
 #include "klee/Config/Version.h"
 #include "klee/Internal/Module/TxValues.h"
 
@@ -158,44 +160,23 @@ namespace klee {
   ///
   /// \see TxTree
   /// \see TxTreeNode
+/// \see TxStore
 /// \see TxStateValue
 /// \see TxStateAddress
   class Dependency {
 
-  public:
-    typedef std::map<ref<TxInterpolantAddress>, ref<TxInterpolantValue> >
-    InterpolantStoreMap;
-    typedef std::map<const llvm::Value *, InterpolantStoreMap> InterpolantStore;
-
   private:
+    /// The store
+    TxStore store;
+
     /// \brief Previous path condition
     Dependency *parent;
 
     /// \brief Argument values to be passed onto callee
     std::vector<ref<TxStateValue> > argumentValuesList;
 
-    /// \brief The mapping of concrete locations to stored value
-    std::map<ref<TxStateAddress>,
-             std::pair<ref<TxStateValue>, ref<TxStateValue> > >
-    concretelyAddressedStore;
-
-    /// \brief Ordered keys of the concretely-addressed store.
-    std::vector<ref<TxStateAddress> > concretelyAddressedStoreKeys;
-
-    /// \brief The mapping of symbolic locations to stored value
-    std::map<ref<TxStateAddress>,
-             std::pair<ref<TxStateValue>, ref<TxStateValue> > >
-    symbolicallyAddressedStore;
-
-    /// \brief Ordered keys of the symbolically-addressed store.
-    std::vector<ref<TxStateAddress> > symbolicallyAddressedStoreKeys;
-
     /// \brief The store of the versioned values
     std::map<llvm::Value *, std::vector<ref<TxStateValue> > > valuesMap;
-
-    /// \brief Locations of this node and its ancestors that are needed for
-    /// the core and dominates other locations.
-    std::set<ref<TxStateAddress> > coreLocations;
 
     /// \brief The data layout of the analysis target program
     llvm::DataLayout *targetData;
@@ -267,23 +248,14 @@ namespace klee {
 
     /// \brief Find existing value or if not found immediately register a new
     /// one.
-    inline ref<TxStateValue> getLatestValueNoConstantCheckOrCreate(
-        llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,
-        ref<Expr> expr);
+    inline ref<TxStateValue>
+    createConstantValue(llvm::Value *value,
+                        const std::vector<llvm::Instruction *> &callHistory,
+                        ref<Expr> expr);
 
     /// \brief Gets the latest pointer value for marking
     ref<TxStateValue> getLatestValueForMarking(llvm::Value *val,
                                                ref<Expr> expr);
-
-    /// \brief Newly relate a location with its stored value, when the value is
-    /// loaded from the location
-    void updateStoreWithLoadedValue(ref<TxStateAddress> loc,
-                                    ref<TxStateValue> address,
-                                    ref<TxStateValue> value);
-
-    /// \brief Newly relate an location with its stored value
-    void updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
-                     ref<TxStateValue> value);
 
     /// \brief Add flow dependency between source and target value
     void addDependency(ref<TxStateValue> source, ref<TxStateValue> target,
@@ -356,29 +328,6 @@ namespace klee {
         std::vector<ref<Expr> > &arguments,
         std::vector<ref<TxStateValue> > &argumentValuesList);
 
-    void removeAddressValue(
-        std::map<ref<TxStateAddress>, ref<TxStateValue> > &simpleStore,
-        Dependency::InterpolantStore &concreteStore,
-        std::set<const Array *> &replacements, bool coreOnly) const;
-
-    void getConcreteStore(
-        const std::vector<llvm::Instruction *> &callHistory,
-        const std::map<ref<TxStateAddress>,
-                       std::pair<ref<TxStateValue>, ref<TxStateValue> > > &
-            store,
-        const std::vector<ref<TxStateAddress> > &orderedStoreKeys,
-        std::set<const Array *> &replacements, bool coreOnly,
-        Dependency::InterpolantStore &concreteStore) const;
-
-    void getSymbolicStore(
-        const std::vector<llvm::Instruction *> &callHistory,
-        const std::map<ref<TxStateAddress>,
-                       std::pair<ref<TxStateValue>, ref<TxStateValue> > > &
-            store,
-        const std::vector<ref<TxStateAddress> > &orderedStoreKeys,
-        std::set<const Array *> &replacements, bool coreOnly,
-        Dependency::InterpolantStore &symbolicStore) const;
-
   public:
     /// \brief This is for dynamic setting up of debug messages.
     int debugSubsumptionLevel;
@@ -393,6 +342,30 @@ namespace klee {
     ~Dependency();
 
     Dependency *cdr() const;
+
+    /// \brief This retrieves the locations known at this state, and the
+    /// expressions stored in the locations. Returns as the last argument a pair
+    /// of the store part indexed by constants, and the store part indexed by
+    /// symbolic expressions.
+    ///
+    /// \param replacements The replacement bound variables when
+    /// retrieving state for creating subsumption table entry: As the
+    /// resulting expression will be used for storing in the
+    /// subsumption table, the variables need to be replaced with the
+    /// bound ones.
+    /// \param coreOnly Indicate whether we are retrieving only data
+    /// for locations relevant to an unsatisfiability core.
+    ///
+    /// \sa TxStore#getStoredExpressions()
+    void getStoredExpressions(
+        const std::vector<llvm::Instruction *> &callHistory,
+        std::set<const Array *> &replacements, bool coreOnly,
+        TxStore::TopInterpolantStore &concretelyAddressedStore,
+        TxStore::TopInterpolantStore &symbolicallyAddressedStore) {
+      store.getStoredExpressions(callHistory, replacements, coreOnly,
+                                 concretelyAddressedStore,
+                                 symbolicallyAddressedStore);
+    }
 
     ref<TxStateValue>
     getLatestValue(llvm::Value *value,
@@ -423,23 +396,6 @@ namespace klee {
                            std::vector<ref<Expr> > &args, bool inBounds,
                            bool symbolicExecutionError);
 
-    /// \brief This retrieves the locations known at this state, and the
-    /// expressions stored in the locations. Returns as the last argument a pair
-    /// of the store part indexed by constants, and the store part indexed by
-    /// symbolic expressions.
-    ///
-    /// \param replacements The replacement bound variables when
-    /// retrieving state for creating subsumption table entry: As the
-    /// resulting expression will be used for storing in the
-    /// subsumption table, the variables need to be replaced with the
-    /// bound ones.
-    /// \param coreOnly Indicate whether we are retrieving only data
-    /// for locations relevant to an unsatisfiability core.
-    void
-    getStoredExpressions(const std::vector<llvm::Instruction *> &callHistory,
-                         std::set<const Array *> &replacements, bool coreOnly,
-                         InterpolantStore &_concretelyAddressedStore,
-                         InterpolantStore &_symbolicallyAddressedStore);
 
     /// \brief Record call arguments in a function call
     void bindCallArguments(llvm::Instruction *instr,

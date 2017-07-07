@@ -83,9 +83,7 @@ namespace klee {
       return a;
     }
 
-    std::vector< ref<Expr> > getCore() const {
-      return unsatCore;
-    }
+    const std::vector<ref<Expr> > &getCore() const { return unsatCore; }
   };
 
   /***/

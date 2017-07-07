@@ -227,9 +227,9 @@ class SubsumptionTableEntry {
 
   ref<Expr> interpolant;
 
-  Dependency::InterpolantStore concreteAddressStore;
+  TxStore::TopInterpolantStore concreteAddressStore;
 
-  Dependency::InterpolantStore symbolicAddressStore;
+  TxStore::TopInterpolantStore symbolicAddressStore;
 
   std::set<const Array *> existentials;
 
@@ -281,18 +281,18 @@ class SubsumptionTableEntry {
   ///
   /// \return false if there is contradictory equality constraints between state
   /// constraints and query expression, otherwise, return true.
-  static bool detectConflictPrimitives(ExecutionState &state, ref<Expr> query);
+  static bool detectConflictPrimitives(ExecutionState &state, ref<Expr> expr);
 
   /// \brief Get a conjunction of equalities that are top-level conjuncts in the
   /// query.
   ///
   /// \param conjunction The output conjunction of top-level conjuncts in the
   /// query expression.
-  /// \param query The query expression.
+  /// \param expr The query expression.
   /// \return false if there is an equality conjunct that is simplifiable to
   /// false, true otherwise.
-  static bool fetchQueryEqualityConjuncts(std::vector<ref<Expr> > &conjunction,
-                                          ref<Expr> query);
+  static bool fetchExprEqualityConjucts(std::vector<ref<Expr> > &conjunction,
+                                        ref<Expr> expr);
 
   static ref<Expr> simplifyArithmeticBody(ref<Expr> existsExpr,
                                           bool &hasExistentialsOnly);
@@ -329,8 +329,8 @@ public:
   ~SubsumptionTableEntry();
 
   bool subsumed(TimingSolver *solver, ExecutionState &state, double timeout,
-                Dependency::InterpolantStore &concretelyAddressedStore,
-                Dependency::InterpolantStore &symbolicallyAddressedStore,
+                TxStore::TopInterpolantStore &concretelyAddressedStore,
+                TxStore::TopInterpolantStore &symbolicallyAddressedStore,
                 int debugSubsumptionLevel);
 
   /// Tests if the argument is a variable. A variable here is defined to be
@@ -497,8 +497,8 @@ public:
   /// part indexed by symbolic expressions.
   void getStoredExpressions(
       const std::vector<llvm::Instruction *> &callHistory,
-      Dependency::InterpolantStore &concretelyAddressedStore,
-      Dependency::InterpolantStore &symbolicallyAddressedStore) const;
+      TxStore::TopInterpolantStore &concretelyAddressedStore,
+      TxStore::TopInterpolantStore &symbolicallyAddressedStore) const;
 
   /// \brief This retrieves the allocations known at this state, and the
   /// expressions stored in the allocations, as long as the allocation is
@@ -514,8 +514,8 @@ public:
   void getStoredCoreExpressions(
       const std::vector<llvm::Instruction *> &callHistory,
       std::set<const Array *> &replacements,
-      Dependency::InterpolantStore &concretelyAddressedStore,
-      Dependency::InterpolantStore &symbolicallyAddressedStore) const;
+      TxStore::TopInterpolantStore &concretelyAddressedStore,
+      TxStore::TopInterpolantStore &symbolicallyAddressedStore) const;
 
   void incInstructionsDepth();
 
@@ -749,7 +749,8 @@ public:
 
   /// \brief Mark the path condition in the Tracer-X tree node associated
   /// with the given KLEE execution state.
-  void markPathCondition(ExecutionState &state, TimingSolver *solver);
+  void markPathCondition(ExecutionState &state, TimingSolver *solver,
+                         std::vector<ref<Expr> > &unsatCore);
 
   /// \brief Creates fresh interpolation data holder for the two given KLEE
   /// execution states.
