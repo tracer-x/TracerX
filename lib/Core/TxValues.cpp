@@ -428,6 +428,7 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream) const {
 void TxInterpolantValue::print(llvm::raw_ostream &stream,
                                const std::string &prefix) const {
   std::string nextTabs = appendTab(prefix);
+  bool offsetDisplayed = false;
 
   if (!doNotUseBound && !allocationBounds.empty()) {
     stream << prefix << "BOUNDS:";
@@ -450,32 +451,36 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
       }
       stream << "}]";
     }
+    offsetDisplayed = true;
+  }
 
-    if (!allocationOffsets.empty()) {
+  if (!allocationOffsets.empty()) {
+    if (offsetDisplayed)
       stream << "\n";
-      stream << prefix << "OFFSETS:";
-      for (std::map<ref<AllocationContext>,
-                    std::set<ref<Expr> > >::const_iterator
-               it = allocationOffsets.begin(),
-               ie = allocationOffsets.end();
-           it != ie; ++it) {
-        std::set<ref<Expr> > boundsSet = it->second;
-        stream << "\n";
-        stream << prefix << "[";
-        it->first->print(stream);
-        stream << "=={";
-        for (std::set<ref<Expr> >::const_iterator it1 = it->second.begin(),
-                                                  is1 = it1,
-                                                  ie1 = it->second.end();
-             it1 != ie1; ++it1) {
-          if (it1 != is1)
-            stream << ",";
-          (*it1)->print(stream);
-        }
-        stream << "}]";
+    stream << prefix << "OFFSETS:";
+    for (std::map<ref<AllocationContext>, std::set<ref<Expr> > >::const_iterator
+             it = allocationOffsets.begin(),
+             ie = allocationOffsets.end();
+         it != ie; ++it) {
+      std::set<ref<Expr> > boundsSet = it->second;
+      stream << "\n";
+      stream << prefix << "[";
+      it->first->print(stream);
+      stream << "=={";
+      for (std::set<ref<Expr> >::const_iterator it1 = it->second.begin(),
+                                                is1 = it1,
+                                                ie1 = it->second.end();
+           it1 != ie1; ++it1) {
+        if (it1 != is1)
+          stream << ",";
+        (*it1)->print(stream);
       }
+      stream << "}]";
     }
-  } else {
+    offsetDisplayed = true;
+  }
+
+  if (!offsetDisplayed) {
     stream << prefix;
     expr->print(stream);
   }
