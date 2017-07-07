@@ -129,6 +129,37 @@ PathCondition::packInterpolant(std::set<const Array *> &replacements) {
   return res;
 }
 
+ref<Expr>
+PathCondition::packWpInterpolant(std::set<const Array *> &replacements) {
+  ref<Expr> res;
+  for (PathCondition *it = this; it != 0; it = it->tail) {
+    if (it->core) {
+      if (!it->shadowed) {
+#ifdef ENABLE_Z3
+        it->shadowConstraint =
+            (NoExistential ? it->constraint
+                           : ShadowArray::getShadowExpression(it->constraint,
+                                                              replacements));
+#else
+        it->shadowConstraint = it->constraint;
+#endif
+        it->shadowed = true;
+        it->boundVariables.insert(replacements.begin(), replacements.end());
+      } else {
+        // Already shadowed, we add the bound variables
+        replacements.insert(it->boundVariables.begin(),
+                            it->boundVariables.end());
+      }
+      if (!res.isNull()) {
+        res = AndExpr::create(res, it->shadowConstraint);
+      } else {
+        res = it->shadowConstraint;
+      }
+    }
+  }
+  return res;
+}
+
 void PathCondition::dump() const {
   this->print(llvm::errs());
   llvm::errs() << "\n";
@@ -160,6 +191,7 @@ SubsumptionTableEntry::SubsumptionTableEntry(
       nodeSequenceNumber(node->getNodeSequenceNumber()) {
   existentials.clear();
   interpolant = node->getInterpolant(existentials);
+  wpInterpolant = node->getWpInterpolant(existentials);
 
   node->getStoredCoreExpressions(callHistory, existentials,
                                  concreteAddressStore, symbolicAddressStore);
@@ -1560,6 +1592,8 @@ bool SubsumptionTableEntry::subsumed(
 
 ref<Expr> SubsumptionTableEntry::getInterpolant() const { return interpolant; }
 
+ref<Expr> SubsumptionTableEntry::getWpInterpolant() const { return wpInterpolant; }
+
 void SubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
   print(stream, 0);
 }
@@ -1641,6 +1675,90 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
     }
     stream << "]\n";
   }
+}
+
+void SubsumptionTableEntry::wpPrint(llvm::raw_ostream &stream) const {
+  wpPrint(stream, 0);
+}
+
+void SubsumptionTableEntry::wpPrint(llvm::raw_ostream &stream,
+                                  const unsigned paddingAmount) const {
+  wpPrint(stream, makeTabs(paddingAmount));
+}
+
+void SubsumptionTableEntry::wpPrint(llvm::raw_ostream &stream,
+                                  const std::string &prefix) const {
+  std::string tabsNext = appendTab(prefix);
+  std::string tabsNextNext = appendTab(tabsNext);
+
+  stream << prefix << "------------ WP Subsumption Table Entry ------------\n";
+  stream << prefix << "Program point = " << programPoint << "\n";
+  stream << prefix << "wp interpolant = ";
+  if (!wpInterpolant.isNull())
+    wpInterpolant->print(stream);
+  else
+    stream << "(empty)";
+  stream << "\n";
+
+  if (!concreteAddressStore.empty()) {
+    stream << prefix << "concrete store = [\n";
+    for (TxStore::TopInterpolantStore::const_iterator
+             is1 = concreteAddressStore.begin(),
+             ie1 = concreteAddressStore.end(), it1 = is1;
+         it1 != ie1; ++it1) {
+      for (TxStore::LowerInterpolantStore::const_iterator
+               is2 = it1->second.begin(),
+               ie2 = it1->second.end(), it2 = is2;
+           it2 != ie2; ++it2) {
+        if (it1 != is1 || it2 != is2)
+          stream << tabsNext << "------------------------------------------\n";
+        stream << tabsNext << "address:\n";
+        it2->first->print(stream, tabsNextNext);
+        stream << "\n";
+        stream << tabsNext << "content:\n";
+        it2->second->print(stream, tabsNextNext);
+        stream << "\n";
+      }
+    }
+    stream << prefix << "]\n";
+  }
+
+  if (!symbolicAddressStore.empty()) {
+    stream << prefix << "symbolic store = [\n";
+    for (TxStore::TopInterpolantStore::const_iterator
+             is1 = symbolicAddressStore.begin(),
+             ie1 = symbolicAddressStore.end(), it1 = is1;
+         it1 != ie1; ++it1) {
+      for (TxStore::LowerInterpolantStore::const_iterator
+               is2 = it1->second.begin(),
+               ie2 = it1->second.end(), it2 = is2;
+           it2 != ie2; ++it2) {
+        if (it1 != is1 || it2 != is2)
+          stream << tabsNext << "------------------------------------------\n";
+        stream << tabsNext << "address:\n";
+        it2->first->print(stream, tabsNextNext);
+        stream << "\n";
+        stream << tabsNext << "content:\n";
+        it2->second->print(stream, tabsNextNext);
+        stream << "\n";
+      }
+    }
+    stream << "]\n";
+  }
+
+  if (!existentials.empty()) {
+    stream << prefix << "existentials = [";
+    for (std::set<const Array *>::const_iterator is = existentials.begin(),
+                                                 ie = existentials.end(),
+                                                 it = is;
+         it != ie; ++it) {
+      if (it != is)
+        stream << ", ";
+      stream << (*it)->name;
+    }
+    stream << "]\n";
+  }
+  stream << prefix << "--------- END of WP Subsumption Table Entry ---------\n";
 }
 
 void SubsumptionTableEntry::printStat(std::stringstream &stream) {
@@ -2047,6 +2165,7 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
         std::string msg;
         llvm::raw_string_ostream out(msg);
         entry->print(out);
+        entry->wpPrint(out);
         out.flush();
         klee_message("%s", msg.c_str());
       }
@@ -2199,6 +2318,8 @@ void TxTree::dump() const { this->print(llvm::errs()); }
 // Statistics
 Statistic TxTreeNode::getInterpolantTime("GetInterpolantTime",
                                          "GetInterpolantTime");
+Statistic TxTreeNode::getWpInterpolantTime("GetWpInterpolantTime",
+                                         "GetWpInterpolantTime");                                         
 Statistic TxTreeNode::addConstraintTime("AddConstraintTime",
                                         "AddConstraintTime");
 Statistic TxTreeNode::splitTime("SplitTime", "SplitTime");
@@ -2219,6 +2340,8 @@ uint64_t TxTreeNode::nextNodeSequenceNumber = 1;
 void TxTreeNode::printTimeStat(std::stringstream &stream) {
   stream << "KLEE: done:     getInterpolant = "
          << ((double)getInterpolantTime.getValue()) / 1000 << "\n";
+  stream << "KLEE: done:     getWpInterpolant = "
+         << ((double)getWpInterpolantTime.getValue()) / 1000 << "\n";         
   stream << "KLEE: done:     addConstraintTime = "
          << ((double)addConstraintTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     splitTime = " << ((double)splitTime.getValue()) /
@@ -2277,6 +2400,13 @@ ref<Expr>
 TxTreeNode::getInterpolant(std::set<const Array *> &replacements) const {
   TimerStatIncrementer t(getInterpolantTime);
   ref<Expr> expr = this->pathCondition->packInterpolant(replacements);
+  return expr;
+}
+
+ref<Expr>
+TxTreeNode::getWpInterpolant(std::set<const Array *> &replacements) const {
+  TimerStatIncrementer t(getWpInterpolantTime);
+  ref<Expr> expr = this->pathCondition->packWpInterpolant(replacements);
   return expr;
 }
 
