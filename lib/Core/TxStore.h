@@ -43,9 +43,7 @@ public:
 
   ~TxStoreEntry() {}
 
-  ref<TxInterpolantAddress> getIndex() {
-    return address->getInterpolantStyleAddress();
-  }
+  ref<TxVariable> getIndex() { return address->getInterpolantStyleAddress(); }
 
   ref<TxStateAddress> getAddress() { return address; }
 
@@ -56,24 +54,24 @@ public:
 
 class TxStore {
 public:
-  typedef std::map<ref<TxInterpolantAddress>, ref<TxInterpolantValue> >
+  typedef std::map<ref<TxVariable>, ref<TxInterpolantValue> >
   LowerInterpolantStore;
   typedef std::map<const llvm::Value *, LowerInterpolantStore>
   TopInterpolantStore;
-  typedef std::map<ref<TxInterpolantAddress>, ref<TxStoreEntry> > StateStore;
+  typedef std::map<ref<TxVariable>, ref<TxStoreEntry> > StateStore;
 
 private:
   /// \brief The mapping of concrete locations to stored value
   StateStore concretelyAddressedStore;
 
   /// \brief Ordered keys of the concretely-addressed store.
-  std::vector<ref<TxInterpolantAddress> > concretelyAddressedStoreKeys;
+  std::vector<ref<TxVariable> > concretelyAddressedStoreKeys;
 
   /// \brief The mapping of symbolic locations to stored value
   StateStore symbolicallyAddressedStore;
 
   /// \brief Ordered keys of the symbolically-addressed store.
-  std::vector<ref<TxInterpolantAddress> > symbolicallyAddressedStoreKeys;
+  std::vector<ref<TxVariable> > symbolicallyAddressedStoreKeys;
 
   void getConcreteStore(
       const std::vector<llvm::Instruction *> &callHistory,

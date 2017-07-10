@@ -93,7 +93,7 @@ void TxStore::getSymbolicStore(
           symbolicStore[it->first->getContext()->getValue()];
 #ifdef ENABLE_Z3
       if (!NoExistential) {
-        ref<TxInterpolantAddress> address =
+        ref<TxVariable> address =
             TxStateAddress::create(it->second->getAddress(), replacements)
                 ->getInterpolantStyleAddress();
         map[address] =

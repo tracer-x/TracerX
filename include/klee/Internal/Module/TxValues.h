@@ -138,10 +138,17 @@ public:
   void print(llvm::raw_ostream &stream, const std::string &prefix) const;
 };
 
-/// \brief The address to be stored as an index in the subsumption table. This
-/// class wraps a memory location, supplying weaker address equality comparison
-/// for the purpose of subsumption checking
-class TxInterpolantAddress {
+/// \brief TxVariable represents a variable. Here a variable is distinct from an
+/// address: A variable takes different addresses throughout the execution: it
+/// is identified by only allocation site, callsite stack, and an offset. Given
+/// a variable, addresses can be ordered according to the time they are
+/// associated to the variable, and thus there is a notion of a more / less
+/// recent address associated to a variable.
+///
+/// A variable is also used as the index in the subsumption table: It provides a
+/// weaker equality comparison to addresses for the purpose of subsumption
+/// checking.
+class TxVariable {
 public:
   unsigned refCount;
 
@@ -160,12 +167,12 @@ private:
   uint64_t concreteOffset;
 
   /// \brief The copy constructor.
-  TxInterpolantAddress(const TxInterpolantAddress &src)
+  TxVariable(const TxVariable &src)
       : refCount(0), context(src.context), offset(src.offset),
         isConcrete(src.isConcrete), concreteOffset(src.concreteOffset) {}
 
   /// \brief The normal constructor.
-  TxInterpolantAddress(ref<AllocationContext> _context, ref<Expr> _offset)
+  TxVariable(ref<AllocationContext> _context, ref<Expr> _offset)
       : refCount(0), context(_context), offset(_offset) {
     isConcrete = false;
     concreteOffset = 0;
@@ -177,9 +184,9 @@ private:
   }
 
 public:
-  static ref<TxInterpolantAddress> create(ref<AllocationContext> context,
-                                          ref<Expr> offset) {
-    ref<TxInterpolantAddress> ret(new TxInterpolantAddress(context, offset));
+  static ref<TxVariable> create(ref<AllocationContext> context,
+                                ref<Expr> offset) {
+    ref<TxVariable> ret(new TxVariable(context, offset));
     return ret;
   }
 
@@ -206,7 +213,7 @@ public:
   /// but of different loop iterations. This does not make sense when comparing
   /// states for subsumption as in subsumption, related allocations in different
   /// paths may have different base addresses.
-  int compare(const TxInterpolantAddress &other) const {
+  int compare(const TxVariable &other) const {
     int res = context->compare(*(other.context.get()));
     if (res)
       return res;
@@ -355,7 +362,7 @@ public:
 
 private:
   /// \brief Address for use in interpolants, with less information
-  ref<TxInterpolantAddress> interpolantStyleAddress;
+  ref<TxVariable> interpolantStyleAddress;
 
   /// \brief The absolute address
   ref<Expr> address;
@@ -375,8 +382,8 @@ private:
 
   TxStateAddress(ref<AllocationContext> _context, ref<Expr> &_address,
                  ref<Expr> &_base, ref<Expr> &_offset, uint64_t _size)
-      : refCount(0), interpolantStyleAddress(
-                         TxInterpolantAddress::create(_context, _offset)),
+      : refCount(0),
+        interpolantStyleAddress(TxVariable::create(_context, _offset)),
         concreteOffsetBound(_size), size(_size) {
     bool unknownBase = false;
 
@@ -456,7 +463,7 @@ public:
     return ret;
   }
 
-  ref<TxInterpolantAddress> &getInterpolantStyleAddress() {
+  ref<TxVariable> &getInterpolantStyleAddress() {
     return interpolantStyleAddress;
   }
 
