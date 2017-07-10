@@ -379,12 +379,15 @@ public:
 
   bool isPointer() const { return !allocationOffsets.empty(); }
 
-  ref<Expr> getBoundsCheck(ref<TxInterpolantValue> svalue,
-                           std::set<ref<Expr> > &bounds,
-                           int debugSubsumptionLevel) const;
+  ref<Expr> getBoundsCheck(
+      ref<TxInterpolantValue> svalue, std::set<ref<Expr> > &bounds,
+      std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+      int debugSubsumptionLevel) const;
 
-  ref<Expr> getOffsetsCheck(ref<TxInterpolantValue> svalue,
-                            int debugSubsumptionLevel) const;
+  ref<Expr> getOffsetsCheck(
+      ref<TxInterpolantValue> svalue,
+      std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+      int debugSubsumptionLevel) const;
 
   ref<Expr> getExpression() const { return expr; }
 

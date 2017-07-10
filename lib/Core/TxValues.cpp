@@ -222,9 +222,10 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
   }
 }
 
-ref<Expr> TxInterpolantValue::getBoundsCheck(ref<TxInterpolantValue> stateValue,
-                                             std::set<ref<Expr> > &bounds,
-                                             int debugSubsumptionLevel) const {
+ref<Expr> TxInterpolantValue::getBoundsCheck(
+    ref<TxInterpolantValue> stateValue, std::set<ref<Expr> > &bounds,
+    std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+    int debugSubsumptionLevel) const {
   ref<Expr> res;
 #ifdef ENABLE_Z3
 
@@ -323,9 +324,10 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(ref<TxInterpolantValue> stateValue,
   return res;
 }
 
-ref<Expr>
-TxInterpolantValue::getOffsetsCheck(ref<TxInterpolantValue> stateValue,
-                                    int debugSubsumptionLevel) const {
+ref<Expr> TxInterpolantValue::getOffsetsCheck(
+    ref<TxInterpolantValue> stateValue,
+    std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+    int debugSubsumptionLevel) const {
   ref<Expr> res;
 #ifdef ENABLE_Z3
 

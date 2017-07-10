@@ -771,7 +771,12 @@ bool SubsumptionTableEntry::subsumed(
 
   ref<Expr> stateEqualityConstraints;
 
-  // Pointer values in the core for memory bounds interpolation
+  // Translation of allocation in the current state into an allocation in the
+  // tabled interpolant. This translation is used to equate absolute address
+  // values for allocations of matching sizes.
+  std::map<ref<AllocationInfo>, ref<AllocationInfo> > unifiedBases;
+
+  // Pointer values in the core for memory bounds interpolation.
   std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > > corePointerValues;
 
   // Pointer values in the core for exact equality
@@ -849,7 +854,7 @@ bool SubsumptionTableEntry::subsumed(
             if (!ExactAddressInterpolant && tabledValue->useBound()) {
               std::set<ref<Expr> > bounds;
               ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
-                  stateValue, bounds, debugSubsumptionLevel);
+                  stateValue, bounds, unifiedBases, debugSubsumptionLevel);
               if (boundsCheck->isFalse()) {
                 if (debugSubsumptionLevel >= 1) {
                   std::string msg;
@@ -867,7 +872,7 @@ bool SubsumptionTableEntry::subsumed(
               corePointerValues[stateValue] = bounds;
             } else {
               ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
-                  stateValue, debugSubsumptionLevel);
+                  stateValue, unifiedBases, debugSubsumptionLevel);
 
               if (offsetsCheck->isFalse()) {
                 if (debugSubsumptionLevel >= 1) {
@@ -981,7 +986,7 @@ bool SubsumptionTableEntry::subsumed(
               if (!ExactAddressInterpolant && tabledValue->useBound()) {
                 std::set<ref<Expr> > bounds;
                 ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
-                    stateValue, bounds, debugSubsumptionLevel);
+                    stateValue, bounds, unifiedBases, debugSubsumptionLevel);
 
                 if (!boundsCheck->isTrue()) {
                   newTerm = EqExpr::create(ConstantExpr::create(0, Expr::Bool),
@@ -999,7 +1004,7 @@ bool SubsumptionTableEntry::subsumed(
                 corePointerValues[stateValue] = bounds;
               } else {
                 ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
-                    stateValue, debugSubsumptionLevel);
+                    stateValue, unifiedBases, debugSubsumptionLevel);
 
                 if (offsetsCheck->isFalse()) {
                   if (debugSubsumptionLevel >= 1) {
@@ -1114,7 +1119,7 @@ bool SubsumptionTableEntry::subsumed(
             if (!ExactAddressInterpolant && tabledValue->useBound()) {
               std::set<ref<Expr> > bounds;
               ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
-                  stateValue, bounds, debugSubsumptionLevel);
+                  stateValue, bounds, unifiedBases, debugSubsumptionLevel);
 
               if (!boundsCheck->isTrue()) {
                 newTerm = EqExpr::create(
@@ -1133,7 +1138,7 @@ bool SubsumptionTableEntry::subsumed(
               corePointerValues[stateValue] = bounds;
             } else {
               ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
-                  stateValue, debugSubsumptionLevel);
+                  stateValue, unifiedBases, debugSubsumptionLevel);
 
               if (!offsetsCheck->isTrue()) {
                 newTerm = EqExpr::create(
@@ -1196,7 +1201,7 @@ bool SubsumptionTableEntry::subsumed(
             if (!ExactAddressInterpolant && tabledValue->useBound()) {
               std::set<ref<Expr> > bounds;
               ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
-                  stateValue, bounds, debugSubsumptionLevel);
+                  stateValue, bounds, unifiedBases, debugSubsumptionLevel);
 
               if (!boundsCheck->isTrue()) {
                 newTerm = EqExpr::create(
@@ -1216,7 +1221,7 @@ bool SubsumptionTableEntry::subsumed(
             } else {
               std::set<ref<Expr> > bounds;
               ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
-                  stateValue, debugSubsumptionLevel);
+                  stateValue, unifiedBases, debugSubsumptionLevel);
 
               if (!offsetsCheck->isTrue()) {
                 newTerm = EqExpr::create(
