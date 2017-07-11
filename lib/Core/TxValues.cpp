@@ -34,36 +34,7 @@ namespace klee {
 
 ref<AllocationContext> AllocationContext::create(
     llvm::Value *_value, const std::vector<llvm::Instruction *> &_callHistory) {
-  Type ty = GLOBAL;
-
-  if (llvm::Instruction *inst = llvm::dyn_cast<llvm::Instruction>(_value)) {
-    if (inst->getParent() && inst->getParent()->getParent()) {
-      // Heap-allocated memory is considered global, and to be recorded in
-      // global frame. Here we test if the allocation was a call to *alloc and
-      // getenv functions.
-      if (llvm::CallInst *ci = llvm::dyn_cast<llvm::CallInst>(inst)) {
-        // Here we determine if this was a call to *alloc or getenv functions
-        // from the LLVM source of the call instruction instead of
-        // llvm::Function::getName(). This is to circumvent segmentation fault
-        // issue when libc is not linked.
-        std::string buf;
-        llvm::raw_string_ostream stream(buf);
-        ci->print(stream);
-        stream.flush();
-        if (buf.find("@malloc(") != std::string::npos ||
-            buf.find("@realloc(") != std::string::npos ||
-            buf.find("@calloc(") != std::string::npos) {
-          ty = HEAP;
-        } else if (buf.find("@getenv(") != std::string::npos) {
-          ty = GLOBAL;
-        }
-      } else {
-        ty = LOCAL;
-      }
-    }
-  }
-
-  ref<AllocationContext> ret(new AllocationContext(ty, _value, _callHistory));
+  ref<AllocationContext> ret(new AllocationContext(_value, _callHistory));
   return ret;
 }
 
@@ -73,19 +44,6 @@ void AllocationContext::print(llvm::raw_ostream &stream,
   if (value) {
     stream << prefix << "Location: ";
     value->print(stream);
-    switch (ty) {
-    case LOCAL:
-      stream << " (local)";
-      break;
-    case GLOBAL:
-      stream << " (global)";
-      break;
-    case HEAP:
-      stream << " (heap)";
-      break;
-    default:
-      break;
-    }
   }
   if (callHistory.size() > 0) {
     stream << "\n" << prefix << "Call history:";

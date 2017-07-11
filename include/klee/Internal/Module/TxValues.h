@@ -47,12 +47,6 @@ class AllocationContext {
 public:
   unsigned refCount;
 
-  enum Type {
-    LOCAL,
-    GLOBAL,
-    HEAP
-  } ty;
-
 private:
   /// \brief The location's LLVM value
   llvm::Value *value;
@@ -60,9 +54,9 @@ private:
   /// \brief The call history by which the allocation is reached
   std::vector<llvm::Instruction *> callHistory;
 
-  AllocationContext(Type _ty, llvm::Value *_value,
+  AllocationContext(llvm::Value *_value,
                     const std::vector<llvm::Instruction *> &_callHistory)
-      : refCount(0), ty(_ty), value(_value), callHistory(_callHistory) {}
+      : refCount(0), value(_value), callHistory(_callHistory) {}
 
 public:
   ~AllocationContext() { callHistory.clear(); }
