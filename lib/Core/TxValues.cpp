@@ -144,8 +144,8 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
   for (std::set<ref<TxStateAddress> >::const_iterator it = _locations.begin(),
                                                       ie = _locations.end();
        it != ie; ++it) {
-    ref<AllocationContext> context =
-        (*it)->getContext(); // The allocation context
+    ref<AllocationInfo> allocInfo =
+        (*it)->getAllocationInfo(); // The allocation context
 
     ref<Expr> offset =
         shadowing
@@ -155,15 +155,15 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
     // We next build the offsets to be compared against stored allocation
     // offset bounds
     ConstantExpr *oe = llvm::dyn_cast<ConstantExpr>(offset);
-    if (oe && !allocationOffsets[context].empty()) {
+    if (oe && !allocationOffsets[allocInfo].empty()) {
       // Here we check if smaller offset exists, in which case we replace it
       // with the new offset; as we want the greater offset to possibly
       // violate an offset bound.
       std::set<ref<Expr> > res;
       uint64_t offsetInt = oe->getZExtValue();
       for (std::set<ref<Expr> >::iterator
-               it1 = allocationOffsets[context].begin(),
-               ie1 = allocationOffsets[context].end();
+               it1 = allocationOffsets[allocInfo].begin(),
+               ie1 = allocationOffsets[allocInfo].end();
            it1 != ie1; ++it1) {
         if (ConstantExpr *ce = llvm::dyn_cast<ConstantExpr>(*it1)) {
           uint64_t c = ce->getZExtValue();
@@ -174,9 +174,9 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
         }
         res.insert(*it1);
       }
-      allocationOffsets[context] = res;
+      allocationOffsets[allocInfo] = res;
     } else {
-      allocationOffsets[context].insert(offset);
+      allocationOffsets[allocInfo].insert(offset);
     }
   }
 
@@ -190,15 +190,15 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
     for (std::set<ref<TxStateAddress> >::const_iterator it = _locations.begin(),
                                                         ie = _locations.end();
          it != ie; ++it) {
-      ref<AllocationContext> context =
-          (*it)->getContext(); // The allocation site
+      ref<AllocationInfo> allocInfo =
+          (*it)->getAllocationInfo(); // The allocation info
 
       // Concrete bound
       uint64_t concreteBound = (*it)->getConcreteOffsetBound();
       std::set<ref<Expr> > newBounds;
 
       if (concreteBound > 0)
-        allocationBounds[context].insert(Expr::createPointer(concreteBound));
+        allocationBounds[allocInfo].insert(Expr::createPointer(concreteBound));
 
       // Symbolic bounds
       const std::set<ref<Expr> > &bounds = (*it)->getSymbolicOffsetBounds();
@@ -212,11 +212,11 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
               ShadowArray::getShadowExpression(*it1, replacements));
         }
         if (!shadowBounds.empty()) {
-          allocationBounds[context]
+          allocationBounds[allocInfo]
               .insert(shadowBounds.begin(), shadowBounds.end());
         }
       } else if (!bounds.empty()) {
-        allocationBounds[context].insert(bounds.begin(), bounds.end());
+        allocationBounds[allocInfo].insert(bounds.begin(), bounds.end());
       }
     }
   }
@@ -237,12 +237,12 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
   // information from the argument object; in this way resulting in
   // less iterations compared to doing it the other way around.
   bool matchFound = false;
-  for (std::map<ref<AllocationContext>, std::set<ref<Expr> > >::const_iterator
+  for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
            it = allocationBounds.begin(),
            ie = allocationBounds.end();
        it != ie; ++it) {
     std::set<ref<Expr> > tabledBounds = it->second;
-    std::map<ref<AllocationContext>, std::set<ref<Expr> > >::iterator iter =
+    std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::iterator iter =
         stateValue->allocationOffsets.find(it->first);
     if (iter == stateValue->allocationOffsets.end()) {
       continue;
@@ -339,12 +339,12 @@ ref<Expr> TxInterpolantValue::getOffsetsCheck(
   // information from the argument object; in this way resulting in
   // less iterations compared to doing it the other way around.
   bool matchFound = false;
-  for (std::map<ref<AllocationContext>, std::set<ref<Expr> > >::const_iterator
+  for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
            it = allocationOffsets.begin(),
            ie = allocationOffsets.end();
        it != ie; ++it) {
     const std::set<ref<Expr> > &tabledOffsets = it->second;
-    std::map<ref<AllocationContext>, std::set<ref<Expr> > >::iterator iter =
+    std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::iterator iter =
         stateValue->allocationOffsets.find(it->first);
     if (iter == stateValue->allocationOffsets.end()) {
       continue;
@@ -422,7 +422,7 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
 
   if (!doNotUseBound && !allocationBounds.empty()) {
     stream << prefix << "BOUNDS:";
-    for (std::map<ref<AllocationContext>, std::set<ref<Expr> > >::const_iterator
+    for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
              it = allocationBounds.begin(),
              ie = allocationBounds.end();
          it != ie; ++it) {
@@ -447,7 +447,7 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
     if (offsetDisplayed)
       stream << "\n";
     stream << prefix << "OFFSETS:";
-    for (std::map<ref<AllocationContext>, std::set<ref<Expr> > >::const_iterator
+    for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
              it = allocationOffsets.begin(),
              ie = allocationOffsets.end();
          it != ie; ++it) {

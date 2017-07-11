@@ -301,13 +301,13 @@ private:
   /// This constitutes the weakest liberal precondition of the memory checks
   /// against which the offsets of the pointer values of the current state are
   /// to be checked.
-  std::map<ref<AllocationContext>, std::set<ref<Expr> > > allocationBounds;
+  std::map<ref<AllocationInfo>, std::set<ref<Expr> > > allocationBounds;
 
   /// \brief In case the stored value was a pointer, then this should be a
   /// non-empty map mapping of allocation sites to the set of offsets. This is
   /// the offset values of the current state to be checked against the offset
   /// bounds.
-  std::map<ref<AllocationContext>, std::set<ref<Expr> > > allocationOffsets;
+  std::map<ref<AllocationInfo>, std::set<ref<Expr> > > allocationOffsets;
 
   /// \brief The id of this object
   uint64_t id;
