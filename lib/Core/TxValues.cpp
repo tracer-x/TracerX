@@ -303,7 +303,7 @@ TxInterpolantValue::getOffsetsCheck(ref<TxInterpolantValue> stateValue,
            it = allocationOffsets.begin(),
            ie = allocationOffsets.end();
        it != ie; ++it) {
-    std::set<ref<Expr> > tabledOffsets = it->second;
+    const std::set<ref<Expr> > &tabledOffsets = it->second;
     std::map<ref<AllocationContext>, std::set<ref<Expr> > >::iterator iter =
         stateValue->allocationOffsets.find(it->first);
     if (iter == stateValue->allocationOffsets.end()) {
@@ -311,7 +311,7 @@ TxInterpolantValue::getOffsetsCheck(ref<TxInterpolantValue> stateValue,
     }
     matchFound = true;
 
-    std::set<ref<Expr> > stateOffsets = iter->second;
+    std::set<ref<Expr> > &stateOffsets = iter->second;
 
     assert(!tabledOffsets.empty() && "tabled offsets empty");
 
@@ -386,7 +386,6 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
              it = allocationBounds.begin(),
              ie = allocationBounds.end();
          it != ie; ++it) {
-      std::set<ref<Expr> > boundsSet = it->second;
       stream << "\n";
       stream << prefix << "[";
       it->first->print(stream);
@@ -412,7 +411,6 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
              it = allocationOffsets.begin(),
              ie = allocationOffsets.end();
          it != ie; ++it) {
-      std::set<ref<Expr> > boundsSet = it->second;
       stream << "\n";
       stream << prefix << "[";
       it->first->print(stream);
@@ -452,7 +450,8 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
 
 bool TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
                                        std::set<ref<Expr> > &_bounds) {
-  std::set<ref<TxStateAddress> > locations = checkedAddress->getLocations();
+  const std::set<ref<TxStateAddress> > &locations =
+      checkedAddress->getLocations();
   std::set<ref<Expr> > bounds(_bounds);
 
   if (bounds.empty()) {
