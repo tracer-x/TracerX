@@ -43,7 +43,7 @@ public:
 
   ~TxStoreEntry() {}
 
-  ref<TxVariable> getIndex() { return address->getInterpolantStyleAddress(); }
+  ref<TxVariable> getIndex() { return address->getAsVariable(); }
 
   ref<TxStateAddress> getAddress() { return address; }
 
@@ -101,7 +101,7 @@ public:
   }
 
   StateStore::iterator concreteFind(ref<TxStateAddress> loc) {
-    return concretelyAddressedStore.find(loc->getInterpolantStyleAddress());
+    return concretelyAddressedStore.find(loc->getAsVariable());
   }
 
   StateStore::iterator concreteBegin() {
@@ -111,7 +111,7 @@ public:
   StateStore::iterator concreteEnd() { return concretelyAddressedStore.end(); }
 
   StateStore::iterator symbolicFind(ref<TxStateAddress> loc) {
-    return symbolicallyAddressedStore.find(loc->getInterpolantStyleAddress());
+    return symbolicallyAddressedStore.find(loc->getAsVariable());
   }
 
   StateStore::iterator symbolicBegin() {

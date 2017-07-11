@@ -511,7 +511,7 @@ public:
     return ret;
   }
 
-  ref<TxVariable> &getInterpolantStyleAddress() { return variable; }
+  ref<TxVariable> &getAsVariable() { return variable; }
 
   llvm::Value *getValue() const { return variable->getBase(); }
 

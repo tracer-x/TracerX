@@ -93,9 +93,8 @@ void TxStore::getSymbolicStore(
           symbolicStore[it->first->getContext()->getValue()];
 #ifdef ENABLE_Z3
       if (!NoExistential) {
-        ref<TxVariable> address =
-            TxStateAddress::create(it->second->getAddress(), replacements)
-                ->getInterpolantStyleAddress();
+        ref<TxVariable> address = TxStateAddress::create(
+            it->second->getAddress(), replacements)->getAsVariable();
         map[address] =
             it->second->getContent()->getInterpolantStyleValue(replacements);
       } else {
@@ -121,10 +120,10 @@ void TxStore::updateStoreWithLoadedValue(ref<TxStateAddress> loc,
 void TxStore::updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
                           ref<TxStateValue> value) {
   if (loc->hasConstantAddress()) {
-    concretelyAddressedStore[loc->getInterpolantStyleAddress()] =
+    concretelyAddressedStore[loc->getAsVariable()] =
         ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
   } else {
-    symbolicallyAddressedStore[loc->getInterpolantStyleAddress()] =
+    symbolicallyAddressedStore[loc->getAsVariable()] =
         ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
   }
 }
