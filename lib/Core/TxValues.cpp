@@ -562,7 +562,8 @@ TxStateAddress::create(ref<TxStateAddress> loc,
                        std::set<const Array *> &replacements) {
   ref<Expr> _address(
       ShadowArray::getShadowExpression(loc->address, replacements)),
-      _base(ShadowArray::getShadowExpression(loc->base, replacements)),
+      _base(ShadowArray::getShadowExpression(loc->allocInfo->getBase(),
+                                             replacements)),
       _offset(ShadowArray::getShadowExpression(loc->getOffset(), replacements));
   ref<TxStateAddress> ret(new TxStateAddress(loc->getContext(), _address, _base,
                                              _offset, loc->size));
@@ -582,10 +583,10 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
   address->print(stream);
   stream << "\n";
   stream << prefix << "base: ";
-  if (!llvm::isa<ConstantExpr>(base))
+  if (!llvm::isa<ConstantExpr>(allocInfo->getBase()))
     stream << " (symbolic)";
   stream << ": ";
-  base->print(stream);
+  allocInfo->print(stream);
   stream << "\n";
   stream << prefix
          << "pointer to location object: " << reinterpret_cast<uintptr_t>(this);
