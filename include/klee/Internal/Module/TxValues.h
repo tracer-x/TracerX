@@ -553,6 +553,8 @@ public:
 
   ref<AllocationContext> getContext() const { return variable->getContext(); }
 
+  ref<AllocationInfo> getAllocationInfo() const { return allocInfo; }
+
   uint64_t getConcreteOffsetBound() const { return concreteOffsetBound; }
 
   ref<Expr> getOffset() const { return variable->getOffset(); }
