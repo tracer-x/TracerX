@@ -32,6 +32,27 @@ using namespace klee;
 
 namespace klee {
 
+bool AllocationInfo::translate(
+    ref<AllocationInfo> other,
+    std::map<ref<AllocationInfo>, ref<AllocationInfo> > &table) const {
+  ref<AllocationInfo> self(new AllocationInfo(base, size));
+
+  if (self == other)
+    return true;
+
+  std::map<ref<AllocationInfo>, ref<AllocationInfo> >::const_iterator it =
+      table.find(self);
+  if (it != table.end()) {
+    if (it->second != other) {
+      return false;
+    }
+    return true;
+  }
+
+  table[self] = other;
+  return true;
+}
+
 int AllocationInfo::compare(const AllocationInfo &other) const {
   if (base == other.base) {
     if (size == other.size) {

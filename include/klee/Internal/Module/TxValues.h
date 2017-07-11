@@ -65,6 +65,17 @@ public:
 
   uint64_t getSize() { return size; }
 
+  /// \brief Translate this allocation info into another.
+  ///
+  /// \param other The other translation info to translate to
+  /// \param table The translation table. This table gets updated if this is a
+  /// new translation.
+  ///
+  /// \return true if the translation was successful, false otherwise.
+  bool
+  translate(ref<AllocationInfo> other,
+            std::map<ref<AllocationInfo>, ref<AllocationInfo> > &table) const;
+
   int compare(const AllocationInfo &other) const;
 
   /// \brief Print the content of the object to the LLVM error stream
