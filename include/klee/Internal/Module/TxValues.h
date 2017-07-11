@@ -410,8 +410,8 @@ public:
   unsigned refCount;
 
 private:
-  /// \brief Address for use in interpolants, with less information
-  ref<TxVariable> interpolantStyleAddress;
+  /// \brief This address as a variable, with less information
+  ref<TxVariable> variable;
 
   /// \brief The absolute address
   ref<Expr> address;
@@ -431,8 +431,7 @@ private:
 
   TxStateAddress(ref<AllocationContext> _context, ref<Expr> &_address,
                  ref<Expr> &_base, ref<Expr> &_offset, uint64_t _size)
-      : refCount(0),
-        interpolantStyleAddress(TxVariable::create(_context, _offset)),
+      : refCount(0), variable(TxVariable::create(_context, _offset)),
         concreteOffsetBound(_size), size(_size) {
     bool unknownBase = false;
 
@@ -512,15 +511,12 @@ public:
     return ret;
   }
 
-  ref<TxVariable> &getInterpolantStyleAddress() {
-    return interpolantStyleAddress;
-  }
+  ref<TxVariable> &getInterpolantStyleAddress() { return variable; }
 
-  llvm::Value *getValue() const { return interpolantStyleAddress->getBase(); }
+  llvm::Value *getValue() const { return variable->getBase(); }
 
   int compare(const TxStateAddress &other) const {
-    int res = interpolantStyleAddress->compare(
-        *(other.interpolantStyleAddress.get()));
+    int res = variable->compare(*(other.variable.get()));
     if (res)
       return res;
 
@@ -552,13 +548,11 @@ public:
     return symbolicOffsetBounds;
   }
 
-  ref<AllocationContext> getContext() const {
-    return interpolantStyleAddress->getContext();
-  }
+  ref<AllocationContext> getContext() const { return variable->getContext(); }
 
   uint64_t getConcreteOffsetBound() const { return concreteOffsetBound; }
 
-  ref<Expr> getOffset() const { return interpolantStyleAddress->getOffset(); }
+  ref<Expr> getOffset() const { return variable->getOffset(); }
 
   uint64_t getSize() const { return size; }
 

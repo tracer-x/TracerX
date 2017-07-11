@@ -573,7 +573,7 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
                            const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
-  interpolantStyleAddress->print(stream, prefix);
+  variable->print(stream, prefix);
   stream << "\n";
   stream << prefix << "address";
   if (!llvm::isa<ConstantExpr>(address))
