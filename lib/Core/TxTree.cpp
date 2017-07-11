@@ -1899,6 +1899,8 @@ bool TxTree::symbolicExecutionError = false;
 
 uint64_t TxTree::subsumptionCheckCount = 0;
 
+uint64_t TxTree::blockCount = 1;
+
 void TxTree::printTimeStat(std::stringstream &stream) {
   stream << "KLEE: done:     setCurrentINode = "
          << ((double)setCurrentINodeTime.getValue()) / 1000 << "\n";
@@ -1949,6 +1951,8 @@ std::string TxTree::getInterpolationStat() {
   std::stringstream stream;
   stream << "KLEE: done: Total reduced symbolic execution tree nodes = "
 		 << TxTreeGraph::nodeCount  << "\n";
+  stream << "KLEE: done: Total number of visited basic blocks = "
+		 << blockCount  << "\n";
   stream << "\nKLEE: done: Subsumption statistics\n";
   printTableStat(stream);
   stream << "\nKLEE: done: TxTree method execution times (ms):\n";
