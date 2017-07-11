@@ -42,6 +42,52 @@ class TxStateAddress;
 
 class TxStateValue;
 
+class AllocationInfo {
+public:
+  unsigned refCount;
+
+private:
+  ref<Expr> base;
+
+  uint64_t size;
+
+  AllocationInfo(ref<Expr> _base, uint64_t _size)
+      : refCount(0), base(_base), size(_size) {}
+
+public:
+  ~AllocationInfo() {}
+
+  static ref<AllocationInfo> create(ref<Expr> base, uint64_t size) {
+    return ref<AllocationInfo>(new AllocationInfo(base, size));
+  }
+
+  ref<Expr> getBase() { return base; }
+
+  uint64_t getSize() { return size; }
+
+  int compare(const AllocationInfo &other) const;
+
+  /// \brief Print the content of the object to the LLVM error stream
+  void dump() const {
+    print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+
+  /// \brief Print the content of the object into a stream.
+  ///
+  /// \param stream The stream to print the data to.
+  void print(llvm::raw_ostream &stream) const {
+    std::string emptyString;
+    print(stream, emptyString);
+  }
+
+  /// \brief Print the content of the object into a stream.
+  ///
+  /// \param stream The stream to print the data to.
+  /// \param prefix Padding spaces to print before the actual data.
+  void print(llvm::raw_ostream &stream, const std::string &prefix) const;
+};
+
 class AllocationContext {
 
 public:

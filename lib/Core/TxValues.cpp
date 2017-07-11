@@ -32,6 +32,44 @@ using namespace klee;
 
 namespace klee {
 
+int AllocationInfo::compare(const AllocationInfo &other) const {
+  if (base == other.base) {
+    if (size == other.size) {
+      return 0;
+    }
+    if (size < other.size) {
+      return -1;
+    }
+    return 1;
+  } else if (ConstantExpr *cbx = llvm::dyn_cast<ConstantExpr>(base)) {
+    uint64_t cb = cbx->getZExtValue();
+    if (ConstantExpr *cbox = llvm::dyn_cast<ConstantExpr>(other.base)) {
+      uint64_t cbo = cbox->getZExtValue();
+      if (cb == cbo) {
+        if (size < other.size) {
+          return -1;
+        }
+        return 1;
+      } else if (cb < cbo)
+        return -1;
+      return 1;
+    }
+  }
+
+  if (base->hash() < other.base->hash())
+    return -1;
+  return 1;
+}
+
+void AllocationInfo::print(llvm::raw_ostream &stream,
+                           const std::string &prefix) const {
+  stream << prefix << "[base: ";
+  base->print(stream);
+  stream << ", size: " << size << "]";
+}
+
+/**/
+
 ref<AllocationContext> AllocationContext::create(
     llvm::Value *_value, const std::vector<llvm::Instruction *> &_callHistory) {
   ref<AllocationContext> ret(new AllocationContext(_value, _callHistory));
