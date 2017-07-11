@@ -2159,6 +2159,7 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
       SubsumptionTable::insert(node->getProgramPoint(), node->entryCallHistory,
                                entry);
 
+
       TxTreeGraph::addTableEntryMapping(node, entry);
 
       if (debugSubsumptionLevel >= 2) {
