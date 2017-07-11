@@ -537,13 +537,13 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
   interpolantStyleAddress->print(stream, prefix);
   stream << "\n";
   stream << prefix << "address";
-  if (!llvm::isa<ConstantExpr>(this->address))
+  if (!llvm::isa<ConstantExpr>(address))
     stream << " (symbolic)";
   stream << ": ";
   address->print(stream);
   stream << "\n";
   stream << prefix << "base: ";
-  if (!llvm::isa<ConstantExpr>(this->base))
+  if (!llvm::isa<ConstantExpr>(base))
     stream << " (symbolic)";
   stream << ": ";
   base->print(stream);
