@@ -344,8 +344,60 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
   if (res.isNull()) {
     if (matchFound)
       return ConstantExpr::create(1, Expr::Bool);
-    else
+    else {
+      // Match not found; we force match via address translation
+      for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
+               selfBoundsListIt = allocationBounds.begin(),
+               selfBoundsListIe = allocationBounds.end();
+           selfBoundsListIt != selfBoundsListIe && !matchFound;
+           ++selfBoundsListIt) {
+        for (std::map<ref<AllocationInfo>,
+                      std::set<ref<Expr> > >::const_iterator
+                 otherOffsetsListIt = other->allocationOffsets.begin(),
+                 otherOffsetsListIe = other->allocationOffsets.end();
+             otherOffsetsListIt != otherOffsetsListIe && !matchFound;
+             ++otherOffsetsListIt) {
+          uint64_t selfSize = selfBoundsListIt->first->getSize(),
+                   otherSize = otherOffsetsListIt->first->getSize();
+          if (selfSize == otherSize) {
+            // Allocation sizes match
+            const std::set<ref<Expr> > &selfBounds = selfBoundsListIt->second;
+            const std::set<ref<Expr> > &otherOffsets =
+                otherOffsetsListIt->second;
+            ref<Expr> expr;
+            for (std::set<ref<Expr> >::const_iterator
+                     selfBoundsIt = selfBounds.begin(),
+                     selfBoundsIe = selfBounds.end();
+                 selfBoundsIt != selfBoundsIe; ++selfBoundsIt) {
+              for (std::set<ref<Expr> >::const_iterator
+                       otherOffsetsIt = otherOffsets.begin(),
+                       otherOffsetsIe = otherOffsets.end();
+                   otherOffsetsIt != otherOffsetsIe; ++otherOffsetsIt) {
+                // Create constraints for offset equalities
+                if (expr.isNull()) {
+                  expr = UltExpr::create(*otherOffsetsIt, *selfBoundsIt);
+                } else {
+                  expr = AndExpr::create(
+                      UltExpr::create(*otherOffsetsIt, *selfBoundsIt), expr);
+                }
+              }
+            }
+
+            if (!expr.isNull() && !expr->isFalse()) {
+              if (otherOffsetsListIt->first->translate(selfBoundsListIt->first,
+                                                       unifiedBases)) {
+                res = expr;
+                matchFound = true;
+              }
+            }
+          }
+        }
+      }
+      if (matchFound)
+        return res;
+
       return ConstantExpr::create(0, Expr::Bool);
+    }
   }
 #endif // ENABLE_Z3
   return res;
@@ -437,8 +489,60 @@ ref<Expr> TxInterpolantValue::getOffsetsCheck(
   if (res.isNull()) {
     if (matchFound)
       return ConstantExpr::create(1, Expr::Bool);
-    else
+    else {
+      // Match not found; we force match via address translation
+      for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
+               selfOffsetsListIt = allocationOffsets.begin(),
+               selfOffsetsListIe = allocationOffsets.end();
+           selfOffsetsListIt != selfOffsetsListIe && !matchFound;
+           ++selfOffsetsListIt) {
+        for (std::map<ref<AllocationInfo>,
+                      std::set<ref<Expr> > >::const_iterator
+                 otherOffsetsListIt = other->allocationOffsets.begin(),
+                 otherOffsetsListIe = other->allocationOffsets.end();
+             otherOffsetsListIt != otherOffsetsListIe && !matchFound;
+             ++otherOffsetsListIt) {
+          uint64_t selfSize = selfOffsetsListIt->first->getSize(),
+                   otherSize = otherOffsetsListIt->first->getSize();
+          if (selfSize == otherSize) {
+            // Allocation sizes match
+            const std::set<ref<Expr> > &selfOffsets = selfOffsetsListIt->second;
+            const std::set<ref<Expr> > &otherOffsets =
+                otherOffsetsListIt->second;
+            ref<Expr> expr;
+            for (std::set<ref<Expr> >::const_iterator
+                     selfOffsetsIt = selfOffsets.begin(),
+                     selfOffsetsIe = selfOffsets.end();
+                 selfOffsetsIt != selfOffsetsIe; ++selfOffsetsIt) {
+              for (std::set<ref<Expr> >::const_iterator
+                       otherOffsetsIt = otherOffsets.begin(),
+                       otherOffsetsIe = otherOffsets.end();
+                   otherOffsetsIt != otherOffsetsIe; ++otherOffsetsIt) {
+                // Create constraints for offset equalities
+                if (expr.isNull()) {
+                  expr = EqExpr::create(*otherOffsetsIt, *selfOffsetsIt);
+                } else {
+                  expr = AndExpr::create(
+                      EqExpr::create(*otherOffsetsIt, *selfOffsetsIt), expr);
+                }
+              }
+            }
+
+            if (!expr.isNull() && !expr->isFalse()) {
+              if (otherOffsetsListIt->first->translate(selfOffsetsListIt->first,
+                                                       unifiedBases)) {
+                res = expr;
+                matchFound = true;
+              }
+            }
+          }
+        }
+      }
+      if (matchFound)
+        return res;
+
       return ConstantExpr::create(0, Expr::Bool);
+    }
   }
 #endif // ENABLE_Z3
   return res;
