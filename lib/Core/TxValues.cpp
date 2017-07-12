@@ -244,7 +244,7 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
 }
 
 ref<Expr> TxInterpolantValue::getBoundsCheck(
-    ref<TxInterpolantValue> stateValue, std::set<ref<Expr> > &bounds,
+    ref<TxInterpolantValue> other, std::set<ref<Expr> > &bounds,
     std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
     int debugSubsumptionLevel) const {
   ref<Expr> res;
@@ -259,77 +259,83 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
   // less iterations compared to doing it the other way around.
   bool matchFound = false;
   for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
-           it = allocationBounds.begin(),
-           ie = allocationBounds.end();
-       it != ie; ++it) {
-    std::set<ref<Expr> > tabledBounds = it->second;
-    std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::iterator iter =
-        stateValue->allocationOffsets.find(it->first);
-    if (iter == stateValue->allocationOffsets.end()) {
+           selfBoundsListIt = allocationBounds.begin(),
+           selfBoundsListIe = allocationBounds.end();
+       selfBoundsListIt != selfBoundsListIe; ++selfBoundsListIt) {
+    std::set<ref<Expr> > selfBounds = selfBoundsListIt->second;
+    std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::iterator
+    otherOffsetsListIt = other->allocationOffsets.find(selfBoundsListIt->first);
+    if (otherOffsetsListIt == other->allocationOffsets.end()) {
       continue;
     }
     matchFound = true;
 
-    std::set<ref<Expr> > stateOffsets = iter->second;
+    std::set<ref<Expr> > otherOffsets = otherOffsetsListIt->second;
 
-    assert(!tabledBounds.empty() && "tabled bounds empty");
+    assert(!selfBounds.empty() && "tabled bounds empty");
 
-    if (stateOffsets.empty()) {
+    if (otherOffsets.empty()) {
       if (debugSubsumptionLevel >= 3) {
         std::string msg;
         llvm::raw_string_ostream stream(msg);
-        it->first->print(stream);
+        selfBoundsListIt->first->print(stream);
         stream.flush();
         klee_message("No offset defined in state for %s", msg.c_str());
       }
       return ConstantExpr::create(0, Expr::Bool);
     }
 
-    for (std::set<ref<Expr> >::const_iterator it1 = stateOffsets.begin(),
-                                              ie1 = stateOffsets.end();
-         it1 != ie1; ++it1) {
-      for (std::set<ref<Expr> >::const_iterator it2 = tabledBounds.begin(),
-                                                ie2 = tabledBounds.end();
-           it2 != ie2; ++it2) {
-        if (ConstantExpr *tabledBound = llvm::dyn_cast<ConstantExpr>(*it2)) {
-          uint64_t tabledBoundInt = tabledBound->getZExtValue();
-          if (ConstantExpr *stateOffset = llvm::dyn_cast<ConstantExpr>(*it1)) {
-            if (tabledBoundInt > 0) {
-              uint64_t stateOffsetInt = stateOffset->getZExtValue();
-              if (stateOffsetInt >= tabledBoundInt) {
+    for (std::set<ref<Expr> >::const_iterator
+             otherOffsetsIt = otherOffsets.begin(),
+             otherOffsetsIe = otherOffsets.end();
+         otherOffsetsIt != otherOffsetsIe; ++otherOffsetsIt) {
+      for (std::set<ref<Expr> >::const_iterator
+               selfBoundsIt = selfBounds.begin(),
+               selfBoundsIe = selfBounds.end();
+           selfBoundsIt != selfBoundsIe; ++selfBoundsIt) {
+        if (ConstantExpr *selfBoundObj =
+                llvm::dyn_cast<ConstantExpr>(*selfBoundsIt)) {
+          uint64_t selfBound = selfBoundObj->getZExtValue();
+          if (ConstantExpr *otherOffsetObj =
+                  llvm::dyn_cast<ConstantExpr>(*otherOffsetsIt)) {
+            if (selfBound > 0) {
+              uint64_t otherOffset = otherOffsetObj->getZExtValue();
+              if (otherOffset >= selfBound) {
                 if (debugSubsumptionLevel >= 3) {
                   std::string msg;
                   llvm::raw_string_ostream stream(msg);
-                  it->first->print(stream);
+                  selfBoundsListIt->first->print(stream);
                   stream.flush();
                   klee_message("Offset %lu out of bound %lu for %s",
-                               stateOffsetInt, tabledBoundInt, msg.c_str());
+                               otherOffset, selfBound, msg.c_str());
                 }
                 return ConstantExpr::create(0, Expr::Bool);
               } else {
-                bounds.insert(*it2);
+                bounds.insert(*selfBoundsIt);
                 continue;
               }
             }
-          } else if (tabledBoundInt > 0) {
+          } else if (selfBound > 0) {
             // Symbolic state offset, but concrete tabled bound. Here the bound
             // is known (non-zero), so we create constraints
             if (res.isNull()) {
-              res = UltExpr::create(*it1, *it2);
+              res = UltExpr::create(*otherOffsetsIt, *selfBoundsIt);
             } else {
-              res = AndExpr::create(UltExpr::create(*it1, *it2), res);
+              res = AndExpr::create(
+                  UltExpr::create(*otherOffsetsIt, *selfBoundsIt), res);
             }
-            bounds.insert(*it2);
+            bounds.insert(*selfBoundsIt);
           }
           continue;
         }
         // Create constraints for symbolic bounds
         if (res.isNull()) {
-          res = UltExpr::create(*it1, *it2);
+          res = UltExpr::create(*otherOffsetsIt, *selfBoundsIt);
         } else {
-          res = AndExpr::create(UltExpr::create(*it1, *it2), res);
+          res = AndExpr::create(UltExpr::create(*otherOffsetsIt, *selfBoundsIt),
+                                res);
         }
-        bounds.insert(*it2);
+        bounds.insert(*selfBoundsIt);
       }
     }
   }
@@ -346,7 +352,7 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
 }
 
 ref<Expr> TxInterpolantValue::getOffsetsCheck(
-    ref<TxInterpolantValue> stateValue,
+    ref<TxInterpolantValue> other,
     std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
     int debugSubsumptionLevel) const {
   ref<Expr> res;
@@ -361,50 +367,55 @@ ref<Expr> TxInterpolantValue::getOffsetsCheck(
   // less iterations compared to doing it the other way around.
   bool matchFound = false;
   for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
-           it = allocationOffsets.begin(),
-           ie = allocationOffsets.end();
-       it != ie; ++it) {
-    const std::set<ref<Expr> > &tabledOffsets = it->second;
-    std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::iterator iter =
-        stateValue->allocationOffsets.find(it->first);
-    if (iter == stateValue->allocationOffsets.end()) {
+           selfOffsetsListIt = allocationOffsets.begin(),
+           selfOffsetsListIe = allocationOffsets.end();
+       selfOffsetsListIt != selfOffsetsListIe; ++selfOffsetsListIt) {
+    const std::set<ref<Expr> > &selfOffsets = selfOffsetsListIt->second;
+    std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::iterator
+    otherOffsetsListIt =
+        other->allocationOffsets.find(selfOffsetsListIt->first);
+    if (otherOffsetsListIt == other->allocationOffsets.end()) {
       continue;
     }
     matchFound = true;
 
-    std::set<ref<Expr> > &stateOffsets = iter->second;
+    std::set<ref<Expr> > &otherOffsets = otherOffsetsListIt->second;
 
-    assert(!tabledOffsets.empty() && "tabled offsets empty");
+    assert(!selfOffsets.empty() && "tabled offsets empty");
 
-    if (stateOffsets.empty()) {
+    if (otherOffsets.empty()) {
       if (debugSubsumptionLevel >= 3) {
         std::string msg;
         llvm::raw_string_ostream stream(msg);
-        it->first->print(stream);
+        selfOffsetsListIt->first->print(stream);
         stream.flush();
         klee_message("No offset defined in state for %s", msg.c_str());
       }
       return ConstantExpr::create(0, Expr::Bool);
     }
 
-    for (std::set<ref<Expr> >::const_iterator it1 = stateOffsets.begin(),
-                                              ie1 = stateOffsets.end();
-         it1 != ie1; ++it1) {
-      for (std::set<ref<Expr> >::const_iterator it2 = tabledOffsets.begin(),
-                                                ie2 = tabledOffsets.end();
-           it2 != ie2; ++it2) {
-        if (ConstantExpr *tabledOffset = llvm::dyn_cast<ConstantExpr>(*it2)) {
-          uint64_t tabledOffsetInt = tabledOffset->getZExtValue();
-          if (ConstantExpr *stateOffset = llvm::dyn_cast<ConstantExpr>(*it1)) {
-            uint64_t stateOffsetInt = stateOffset->getZExtValue();
-            if (stateOffsetInt != tabledOffsetInt) {
+    for (std::set<ref<Expr> >::const_iterator
+             otherOffsetsIt = otherOffsets.begin(),
+             otherOffsetsIe = otherOffsets.end();
+         otherOffsetsIt != otherOffsetsIe; ++otherOffsetsIt) {
+      for (std::set<ref<Expr> >::const_iterator
+               selfOffsetsIt = selfOffsets.begin(),
+               selfOffsetsIe = selfOffsets.end();
+           selfOffsetsIt != selfOffsetsIe; ++selfOffsetsIt) {
+        if (ConstantExpr *selfOffsetObj =
+                llvm::dyn_cast<ConstantExpr>(*selfOffsetsIt)) {
+          uint64_t selfOffset = selfOffsetObj->getZExtValue();
+          if (ConstantExpr *otherOffsetObj =
+                  llvm::dyn_cast<ConstantExpr>(*otherOffsetsIt)) {
+            uint64_t otherOffset = otherOffsetObj->getZExtValue();
+            if (otherOffset != selfOffset) {
               if (debugSubsumptionLevel >= 3) {
                 std::string msg;
                 llvm::raw_string_ostream stream(msg);
-                it->first->print(stream);
+                selfOffsetsListIt->first->print(stream);
                 stream.flush();
                 klee_message("Offset %lu does not equal %lu for %s",
-                             stateOffsetInt, tabledOffsetInt, msg.c_str());
+                             otherOffset, selfOffset, msg.c_str());
               }
               return ConstantExpr::create(0, Expr::Bool);
             }
@@ -413,9 +424,10 @@ ref<Expr> TxInterpolantValue::getOffsetsCheck(
 
         // Create constraints for offset equalities
         if (res.isNull()) {
-          res = EqExpr::create(*it1, *it2);
+          res = EqExpr::create(*otherOffsetsIt, *selfOffsetsIt);
         } else {
-          res = AndExpr::create(EqExpr::create(*it1, *it2), res);
+          res = AndExpr::create(EqExpr::create(*otherOffsetsIt, *selfOffsetsIt),
+                                res);
         }
       }
     }
