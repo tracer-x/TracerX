@@ -252,7 +252,9 @@ public:
     return ret;
   }
 
-  llvm::Value *getBase() const { return allocInfo->getContext()->getValue(); }
+  llvm::Value *getValue() const { return allocInfo->getContext()->getValue(); }
+
+  ref<Expr> getBase() const { return allocInfo->getBase(); }
 
   ref<AllocationContext> getContext() const { return allocInfo->getContext(); }
 
@@ -532,7 +534,7 @@ public:
 
   ref<TxVariable> &getAsVariable() { return variable; }
 
-  llvm::Value *getValue() const { return variable->getBase(); }
+  llvm::Value *getValue() const { return variable->getValue(); }
 
   int compare(const TxStateAddress &other) const {
     int res = variable->compare(*(other.variable.get()));
