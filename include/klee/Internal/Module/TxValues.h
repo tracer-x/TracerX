@@ -252,6 +252,8 @@ public:
     return ret;
   }
 
+  ref<AllocationInfo> getAllocationInfo() const { return allocInfo; }
+
   llvm::Value *getValue() const { return allocInfo->getContext()->getValue(); }
 
   ref<Expr> getBase() const { return allocInfo->getBase(); }
@@ -434,9 +436,6 @@ private:
   /// \brief The absolute address
   ref<Expr> address;
 
-  /// \brief The allocation information, including the base address
-  ref<AllocationInfo> allocInfo;
-
   /// \brief The expressions representing the bound on the offset, i.e., the
   /// interpolant, in case it is symbolic.
   std::set<ref<Expr> > symbolicOffsetBounds;
@@ -476,6 +475,7 @@ private:
       address = _address;
     }
 
+    ref<AllocationInfo> allocInfo;
     if (_base->getWidth() < pointerWidth) {
       allocInfo = AllocationInfo::create(
           _context, ZExtExpr::create(_base, pointerWidth), _size);
@@ -518,14 +518,14 @@ public:
                                     ref<Expr> &offsetDelta) {
     ConstantExpr *c = llvm::dyn_cast<ConstantExpr>(offsetDelta);
     if (c && c->getZExtValue() == 0) {
-      ref<Expr> base = loc->allocInfo->getBase();
+      ref<Expr> base = loc->getBase();
       ref<Expr> offset = loc->getOffset();
       ref<TxStateAddress> ret(new TxStateAddress(loc->getContext(), address,
                                                  base, offset, loc->size));
       return ret;
     }
 
-    ref<Expr> base = loc->allocInfo->getBase();
+    ref<Expr> base = loc->getBase();
     ref<Expr> newOffset = AddExpr::create(loc->getOffset(), offsetDelta);
     ref<TxStateAddress> ret(new TxStateAddress(loc->getContext(), address, base,
                                                newOffset, loc->size));
@@ -542,10 +542,10 @@ public:
       return res;
 
     // FIXME: Should this just be allocInfo == other.allocInfo?
-    if (allocInfo->getBase() == other.allocInfo->getBase())
+    if (variable->getBase() == other.variable->getBase())
       return 0;
 
-    if (allocInfo->getBase()->hash() < other.allocInfo->getBase()->hash())
+    if (variable->getBase()->hash() < other.variable->getBase()->hash())
       return -3;
 
     return 3;
@@ -564,7 +564,7 @@ public:
 
   ref<Expr> getAddress() const { return address; }
 
-  ref<Expr> getBase() const { return allocInfo->getBase(); }
+  ref<Expr> getBase() const { return variable->getBase(); }
 
   const std::set<ref<Expr> > &getSymbolicOffsetBounds() const {
     return symbolicOffsetBounds;
@@ -572,7 +572,9 @@ public:
 
   ref<AllocationContext> getContext() const { return variable->getContext(); }
 
-  ref<AllocationInfo> getAllocationInfo() const { return allocInfo; }
+  ref<AllocationInfo> getAllocationInfo() const {
+    return variable->getAllocationInfo();
+  }
 
   uint64_t getConcreteOffsetBound() const { return concreteOffsetBound; }
 
