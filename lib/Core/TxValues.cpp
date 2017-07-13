@@ -35,7 +35,8 @@ namespace klee {
 bool AllocationInfo::translate(
     ref<AllocationInfo> other,
     std::map<ref<AllocationInfo>, ref<AllocationInfo> > &table) const {
-  ref<AllocationInfo> self(new AllocationInfo(base, size));
+  ref<AllocationContext> _context(context);
+  ref<AllocationInfo> self(new AllocationInfo(_context, base, size));
 
   if (self == other)
     return true;

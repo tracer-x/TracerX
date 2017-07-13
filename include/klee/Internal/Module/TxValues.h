@@ -143,19 +143,25 @@ public:
   unsigned refCount;
 
 private:
+  ref<AllocationContext> context;
+
   ref<Expr> base;
 
   uint64_t size;
 
-  AllocationInfo(ref<Expr> _base, uint64_t _size)
-      : refCount(0), base(_base), size(_size) {}
+  AllocationInfo(ref<AllocationContext> &_context, ref<Expr> _base,
+                 uint64_t _size)
+      : refCount(0), context(_context), base(_base), size(_size) {}
 
 public:
   ~AllocationInfo() {}
 
-  static ref<AllocationInfo> create(ref<Expr> base, uint64_t size) {
-    return ref<AllocationInfo>(new AllocationInfo(base, size));
+  static ref<AllocationInfo> create(ref<AllocationContext> &context,
+                                    ref<Expr> base, uint64_t size) {
+    return ref<AllocationInfo>(new AllocationInfo(context, base, size));
   }
+
+  ref<AllocationContext> getContext() { return context; }
 
   ref<Expr> getBase() { return base; }
 
@@ -471,10 +477,10 @@ private:
     }
 
     if (_base->getWidth() < pointerWidth) {
-      allocInfo =
-          AllocationInfo::create(ZExtExpr::create(_base, pointerWidth), _size);
+      allocInfo = AllocationInfo::create(
+          _context, ZExtExpr::create(_base, pointerWidth), _size);
     } else {
-      allocInfo = AllocationInfo::create(_base, _size);
+      allocInfo = AllocationInfo::create(_context, _base, _size);
     }
 
     if (unknownBase) {
@@ -484,8 +490,8 @@ private:
       } else {
         tmpOffset = _offset;
       }
-      allocInfo =
-          AllocationInfo::create(SubExpr::create(address, tmpOffset), _size);
+      allocInfo = AllocationInfo::create(
+          _context, SubExpr::create(address, tmpOffset), _size);
     }
   }
 
