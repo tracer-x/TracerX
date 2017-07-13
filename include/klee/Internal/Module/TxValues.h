@@ -216,9 +216,8 @@ public:
   unsigned refCount;
 
 private:
-  /// \brief the context (allocation site and call history) of the allocation of
-  /// this address
-  ref<AllocationContext> context;
+  /// \brief The allocation information of this variable
+  ref<AllocationInfo> allocInfo;
 
   /// \brief The offset wrt. the allocation
   ref<Expr> offset;
@@ -231,12 +230,12 @@ private:
 
   /// \brief The copy constructor.
   TxVariable(const TxVariable &src)
-      : refCount(0), context(src.context), offset(src.offset),
+      : refCount(0), allocInfo(src.allocInfo), offset(src.offset),
         isConcrete(src.isConcrete), concreteOffset(src.concreteOffset) {}
 
   /// \brief The normal constructor.
-  TxVariable(ref<AllocationContext> _context, ref<Expr> _offset)
-      : refCount(0), context(_context), offset(_offset) {
+  TxVariable(ref<AllocationInfo> _allocInfo, ref<Expr> _offset)
+      : refCount(0), allocInfo(_allocInfo), offset(_offset) {
     isConcrete = false;
     concreteOffset = 0;
 
@@ -247,15 +246,15 @@ private:
   }
 
 public:
-  static ref<TxVariable> create(ref<AllocationContext> context,
+  static ref<TxVariable> create(ref<AllocationInfo> allocInfo,
                                 ref<Expr> offset) {
-    ref<TxVariable> ret(new TxVariable(context, offset));
+    ref<TxVariable> ret(new TxVariable(allocInfo, offset));
     return ret;
   }
 
-  llvm::Value *getBase() const { return context->getValue(); }
+  llvm::Value *getBase() const { return allocInfo->getContext()->getValue(); }
 
-  ref<AllocationContext> getContext() const { return context; }
+  ref<AllocationContext> getContext() const { return allocInfo->getContext(); }
 
   ref<Expr> getOffset() const { return offset; }
 
@@ -277,7 +276,7 @@ public:
   /// states for subsumption as in subsumption, related allocations in different
   /// paths may have different base addresses.
   int compare(const TxVariable &other) const {
-    int res = context->compare(*(other.context.get()));
+    int res = allocInfo->compare(*(other.allocInfo.get()));
     if (res)
       return res;
 
@@ -448,8 +447,7 @@ private:
 
   TxStateAddress(ref<AllocationContext> _context, ref<Expr> &_address,
                  ref<Expr> &_base, ref<Expr> &_offset, uint64_t _size)
-      : refCount(0), variable(TxVariable::create(_context, _offset)),
-        concreteOffsetBound(_size), size(_size) {
+      : refCount(0), concreteOffsetBound(_size), size(_size) {
     bool unknownBase = false;
 
     if (ConstantExpr *co = llvm::dyn_cast<ConstantExpr>(_offset)) {
@@ -493,6 +491,8 @@ private:
       allocInfo = AllocationInfo::create(
           _context, SubExpr::create(address, tmpOffset), _size);
     }
+
+    variable = TxVariable::create(allocInfo, _offset);
   }
 
 public:

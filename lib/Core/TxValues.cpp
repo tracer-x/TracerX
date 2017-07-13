@@ -124,15 +124,15 @@ void TxVariable::print(llvm::raw_ostream &stream,
   std::string tabsNext = appendTab(prefix);
 
   stream << prefix << "function/value: ";
-  if (outputFunctionName(context->getValue(), stream))
+  if (outputFunctionName(allocInfo->getContext()->getValue(), stream))
     stream << "/";
-  context->getValue()->print(stream);
+  allocInfo->getContext()->getValue()->print(stream);
   stream << "\n";
 
   stream << prefix << "stack:\n";
   for (std::vector<llvm::Instruction *>::const_reverse_iterator
-           it = context->getCallHistory().rbegin(),
-           ib = it, ie = context->getCallHistory().rend();
+           it = allocInfo->getContext()->getCallHistory().rbegin(),
+           ib = it, ie = allocInfo->getContext()->getCallHistory().rend();
        it != ie; ++it) {
     stream << tabsNext;
     (*it)->print(stream);
