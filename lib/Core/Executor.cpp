@@ -1484,8 +1484,8 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
     state.incomingBBIndex = first->getBasicBlockIndex(src);
   }
   if (INTERPOLATION_ENABLED)
-	  //blockCount increased to count all visited Basic Blocks
-	  TxTree::blockCount++;
+    // blockCount increased to count all visited Basic Blocks
+    TxTree::blockCount++;
 }
 
 void Executor::printFileLine(ExecutionState &state, KInstruction *ki,

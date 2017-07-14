@@ -708,10 +708,12 @@ public:
   static Statistic executeMemoryOperationTime;
   static double entryNumber;
   static double programPointNumber;
-  static uint64_t blockCount;
 
   /// \brief Number of subsumption checks for statistical purposes
   static uint64_t subsumptionCheckCount;
+
+  /// \brief Number of visited basic blocks for statistical purposes
+  static uint64_t blockCount;
 
   /// \brief The root node of the tree
   TxTreeNode *root;
