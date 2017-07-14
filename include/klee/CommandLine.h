@@ -71,6 +71,8 @@ extern llvm::cl::opt<CoreSolverType> DebugCrossCheckCoreSolverWith;
 // was undefined to avoid regression test failure.
 extern llvm::cl::opt<bool> NoInterpolation;
 
+extern llvm::cl::opt<bool> NoCompression;
+
 #ifdef ENABLE_Z3
 
 extern llvm::cl::opt<bool> OutputTree;
@@ -86,8 +88,6 @@ extern llvm::cl::opt<int> DebugSubsumption;
 extern llvm::cl::opt<bool> ExactAddressInterpolant;
 
 extern llvm::cl::opt<bool> SpecialFunctionBoundInterpolation;
-
-extern llvm::cl::opt<bool> NoCompression;
 
 #endif
 

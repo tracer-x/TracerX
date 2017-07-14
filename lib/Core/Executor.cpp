@@ -903,258 +903,273 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
 
 		  ++stats::forks;
 
-		  falseState = trueState->branch();
-		  addedStates.push_back(falseState);
+                  falseState = trueState->branch();
+                  addedStates.push_back(falseState);
 
-		  if (RandomizeFork && theRNG.getBool())
-			  std::swap(trueState, falseState);
+                  if (RandomizeFork && theRNG.getBool())
+                    std::swap(trueState, falseState);
 
-		  if (it != seedMap.end()) {
-		      std::vector<SeedInfo> seeds = it->second;
-		      it->second.clear();
-		      std::vector<SeedInfo> &trueSeeds = seedMap[trueState];
-		      std::vector<SeedInfo> &falseSeeds = seedMap[falseState];
-		      for (std::vector<SeedInfo>::iterator siit = seeds.begin(),
-		             siie = seeds.end(); siit != siie; ++siit) {
-		    	  ref<ConstantExpr> res;
-		          bool success =
-		            solver->getValue(current, siit->assignment.evaluate(condition), res);
-		          assert(success && "FIXME: Unhandled solver failure");
-		          (void) success;
-		          if (res->isTrue()) {
-		        	  trueSeeds.push_back(*siit);
-		          } else {
-		              falseSeeds.push_back(*siit);
-		          }
-		      }
+                  if (it != seedMap.end()) {
+                    std::vector<SeedInfo> seeds = it->second;
+                    it->second.clear();
+                    std::vector<SeedInfo> &trueSeeds = seedMap[trueState];
+                    std::vector<SeedInfo> &falseSeeds = seedMap[falseState];
+                    for (std::vector<SeedInfo>::iterator siit = seeds.begin(),
+                                                         siie = seeds.end();
+                         siit != siie; ++siit) {
+                      ref<ConstantExpr> res;
+                      bool success = solver->getValue(
+                          current, siit->assignment.evaluate(condition), res);
+                      assert(success && "FIXME: Unhandled solver failure");
+                      (void)success;
+                      if (res->isTrue()) {
+                        trueSeeds.push_back(*siit);
+                      } else {
+                        falseSeeds.push_back(*siit);
+                      }
+                    }
 
-		      bool swapInfo = false;
-		      if (trueSeeds.empty()) {
-		    	  if (&current == trueState) swapInfo = true;
-		          seedMap.erase(trueState);
-		      }
-		      if (falseSeeds.empty()) {
-		    	  if (&current == falseState) swapInfo = true;
-		          seedMap.erase(falseState);
-		      }
-		      if (swapInfo) {
-		    	  std::swap(trueState->coveredNew, falseState->coveredNew);
-		          std::swap(trueState->coveredLines, falseState->coveredLines);
-		      }
-		    }
+                    bool swapInfo = false;
+                    if (trueSeeds.empty()) {
+                      if (&current == trueState)
+                        swapInfo = true;
+                      seedMap.erase(trueState);
+                    }
+                    if (falseSeeds.empty()) {
+                      if (&current == falseState)
+                        swapInfo = true;
+                      seedMap.erase(falseState);
+                    }
+                    if (swapInfo) {
+                      std::swap(trueState->coveredNew, falseState->coveredNew);
+                      std::swap(trueState->coveredLines,
+                                falseState->coveredLines);
+                    }
+                  }
 
-		    current.ptreeNode->data = 0;
-		    std::pair<PTree::Node*, PTree::Node*> res =
-		      processTree->split(current.ptreeNode, falseState, trueState);
-		    falseState->ptreeNode = res.first;
-		    trueState->ptreeNode = res.second;
+                  current.ptreeNode->data = 0;
+                  std::pair<PTree::Node *, PTree::Node *> res =
+                      processTree->split(current.ptreeNode, falseState,
+                                         trueState);
+                  falseState->ptreeNode = res.first;
+                  trueState->ptreeNode = res.second;
 
-		    if (!isInternal) {
-		    	if (pathWriter) {
-		    		falseState->pathOS = pathWriter->open(current.pathOS);
-		    		trueState->pathOS << "1";
-		    		falseState->pathOS << "0";
-		    	}
-		    	if (symPathWriter) {
-		    		falseState->symPathOS = symPathWriter->open(current.symPathOS);
-		    		trueState->symPathOS << "1";
-		    		falseState->symPathOS << "0";
-		    	}
-		    }
+                  if (!isInternal) {
+                    if (pathWriter) {
+                      falseState->pathOS = pathWriter->open(current.pathOS);
+                      trueState->pathOS << "1";
+                      falseState->pathOS << "0";
+                    }
+                    if (symPathWriter) {
+                      falseState->symPathOS =
+                          symPathWriter->open(current.symPathOS);
+                      trueState->symPathOS << "1";
+                      falseState->symPathOS << "0";
+                    }
+                  }
 
-		    if (INTERPOLATION_ENABLED) {
-		    	std::pair<TxTreeNode *, TxTreeNode *> ires =
-		    	txTree->split(current.txTreeNode, falseState, trueState);
-		    	falseState->txTreeNode = ires.first;
-		    	trueState->txTreeNode = ires.second;
-		    	// Validity proof succeeded of a query: antecedent -> consequent.
-		    	// We then extract the unsatisfiability core of antecedent and not
-		    	// consequent as the Craig interpolant.
-		    	txTree->markPathCondition(current, solver, unsatCore);
-		    }
+                  if (INTERPOLATION_ENABLED) {
+                    std::pair<TxTreeNode *, TxTreeNode *> ires = txTree->split(
+                        current.txTreeNode, falseState, trueState);
+                    falseState->txTreeNode = ires.first;
+                    trueState->txTreeNode = ires.second;
+                    // Validity proof succeeded of a query: antecedent ->
+                    // consequent.
+                    // We then extract the unsatisfiability core of antecedent
+                    // and not
+                    // consequent as the Craig interpolant.
+                    txTree->markPathCondition(current, solver, unsatCore);
+                  }
 
-		    addConstraint(*trueState, condition);
+                  addConstraint(*trueState, condition);
 
-		    // Kinda gross, do we even really still want this option?
-		    if (MaxDepth && MaxDepth<=trueState->depth) {
-		      terminateStateEarly(*trueState, "max-depth exceeded.");
-		      terminateStateEarly(*falseState, "max-depth exceeded.");
-		      return StatePair(0, 0);
-		    }
-		    terminateStateEarly(*falseState, "infeasible false path");
+                  // Kinda gross, do we even really still want this option?
+                  if (MaxDepth && MaxDepth <= trueState->depth) {
+                    terminateStateEarly(*trueState, "max-depth exceeded.");
+                    terminateStateEarly(*falseState, "max-depth exceeded.");
+                    return StatePair(0, 0);
+                  }
+                  terminateStateEarly(*falseState, "infeasible false path");
 
-		    return StatePair(trueState, 0);
-	  } else if (res==Solver::False) {
-		    TimerStatIncrementer timer(stats::forkTime);
-		    ExecutionState  *trueState, *falseState = &current;
+                  return StatePair(trueState, 0);
+          } else if (res == Solver::False) {
+            TimerStatIncrementer timer(stats::forkTime);
+            ExecutionState *trueState, *falseState = &current;
 
-		    ++stats::forks;
+            ++stats::forks;
 
-		    trueState = falseState->branch();
-		    addedStates.push_back(trueState);
+            trueState = falseState->branch();
+            addedStates.push_back(trueState);
 
-		    if (RandomizeFork && theRNG.getBool())
-		    	std::swap(trueState, falseState);
+            if (RandomizeFork && theRNG.getBool())
+              std::swap(trueState, falseState);
 
-		    if (it != seedMap.end()) {
-		    	std::vector<SeedInfo> seeds = it->second;
-		    	it->second.clear();
-		    	std::vector<SeedInfo> &trueSeeds = seedMap[trueState];
-		    	std::vector<SeedInfo> &falseSeeds = seedMap[falseState];
-		    	for (std::vector<SeedInfo>::iterator siit = seeds.begin(),
-		             siie = seeds.end(); siit != siie; ++siit) {
-		    		ref<ConstantExpr> res;
-		    		bool success =
-		              solver->getValue(current, siit->assignment.evaluate(condition), res);
-		    		assert(success && "FIXME: Unhandled solver failure");
-		    		(void) success;
-		    		if (res->isTrue()) {
-		    			trueSeeds.push_back(*siit);
-		    		} else {
-		    			falseSeeds.push_back(*siit);
-		    		}
-		    	}
+            if (it != seedMap.end()) {
+              std::vector<SeedInfo> seeds = it->second;
+              it->second.clear();
+              std::vector<SeedInfo> &trueSeeds = seedMap[trueState];
+              std::vector<SeedInfo> &falseSeeds = seedMap[falseState];
+              for (std::vector<SeedInfo>::iterator siit = seeds.begin(),
+                                                   siie = seeds.end();
+                   siit != siie; ++siit) {
+                ref<ConstantExpr> res;
+                bool success = solver->getValue(
+                    current, siit->assignment.evaluate(condition), res);
+                assert(success && "FIXME: Unhandled solver failure");
+                (void)success;
+                if (res->isTrue()) {
+                  trueSeeds.push_back(*siit);
+                } else {
+                  falseSeeds.push_back(*siit);
+                }
+              }
 
-		    	bool swapInfo = false;
-		    	if (trueSeeds.empty()) {
-		    		if (&current == trueState) swapInfo = true;
-		    		seedMap.erase(trueState);
-		    	}
-		    	if (falseSeeds.empty()) {
-		    		if (&current == falseState) swapInfo = true;
-		    		seedMap.erase(falseState);
-		    	}
-		    	if (swapInfo) {
-		    		std::swap(trueState->coveredNew, falseState->coveredNew);
-		    		std::swap(trueState->coveredLines, falseState->coveredLines);
-		    	}
-		    }
+              bool swapInfo = false;
+              if (trueSeeds.empty()) {
+                if (&current == trueState)
+                  swapInfo = true;
+                seedMap.erase(trueState);
+              }
+              if (falseSeeds.empty()) {
+                if (&current == falseState)
+                  swapInfo = true;
+                seedMap.erase(falseState);
+              }
+              if (swapInfo) {
+                std::swap(trueState->coveredNew, falseState->coveredNew);
+                std::swap(trueState->coveredLines, falseState->coveredLines);
+              }
+            }
 
-		    current.ptreeNode->data = 0;
-		    std::pair<PTree::Node*, PTree::Node*> res =
-		      processTree->split(current.ptreeNode, falseState, trueState);
-		    falseState->ptreeNode = res.first;
-		    trueState->ptreeNode = res.second;
+            current.ptreeNode->data = 0;
+            std::pair<PTree::Node *, PTree::Node *> res =
+                processTree->split(current.ptreeNode, falseState, trueState);
+            falseState->ptreeNode = res.first;
+            trueState->ptreeNode = res.second;
 
-		    if (!isInternal) {
-		    	if (pathWriter) {
-		    		falseState->pathOS = pathWriter->open(current.pathOS);
-		    		trueState->pathOS << "1";
-		    		falseState->pathOS << "0";
-		    	}
-		    	if (symPathWriter) {
-		    		falseState->symPathOS = symPathWriter->open(current.symPathOS);
-		    		trueState->symPathOS << "1";
-		    		falseState->symPathOS << "0";
-		    	}
-		    }
+            if (!isInternal) {
+              if (pathWriter) {
+                falseState->pathOS = pathWriter->open(current.pathOS);
+                trueState->pathOS << "1";
+                falseState->pathOS << "0";
+              }
+              if (symPathWriter) {
+                falseState->symPathOS = symPathWriter->open(current.symPathOS);
+                trueState->symPathOS << "1";
+                falseState->symPathOS << "0";
+              }
+            }
 
-		    if (INTERPOLATION_ENABLED) {
-		      std::pair<TxTreeNode *, TxTreeNode *> ires =
-		      txTree->split(current.txTreeNode, falseState, trueState);
-		      falseState->txTreeNode = ires.first;
-		      trueState->txTreeNode = ires.second;
-		      // Falsity proof succeeded of a query: antecedent -> consequent,
-		      // which means that antecedent -> not(consequent) is valid. In this
-		      // case also we extract the unsat core of the proof
-		      txTree->markPathCondition(current, solver, unsatCore);
-		    }
+            if (INTERPOLATION_ENABLED) {
+              std::pair<TxTreeNode *, TxTreeNode *> ires =
+                  txTree->split(current.txTreeNode, falseState, trueState);
+              falseState->txTreeNode = ires.first;
+              trueState->txTreeNode = ires.second;
+              // Falsity proof succeeded of a query: antecedent -> consequent,
+              // which means that antecedent -> not(consequent) is valid. In
+              // this
+              // case also we extract the unsat core of the proof
+              txTree->markPathCondition(current, solver, unsatCore);
+            }
 
-	        terminateStateEarly(*trueState, "infeasible true path");
-		    addConstraint(*falseState, Expr::createIsZero(condition));
+            terminateStateEarly(*trueState, "infeasible true path");
+            addConstraint(*falseState, Expr::createIsZero(condition));
 
-		    // Kinda gross, do we even really still want this option?
-		    if (MaxDepth && MaxDepth<=trueState->depth) {
-		      terminateStateEarly(*trueState, "max-depth exceeded.");
-		      terminateStateEarly(*falseState, "max-depth exceeded.");
-		      return StatePair(0, 0);
-		    }
+            // Kinda gross, do we even really still want this option?
+            if (MaxDepth && MaxDepth <= trueState->depth) {
+              terminateStateEarly(*trueState, "max-depth exceeded.");
+              terminateStateEarly(*falseState, "max-depth exceeded.");
+              return StatePair(0, 0);
+            }
 
-		    return StatePair(0, falseState);
-	  } else {
-		  TimerStatIncrementer timer(stats::forkTime);
-		  ExecutionState *falseState, *trueState = &current;
+            return StatePair(0, falseState);
+          } else {
+            TimerStatIncrementer timer(stats::forkTime);
+            ExecutionState *falseState, *trueState = &current;
 
-		  ++stats::forks;
+            ++stats::forks;
 
-		  falseState = trueState->branch();
-		  addedStates.push_back(falseState);
+            falseState = trueState->branch();
+            addedStates.push_back(falseState);
 
-		  if (RandomizeFork && theRNG.getBool())
-			  std::swap(trueState, falseState);
+            if (RandomizeFork && theRNG.getBool())
+              std::swap(trueState, falseState);
 
-		  if (it != seedMap.end()) {
-			  std::vector<SeedInfo> seeds = it->second;
-			  it->second.clear();
-			  std::vector<SeedInfo> &trueSeeds = seedMap[trueState];
-			  std::vector<SeedInfo> &falseSeeds = seedMap[falseState];
-			  for (std::vector<SeedInfo>::iterator siit = seeds.begin(),
-	             siie = seeds.end(); siit != siie; ++siit) {
-				  ref<ConstantExpr> res;
-				  bool success =
-	                solver->getValue(current, siit->assignment.evaluate(condition), res);
-				  assert(success && "FIXME: Unhandled solver failure");
-				  (void) success;
-				  if (res->isTrue()) {
-					  trueSeeds.push_back(*siit);
-				  } else {
-					  falseSeeds.push_back(*siit);
-				  }
-			  }
+            if (it != seedMap.end()) {
+              std::vector<SeedInfo> seeds = it->second;
+              it->second.clear();
+              std::vector<SeedInfo> &trueSeeds = seedMap[trueState];
+              std::vector<SeedInfo> &falseSeeds = seedMap[falseState];
+              for (std::vector<SeedInfo>::iterator siit = seeds.begin(),
+                                                   siie = seeds.end();
+                   siit != siie; ++siit) {
+                ref<ConstantExpr> res;
+                bool success = solver->getValue(
+                    current, siit->assignment.evaluate(condition), res);
+                assert(success && "FIXME: Unhandled solver failure");
+                (void)success;
+                if (res->isTrue()) {
+                  trueSeeds.push_back(*siit);
+                } else {
+                  falseSeeds.push_back(*siit);
+                }
+              }
 
-			  bool swapInfo = false;
-			  if (trueSeeds.empty()) {
-				  if (&current == trueState) swapInfo = true;
-				  seedMap.erase(trueState);
-			  }
-			  if (falseSeeds.empty()) {
-				  if (&current == falseState) swapInfo = true;
-				  seedMap.erase(falseState);
-			  }
-			  if (swapInfo) {
-				  std::swap(trueState->coveredNew, falseState->coveredNew);
-				  std::swap(trueState->coveredLines, falseState->coveredLines);
-			  }
-		  }
+              bool swapInfo = false;
+              if (trueSeeds.empty()) {
+                if (&current == trueState)
+                  swapInfo = true;
+                seedMap.erase(trueState);
+              }
+              if (falseSeeds.empty()) {
+                if (&current == falseState)
+                  swapInfo = true;
+                seedMap.erase(falseState);
+              }
+              if (swapInfo) {
+                std::swap(trueState->coveredNew, falseState->coveredNew);
+                std::swap(trueState->coveredLines, falseState->coveredLines);
+              }
+            }
 
-		  current.ptreeNode->data = 0;
-		  std::pair<PTree::Node*, PTree::Node*> res =
-	        processTree->split(current.ptreeNode, falseState, trueState);
-		  falseState->ptreeNode = res.first;
-		  trueState->ptreeNode = res.second;
+            current.ptreeNode->data = 0;
+            std::pair<PTree::Node *, PTree::Node *> res =
+                processTree->split(current.ptreeNode, falseState, trueState);
+            falseState->ptreeNode = res.first;
+            trueState->ptreeNode = res.second;
 
-		  if (!isInternal) {
-			  if (pathWriter) {
-				  falseState->pathOS = pathWriter->open(current.pathOS);
-				  trueState->pathOS << "1";
-				  falseState->pathOS << "0";
-			  }
-			  if (symPathWriter) {
-				  falseState->symPathOS = symPathWriter->open(current.symPathOS);
-				  trueState->symPathOS << "1";
-				  falseState->symPathOS << "0";
-			  }
-		  }
+            if (!isInternal) {
+              if (pathWriter) {
+                falseState->pathOS = pathWriter->open(current.pathOS);
+                trueState->pathOS << "1";
+                falseState->pathOS << "0";
+              }
+              if (symPathWriter) {
+                falseState->symPathOS = symPathWriter->open(current.symPathOS);
+                trueState->symPathOS << "1";
+                falseState->symPathOS << "0";
+              }
+            }
 
-		  if (INTERPOLATION_ENABLED) {
-			  std::pair<TxTreeNode *, TxTreeNode *> ires =
-	            txTree->split(current.txTreeNode, falseState, trueState);
-			  falseState->txTreeNode = ires.first;
-			  trueState->txTreeNode = ires.second;
-		  }
+            if (INTERPOLATION_ENABLED) {
+              std::pair<TxTreeNode *, TxTreeNode *> ires =
+                  txTree->split(current.txTreeNode, falseState, trueState);
+              falseState->txTreeNode = ires.first;
+              trueState->txTreeNode = ires.second;
+            }
 
-		  addConstraint(*trueState, condition);
-		  addConstraint(*falseState, Expr::createIsZero(condition));
+            addConstraint(*trueState, condition);
+            addConstraint(*falseState, Expr::createIsZero(condition));
 
-		  // Kinda gross, do we even really still want this option?
-		  if (MaxDepth && MaxDepth<=trueState->depth) {
-			  terminateStateEarly(*trueState, "max-depth exceeded.");
-			  terminateStateEarly(*falseState, "max-depth exceeded.");
-			  return StatePair(0, 0);
-		  }
+            // Kinda gross, do we even really still want this option?
+            if (MaxDepth && MaxDepth <= trueState->depth) {
+              terminateStateEarly(*trueState, "max-depth exceeded.");
+              terminateStateEarly(*falseState, "max-depth exceeded.");
+              return StatePair(0, 0);
+            }
 
-		  return StatePair(trueState, falseState);
-	  }
+            return StatePair(trueState, falseState);
+          }
   }else{
 	  if (res==Solver::True) {
 	    if (!isInternal) {
