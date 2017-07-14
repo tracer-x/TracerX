@@ -87,6 +87,8 @@ extern llvm::cl::opt<bool> ExactAddressInterpolant;
 
 extern llvm::cl::opt<bool> SpecialFunctionBoundInterpolation;
 
+extern llvm::cl::opt<bool> NoCompression;
+
 #endif
 
 #ifdef ENABLE_METASMT
