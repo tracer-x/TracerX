@@ -93,6 +93,12 @@ llvm::cl::opt<bool> NoInterpolation(
                    "Interpolation is enabled by default when Z3 was the solver "
                    "used. This option has no effect when Z3 was not used."));
 
+llvm::cl::opt<bool> NoCompression(
+    "no-compression",
+    llvm::cl::desc("Disable compression of nodes at choice points when one "
+                   "of the true or false branch is infeasible."),
+    llvm::cl::init(false));
+
 #ifdef ENABLE_Z3
 llvm::cl::opt<bool> OutputTree(
     "output-tree",
