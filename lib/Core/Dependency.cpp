@@ -736,7 +736,7 @@ void Dependency::execute(llvm::Instruction *instr,
           ref<TxStateAddress> loc = *(locations.begin());
 
           // Check the possible mismatch between Tracer-X and KLEE loaded value
-          TxStore::StateStore::iterator storeIt = store.concreteFind(loc);
+          TxStore::LowerStateStore::iterator storeIt = store.concreteFind(loc);
           ref<TxStoreEntry> target;
 
           if (storeIt == store.concreteEnd()) {
@@ -822,7 +822,7 @@ void Dependency::execute(llvm::Instruction *instr,
            li != le; ++li) {
         ref<TxStoreEntry> addressValuePair;
 
-        TxStore::StateStore::iterator storeIter;
+        TxStore::LowerStateStore::iterator storeIter;
         if ((*li)->hasConstantAddress()) {
           storeIter = store.concreteFind(*li);
           if (storeIter != store.concreteEnd()) {

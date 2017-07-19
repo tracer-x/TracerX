@@ -58,26 +58,24 @@ public:
   LowerInterpolantStore;
   typedef std::map<const llvm::Value *, LowerInterpolantStore>
   TopInterpolantStore;
-  typedef std::map<ref<TxVariable>, ref<TxStoreEntry> > StateStore;
+  typedef std::map<ref<TxVariable>, ref<TxStoreEntry> > LowerStateStore;
 
 private:
   /// \brief The mapping of concrete locations to stored value
-  StateStore concretelyAddressedStore;
+  LowerStateStore concretelyAddressedStore;
 
   /// \brief The mapping of symbolic locations to stored value
-  StateStore symbolicallyAddressedStore;
+  LowerStateStore symbolicallyAddressedStore;
 
-  void getConcreteStore(
-      const std::vector<llvm::Instruction *> &callHistory,
-      const StateStore &store,
-      std::set<const Array *> &replacements, bool coreOnly,
-      TopInterpolantStore &concreteStore) const;
+  void getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
+                        const LowerStateStore &store,
+                        std::set<const Array *> &replacements, bool coreOnly,
+                        TopInterpolantStore &concreteStore) const;
 
-  void getSymbolicStore(
-      const std::vector<llvm::Instruction *> &callHistory,
-      const StateStore &store,
-      std::set<const Array *> &replacements, bool coreOnly,
-      TopInterpolantStore &symbolicStore) const;
+  void getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
+                        const LowerStateStore &store,
+                        std::set<const Array *> &replacements, bool coreOnly,
+                        TopInterpolantStore &symbolicStore) const;
 
 public:
   /// \brief Constructor for an empty store.
@@ -94,25 +92,27 @@ public:
     symbolicallyAddressedStore.clear();
   }
 
-  StateStore::iterator concreteFind(ref<TxStateAddress> loc) {
+  LowerStateStore::iterator concreteFind(ref<TxStateAddress> loc) {
     return concretelyAddressedStore.find(loc->getAsVariable());
   }
 
-  StateStore::iterator concreteBegin() {
+  LowerStateStore::iterator concreteBegin() {
     return concretelyAddressedStore.begin();
   }
 
-  StateStore::iterator concreteEnd() { return concretelyAddressedStore.end(); }
+  LowerStateStore::iterator concreteEnd() {
+    return concretelyAddressedStore.end();
+  }
 
-  StateStore::iterator symbolicFind(ref<TxStateAddress> loc) {
+  LowerStateStore::iterator symbolicFind(ref<TxStateAddress> loc) {
     return symbolicallyAddressedStore.find(loc->getAsVariable());
   }
 
-  StateStore::iterator symbolicBegin() {
+  LowerStateStore::iterator symbolicBegin() {
     return symbolicallyAddressedStore.begin();
   }
 
-  StateStore::iterator symbolicEnd() {
+  LowerStateStore::iterator symbolicEnd() {
     return symbolicallyAddressedStore.end();
   }
 

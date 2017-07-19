@@ -34,12 +34,12 @@ void TxStore::getStoredExpressions(
                    coreOnly, _symbolicallyAddressedStore);
 }
 
-void TxStore::getConcreteStore(
-    const std::vector<llvm::Instruction *> &callHistory,
-    const StateStore &store,
-    std::set<const Array *> &replacements, bool coreOnly,
-    TopInterpolantStore &concreteStore) const {
-  for (StateStore::const_iterator it = store.begin(), ie = store.end();
+void
+TxStore::getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
+                          const LowerStateStore &store,
+                          std::set<const Array *> &replacements, bool coreOnly,
+                          TopInterpolantStore &concreteStore) const {
+  for (LowerStateStore::const_iterator it = store.begin(), ie = store.end();
        it != ie; ++it) {
     if (!it->first->contextIsPrefixOf(callHistory))
       continue;
@@ -70,12 +70,12 @@ void TxStore::getConcreteStore(
   }
 }
 
-void TxStore::getSymbolicStore(
-    const std::vector<llvm::Instruction *> &callHistory,
-    const StateStore &store,
-    std::set<const Array *> &replacements, bool coreOnly,
-    TopInterpolantStore &symbolicStore) const {
-  for (StateStore::const_iterator it = store.begin(), ie = store.end();
+void
+TxStore::getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
+                          const LowerStateStore &store,
+                          std::set<const Array *> &replacements, bool coreOnly,
+                          TopInterpolantStore &symbolicStore) const {
+  for (LowerStateStore::const_iterator it = store.begin(), ie = store.end();
        it != ie; ++it) {
     if (!it->first->contextIsPrefixOf(callHistory))
       continue;
@@ -141,9 +141,9 @@ void TxStore::print(llvm::raw_ostream &stream,
     stream << tabs << "concrete store = []\n";
   } else {
     stream << tabs << "concrete store = [\n";
-    for (StateStore::const_iterator is = concretelyAddressedStore.begin(),
-                                    ie = concretelyAddressedStore.end(),
-                                    it = is;
+    for (LowerStateStore::const_iterator is = concretelyAddressedStore.begin(),
+                                         ie = concretelyAddressedStore.end(),
+                                         it = is;
          it != ie; ++it) {
       if (it != is)
         stream << tabsNext << "------------------------------------------\n";
@@ -161,9 +161,9 @@ void TxStore::print(llvm::raw_ostream &stream,
     stream << tabs << "symbolic store = []\n";
   } else {
     stream << tabs << "symbolic store = [\n";
-    for (StateStore::const_iterator is = symbolicallyAddressedStore.begin(),
-                                    ie = symbolicallyAddressedStore.end(),
-                                    it = is;
+    for (LowerStateStore::const_iterator
+             is = symbolicallyAddressedStore.begin(),
+             ie = symbolicallyAddressedStore.end(), it = is;
          it != ie; ++it) {
       if (it != is)
         stream << tabsNext << "------------------------------------------\n";
