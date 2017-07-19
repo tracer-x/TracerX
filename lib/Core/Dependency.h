@@ -119,14 +119,14 @@ namespace klee {
   /// the domain of \f$h'\f$ is based on shadow data structure with
   /// the following main components:
   ///
-/// - TxStateValue: LLVM values (i.e., variables) with versioning
+  /// - TxStateValue: LLVM values (i.e., variables) with versioning
   ///   index. This represents the values loaded from memory into LLVM
   ///   temporary variables. They have versioning index, as, different
   ///   from LLVM values themselves which are static entities, a
   ///   (symbolic) execution may go through the same instruction
   ///   multiple times. Hence the value of that instruction has to be
   ///   versioned.
-/// - TxStateAddress: A representation of pointers. It is important
+  /// - TxStateAddress: A representation of pointers. It is important
   ///   to note that each pointer is associated with memory allocation
   ///   and its displacement (offset) wrt. the base address of the
   ///   allocation.
@@ -141,28 +141,28 @@ namespace klee {
   ///
   /// <b>Notes on pointer flow propagation</b>
   ///
-/// A TxStateValue object may represent a pointer value, in which
-/// case it is linked to possibly several TxStateAddress objects via
-/// TxStateValue#locations member variable. Such TxStateValue
+  /// A TxStateValue object may represent a pointer value, in which
+  /// case it is linked to possibly several TxStateAddress objects via
+  /// TxStateValue#locations member variable. Such TxStateValue
   /// object may be used in memory access operations of LLVM
   /// (<b>load</b> or <b>store</b>). The memory dependency computation
-/// propagates such pointer value information in TxStateAddress from
-/// one TxStateValue to another such that there is no need to
+  /// propagates such pointer value information in TxStateAddress from
+  /// one TxStateValue to another such that there is no need to
   /// inefficiently hunt for the pointer value at the point of use of
   /// the pointer. For example, a symbolic execution of LLVM's
   /// <b>getelementptr</b> instruction would create a new
-/// TxStateValue representing the return value of the
-/// instruction. This new TxStateValue would inherit all members
-/// of the TxStateValue#locations variable of the TxStateValue
+  /// TxStateValue representing the return value of the
+  /// instruction. This new TxStateValue would inherit all members
+  /// of the TxStateValue#locations variable of the TxStateValue
   /// object representing the pointer argument of the instruction,
   /// with modified offsets according to the offset argument of the
   /// instruction.
   ///
   /// \see TxTree
   /// \see TxTreeNode
-/// \see TxStore
-/// \see TxStateValue
-/// \see TxStateAddress
+  /// \see TxStore
+  /// \see TxStateValue
+  /// \see TxStateAddress
   class Dependency {
 
   private:
