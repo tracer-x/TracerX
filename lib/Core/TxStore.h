@@ -64,14 +64,8 @@ private:
   /// \brief The mapping of concrete locations to stored value
   StateStore concretelyAddressedStore;
 
-  /// \brief Ordered keys of the concretely-addressed store.
-  std::vector<ref<TxVariable> > concretelyAddressedStoreKeys;
-
   /// \brief The mapping of symbolic locations to stored value
   StateStore symbolicallyAddressedStore;
-
-  /// \brief Ordered keys of the symbolically-addressed store.
-  std::vector<ref<TxVariable> > symbolicallyAddressedStoreKeys;
 
   void getConcreteStore(
       const std::vector<llvm::Instruction *> &callHistory,
