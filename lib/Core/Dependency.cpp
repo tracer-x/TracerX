@@ -820,13 +820,13 @@ void Dependency::execute(llvm::Instruction *instr,
       for (std::set<ref<TxStateAddress> >::iterator li = locations.begin(),
                                                     le = locations.end();
            li != le; ++li) {
-        ref<TxStoreEntry> addressValuePair;
+        ref<TxStoreEntry> storeEntry;
 
         TxStore::LowerStateStore::iterator storeIter;
         if ((*li)->hasConstantAddress()) {
           storeIter = store.concreteFind(*li);
           if (storeIter != store.concreteEnd()) {
-            addressValuePair = storeIter->second;
+            storeEntry = storeIter->second;
           }
         } else {
           storeIter = store.symbolicFind(*li);
@@ -834,28 +834,27 @@ void Dependency::execute(llvm::Instruction *instr,
             // FIXME: Here we assume that the expressions have to exactly be the
             // same expression object. More properly, this should instead add an
             // ite constraint onto the path condition.
-            addressValuePair = storeIter->second;
+            storeEntry = storeIter->second;
           }
         }
 
         // Build the loaded value
         ref<TxStateValue> loadedValue =
-            (addressValuePair.isNull() ||
-             addressValuePair->getContent()->getLocations().empty()) &&
+            (storeEntry.isNull() ||
+             storeEntry->getContent()->getLocations().empty()) &&
                     loadedType->isPointerTy()
                 ? getNewPointerValue(instr, callHistory, valueExpr, 0)
                 : getNewTxStateValue(instr, callHistory, valueExpr);
 
-        if (addressValuePair.isNull() ||
+        if (storeEntry.isNull() ||
             loadedValue->getExpression() !=
-                addressValuePair->getContent()->getExpression()) {
+                storeEntry->getContent()->getExpression()) {
           // We could not find the stored value, create a new one.
           store.updateStoreWithLoadedValue(*li, addressValue, loadedValue);
         } else {
-          addDependencyViaLocation(addressValuePair->getContent(), loadedValue,
-                                   *li);
+          addDependencyViaLocation(storeEntry->getContent(), loadedValue, *li);
           loadedValue->setLoadAddress(addressValue);
-          loadedValue->setStoreAddress(addressValuePair->getAddressValue());
+          loadedValue->setStoreAddress(storeEntry->getAddressValue());
         }
       }
       break;
