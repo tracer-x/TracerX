@@ -102,7 +102,10 @@ void TxStore::getSymbolicStore(
         map[it->first] = it->second->getContent()->getInterpolantStyleValue();
       }
 #else
-      map[it->first] = it->second->getContent()->getInterpolantStyleValue();
+      ref<TxVariable> address = TxStateAddress::create(
+          it->second->getAddress(), replacements)->getAsVariable();
+      map[address] =
+          it->second->getContent()->getInterpolantStyleValue(replacements);
 #endif
     }
   }
