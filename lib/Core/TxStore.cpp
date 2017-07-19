@@ -64,8 +64,7 @@ void TxStore::getConcreteStore(
       }
 #else
       map[it->first] =
-          it->second->second->getContent()->getInterpolantStyleValue(
-              replacements);
+          it->second->getContent()->getInterpolantStyleValue(replacements);
 #endif
     }
   }
