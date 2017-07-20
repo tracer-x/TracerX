@@ -47,12 +47,6 @@ class AllocationContext {
 public:
   unsigned refCount;
 
-  enum Type {
-    LOCAL,
-    GLOBAL,
-    HEAP
-  } ty;
-
 private:
   /// \brief The location's LLVM value
   llvm::Value *value;
@@ -60,9 +54,9 @@ private:
   /// \brief The call history by which the allocation is reached
   std::vector<llvm::Instruction *> callHistory;
 
-  AllocationContext(Type _ty, llvm::Value *_value,
+  AllocationContext(llvm::Value *_value,
                     const std::vector<llvm::Instruction *> &_callHistory)
-      : refCount(0), ty(_ty), value(_value), callHistory(_callHistory) {}
+      : refCount(0), value(_value), callHistory(_callHistory) {}
 
 public:
   ~AllocationContext() { callHistory.clear(); }
@@ -165,21 +159,14 @@ private:
   /// \brief The value of the concrete offset
   uint64_t concreteOffset;
 
-  /// \brief This is an indirection count, e.g., given %x the address of a local
-  /// variable x, indirection count 1 of %x refers to the address stored in x;
-  /// indirection count 2 of %x refers to the address stored in the address
-  /// stored in x.
-  uint64_t indirectionCount;
-
   /// \brief The copy constructor.
   TxInterpolantAddress(const TxInterpolantAddress &src)
       : refCount(0), context(src.context), offset(src.offset),
-        isConcrete(src.isConcrete), concreteOffset(src.concreteOffset),
-        indirectionCount(src.indirectionCount) {}
+        isConcrete(src.isConcrete), concreteOffset(src.concreteOffset) {}
 
   /// \brief The normal constructor.
   TxInterpolantAddress(ref<AllocationContext> _context, ref<Expr> _offset)
-      : refCount(0), context(_context), offset(_offset), indirectionCount(0) {
+      : refCount(0), context(_context), offset(_offset) {
     isConcrete = false;
     concreteOffset = 0;
 
@@ -207,14 +194,6 @@ public:
     return getContext()->isPrefixOf(callHistory);
   }
 
-  /// \brief Copy this address, but increment the indirection count
-  ref<TxInterpolantAddress> copyWithIndirectionCountIncrement() {
-    TxInterpolantAddress copy = *this;
-    copy.indirectionCount++;
-    ref<TxInterpolantAddress> ret(&copy);
-    return ret;
-  }
-
   /// \brief The comparator of this class' objects. This member function checks
   /// for the equality of TxInterpolantAddress#indirectionCount member variables
   /// to
@@ -228,10 +207,6 @@ public:
   /// states for subsumption as in subsumption, related allocations in different
   /// paths may have different base addresses.
   int compare(const TxInterpolantAddress &other) const {
-    int indirectionDiff = indirectionCount - other.indirectionCount;
-    if (indirectionDiff != 0)
-      return indirectionDiff;
-
     int res = context->compare(*(other.context.get()));
     if (res)
       return res;
@@ -249,8 +224,6 @@ public:
 
     return 1;
   }
-
-  void incrementIndirectionCount() { indirectionCount++; }
 
   void print(llvm::raw_ostream &stream) const { print(stream, ""); }
 

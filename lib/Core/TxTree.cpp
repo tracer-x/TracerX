@@ -790,8 +790,7 @@ bool SubsumptionTableEntry::subsumed(
       const TxStore::LowerInterpolantStore &stateSymbolicMap =
           symbolicallyAddressedStore[it1->first];
 
-      // If the current state does not constrain the same base, subsumption
-      // fails.
+      // If the current state is empty, subsumption fails.
       if (stateConcreteMap.empty() && stateSymbolicMap.empty()) {
         if (debugSubsumptionLevel >= 1) {
           klee_message("#%lu=>#%lu: Check failure due to empty state concrete "

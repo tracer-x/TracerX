@@ -1258,6 +1258,7 @@ bool Dependency::markAllPointerValues(llvm::Value *val, ref<Expr> address,
 
 /// \brief Tests if bound interpolation shold be enabled
 bool Dependency::boundInterpolation(llvm::Value *val) {
+#ifdef ENABLE_Z3
   if (SpecialFunctionBoundInterpolation) {
     if (!val)
       return true;
@@ -1270,6 +1271,9 @@ bool Dependency::boundInterpolation(llvm::Value *val) {
     return false;
   }
   return true;
+#else
+  return false;
+#endif // ENABLE_Z3
 }
 
 inline ref<TxStateValue> Dependency::createConstantValue(

@@ -34,36 +34,7 @@ namespace klee {
 
 ref<AllocationContext> AllocationContext::create(
     llvm::Value *_value, const std::vector<llvm::Instruction *> &_callHistory) {
-  Type ty = GLOBAL;
-
-  if (llvm::Instruction *inst = llvm::dyn_cast<llvm::Instruction>(_value)) {
-    if (inst->getParent() && inst->getParent()->getParent()) {
-      // Heap-allocated memory is considered global, and to be recorded in
-      // global frame. Here we test if the allocation was a call to *alloc and
-      // getenv functions.
-      if (llvm::CallInst *ci = llvm::dyn_cast<llvm::CallInst>(inst)) {
-        // Here we determine if this was a call to *alloc or getenv functions
-        // from the LLVM source of the call instruction instead of
-        // llvm::Function::getName(). This is to circumvent segmentation fault
-        // issue when libc is not linked.
-        std::string buf;
-        llvm::raw_string_ostream stream(buf);
-        ci->print(stream);
-        stream.flush();
-        if (buf.find("@malloc(") != std::string::npos ||
-            buf.find("@realloc(") != std::string::npos ||
-            buf.find("@calloc(") != std::string::npos) {
-          ty = HEAP;
-        } else if (buf.find("@getenv(") != std::string::npos) {
-          ty = GLOBAL;
-        }
-      } else {
-        ty = LOCAL;
-      }
-    }
-  }
-
-  ref<AllocationContext> ret(new AllocationContext(ty, _value, _callHistory));
+  ref<AllocationContext> ret(new AllocationContext(_value, _callHistory));
   return ret;
 }
 
@@ -73,19 +44,6 @@ void AllocationContext::print(llvm::raw_ostream &stream,
   if (value) {
     stream << prefix << "Location: ";
     value->print(stream);
-    switch (ty) {
-    case LOCAL:
-      stream << " (local)";
-      break;
-    case GLOBAL:
-      stream << " (global)";
-      break;
-    case HEAP:
-      stream << " (heap)";
-      break;
-    default:
-      break;
-    }
   }
   if (callHistory.size() > 0) {
     stream << "\n" << prefix << "Call history:";
@@ -105,15 +63,7 @@ void TxInterpolantAddress::print(llvm::raw_ostream &stream,
                                  const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
-  stream << prefix << "indirection: ";
-  if (indirectionCount == 0)
-    stream << "(none)";
-  else {
-    for (uint64_t i = 0; i < indirectionCount; ++i) {
-      stream << "*";
-    }
-  }
-  stream << "\n" << prefix << "function/value: ";
+  stream << prefix << "function/value: ";
   if (outputFunctionName(context->getValue(), stream))
     stream << "/";
   context->getValue()->print(stream);
@@ -353,7 +303,7 @@ TxInterpolantValue::getOffsetsCheck(ref<TxInterpolantValue> stateValue,
            it = allocationOffsets.begin(),
            ie = allocationOffsets.end();
        it != ie; ++it) {
-    std::set<ref<Expr> > tabledOffsets = it->second;
+    const std::set<ref<Expr> > &tabledOffsets = it->second;
     std::map<ref<AllocationContext>, std::set<ref<Expr> > >::iterator iter =
         stateValue->allocationOffsets.find(it->first);
     if (iter == stateValue->allocationOffsets.end()) {
@@ -361,7 +311,7 @@ TxInterpolantValue::getOffsetsCheck(ref<TxInterpolantValue> stateValue,
     }
     matchFound = true;
 
-    std::set<ref<Expr> > stateOffsets = iter->second;
+    std::set<ref<Expr> > &stateOffsets = iter->second;
 
     assert(!tabledOffsets.empty() && "tabled offsets empty");
 
@@ -436,7 +386,6 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
              it = allocationBounds.begin(),
              ie = allocationBounds.end();
          it != ie; ++it) {
-      std::set<ref<Expr> > boundsSet = it->second;
       stream << "\n";
       stream << prefix << "[";
       it->first->print(stream);
@@ -462,7 +411,6 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
              it = allocationOffsets.begin(),
              ie = allocationOffsets.end();
          it != ie; ++it) {
-      std::set<ref<Expr> > boundsSet = it->second;
       stream << "\n";
       stream << prefix << "[";
       it->first->print(stream);
@@ -502,7 +450,8 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
 
 bool TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
                                        std::set<ref<Expr> > &_bounds) {
-  std::set<ref<TxStateAddress> > locations = checkedAddress->getLocations();
+  const std::set<ref<TxStateAddress> > &locations =
+      checkedAddress->getLocations();
   std::set<ref<Expr> > bounds(_bounds);
 
   if (bounds.empty()) {
@@ -587,13 +536,13 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
   interpolantStyleAddress->print(stream, prefix);
   stream << "\n";
   stream << prefix << "address";
-  if (!llvm::isa<ConstantExpr>(this->address))
+  if (!llvm::isa<ConstantExpr>(address))
     stream << " (symbolic)";
   stream << ": ";
   address->print(stream);
   stream << "\n";
   stream << prefix << "base: ";
-  if (!llvm::isa<ConstantExpr>(this->base))
+  if (!llvm::isa<ConstantExpr>(base))
     stream << " (symbolic)";
   stream << ": ";
   base->print(stream);
