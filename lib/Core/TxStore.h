@@ -54,12 +54,15 @@ public:
 
 class TxStore {
 public:
+  class MiddleStateStore;
+
   typedef std::map<ref<TxVariable>, ref<TxInterpolantValue> >
   LowerInterpolantStore;
   typedef std::map<const llvm::Value *, LowerInterpolantStore>
   TopInterpolantStore;
   typedef std::map<ref<TxVariable>, ref<TxStoreEntry> > LowerStateStore;
-  typedef std::map<ref<AllocationContext>, LowerStateStore> TopStateStore;
+  typedef std::map<ref<AllocationContext>, ref<MiddleStateStore> >
+  TopStateStore;
 
   class MiddleStateStore {
   public:
@@ -156,11 +159,8 @@ public:
   };
 
 private:
-  /// \brief The mapping of concrete locations to stored value
-  TopStateStore concretelyAddressedStore;
-
-  /// \brief The mapping of symbolic locations to stored value
-  TopStateStore symbolicallyAddressedStore;
+  /// \brief The mapping of locations to stored value
+  TopStateStore store;
 
   static void
   getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
@@ -179,14 +179,11 @@ public:
   TxStore() {}
 
   /// \brief The copy constructor of this class.
-  TxStore(const TxStore &src)
-      : concretelyAddressedStore(src.concretelyAddressedStore),
-        symbolicallyAddressedStore(src.symbolicallyAddressedStore) {}
+  TxStore(const TxStore &src) : store(src.store) {}
 
   ~TxStore() {
     // Delete the locally-constructed relations
-    concretelyAddressedStore.clear();
-    symbolicallyAddressedStore.clear();
+    store.clear();
   }
 
   /// \brief Finds a store entry given an address
