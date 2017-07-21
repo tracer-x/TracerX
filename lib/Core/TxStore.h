@@ -61,6 +61,100 @@ public:
   typedef std::map<ref<TxVariable>, ref<TxStoreEntry> > LowerStateStore;
   typedef std::map<ref<AllocationContext>, LowerStateStore> TopStateStore;
 
+  class MiddleStateStore {
+  public:
+    unsigned refCount;
+
+  private:
+    LowerStateStore concretelyAddressedStore;
+
+    LowerStateStore symbolicallyAddressedStore;
+
+    ref<AllocationInfo> allocInfo;
+
+    MiddleStateStore(ref<AllocationInfo> _allocInfo)
+        : refCount(0), allocInfo(_allocInfo) {}
+
+  public:
+    static ref<MiddleStateStore> create(ref<AllocationInfo> allocInfo) {
+      return ref<MiddleStateStore>(new MiddleStateStore(allocInfo));
+    }
+
+    LowerStateStore::const_iterator concreteBegin() const {
+      return concretelyAddressedStore.begin();
+    }
+
+    LowerStateStore::const_iterator concreteEnd() const {
+      return concretelyAddressedStore.end();
+    }
+
+    LowerStateStore::const_iterator symbolicBegin() const {
+      return symbolicallyAddressedStore.begin();
+    }
+
+    LowerStateStore::const_iterator symbolicEnd() const {
+      return symbolicallyAddressedStore.end();
+    }
+
+    bool hasAllocationInfo(ref<AllocationInfo> _allocInfo) const {
+      return allocInfo == _allocInfo;
+    }
+
+    ref<TxStoreEntry> find(ref<TxStateAddress> loc) const {
+      ref<TxStoreEntry> ret;
+
+      if (loc->hasConstantAddress()) {
+        TxStore::LowerStateStore::const_iterator lowerStoreIter =
+            concretelyAddressedStore.find(loc->getAsVariable());
+
+        if (lowerStoreIter != concretelyAddressedStore.end()) {
+          ret = lowerStoreIter->second;
+        }
+      } else {
+        TxStore::LowerStateStore::const_iterator lowerStoreIter =
+            symbolicallyAddressedStore.find(loc->getAsVariable());
+        if (lowerStoreIter != symbolicallyAddressedStore.end()) {
+          ret = lowerStoreIter->second;
+        }
+      }
+
+      return ret;
+    }
+
+    bool updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
+                     ref<TxStateValue> value) {
+      if (loc->getAllocationInfo() != allocInfo)
+        return false;
+
+      if (loc->hasConstantAddress()) {
+        concretelyAddressedStore[loc->getAsVariable()] =
+            ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
+      } else {
+        symbolicallyAddressedStore[loc->getAsVariable()] =
+            ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
+      }
+      return true;
+    }
+
+    /// \brief Print the content of the object to the LLVM error stream
+    void dump() const {
+      this->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+
+    /// \brief Print the content of the object into a stream.
+    ///
+    /// \param stream The stream to print the data to.
+    void print(llvm::raw_ostream &stream) const { print(stream, ""); }
+
+    /// \brief Print the content of the object into a stream.
+    ///
+    /// \param stream The stream to print the data to.
+    /// \param paddingAmount The number of whitespaces to be printed before each
+    /// line.
+    void print(llvm::raw_ostream &stream, const std::string &prefix) const;
+  };
+
 private:
   /// \brief The mapping of concrete locations to stored value
   TopStateStore concretelyAddressedStore;

@@ -23,6 +23,56 @@ using namespace klee;
 
 namespace klee {
 
+void TxStore::MiddleStateStore::print(llvm::raw_ostream &stream,
+                                      const std::string &prefix) const {
+  std::string tabsNext = appendTab(prefix);
+  std::string tabsNextNext = appendTab(tabsNext);
+
+  allocInfo->print(stream, prefix);
+  stream << ":\n";
+  if (concretelyAddressedStore.empty()) {
+    stream << prefix << "concretely-addressed store = []\n";
+  } else {
+    stream << prefix << "concretely-addressed store = [\n";
+    for (LowerStateStore::const_iterator
+             lowerIs = concretelyAddressedStore.begin(),
+             lowerIe = concretelyAddressedStore.end(), lowerIt = lowerIs;
+         lowerIt != lowerIe; ++lowerIt) {
+      if (lowerIt != lowerIs)
+        stream << tabsNext << "------------------------------------------\n";
+      stream << tabsNext << "address:\n";
+      lowerIt->second->getAddress()->print(stream, tabsNextNext);
+      stream << "\n";
+      stream << tabsNext << "content:\n";
+      lowerIt->second->getContent()->print(stream, tabsNextNext);
+      stream << "\n";
+    }
+    stream << prefix << "]\n";
+  }
+
+  if (symbolicallyAddressedStore.empty()) {
+    stream << prefix << "symbolically-addressed store = []";
+  } else {
+    stream << prefix << "symbolically-addressed store = [\n";
+    for (LowerStateStore::const_iterator
+             lowerIs = symbolicallyAddressedStore.begin(),
+             lowerIe = symbolicallyAddressedStore.end(), lowerIt = lowerIs;
+         lowerIt != lowerIe; ++lowerIt) {
+      if (lowerIt != lowerIs)
+        stream << tabsNext << "------------------------------------------\n";
+      stream << tabsNext << "address:\n";
+      lowerIt->second->getAddress()->print(stream, tabsNextNext);
+      stream << "\n";
+      stream << tabsNext << "content:\n";
+      lowerIt->second->getContent()->print(stream, tabsNextNext);
+      stream << "\n";
+    }
+    stream << prefix << "]";
+  }
+}
+
+/**/
+
 ref<TxStoreEntry> TxStore::find(ref<TxStateAddress> loc) const {
   ref<TxStoreEntry> ret;
 
