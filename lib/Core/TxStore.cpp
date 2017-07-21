@@ -23,6 +23,38 @@ using namespace klee;
 
 namespace klee {
 
+ref<TxStoreEntry> TxStore::find(ref<TxStateAddress> loc) const {
+  ref<TxStoreEntry> ret;
+
+  if (loc->hasConstantAddress()) {
+    TopStateStore::const_iterator storeIter =
+        concretelyAddressedStore.find(loc->getContext());
+    if (storeIter != concretelyAddressedStore.end() &&
+        !storeIter->second.empty()) {
+      const TxStore::LowerStateStore &lowerStore = storeIter->second;
+      TxStore::LowerStateStore::const_iterator lowerStoreIter =
+          lowerStore.find(loc->getAsVariable());
+      if (lowerStoreIter != lowerStore.end()) {
+        ret = lowerStoreIter->second;
+      }
+    }
+  } else {
+    TopStateStore::const_iterator storeIter =
+        symbolicallyAddressedStore.find(loc->getContext());
+    if (storeIter != symbolicallyAddressedStore.end() &&
+        !storeIter->second.empty()) {
+      const TxStore::LowerStateStore &lowerStore = storeIter->second;
+      TxStore::LowerStateStore::const_iterator lowerStoreIter =
+          lowerStore.find(loc->getAsVariable());
+      if (lowerStoreIter != lowerStore.end()) {
+        ret = lowerStoreIter->second;
+      }
+    }
+  }
+
+  return ret;
+}
+
 void TxStore::getStoredExpressions(
     const std::vector<llvm::Instruction *> &callHistory,
     std::set<const Array *> &replacements, bool coreOnly,

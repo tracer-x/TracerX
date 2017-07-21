@@ -93,37 +93,8 @@ public:
     symbolicallyAddressedStore.clear();
   }
 
-  TopStateStore::iterator concreteFind(ref<TxStateAddress> loc) {
-    TopStateStore::iterator ret =
-        concretelyAddressedStore.find(loc->getContext());
-    if (ret != concretelyAddressedStore.end() && ret->second.empty())
-      return concretelyAddressedStore.end();
-    return ret;
-  }
-
-  TopStateStore::iterator concreteBegin() {
-    return concretelyAddressedStore.begin();
-  }
-
-  TopStateStore::iterator concreteEnd() {
-    return concretelyAddressedStore.end();
-  }
-
-  TopStateStore::iterator symbolicFind(ref<TxStateAddress> loc) {
-    TopStateStore::iterator ret =
-        symbolicallyAddressedStore.find(loc->getContext());
-    if (ret != symbolicallyAddressedStore.end() && ret->second.empty())
-      return symbolicallyAddressedStore.end();
-    return ret;
-  }
-
-  TopStateStore::iterator symbolicBegin() {
-    return symbolicallyAddressedStore.begin();
-  }
-
-  TopStateStore::iterator symbolicEnd() {
-    return symbolicallyAddressedStore.end();
-  }
+  /// \brief Finds a store entry given an address
+  ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;
 
   /// \brief This retrieves the locations known at this state, and the
   /// expressions stored in the locations. Returns as the last argument a pair

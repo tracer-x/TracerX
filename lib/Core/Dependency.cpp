@@ -736,25 +736,7 @@ void Dependency::execute(llvm::Instruction *instr,
           ref<TxStateAddress> loc = *(locations.begin());
 
           // Check the possible mismatch between Tracer-X and KLEE loaded value
-          TxStore::TopStateStore::iterator storeIt = store.concreteFind(loc);
-          ref<TxStoreEntry> target;
-
-          if (storeIt == store.concreteEnd()) {
-            storeIt = store.symbolicFind(loc);
-            if (storeIt != store.symbolicEnd()) {
-              TxStore::LowerStateStore &lowerStore = storeIt->second;
-              TxStore::LowerStateStore::iterator lowerStoreIter =
-                  lowerStore.find(loc->getAsVariable());
-              if (lowerStoreIter != lowerStore.end())
-                target = lowerStoreIter->second;
-              }
-          } else {
-            TxStore::LowerStateStore &lowerStore = storeIt->second;
-            TxStore::LowerStateStore::iterator lowerStoreIter =
-                lowerStore.find(loc->getAsVariable());
-            if (lowerStoreIter != lowerStore.end())
-              target = lowerStoreIter->second;
-          }
+          ref<TxStoreEntry> target = store.find(loc);
 
           if (!target.isNull() &&
               valueExpr != target->getContent()->getExpression()) {
@@ -828,33 +810,7 @@ void Dependency::execute(llvm::Instruction *instr,
       for (std::set<ref<TxStateAddress> >::iterator li = locations.begin(),
                                                     le = locations.end();
            li != le; ++li) {
-        ref<TxStoreEntry> storeEntry;
-
-        TxStore::TopStateStore::iterator storeIter;
-        if ((*li)->hasConstantAddress()) {
-          storeIter = store.concreteFind(*li);
-          if (storeIter != store.concreteEnd()) {
-            TxStore::LowerStateStore &lowerStore = storeIter->second;
-            TxStore::LowerStateStore::iterator lowerStoreIter =
-                lowerStore.find((*li)->getAsVariable());
-            if (lowerStoreIter != lowerStore.end()) {
-              storeEntry = lowerStoreIter->second;
-            }
-          }
-        } else {
-          storeIter = store.symbolicFind(*li);
-          if (storeIter != store.symbolicEnd()) {
-            TxStore::LowerStateStore &lowerStore = storeIter->second;
-            // FIXME: Here we assume that the expressions have to exactly be the
-            // same expression object. More properly, this should instead add an
-            // ite constraint onto the path condition.
-            TxStore::LowerStateStore::iterator lowerStoreIter =
-                lowerStore.find((*li)->getAsVariable());
-            if (lowerStoreIter != lowerStore.end()) {
-              storeEntry = lowerStoreIter->second;
-            }
-          }
-        }
+        ref<TxStoreEntry> storeEntry = store.find(*li);
 
         // Build the loaded value
         ref<TxStateValue> loadedValue =
