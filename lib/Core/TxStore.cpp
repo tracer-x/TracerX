@@ -70,7 +70,7 @@ void
 TxStore::getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
                           const TopStateStore &store,
                           std::set<const Array *> &replacements, bool coreOnly,
-                          TopInterpolantStore &concreteStore) const {
+                          TopInterpolantStore &concreteStore) {
   for (TopStateStore::const_iterator it = store.begin(), ie = store.end();
        it != ie; ++it) {
     if (!it->first->isPrefixOf(callHistory))
@@ -109,7 +109,7 @@ void
 TxStore::getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
                           const TopStateStore &store,
                           std::set<const Array *> &replacements, bool coreOnly,
-                          TopInterpolantStore &symbolicStore) const {
+                          TopInterpolantStore &symbolicStore) {
   for (TopStateStore::const_iterator it = store.begin(), ie = store.end();
        it != ie; ++it) {
     if (!it->first->isPrefixOf(callHistory))

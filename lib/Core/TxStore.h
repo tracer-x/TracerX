@@ -68,15 +68,17 @@ private:
   /// \brief The mapping of symbolic locations to stored value
   TopStateStore symbolicallyAddressedStore;
 
-  void getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
-                        const TopStateStore &store,
-                        std::set<const Array *> &replacements, bool coreOnly,
-                        TopInterpolantStore &concreteStore) const;
+  static void
+  getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
+                   const TopStateStore &store,
+                   std::set<const Array *> &replacements, bool coreOnly,
+                   TopInterpolantStore &concreteStore);
 
-  void getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
-                        const TopStateStore &store,
-                        std::set<const Array *> &replacements, bool coreOnly,
-                        TopInterpolantStore &symbolicStore) const;
+  static void
+  getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
+                   const TopStateStore &store,
+                   std::set<const Array *> &replacements, bool coreOnly,
+                   TopInterpolantStore &symbolicStore);
 
 public:
   /// \brief Constructor for an empty store.
