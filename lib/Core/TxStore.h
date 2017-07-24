@@ -159,18 +159,38 @@ public:
   };
 
 private:
+  /// \brief A concretely-addressed store of the earlier versions of all
+  /// addresses
+  LowerStateStore concreteHistoricalStore;
+
+  /// \brief A symbolically-addressed store of the earlier versions of all
+  /// addresses
+  LowerStateStore symbolicHistoricalStore;
+
   /// \brief The mapping of locations to stored value
   TopStateStore store;
+
+  static void concreteToInterpolant(ref<TxVariable> variable,
+                                    ref<TxStoreEntry> entry,
+                                    std::set<const Array *> &replacements,
+                                    bool coreOnly, LowerInterpolantStore &map);
+
+  static void symbolicToInterpolant(ref<TxVariable> variable,
+                                    ref<TxStoreEntry> entry,
+                                    std::set<const Array *> &replacements,
+                                    bool coreOnly, LowerInterpolantStore &map);
 
   static void
   getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
                    const TopStateStore &store,
+                   const LowerStateStore &historicalStore,
                    std::set<const Array *> &replacements, bool coreOnly,
                    TopInterpolantStore &concreteStore);
 
   static void
   getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
                    const TopStateStore &store,
+                   const LowerStateStore &historicalStore,
                    std::set<const Array *> &replacements, bool coreOnly,
                    TopInterpolantStore &symbolicStore);
 
@@ -179,10 +199,15 @@ public:
   TxStore() {}
 
   /// \brief The copy constructor of this class.
-  TxStore(const TxStore &src) : store(src.store) {}
+  TxStore(const TxStore &src)
+      : concreteHistoricalStore(src.concreteHistoricalStore),
+        symbolicHistoricalStore(src.symbolicHistoricalStore), store(src.store) {
+  }
 
   ~TxStore() {
     // Delete the locally-constructed relations
+    concreteHistoricalStore.clear();
+    symbolicHistoricalStore.clear();
     store.clear();
   }
 
