@@ -185,14 +185,16 @@ private:
                    const TopStateStore &store,
                    const LowerStateStore &historicalStore,
                    std::set<const Array *> &replacements, bool coreOnly,
-                   TopInterpolantStore &concreteStore);
+                   TopInterpolantStore &concretelyAddressedStore,
+                   LowerInterpolantStore &concretelyAddressedHistoricalStore);
 
   static void
   getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
                    const TopStateStore &store,
                    const LowerStateStore &historicalStore,
                    std::set<const Array *> &replacements, bool coreOnly,
-                   TopInterpolantStore &symbolicStore);
+                   TopInterpolantStore &symbolicallyAddressedStore,
+                   LowerInterpolantStore &symbolicallyAddressedHistoricalStore);
 
 public:
   /// \brief Constructor for an empty store.
@@ -228,11 +230,13 @@ public:
   /// bound ones.
   /// \param coreOnly Indicate whether we are retrieving only data
   /// for locations relevant to an unsatisfiability core.
-  void
-  getStoredExpressions(const std::vector<llvm::Instruction *> &callHistory,
-                       std::set<const Array *> &replacements, bool coreOnly,
-                       TopInterpolantStore &_concretelyAddressedStore,
-                       TopInterpolantStore &_symbolicallyAddressedStore) const;
+  void getStoredExpressions(
+      const std::vector<llvm::Instruction *> &callHistory,
+      std::set<const Array *> &replacements, bool coreOnly,
+      TopInterpolantStore &_concretelyAddressedStore,
+      TopInterpolantStore &_symbolicallyAddressedStore,
+      LowerInterpolantStore &_concretelyAddressedHistoricalStore,
+      LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const;
 
   /// \brief Newly relate a location with its stored value, when the value is
   /// loaded from the location

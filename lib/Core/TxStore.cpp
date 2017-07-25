@@ -87,11 +87,15 @@ void TxStore::getStoredExpressions(
     const std::vector<llvm::Instruction *> &callHistory,
     std::set<const Array *> &replacements, bool coreOnly,
     TopInterpolantStore &_concretelyAddressedStore,
-    TopInterpolantStore &_symbolicallyAddressedStore) const {
+    TopInterpolantStore &_symbolicallyAddressedStore,
+    LowerInterpolantStore &_concretelyAddressedHistoricalStore,
+    LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const {
   getConcreteStore(callHistory, store, concretelyAddressedHistoricalStore,
-                   replacements, coreOnly, _concretelyAddressedStore);
+                   replacements, coreOnly, _concretelyAddressedStore,
+                   _concretelyAddressedHistoricalStore);
   getSymbolicStore(callHistory, store, symbolicallyAddressedHistoricalStore,
-                   replacements, coreOnly, _symbolicallyAddressedStore);
+                   replacements, coreOnly, _symbolicallyAddressedStore,
+                   _symbolicallyAddressedHistoricalStore);
 }
 
 inline void
@@ -142,12 +146,12 @@ TxStore::symbolicToInterpolant(ref<TxVariable> variable,
   }
 }
 
-void
-TxStore::getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
-                          const TopStateStore &store,
-                          const LowerStateStore &historicalStore,
-                          std::set<const Array *> &replacements, bool coreOnly,
-                          TopInterpolantStore &concretelyAddressedStore) {
+void TxStore::getConcreteStore(
+    const std::vector<llvm::Instruction *> &callHistory,
+    const TopStateStore &store, const LowerStateStore &historicalStore,
+    std::set<const Array *> &replacements, bool coreOnly,
+    TopInterpolantStore &concretelyAddressedStore,
+    LowerInterpolantStore &concretelyAddressedHistoricalStore) {
   for (TopStateStore::const_iterator it = store.begin(), ie = store.end();
        it != ie; ++it) {
     if (!it->first->isPrefixOf(callHistory))
@@ -172,19 +176,17 @@ TxStore::getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
     if (!it->first->contextIsPrefixOf(callHistory))
       continue;
 
-    LowerInterpolantStore &map =
-        concretelyAddressedStore[it->first->getValue()];
-
-    concreteToInterpolant(it->first, it->second, replacements, coreOnly, map);
+    concreteToInterpolant(it->first, it->second, replacements, coreOnly,
+                          concretelyAddressedHistoricalStore);
   }
 }
 
-void
-TxStore::getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
-                          const TopStateStore &store,
-                          const LowerStateStore &historicalStore,
-                          std::set<const Array *> &replacements, bool coreOnly,
-                          TopInterpolantStore &symbolicallyAddressedStore) {
+void TxStore::getSymbolicStore(
+    const std::vector<llvm::Instruction *> &callHistory,
+    const TopStateStore &store, const LowerStateStore &historicalStore,
+    std::set<const Array *> &replacements, bool coreOnly,
+    TopInterpolantStore &symbolicallyAddressedStore,
+    LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
   for (TopStateStore::const_iterator it = store.begin(), ie = store.end();
        it != ie; ++it) {
     if (!it->first->isPrefixOf(callHistory))
@@ -209,10 +211,8 @@ TxStore::getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
     if (!it->first->contextIsPrefixOf(callHistory))
       continue;
 
-    LowerInterpolantStore &map =
-        symbolicallyAddressedStore[it->first->getValue()];
-
-    symbolicToInterpolant(it->first, it->second, replacements, coreOnly, map);
+    symbolicToInterpolant(it->first, it->second, replacements, coreOnly,
+                          symbolicallyAddressedHistoricalStore);
   }
 }
 
