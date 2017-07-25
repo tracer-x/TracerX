@@ -87,7 +87,7 @@ void TxStore::getStoredExpressions(
     const std::vector<llvm::Instruction *> &callHistory,
     std::set<const Array *> &replacements, bool coreOnly,
     TopInterpolantStore &_concretelyAddressedStore,
-    TopInterpolantStore &_symbolicallyAddressedStore) {
+    TopInterpolantStore &_symbolicallyAddressedStore) const {
   getConcreteStore(callHistory, store, concretelyAddressedHistoricalStore,
                    replacements, coreOnly, _concretelyAddressedStore);
   getSymbolicStore(callHistory, store, symbolicallyAddressedHistoricalStore,
