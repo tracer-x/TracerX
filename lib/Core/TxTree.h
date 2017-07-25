@@ -228,6 +228,10 @@ class SubsumptionTableEntry {
 
   ref<Expr> interpolant;
 
+  TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore;
+
+  TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore;
+
   TxStore::TopInterpolantStore concretelyAddressedStore;
 
   TxStore::TopInterpolantStore symbolicallyAddressedStore;
@@ -329,10 +333,13 @@ public:
 
   ~SubsumptionTableEntry();
 
-  bool subsumed(TimingSolver *solver, ExecutionState &state, double timeout,
-                TxStore::TopInterpolantStore &concretelyAddressedStore,
-                TxStore::TopInterpolantStore &symbolicallyAddressedStore,
-                int debugSubsumptionLevel);
+  bool subsumed(
+      TimingSolver *solver, ExecutionState &state, double timeout,
+      TxStore::TopInterpolantStore &_concretelyAddressedStore,
+      TxStore::TopInterpolantStore &_symbolicallyAddressedStore,
+      TxStore::LowerInterpolantStore &_concretelyAddressedHistoricalStore,
+      TxStore::LowerInterpolantStore &_symbolicallyAddressedHistoricalStore,
+      int debugSubsumptionLevel);
 
   /// Tests if the argument is a variable. A variable here is defined to be
   /// either a symbolic concatenation or a symbolic read. A concatenation in
@@ -499,7 +506,10 @@ public:
   void getStoredExpressions(
       const std::vector<llvm::Instruction *> &callHistory,
       TxStore::TopInterpolantStore &concretelyAddressedStore,
-      TxStore::TopInterpolantStore &symbolicallyAddressedStore) const;
+      TxStore::TopInterpolantStore &symbolicallyAddressedStore,
+      TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
+      TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore)
+      const;
 
   /// \brief This retrieves the allocations known at this state, and the
   /// expressions stored in the allocations, as long as the allocation is
@@ -516,7 +526,10 @@ public:
       const std::vector<llvm::Instruction *> &callHistory,
       std::set<const Array *> &replacements,
       TxStore::TopInterpolantStore &concretelyAddressedStore,
-      TxStore::TopInterpolantStore &symbolicallyAddressedStore) const;
+      TxStore::TopInterpolantStore &symbolicallyAddressedStore,
+      TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
+      TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore)
+      const;
 
   void incInstructionsDepth();
 
