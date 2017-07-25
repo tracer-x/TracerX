@@ -228,11 +228,11 @@ public:
   /// bound ones.
   /// \param coreOnly Indicate whether we are retrieving only data
   /// for locations relevant to an unsatisfiability core.
-  void getStoredExpressions(const std::vector<llvm::Instruction *> &callHistory,
-                            std::set<const Array *> &replacements,
-                            bool coreOnly,
-                            TopInterpolantStore &_concretelyAddressedStore,
-                            TopInterpolantStore &_symbolicallyAddressedStore);
+  void
+  getStoredExpressions(const std::vector<llvm::Instruction *> &callHistory,
+                       std::set<const Array *> &replacements, bool coreOnly,
+                       TopInterpolantStore &_concretelyAddressedStore,
+                       TopInterpolantStore &_symbolicallyAddressedStore) const;
 
   /// \brief Newly relate a location with its stored value, when the value is
   /// loaded from the location
