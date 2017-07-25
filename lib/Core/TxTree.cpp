@@ -147,10 +147,10 @@ void PathCondition::print(llvm::raw_ostream &stream) const {
 
 /**/
 
-Statistic SubsumptionTableEntry::concreteStoreExpressionBuildTime(
-    "concreteStoreExpressionBuildTime", "concreteStoreTime");
-Statistic SubsumptionTableEntry::symbolicStoreExpressionBuildTime(
-    "symbolicStoreExpressionBuildTime", "symbolicStoreTime");
+Statistic SubsumptionTableEntry::concretelyAddressedStoreExpressionBuildTime(
+    "concretelyAddressedStoreExpressionBuildTime", "concreteStoreTime");
+Statistic SubsumptionTableEntry::symbolicallyAddressedStoreExpressionBuildTime(
+    "symbolicallyAddressedStoreExpressionBuildTime", "symbolicStoreTime");
 Statistic SubsumptionTableEntry::solverAccessTime("solverAccessTime",
                                                   "solverAccessTime");
 
@@ -162,12 +162,13 @@ SubsumptionTableEntry::SubsumptionTableEntry(
   interpolant = node->getInterpolant(existentials);
 
   node->getStoredCoreExpressions(callHistory, existentials,
-                                 concreteAddressStore, symbolicAddressStore);
+                                 concretelyAddressedStore,
+                                 symbolicallyAddressedStore);
 }
 
 SubsumptionTableEntry::~SubsumptionTableEntry() {
-  concreteAddressStore.clear();
-  symbolicAddressStore.clear();
+  concretelyAddressedStore.clear();
+  symbolicallyAddressedStore.clear();
 }
 
 bool
@@ -783,12 +784,12 @@ bool SubsumptionTableEntry::subsumed(
   std::set<ref<TxInterpolantValue> > coreExactPointerValues;
 
   {
-    TimerStatIncrementer t(concreteStoreExpressionBuildTime);
+    TimerStatIncrementer t(concretelyAddressedStoreExpressionBuildTime);
 
     // Build constraints from concrete-address interpolant store
     for (TxStore::TopInterpolantStore::const_iterator
-             it1 = concreteAddressStore.begin(),
-             ie1 = concreteAddressStore.end();
+             it1 = concretelyAddressedStore.begin(),
+             ie1 = concretelyAddressedStore.end();
          it1 != ie1; ++it1) {
 
       const TxStore::LowerInterpolantStore &tabledConcreteMap = it1->second;
@@ -1072,11 +1073,11 @@ bool SubsumptionTableEntry::subsumed(
   }
 
   {
-    TimerStatIncrementer t(symbolicStoreExpressionBuildTime);
+    TimerStatIncrementer t(symbolicallyAddressedStoreExpressionBuildTime);
     // Build constraints from symbolic-address interpolant store
     for (TxStore::TopInterpolantStore::const_iterator
-             it1 = symbolicAddressStore.begin(),
-             ie1 = symbolicAddressStore.end();
+             it1 = symbolicallyAddressedStore.begin(),
+             ie1 = symbolicallyAddressedStore.end();
          it1 != ie1; ++it1) {
       const TxStore::LowerInterpolantStore &tabledSymbolicMap = it1->second;
       const TxStore::LowerInterpolantStore &stateConcreteMap =
@@ -1589,11 +1590,11 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
     stream << "(empty)";
   stream << "\n";
 
-  if (!concreteAddressStore.empty()) {
-    stream << prefix << "concrete store = [\n";
+  if (!concretelyAddressedStore.empty()) {
+    stream << prefix << "concretely-addressed store = [\n";
     for (TxStore::TopInterpolantStore::const_iterator
-             is1 = concreteAddressStore.begin(),
-             ie1 = concreteAddressStore.end(), it1 = is1;
+             is1 = concretelyAddressedStore.begin(),
+             ie1 = concretelyAddressedStore.end(), it1 = is1;
          it1 != ie1; ++it1) {
       for (TxStore::LowerInterpolantStore::const_iterator
                is2 = it1->second.begin(),
@@ -1612,11 +1613,11 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
     stream << prefix << "]\n";
   }
 
-  if (!symbolicAddressStore.empty()) {
-    stream << prefix << "symbolic store = [\n";
+  if (!symbolicallyAddressedStore.empty()) {
+    stream << prefix << "symbolically-addressed store = [\n";
     for (TxStore::TopInterpolantStore::const_iterator
-             is1 = symbolicAddressStore.begin(),
-             ie1 = symbolicAddressStore.end(), it1 = is1;
+             is1 = symbolicallyAddressedStore.begin(),
+             ie1 = symbolicallyAddressedStore.end(), it1 = is1;
          it1 != ie1; ++it1) {
       for (TxStore::LowerInterpolantStore::const_iterator
                is2 = it1->second.begin(),
@@ -1657,11 +1658,11 @@ void SubsumptionTableEntry::printStat(std::stringstream &stream) {
             "(failed) = " << stats::subsumptionQueryCount.getValue() << " ("
          << stats::subsumptionQueryFailureCount.getValue() << ")\n";
   stream << "KLEE: done:     Concrete store expression build time (ms) = "
-         << ((double)concreteStoreExpressionBuildTime.getValue()) / 1000
-         << "\n";
+         << ((double)concretelyAddressedStoreExpressionBuildTime.getValue()) /
+                1000 << "\n";
   stream << "KLEE: done:     Symbolic store expression build time (ms) = "
-         << ((double)symbolicStoreExpressionBuildTime.getValue()) / 1000
-         << "\n";
+         << ((double)symbolicallyAddressedStoreExpressionBuildTime.getValue()) /
+                1000 << "\n";
   stream << "KLEE: done:     Solver access time (ms) = "
          << ((double)solverAccessTime.getValue()) / 1000 << "\n";
 }

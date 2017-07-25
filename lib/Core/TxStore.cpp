@@ -88,10 +88,10 @@ void TxStore::getStoredExpressions(
     std::set<const Array *> &replacements, bool coreOnly,
     TopInterpolantStore &_concretelyAddressedStore,
     TopInterpolantStore &_symbolicallyAddressedStore) {
-  getConcreteStore(callHistory, store, concreteHistoricalStore, replacements,
-                   coreOnly, _concretelyAddressedStore);
-  getSymbolicStore(callHistory, store, symbolicHistoricalStore, replacements,
-                   coreOnly, _symbolicallyAddressedStore);
+  getConcreteStore(callHistory, store, concretelyAddressedHistoricalStore,
+                   replacements, coreOnly, _concretelyAddressedStore);
+  getSymbolicStore(callHistory, store, symbolicallyAddressedHistoricalStore,
+                   replacements, coreOnly, _symbolicallyAddressedStore);
 }
 
 inline void
@@ -147,13 +147,14 @@ TxStore::getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
                           const TopStateStore &store,
                           const LowerStateStore &historicalStore,
                           std::set<const Array *> &replacements, bool coreOnly,
-                          TopInterpolantStore &concreteStore) {
+                          TopInterpolantStore &concretelyAddressedStore) {
   for (TopStateStore::const_iterator it = store.begin(), ie = store.end();
        it != ie; ++it) {
     if (!it->first->isPrefixOf(callHistory))
       continue;
 
-    LowerInterpolantStore &map = concreteStore[it->first->getValue()];
+    LowerInterpolantStore &map =
+        concretelyAddressedStore[it->first->getValue()];
 
     ref<MiddleStateStore> middleStore = it->second;
 
@@ -171,7 +172,8 @@ TxStore::getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
     if (!it->first->contextIsPrefixOf(callHistory))
       continue;
 
-    LowerInterpolantStore &map = concreteStore[it->first->getValue()];
+    LowerInterpolantStore &map =
+        concretelyAddressedStore[it->first->getValue()];
 
     concreteToInterpolant(it->first, it->second, replacements, coreOnly, map);
   }
@@ -182,13 +184,14 @@ TxStore::getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
                           const TopStateStore &store,
                           const LowerStateStore &historicalStore,
                           std::set<const Array *> &replacements, bool coreOnly,
-                          TopInterpolantStore &symbolicStore) {
+                          TopInterpolantStore &symbolicallyAddressedStore) {
   for (TopStateStore::const_iterator it = store.begin(), ie = store.end();
        it != ie; ++it) {
     if (!it->first->isPrefixOf(callHistory))
       continue;
 
-    LowerInterpolantStore &map = symbolicStore[it->first->getValue()];
+    LowerInterpolantStore &map =
+        symbolicallyAddressedStore[it->first->getValue()];
 
     ref<MiddleStateStore> middleStore = it->second;
 
@@ -206,7 +209,8 @@ TxStore::getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
     if (!it->first->contextIsPrefixOf(callHistory))
       continue;
 
-    LowerInterpolantStore &map = symbolicStore[it->first->getValue()];
+    LowerInterpolantStore &map =
+        symbolicallyAddressedStore[it->first->getValue()];
 
     symbolicToInterpolant(it->first, it->second, replacements, coreOnly, map);
   }
@@ -231,10 +235,10 @@ void TxStore::updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
     }
 
     // Here we save the old store
-    concreteHistoricalStore.insert(middleStore->concreteBegin(),
-                                   middleStore->concreteEnd());
-    symbolicHistoricalStore.insert(middleStore->symbolicBegin(),
-                                   middleStore->symbolicEnd());
+    concretelyAddressedHistoricalStore.insert(middleStore->concreteBegin(),
+                                              middleStore->concreteEnd());
+    symbolicallyAddressedHistoricalStore.insert(middleStore->symbolicBegin(),
+                                                middleStore->symbolicEnd());
   }
 
   ref<MiddleStateStore> newMiddleStateStore =

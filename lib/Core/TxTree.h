@@ -179,8 +179,9 @@ public:
 /// subset of the path condition (the SubsumptionTableEntry#interpolant
 /// field), plus the fragment of memory (allocations). They are components
 /// that are needed to ensure the previously-seen conclusions. The memory
-/// fragments are stored in either SubsumptionTableEntry#concreteAddressStore
-/// or SubsumptionTableEntry#symbolicAddressStore, depending on whether
+/// fragments are stored in either
+/// SubsumptionTableEntry#concretelyAddressedStore
+/// or SubsumptionTableEntry#symbolicallyAddressedStore, depending on whether
 /// the memory fragment is concretely addressed or symbolically addressed.
 /// Both fields are multi-level maps that are first indexed by the LLVM
 /// value that represents the allocation (e.g., the call to <b>malloc</b>,
@@ -221,15 +222,15 @@ class SubsumptionTableEntry {
   };
 #endif
 
-  static Statistic concreteStoreExpressionBuildTime;
-  static Statistic symbolicStoreExpressionBuildTime;
+  static Statistic concretelyAddressedStoreExpressionBuildTime;
+  static Statistic symbolicallyAddressedStoreExpressionBuildTime;
   static Statistic solverAccessTime;
 
   ref<Expr> interpolant;
 
-  TxStore::TopInterpolantStore concreteAddressStore;
+  TxStore::TopInterpolantStore concretelyAddressedStore;
 
-  TxStore::TopInterpolantStore symbolicAddressStore;
+  TxStore::TopInterpolantStore symbolicallyAddressedStore;
 
   std::set<const Array *> existentials;
 
@@ -311,8 +312,8 @@ class SubsumptionTableEntry {
                                        ref<Expr> equalities);
 
   bool empty() {
-    return interpolant.isNull() && concreteAddressStore.empty() &&
-           symbolicAddressStore.empty();
+    return interpolant.isNull() && concretelyAddressedStore.empty() &&
+           symbolicallyAddressedStore.empty();
   }
 
   /// \brief For printing member functions running time statistics,

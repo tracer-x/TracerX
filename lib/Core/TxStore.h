@@ -161,11 +161,11 @@ public:
 private:
   /// \brief A concretely-addressed store of the earlier versions of all
   /// addresses
-  LowerStateStore concreteHistoricalStore;
+  LowerStateStore concretelyAddressedHistoricalStore;
 
   /// \brief A symbolically-addressed store of the earlier versions of all
   /// addresses
-  LowerStateStore symbolicHistoricalStore;
+  LowerStateStore symbolicallyAddressedHistoricalStore;
 
   /// \brief The mapping of locations to stored value
   TopStateStore store;
@@ -200,14 +200,16 @@ public:
 
   /// \brief The copy constructor of this class.
   TxStore(const TxStore &src)
-      : concreteHistoricalStore(src.concreteHistoricalStore),
-        symbolicHistoricalStore(src.symbolicHistoricalStore), store(src.store) {
-  }
+      : concretelyAddressedHistoricalStore(
+            src.concretelyAddressedHistoricalStore),
+        symbolicallyAddressedHistoricalStore(
+            src.symbolicallyAddressedHistoricalStore),
+        store(src.store) {}
 
   ~TxStore() {
     // Delete the locally-constructed relations
-    concreteHistoricalStore.clear();
-    symbolicHistoricalStore.clear();
+    concretelyAddressedHistoricalStore.clear();
+    symbolicallyAddressedHistoricalStore.clear();
     store.clear();
   }
 
