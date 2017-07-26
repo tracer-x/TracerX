@@ -175,6 +175,8 @@ class TxSubsumptionTableEntry {
 
   TxStore::TopInterpolantStore symbolicallyAddressedStore;
 
+  ref<Expr> wpInterpolant;
+
   std::set<const Array *> existentials;
 
   /// \brief A procedure for building subsumption check constraints using
@@ -319,6 +321,8 @@ public:
 
   ref<Expr> getInterpolant() const;
 
+  ref<Expr> getWPInterpolant() const;
+
   void dump() const {
     this->print(llvm::errs());
     llvm::errs() << "\n";
@@ -329,6 +333,12 @@ public:
   void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
 
   void print(llvm::raw_ostream &stream, const std::string &prefix) const;
+
+  void PrintWP(llvm::raw_ostream &stream) const;
+
+  void PrintWP(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
+
+  void PrintWP(llvm::raw_ostream &stream, const std::string &prefix) const;
 };
 
 /// \brief The Tracer-X symbolic execution tree node.
@@ -354,6 +364,7 @@ class TxTreeNode {
   // class
 
   static Statistic getInterpolantTime;
+  static Statistic getWPInterpolantTime;
   static Statistic addConstraintTime;
   static Statistic splitTime;
   static Statistic executeTime;
@@ -456,6 +467,12 @@ public:
   /// \return The interpolant expression.
   ref<Expr> getInterpolant(std::set<const Array *> &replacements,
                            std::map<ref<Expr>, ref<Expr> > &substitution) const;
+
+  /// \brief Retrieve the weakest precondition interpolant for this node as KLEE expression object
+  ///
+  /// \return The weakest precondition interpolant expression.
+  ref<Expr> getWPInterpolant() const;
+
 
   /// \brief Extend the path condition with another constraint
   ///

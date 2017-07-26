@@ -56,6 +56,10 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
 
+#ifdef WPInterpolation
+  wpInterpolant = node->getWPInterpolant();
+#endif
+
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
@@ -225,15 +229,13 @@ TxSubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
   // which may contain both normal and shadow variables.
   ref<Expr> body = expr->body;
 
+  // We only simplify a conjunction of interpolant and equalities
+  if (!llvm::isa<AndExpr>(body))
+    return existsExpr;
+
   // If the post-simplified body was a constant, simply return the body;
   if (llvm::isa<ConstantExpr>(body))
     return body;
-
-  // We only simplify a conjunction of interpolant and equalities
-  if (!llvm::isa<AndExpr>(body)) {
-    hasExistentialsOnly = !hasVariableNotInSet(expr->variables, body);
-    return existsExpr;
-  }
 
   // The equality constraint is only a single disjunctive clause
   // of a CNF formula. In this case we simplify nothing.
@@ -1498,6 +1500,8 @@ ref<Expr> TxSubsumptionTableEntry::getInterpolant() const {
   return interpolant;
 }
 
+ref<Expr> TxSubsumptionTableEntry::getWPInterpolant() const { return wpInterpolant; }
+
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
   print(stream, 0);
 }
@@ -1622,6 +1626,31 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     }
   }
   stream << "]";
+}
+
+void TxSubsumptionTableEntry::PrintWP(llvm::raw_ostream &stream) const {
+  PrintWP(stream, 0);
+}
+
+void TxSubsumptionTableEntry::PrintWP(llvm::raw_ostream &stream,
+                                    const unsigned paddingAmount) const {
+  PrintWP(stream, makeTabs(paddingAmount));
+}
+
+void TxSubsumptionTableEntry::PrintWP(llvm::raw_ostream &stream,
+                                    const std::string &prefix) const {
+  std::string tabsNext = appendTab(prefix);
+  std::string tabsNextNext = appendTab(tabsNext);
+
+  stream << prefix << "------------ WP Subsumption Table Entry ------------\n";
+  stream << prefix << "Program point = " << programPoint << "\n";
+  stream << prefix << "wp interpolant = ";
+  if (!wpInterpolant.isNull())
+    wpInterpolant->print(stream);
+  else
+    stream << "(empty)";
+  stream << "\n";
+  stream << prefix << "--------- END of WP Subsumption Table Entry ---------\n";
 }
 
 void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
@@ -2171,6 +2200,8 @@ void TxTree::dump() const { this->print(llvm::errs()); }
 // Statistics
 Statistic TxTreeNode::getInterpolantTime("GetInterpolantTime",
                                          "GetInterpolantTime");
+Statistic TxTreeNode::getWPInterpolantTime("GetWPInterpolantTime",
+                                         "GetWPInterpolantTime");
 Statistic TxTreeNode::addConstraintTime("AddConstraintTime",
                                         "AddConstraintTime");
 Statistic TxTreeNode::splitTime("SplitTime", "SplitTime");
@@ -2191,6 +2222,10 @@ uint64_t TxTreeNode::nextNodeSequenceNumber = 1;
 void TxTreeNode::printTimeStat(std::stringstream &stream) {
   stream << "KLEE: done:     getInterpolant = "
          << ((double)getInterpolantTime.getValue()) / 1000 << "\n";
+#ifdef WPInterpolation
+  stream << "KLEE: done:     get WP Interpolant = "
+         << ((double)getWPInterpolantTime.getValue()) / 1000 << "\n";
+#endif
   stream << "KLEE: done:     addConstraintTime = "
          << ((double)addConstraintTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     splitTime = " << ((double)splitTime.getValue()) /
@@ -2238,6 +2273,15 @@ ref<Expr> TxTreeNode::getInterpolant(
   ref<Expr> expr = dependency->packInterpolant(replacements, substitution);
   return expr;
 }
+
+ref<Expr>
+TxTreeNode::getWPInterpolant() const {
+  TimerStatIncrementer t(getWPInterpolantTime);
+  //TODO: Generate weakest precondition from pathCondition and/or BB instructions
+  ref<Expr> expr = 0;
+  return expr;
+}
+
 
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
   TimerStatIncrementer t(addConstraintTime);
