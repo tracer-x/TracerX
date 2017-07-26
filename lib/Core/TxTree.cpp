@@ -224,13 +224,13 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
   // which may contain both normal and shadow variables.
   ref<Expr> body = expr->body;
 
-  // We only simplify a conjunction of interpolant and equalities
-  if (!llvm::isa<AndExpr>(body))
-    return existsExpr;
-
   // If the post-simplified body was a constant, simply return the body;
   if (llvm::isa<ConstantExpr>(body))
     return body;
+
+  // We only simplify a conjunction of interpolant and equalities
+  if (!llvm::isa<AndExpr>(body))
+    return existsExpr;
 
   // The equality constraint is only a single disjunctive clause
   // of a CNF formula. In this case we simplify nothing.
