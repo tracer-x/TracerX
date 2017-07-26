@@ -80,6 +80,8 @@ public:
 
   ref<Expr> packInterpolant(std::set<const Array *> &replacements);
 
+  ref<Expr> packWpInterpolant(std::set<const Array *> &replacements);
+
   void dump() const;
 
   void print(llvm::raw_ostream &stream) const;
@@ -231,6 +233,8 @@ class SubsumptionTableEntry {
 
   TxStore::TopInterpolantStore symbolicAddressStore;
 
+  ref<Expr> wpInterpolant;
+
   std::set<const Array *> existentials;
 
   /// \brief Test for the existence of a variable in a set in an expression.
@@ -346,6 +350,8 @@ public:
   }
 
   ref<Expr> getInterpolant() const;
+  
+  ref<Expr> getWpInterpolant() const;
 
   void dump() const {
     this->print(llvm::errs());
@@ -357,6 +363,12 @@ public:
   void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
 
   void print(llvm::raw_ostream &stream, const std::string &prefix) const;
+  
+  void wpPrint(llvm::raw_ostream &stream) const;
+
+  void wpPrint(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
+  
+  void wpPrint(llvm::raw_ostream &stream, const std::string &prefix) const;
 };
 
 /// \brief The Tracer-X symbolic execution tree node.
@@ -388,6 +400,7 @@ class TxTreeNode {
   // class
 
   static Statistic getInterpolantTime;
+  static Statistic getWpInterpolantTime;
   static Statistic addConstraintTime;
   static Statistic splitTime;
   static Statistic executeTime;
@@ -466,6 +479,8 @@ public:
   /// variables in the path condition.
   /// \return The interpolant expression.
   ref<Expr> getInterpolant(std::set<const Array *> &replacements) const;
+
+  ref<Expr> getWpInterpolant(std::set<const Array *> &replacements) const;
 
   /// \brief Extend the path condition with another constraint
   ///
