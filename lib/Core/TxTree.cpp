@@ -1075,6 +1075,54 @@ bool SubsumptionTableEntry::subsumed(
         }
       }
     }
+
+    //------------------------------------------------------------------------
+    // Historical concretely-addressed store
+    //------------------------------------------------------------------------
+    for (TxStore::LowerInterpolantStore::const_iterator
+             it1 = concretelyAddressedHistoricalStore.begin(),
+             ie1 = concretelyAddressedHistoricalStore.end();
+         it1 != ie1; ++it1) {
+      TxStore::LowerInterpolantStore::const_iterator stateIt =
+          _concretelyAddressedHistoricalStore.find(it1->first);
+      if (stateIt == _concretelyAddressedHistoricalStore.end()) {
+        // FIXME: This is horribly inefficient: should implement better indexing
+        // based on the allocation info instead
+        bool matchFound = false;
+        for (TxStore::LowerInterpolantStore::const_iterator
+                 it2 = _symbolicallyAddressedHistoricalStore.begin(),
+                 ie2 = _symbolicallyAddressedHistoricalStore.end();
+             it2 != ie2; ++it2) {
+          if (it1->first->getAllocationInfo() ==
+              it2->first->getAllocationInfo()) {
+            matchFound = true;
+            ref<Expr> constraint = OrExpr::create(
+                EqExpr::create(ConstantExpr::create(0, Expr::Bool),
+                               EqExpr::create(it1->first->getOffset(),
+                                              it2->first->getOffset())),
+                EqExpr::create(it1->second->getExpression(),
+                               it2->second->getExpression()));
+            if (stateEqualityConstraints.isNull()) {
+              stateEqualityConstraints = constraint;
+            } else {
+              stateEqualityConstraints =
+                  AndExpr::create(constraint, stateEqualityConstraints);
+            }
+          }
+        }
+        if (!matchFound)
+          return false;
+      } else {
+        ref<Expr> constraint = EqExpr::create(it1->second->getExpression(),
+                                              stateIt->second->getExpression());
+        if (stateEqualityConstraints.isNull()) {
+          stateEqualityConstraints = constraint;
+        } else {
+          stateEqualityConstraints =
+              AndExpr::create(constraint, stateEqualityConstraints);
+        }
+      }
+    }
   }
 
   {
@@ -1271,6 +1319,66 @@ bool SubsumptionTableEntry::subsumed(
                  ? conjunction
                  : AndExpr::create(conjunction, stateEqualityConstraints));
       }
+    }
+
+    //------------------------------------------------------------------------
+    // Historical symbolically-addressed store
+    //------------------------------------------------------------------------
+    for (TxStore::LowerInterpolantStore::const_iterator
+             it1 = symbolicallyAddressedHistoricalStore.begin(),
+             ie1 = symbolicallyAddressedHistoricalStore.end();
+         it1 != ie1; ++it1) {
+      bool matchFound = false;
+      // FIXME: This is horribly inefficient: should implement better indexing
+      // based on allocation info instead
+      for (TxStore::LowerInterpolantStore::const_iterator
+               it2 = _concretelyAddressedHistoricalStore.begin(),
+               ie2 = _concretelyAddressedHistoricalStore.end();
+           it2 != ie2; ++it2) {
+        if (it1->first->getAllocationInfo() ==
+            it2->first->getAllocationInfo()) {
+          ref<Expr> constraint = OrExpr::create(
+              EqExpr::create(ConstantExpr::create(0, Expr::Bool),
+                             EqExpr::create(it1->first->getOffset(),
+                                            it2->first->getOffset())),
+              EqExpr::create(it1->second->getExpression(),
+                             it2->second->getExpression()));
+          if (stateEqualityConstraints.isNull()) {
+            stateEqualityConstraints = constraint;
+          } else {
+            stateEqualityConstraints =
+                AndExpr::create(constraint, stateEqualityConstraints);
+          }
+          matchFound = true;
+        }
+      }
+
+      // FIXME: This is horribly inefficient: should implement better indexing
+      // based on allocation info instead
+      for (TxStore::LowerInterpolantStore::const_iterator
+               it2 = _symbolicallyAddressedHistoricalStore.begin(),
+               ie2 = _symbolicallyAddressedHistoricalStore.end();
+           it2 != ie2; ++it2) {
+        if (it1->first->getAllocationInfo() ==
+            it2->first->getAllocationInfo()) {
+          ref<Expr> constraint = OrExpr::create(
+              EqExpr::create(ConstantExpr::create(0, Expr::Bool),
+                             EqExpr::create(it1->first->getOffset(),
+                                            it2->first->getOffset())),
+              EqExpr::create(it1->second->getExpression(),
+                             it2->second->getExpression()));
+          if (stateEqualityConstraints.isNull()) {
+            stateEqualityConstraints = constraint;
+          } else {
+            stateEqualityConstraints =
+                AndExpr::create(constraint, stateEqualityConstraints);
+          }
+          matchFound = true;
+        }
+      }
+
+      if (!matchFound)
+        return false;
     }
   }
 
