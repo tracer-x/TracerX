@@ -229,8 +229,10 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
     return body;
 
   // We only simplify a conjunction of interpolant and equalities
-  if (!llvm::isa<AndExpr>(body))
+  if (!llvm::isa<AndExpr>(body)) {
+    hasExistentialsOnly = !hasVariableNotInSet(expr->variables, body);
     return existsExpr;
+  }
 
   // The equality constraint is only a single disjunctive clause
   // of a CNF formula. In this case we simplify nothing.
