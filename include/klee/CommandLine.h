@@ -109,6 +109,8 @@ extern llvm::cl::opt<SpecStrategy> SpecStrategyToUse;
 
 extern llvm::cl::opt<std::string> DependencyFolder;
 
+extern llvm::cl::opt<bool> WPInterpolant;
+
 #endif
 
 #ifdef ENABLE_METASMT

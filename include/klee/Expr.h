@@ -19,6 +19,12 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
+#include <llvm/IR/Value.h>
+#else
+#include <llvm/Value.h>
+#endif
+
 #include <sstream>
 #include <set>
 #include <vector>
@@ -161,6 +167,7 @@ public:
     Sge, ///< Not used in canonical form
     Exists,
     LastKind = Exists,
+    WPVar,
     CastKindFirst = ZExt,
     CastKindLast = SExt,
     BinaryKindFirst = Add,
@@ -413,6 +420,55 @@ private:
       : variables(variables), body(body) {}
 };
 
+/// Class representing a WP variable
+class WPVarExpr : public NonConstantExpr {
+public:
+  llvm::Value *address;
+  std::string name;
+  ref<Expr> index;
+
+public:
+  static ref<Expr> alloc(llvm::Value *_address, std::string _name,
+                         const ref<Expr> &_index) {
+    ref<Expr> r(new WPVarExpr(_address, _name, _index));
+    r->computeHash();
+    return r;
+  }
+
+  static ref<Expr> create(llvm::Value *address, std::string name,
+                          ref<Expr> index);
+
+  Width getWidth() const { return index->getWidth(); }
+  Kind getKind() const { return WPVar; }
+
+  unsigned getNumKids() const { return 1; }
+  ref<Expr> getKid(unsigned i) const { return !i ? index : 0; }
+
+  std::string getName() const { return name; }
+
+  llvm::Value *getAddress() const { return address; }
+
+  int compareContents(const Expr &b) const;
+
+  virtual ref<Expr> rebuild(ref<Expr> kids[]) const {
+    return create(address, name, kids[0]);
+  }
+
+  void print(llvm::raw_ostream &os) const;
+
+  virtual unsigned computeHash();
+
+private:
+  WPVarExpr(llvm::Value *_address, std::string _name, const ref<Expr> &_index)
+      : address(_address), name(_name) {
+    index = _index;
+  }
+
+public:
+  static bool classof(const Expr *E) { return E->getKind() == Expr::WPVar; }
+  static bool classof(const WPVarExpr *) { return true; }
+};
+
 // Special
 
 class NotOptimizedExpr : public NonConstantExpr {
@@ -588,7 +644,13 @@ public:
   
   unsigned getNumKids() const { return numKids; }
   ref<Expr> getKid(unsigned i) const { return !i ? index : 0; }
-  
+
+  std::string getName() const { return updates.root->name; }
+
+  const Array *getArray() const { return updates.root; }
+
+  void replaceArray(const Array *arr) { updates.root = arr; }
+
   int compareContents(const Expr &b) const;
 
   virtual ref<Expr> rebuild(ref<Expr> kids[]) const {
@@ -607,7 +669,6 @@ public:
   }
   static bool classof(const ReadExpr *) { return true; }
 };
-
 
 /// Class representing an if-then-else expression.
 class SelectExpr : public NonConstantExpr {
