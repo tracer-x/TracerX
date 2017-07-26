@@ -238,6 +238,20 @@ class SubsumptionTableEntry {
 
   std::set<const Array *> existentials;
 
+  /// \brief A procedure for building subsumption check constraints using
+  /// symbolically-addressed store elements
+  ///
+  /// \return A null expression upon failure, otherwise the constructed
+  /// constraint
+  ref<Expr> makeConstraint(
+      ExecutionState &state, ref<TxInterpolantValue> tabledValue,
+      ref<TxInterpolantValue> stateValue, ref<Expr> tabledOffset,
+      ref<Expr> stateOffset, std::map<ref<TxInterpolantValue>,
+                                      std::set<ref<Expr> > > &corePointerValues,
+      std::set<ref<TxInterpolantValue> > &coreExactPointerValues,
+      std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+      int debugSubsumptionLevel) const;
+
   /// \brief Test for the existence of a variable in a set in an expression.
   ///
   /// \param existentials A set of variables (KLEE arrays).

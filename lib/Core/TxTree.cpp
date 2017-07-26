@@ -174,6 +174,74 @@ SubsumptionTableEntry::~SubsumptionTableEntry() {
   symbolicallyAddressedHistoricalStore.clear();
 }
 
+ref<Expr> SubsumptionTableEntry::makeConstraint(
+    ExecutionState &state, ref<TxInterpolantValue> tabledValue,
+    ref<TxInterpolantValue> stateValue, ref<Expr> tabledOffset,
+    ref<Expr> stateOffset,
+    std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > > &corePointerValues,
+    std::set<ref<TxInterpolantValue> > &coreExactPointerValues,
+    std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+    int debugSubsumptionLevel) const {
+  ref<Expr> constraint;
+
+  if (tabledValue->getExpression()->getWidth() !=
+      stateValue->getExpression()->getWidth()) {
+    // We conservatively require that the addresses should not be
+    // equal whenever their values are of different width
+    constraint = EqExpr::create(ConstantExpr::create(0, Expr::Bool),
+                                EqExpr::create(tabledOffset, stateOffset));
+  } else if (Dependency::boundInterpolation() && tabledValue->isPointer() &&
+             stateValue->isPointer()) {
+    if (!ExactAddressInterpolant && tabledValue->useBound()) {
+      std::set<ref<Expr> > bounds;
+      ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
+          stateValue, bounds, unifiedBases, debugSubsumptionLevel);
+
+      if (!boundsCheck->isTrue()) {
+        if (!boundsCheck->isFalse()) {
+          // Implication: if tabledConcreteAddress ==
+          // stateSymbolicAddress then bounds check must hold
+          constraint = OrExpr::create(constraint, boundsCheck);
+        } else {
+          constraint =
+              EqExpr::create(ConstantExpr::create(0, Expr::Bool),
+                             EqExpr::create(tabledOffset, stateOffset));
+        }
+      }
+
+      // We record the LLVM value of the pointer
+      corePointerValues[stateValue] = bounds;
+    } else {
+      ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
+          stateValue, unifiedBases, debugSubsumptionLevel);
+      if (offsetsCheck->isFalse()) {
+        if (debugSubsumptionLevel >= 1) {
+          klee_message("#%lu=>#%lu: Check failure due to failure in "
+                       "offset equality check",
+                       state.txTreeNode->getNodeSequenceNumber(),
+                       nodeSequenceNumber);
+        }
+        return constraint;
+      }
+      if (!offsetsCheck->isTrue())
+        constraint = offsetsCheck;
+
+      // We record the value of the pointer for interpolation marking
+      coreExactPointerValues.insert(stateValue);
+    }
+  } else {
+    // Implication: if tabledConcreteAddress == stateSymbolicAddress,
+    // then tabledValue->getExpression() ==
+    // stateValue->getExpression()
+    constraint = OrExpr::create(
+        EqExpr::create(ConstantExpr::create(0, Expr::Bool),
+                       EqExpr::create(tabledOffset, stateOffset)),
+        EqExpr::create(tabledValue->getExpression(),
+                       stateValue->getExpression()));
+  }
+  return constraint;
+}
+
 bool
 SubsumptionTableEntry::hasVariableInSet(std::set<const Array *> &existentials,
                                         ref<Expr> expr) {
@@ -1075,6 +1143,57 @@ bool SubsumptionTableEntry::subsumed(
         }
       }
     }
+
+    //------------------------------------------------------------------------
+    // Historical concretely-addressed store
+    //------------------------------------------------------------------------
+    for (TxStore::LowerInterpolantStore::const_iterator
+             it1 = concretelyAddressedHistoricalStore.begin(),
+             ie1 = concretelyAddressedHistoricalStore.end();
+         it1 != ie1; ++it1) {
+      ref<Expr> constraint;
+      TxStore::LowerInterpolantStore::const_iterator stateIt =
+          _concretelyAddressedHistoricalStore.find(it1->first);
+
+      if (stateIt == _concretelyAddressedHistoricalStore.end()) {
+        // FIXME: This is horribly inefficient: should implement better indexing
+        // based on the allocation info instead
+        bool matchFound = false;
+        for (TxStore::LowerInterpolantStore::const_iterator
+                 it2 = _symbolicallyAddressedHistoricalStore.begin(),
+                 ie2 = _symbolicallyAddressedHistoricalStore.end();
+             it2 != ie2; ++it2) {
+          if (it1->first->getAllocationInfo() ==
+              it2->first->getAllocationInfo()) {
+            matchFound = true;
+            constraint = makeConstraint(
+                state, it1->second, it2->second, it1->first->getOffset(),
+                it2->first->getOffset(), corePointerValues,
+                coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
+            if (constraint.isNull())
+              return false;
+            if (stateEqualityConstraints.isNull()) {
+              stateEqualityConstraints = constraint;
+            } else {
+              stateEqualityConstraints =
+                  AndExpr::create(constraint, stateEqualityConstraints);
+            }
+          }
+        }
+        if (!matchFound)
+          return false;
+      } else {
+        constraint = EqExpr::create(it1->second->getExpression(),
+                                    stateIt->second->getExpression());
+      }
+
+      if (stateEqualityConstraints.isNull()) {
+        stateEqualityConstraints = constraint;
+      } else {
+        stateEqualityConstraints =
+            AndExpr::create(constraint, stateEqualityConstraints);
+      }
+    }
   }
 
   {
@@ -1271,6 +1390,66 @@ bool SubsumptionTableEntry::subsumed(
                  ? conjunction
                  : AndExpr::create(conjunction, stateEqualityConstraints));
       }
+    }
+
+    //------------------------------------------------------------------------
+    // Historical symbolically-addressed store
+    //------------------------------------------------------------------------
+    for (TxStore::LowerInterpolantStore::const_iterator
+             it1 = symbolicallyAddressedHistoricalStore.begin(),
+             ie1 = symbolicallyAddressedHistoricalStore.end();
+         it1 != ie1; ++it1) {
+      bool matchFound = false;
+      // FIXME: This is horribly inefficient: should implement better indexing
+      // based on allocation info instead
+      for (TxStore::LowerInterpolantStore::const_iterator
+               it2 = _concretelyAddressedHistoricalStore.begin(),
+               ie2 = _concretelyAddressedHistoricalStore.end();
+           it2 != ie2; ++it2) {
+        if (it1->first->getAllocationInfo() ==
+            it2->first->getAllocationInfo()) {
+          ref<Expr> constraint = makeConstraint(
+              state, it1->second, it2->second, it1->first->getOffset(),
+              it2->first->getOffset(), corePointerValues,
+              coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
+          if (constraint.isNull())
+            return false;
+          if (stateEqualityConstraints.isNull()) {
+            stateEqualityConstraints = constraint;
+          } else {
+            stateEqualityConstraints =
+                AndExpr::create(constraint, stateEqualityConstraints);
+          }
+          matchFound = true;
+        }
+      }
+
+      // FIXME: This is horribly inefficient: should implement better indexing
+      // based on allocation info instead
+      for (TxStore::LowerInterpolantStore::const_iterator
+               it2 = _symbolicallyAddressedHistoricalStore.begin(),
+               ie2 = _symbolicallyAddressedHistoricalStore.end();
+           it2 != ie2; ++it2) {
+        if (it1->first->getAllocationInfo() ==
+            it2->first->getAllocationInfo()) {
+          ref<Expr> constraint = makeConstraint(
+              state, it1->second, it2->second, it1->first->getOffset(),
+              it2->first->getOffset(), corePointerValues,
+              coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
+          if (constraint.isNull())
+            return false;
+          if (stateEqualityConstraints.isNull()) {
+            stateEqualityConstraints = constraint;
+          } else {
+            stateEqualityConstraints =
+                AndExpr::create(constraint, stateEqualityConstraints);
+          }
+          matchFound = true;
+        }
+      }
+
+      if (!matchFound)
+        return false;
     }
   }
 
