@@ -78,6 +78,9 @@ public:
 
     ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;
 
+    /// \brief Finds a store entry given an LLVM value
+    ref<TxStoreEntry> find(ref<TxAllocationContext> alc) const;
+
     ref<TxStoreEntry> findConcrete(
         ref<TxVariable> var,
         std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases)
@@ -207,6 +210,9 @@ public:
   /// \brief Finds a store entry given an address
   ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;
 
+  /// \brief Finds a store entry given an LLVM value
+  ref<TxStoreEntry> find(ref<TxAllocationContext> alc) const;
+
   /// \brief This retrieves the locations known at this state, and the
   /// expressions stored in the locations. Returns as the last argument a pair
   /// of the store part indexed by constants, and the store part indexed by
@@ -253,6 +259,8 @@ public:
       TopInterpolantStore &_symbolicallyAddressedStore,
       LowerInterpolantStore &_concretelyAddressedHistoricalStore,
       LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const;
+
+  ref<TxAllocationContext> getAddressofLatestCopyLLVMValue(llvm::Value *val);
 
   /// \brief Newly relate a location with its stored value, when the value is
   /// loaded from the location

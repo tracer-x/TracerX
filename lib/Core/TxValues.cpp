@@ -205,7 +205,7 @@ void TxVariable::print(llvm::raw_ostream &stream,
     stream << "\n";
     for (std::vector<llvm::Instruction *>::const_reverse_iterator
              it = allocInfo->getContext()->getCallHistory().rbegin(),
-             ib = it, ie = allocInfo->getContext()->getCallHistory().rend();
+             ie = allocInfo->getContext()->getCallHistory().rend();
          it != ie; ++it) {
       stream << tabsNext;
       (*it)->print(stream);

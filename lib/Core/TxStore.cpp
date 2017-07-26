@@ -46,6 +46,29 @@ TxStore::MiddleStateStore::find(ref<TxStateAddress> loc) const {
   return ret;
 }
 
+ref<TxStoreEntry>
+TxStore::MiddleStateStore::find(ref<TxAllocationContext> alc) const {
+  ref<TxStoreEntry> ret;
+
+  for (LowerStateStore::const_iterator
+           lowerIs = concretelyAddressedStore.begin(),
+           lowerIe = concretelyAddressedStore.end(), lowerIt = lowerIs;
+       lowerIt != lowerIe; ++lowerIt) {
+    if (lowerIt->first->getAllocationInfo()->getContext() == alc)
+      return lowerIt->second;
+  }
+
+  for (LowerStateStore::const_iterator
+           lowerIs = symbolicallyAddressedStore.begin(),
+           lowerIe = symbolicallyAddressedStore.end(), lowerIt = lowerIs;
+       lowerIt != lowerIe; ++lowerIt) {
+    if (lowerIt->first->getAllocationInfo()->getContext() == alc)
+      return lowerIt->second;
+  }
+
+  return ret;
+}
+
 ref<TxStoreEntry> TxStore::MiddleStateStore::findConcrete(
     ref<TxVariable> var,
     std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases)
@@ -204,6 +227,16 @@ ref<TxStoreEntry> TxStore::find(ref<TxStateAddress> loc) const {
   return nullEntry;
 }
 
+ref<TxStoreEntry> TxStore::find(ref<TxAllocationContext> alc) const {
+  TopStateStore::const_iterator storeIter = internalStore.find(alc);
+  if (storeIter != internalStore.end()) {
+    return storeIter->second.find(alc);
+  }
+
+  ref<TxStoreEntry> nullEntry;
+  return nullEntry;
+}
+
 void TxStore::getStoredExpressions(
     const TxStore *referenceStore,
     const std::vector<llvm::Instruction *> &callHistory,
@@ -232,6 +265,37 @@ void TxStore::getStoredCoreExpressions(
   getSymbolicStore(referenceStore, callHistory, substitution, replacements,
                    coreOnly, leftRetrieval, _symbolicallyAddressedStore,
                    _symbolicallyAddressedHistoricalStore);
+}
+
+ref<TxAllocationContext>
+TxStore::getAddressofLatestCopyLLVMValue(llvm::Value *val) {
+  ref<TxAllocationContext> address;
+  bool foundValue = false;
+  for (TopStateStore::const_iterator it = internalStore.begin(),
+                                     ie = internalStore.end();
+       it != ie; ++it) {
+    ref<TxAllocationContext> temp = (*it).first;
+    if (temp->getValue() == val) {
+      if (!foundValue) {
+        address = temp;
+        foundValue = true;
+      } else if (temp->getCallHistory().size() >
+                 address->getCallHistory().size()) {
+        address = temp;
+      }
+    }
+  }
+  if (foundValue)
+    return address;
+
+  // Sanity Check
+  llvm::errs() << "LLVM Value:\n";
+  val->dump();
+  llvm::errs() << "Store:\n";
+  this->dump();
+  llvm::errs() << "TxStore::getAddressofLatestCopyLLVMValue LLVM::Value not "
+                  "found in store!";
+  exit(0);
 }
 
 inline void TxStore::concreteToInterpolant(
