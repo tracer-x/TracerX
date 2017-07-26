@@ -56,7 +56,7 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
 
-#ifdef WPInterpolation
+#ifdef WPInterpolant
   wpInterpolant = node->getWPInterpolant();
 #endif
 
@@ -2222,7 +2222,7 @@ uint64_t TxTreeNode::nextNodeSequenceNumber = 1;
 void TxTreeNode::printTimeStat(std::stringstream &stream) {
   stream << "KLEE: done:     getInterpolant = "
          << ((double)getInterpolantTime.getValue()) / 1000 << "\n";
-#ifdef WPInterpolation
+#ifdef WPInterpolant
   stream << "KLEE: done:     get WP Interpolant = "
          << ((double)getWPInterpolantTime.getValue()) / 1000 << "\n";
 #endif
