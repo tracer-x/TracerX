@@ -1608,6 +1608,9 @@ static inline const llvm::fltSemantics *fpWidthToSemantics(unsigned width) {
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
 
+  if (WPInterpolant)
+    txTree->storeInstruction(i);
+
   switch (i->getOpcode()) {
   // Control flow
   case Instruction::Ret: {

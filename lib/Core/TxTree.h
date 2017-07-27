@@ -384,6 +384,10 @@ class TxTreeNode {
 
   uintptr_t programPoint;
 
+  /// \brief List of the instructions in the node in a reverse order (used only
+  /// in WP interpolation)
+  std::vector<llvm::Instruction *> reverseInstructionList;
+
   uint64_t nodeSequenceNumber;
 
   bool storable;
@@ -877,6 +881,10 @@ public:
   /// dependency information, given a particular interpolation tree node.
   static void executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
                             std::vector<ref<Expr> > &args);
+
+  /// \brief Store instruction in node for computing weakest precondition
+  /// interpolant
+  void storeInstruction(llvm::Instruction *instr);
 
   /// \brief Print the content of the tree node object into a stream.
   ///
