@@ -2155,6 +2155,11 @@ void TxTree::executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
   symbolicExecutionError = false;
 }
 
+void TxTree::storeInstruction(llvm::Instruction *instr) {
+  if (WPInterpolant)
+    currentTxTreeNode->reverseInstructionList.push_back(instr);
+}
+
 void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
                        std::string edges) const {
   if (n->left != 0) {
