@@ -2112,8 +2112,12 @@ void TxTree::markPathCondition(ExecutionState &state,
   int debugSubsumptionLevel =
       currentTxTreeNode->dependency->debugSubsumptionLevel;
 
+  if (WPInterpolant)
+    this->markInstruction(state.prevPC->inst);
+
   llvm::BranchInst *binst =
       llvm::dyn_cast<llvm::BranchInst>(state.prevPC->inst);
+
   if (binst) {
     ref<Expr> unknownExpression;
     std::string reason = "";
@@ -2156,8 +2160,12 @@ void TxTree::executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
 }
 
 void TxTree::storeInstruction(llvm::Instruction *instr) {
-  if (WPInterpolant)
-    currentTxTreeNode->reverseInstructionList.push_back(instr);
+  currentTxTreeNode->reverseInstructionList.insert(
+      std::pair<llvm::Instruction *, bool>(instr, false));
+}
+
+void TxTree::markInstruction(llvm::Instruction *instr) {
+  currentTxTreeNode->reverseInstructionList[instr] = true;
 }
 
 void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
