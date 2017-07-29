@@ -167,7 +167,7 @@ namespace klee {
 
   private:
     /// The store
-    TxStore store;
+    TxStore *store;
 
     /// \brief Previous path condition
     Dependency *parent;
@@ -377,7 +377,7 @@ namespace klee {
         TxStore::TopInterpolantStore &symbolicallyAddressedStore,
         TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
         TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
-      store.getStoredExpressions(
+      store->getStoredExpressions(
           callHistory, replacements, coreOnly, concretelyAddressedStore,
           symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
           symbolicallyAddressedHistoricalStore);

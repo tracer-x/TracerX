@@ -434,10 +434,11 @@ Dependency::Dependency(
     : parent(parent), targetData(_targetData),
       globalAddresses(_globalAddresses) {
   if (parent) {
-    store = parent->store;
+    store = TxStore::create(parent->store);
     debugSubsumptionLevel = parent->debugSubsumptionLevel;
     debugStateLevel = parent->debugStateLevel;
   } else {
+    store = TxStore::create(0);
 #ifdef ENABLE_Z3
     debugSubsumptionLevel = DebugSubsumption;
     debugStateLevel = DebugState;
@@ -456,6 +457,7 @@ Dependency::~Dependency() {
        it != ie; ++it) {
     it->second.clear();
   }
+  delete store;
   valuesMap.clear();
 }
 
@@ -730,13 +732,13 @@ void Dependency::execute(llvm::Instruction *instr,
                   ? getNewPointerValue(instr, callHistory, valueExpr, 0)
                   : getNewTxStateValue(instr, callHistory, valueExpr);
 
-          store.updateStoreWithLoadedValue(loc, addressValue, loadedValue);
+          store->updateStoreWithLoadedValue(loc, addressValue, loadedValue);
           break;
         } else if (locations.size() == 1) {
           ref<TxStateAddress> loc = *(locations.begin());
 
           // Check the possible mismatch between Tracer-X and KLEE loaded value
-          ref<TxStoreEntry> target = store.find(loc);
+          ref<TxStoreEntry> target = store->find(loc);
 
           if (!target.isNull() &&
               valueExpr != target->getContent()->getExpression()) {
@@ -779,7 +781,7 @@ void Dependency::execute(llvm::Instruction *instr,
                     ? getNewPointerValue(instr, callHistory, valueExpr, 0)
                     : getNewTxStateValue(instr, callHistory, valueExpr);
 
-            store.updateStoreWithLoadedValue(loc, addressValue, loadedValue);
+            store->updateStoreWithLoadedValue(loc, addressValue, loadedValue);
             break;
           }
         }
@@ -799,8 +801,8 @@ void Dependency::execute(llvm::Instruction *instr,
                   ? getNewPointerValue(instr, callHistory, valueExpr, 0)
                   : getNewTxStateValue(instr, callHistory, valueExpr);
 
-          store.updateStoreWithLoadedValue(*(locations.begin()), addressValue,
-                                           loadedValue);
+          store->updateStoreWithLoadedValue(*(locations.begin()), addressValue,
+                                            loadedValue);
           break;
         }
       }
@@ -810,7 +812,7 @@ void Dependency::execute(llvm::Instruction *instr,
       for (std::set<ref<TxStateAddress> >::iterator li = locations.begin(),
                                                     le = locations.end();
            li != le; ++li) {
-        ref<TxStoreEntry> storeEntry = store.find(*li);
+        ref<TxStoreEntry> storeEntry = store->find(*li);
 
         // Build the loaded value
         ref<TxStateValue> loadedValue =
@@ -824,7 +826,7 @@ void Dependency::execute(llvm::Instruction *instr,
             loadedValue->getExpression() !=
                 storeEntry->getContent()->getExpression()) {
           // We could not find the stored value, create a new one.
-          store.updateStoreWithLoadedValue(*li, addressValue, loadedValue);
+          store->updateStoreWithLoadedValue(*li, addressValue, loadedValue);
         } else {
           addDependencyViaLocation(storeEntry->getContent(), loadedValue, *li);
           loadedValue->setLoadAddress(addressValue);
@@ -863,7 +865,7 @@ void Dependency::execute(llvm::Instruction *instr,
       for (std::set<ref<TxStateAddress> >::iterator it = locations.begin(),
                                                     ie = locations.end();
            it != ie; ++it) {
-        store.updateStore(*it, addressValue, storedValue);
+        store->updateStore(*it, addressValue, storedValue);
       }
       break;
     }
@@ -1073,7 +1075,7 @@ void Dependency::executeMakeSymbolic(
   for (std::set<ref<TxStateAddress> >::iterator it = locations.begin(),
                                                 ie = locations.end();
        it != ie; ++it) {
-    store.updateStore(*it, addressValue, storedValue);
+    store->updateStore(*it, addressValue, storedValue);
   }
 }
 
@@ -1627,7 +1629,7 @@ void Dependency::print(llvm::raw_ostream &stream,
                        const unsigned paddingAmount) const {
   std::string tabs = makeTabs(paddingAmount);
 
-  store.print(stream, paddingAmount);
+  store->print(stream, paddingAmount);
 
   if (parent) {
     stream << tabs << "--------- Parent Dependencies ----------\n";

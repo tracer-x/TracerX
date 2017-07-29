@@ -196,23 +196,24 @@ private:
                    TopInterpolantStore &symbolicallyAddressedStore,
                    LowerInterpolantStore &symbolicallyAddressedHistoricalStore);
 
-public:
   /// \brief Constructor for an empty store.
   TxStore() {}
 
-  /// \brief The copy constructor of this class.
-  TxStore(const TxStore &src)
-      : concretelyAddressedHistoricalStore(
-            src.concretelyAddressedHistoricalStore),
-        symbolicallyAddressedHistoricalStore(
-            src.symbolicallyAddressedHistoricalStore),
-        store(src.store) {}
+public:
+  ~TxStore() {}
 
-  ~TxStore() {
-    // Delete the locally-constructed relations
-    concretelyAddressedHistoricalStore.clear();
-    symbolicallyAddressedHistoricalStore.clear();
-    store.clear();
+  /// \brief Copy from another object
+  static TxStore *create(TxStore *src) {
+    TxStore *ret = new TxStore();
+    if (!src) {
+      return ret;
+    }
+    ret->concretelyAddressedHistoricalStore =
+        src->concretelyAddressedHistoricalStore;
+    ret->symbolicallyAddressedHistoricalStore =
+        src->symbolicallyAddressedHistoricalStore;
+    ret->store = src->store;
+    return ret;
   }
 
   /// \brief Finds a store entry given an address
