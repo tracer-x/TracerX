@@ -173,9 +173,6 @@ void TxStore::getConcreteStore(
   for (LowerStateStore::const_iterator it = historicalStore.begin(),
                                        ie = historicalStore.end();
        it != ie; ++it) {
-    if (!it->first->contextIsPrefixOf(callHistory))
-      continue;
-
     concreteToInterpolant(it->first, it->second, replacements, coreOnly,
                           concretelyAddressedHistoricalStore);
   }
@@ -208,9 +205,6 @@ void TxStore::getSymbolicStore(
   for (LowerStateStore::const_iterator it = historicalStore.begin(),
                                        ie = historicalStore.end();
        it != ie; ++it) {
-    if (!it->first->contextIsPrefixOf(callHistory))
-      continue;
-
     symbolicToInterpolant(it->first, it->second, replacements, coreOnly,
                           symbolicallyAddressedHistoricalStore);
   }
