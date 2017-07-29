@@ -262,11 +262,6 @@ public:
 
   ref<Expr> getOffset() const { return offset; }
 
-  bool
-  contextIsPrefixOf(const std::vector<llvm::Instruction *> &callHistory) const {
-    return getContext()->isPrefixOf(callHistory);
-  }
-
   /// \brief The comparator of this class' objects. This member function checks
   /// for the equality of TxInterpolantAddress#indirectionCount member variables
   /// to
