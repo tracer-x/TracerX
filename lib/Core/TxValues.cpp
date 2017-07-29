@@ -558,6 +558,12 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
   std::string nextTabs = appendTab(prefix);
   bool offsetDisplayed = false;
 
+  stream << prefix << "function/value: ";
+  if (outputFunctionName(value, stream))
+      stream << "/";
+  value->print(stream);
+  stream << "\n";
+
   if (!doNotUseBound && !allocationBounds.empty()) {
     stream << prefix << "BOUNDS:";
     for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
