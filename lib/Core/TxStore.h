@@ -50,6 +50,15 @@ public:
   ref<TxStateValue> getAddressValue() { return addressValue; }
 
   ref<TxStateValue> getContent() { return content; }
+
+  void dump() const {
+    print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+
+  void print(llvm::raw_ostream &stream) const { print(stream, ""); }
+
+  void print(llvm::raw_ostream &stream, const std::string &prefix) const;
 };
 
 class TxStore {

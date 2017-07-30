@@ -23,6 +23,19 @@ using namespace klee;
 
 namespace klee {
 
+void TxStoreEntry::print(llvm::raw_ostream &stream,
+                         const std::string &prefix) const {
+  std::string tabsNext = appendTab(prefix);
+
+  stream << prefix << "address:\n";
+  address->print(stream, tabsNext);
+  stream << "\n";
+  stream << prefix << "content:\n";
+  content->print(stream, tabsNext);
+}
+
+/**/
+
 void TxStore::MiddleStateStore::print(llvm::raw_ostream &stream,
                                       const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
