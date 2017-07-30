@@ -262,10 +262,9 @@ void TxStore::print(llvm::raw_ostream &stream,
   std::string tabsNext = appendTab(tabs);
   std::string tabsNextNext = appendTab(tabsNext);
 
-  if (store.empty()) {
-    stream << tabs << "store = []\n";
-  } else {
-    stream << tabs << "store = [\n";
+  stream << tabs << "store = [";
+  if (!store.empty()) {
+    stream << "\n";
     for (TopStateStore::const_iterator topIs = store.begin(),
                                        topIe = store.end(), topIt = topIs;
          topIt != topIe; ++topIt) {
@@ -273,7 +272,40 @@ void TxStore::print(llvm::raw_ostream &stream,
       stream << ":\n";
       topIt->second.print(stream, tabsNextNext);
     }
-    stream << tabs << "]\n";
+    stream << tabs;
   }
+  stream << "]";
+
+  stream << "\n" << tabs << "concretely-addressed historical store = [";
+  if (!concretelyAddressedHistoricalStore.empty()) {
+    stream << "\n";
+    for (TxStore::LowerStateStore::const_iterator
+             is1 = concretelyAddressedHistoricalStore.begin(),
+             ie1 = concretelyAddressedHistoricalStore.end(), it1 = is1;
+         it1 != ie1; ++it1) {
+      if (it1 != is1)
+        stream << tabsNext << "------------------------------------------\n";
+      it1->second->print(stream, tabsNext);
+      stream << "\n";
+    }
+    stream << tabs;
+  }
+  stream << "]";
+
+  stream << "\n" << tabs << "symbolically-addressed historical store = [";
+  if (!symbolicallyAddressedHistoricalStore.empty()) {
+    stream << "\n";
+    for (TxStore::LowerStateStore::const_iterator
+             is1 = symbolicallyAddressedHistoricalStore.begin(),
+             ie1 = symbolicallyAddressedHistoricalStore.end(), it1 = is1;
+         it1 != ie1; ++it1) {
+      if (it1 != is1)
+        stream << tabsNext << "------------------------------------------\n";
+      it1->second->print(stream, tabsNext);
+      stream << "\n";
+    }
+    stream << tabs;
+  }
+  stream << "]";
 }
 }
