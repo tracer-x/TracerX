@@ -1596,10 +1596,10 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
     interpolant->print(stream);
   else
     stream << "(empty)";
-  stream << "\n";
 
+  stream << "\n" << prefix << "concretely-addressed store = [";
   if (!concretelyAddressedStore.empty()) {
-    stream << prefix << "concretely-addressed store = [\n";
+    stream << "\n";
     for (TxStore::TopInterpolantStore::const_iterator
              is1 = concretelyAddressedStore.begin(),
              ie1 = concretelyAddressedStore.end(), it1 = is1;
@@ -1618,11 +1618,13 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
         stream << "\n";
       }
     }
-    stream << prefix << "]\n";
+    stream << prefix;
   }
+  stream << "]";
 
+  stream << "\n" << prefix << "symbolically-addressed store = [";
   if (!symbolicallyAddressedStore.empty()) {
-    stream << prefix << "symbolically-addressed store = [\n";
+    stream << "\n";
     for (TxStore::TopInterpolantStore::const_iterator
              is1 = symbolicallyAddressedStore.begin(),
              ie1 = symbolicallyAddressedStore.end(), it1 = is1;
@@ -1641,11 +1643,52 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
         stream << "\n";
       }
     }
-    stream << "]\n";
+    stream << prefix;
   }
+  stream << "]";
 
+  stream << "\n" << prefix << "concretely-addressed historical store = [";
+  if (!concretelyAddressedHistoricalStore.empty()) {
+    stream << "\n";
+    for (TxStore::LowerInterpolantStore::const_iterator
+             is1 = concretelyAddressedHistoricalStore.begin(),
+             ie1 = concretelyAddressedHistoricalStore.end(), it1 = is1;
+         it1 != ie1; ++it1) {
+      if (it1 != is1)
+        stream << tabsNext << "------------------------------------------\n";
+      stream << tabsNext << "address:\n";
+      it1->first->print(stream, tabsNextNext);
+      stream << "\n";
+      stream << tabsNext << "content:\n";
+      it1->second->print(stream, tabsNextNext);
+      stream << "\n";
+    }
+    stream << prefix;
+  }
+  stream << "]";
+
+  stream << "\n" << prefix << "symbolically-addressed historical store = [";
+  if (!symbolicallyAddressedHistoricalStore.empty()) {
+    stream << "\n";
+    for (TxStore::LowerInterpolantStore::const_iterator
+             is1 = symbolicallyAddressedHistoricalStore.begin(),
+             ie1 = symbolicallyAddressedHistoricalStore.end(), it1 = is1;
+         it1 != ie1; ++it1) {
+      if (it1 != is1)
+        stream << tabsNext << "------------------------------------------\n";
+      stream << tabsNext << "address:\n";
+      it1->first->print(stream, tabsNextNext);
+      stream << "\n";
+      stream << tabsNext << "content:\n";
+      it1->second->print(stream, tabsNextNext);
+      stream << "\n";
+    }
+    stream << prefix;
+  }
+  stream << "]";
+
+  stream << "\n" << prefix << "existentials = [";
   if (!existentials.empty()) {
-    stream << prefix << "existentials = [";
     for (std::set<const Array *>::const_iterator is = existentials.begin(),
                                                  ie = existentials.end(),
                                                  it = is;
@@ -1654,8 +1697,8 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
         stream << ", ";
       stream << (*it)->name;
     }
-    stream << "]\n";
   }
+  stream << "]";
 }
 
 void SubsumptionTableEntry::printStat(std::stringstream &stream) {
