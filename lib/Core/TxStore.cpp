@@ -42,11 +42,10 @@ void TxStore::MiddleStateStore::print(llvm::raw_ostream &stream,
   std::string tabsNextNext = appendTab(tabsNext);
 
   allocInfo->print(stream, prefix);
-  stream << ":\n";
-  if (concretelyAddressedStore.empty()) {
-    stream << prefix << "concretely-addressed store = []\n";
-  } else {
-    stream << prefix << "concretely-addressed store = [\n";
+  stream << ":";
+  stream << "\n" << prefix << "concretely-addressed store = [";
+  if (!concretelyAddressedStore.empty()) {
+    stream << "\n";
     for (LowerStateStore::const_iterator
              lowerIs = concretelyAddressedStore.begin(),
              lowerIe = concretelyAddressedStore.end(), lowerIt = lowerIs;
@@ -60,13 +59,13 @@ void TxStore::MiddleStateStore::print(llvm::raw_ostream &stream,
       lowerIt->second->getContent()->print(stream, tabsNextNext);
       stream << "\n";
     }
-    stream << prefix << "]\n";
+    stream << prefix;
   }
+  stream << "]";
 
-  if (symbolicallyAddressedStore.empty()) {
-    stream << prefix << "symbolically-addressed store = []";
-  } else {
-    stream << prefix << "symbolically-addressed store = [\n";
+  stream << "\n" << prefix << "symbolically-addressed store = [";
+  if (!symbolicallyAddressedStore.empty()) {
+    stream << "\n";
     for (LowerStateStore::const_iterator
              lowerIs = symbolicallyAddressedStore.begin(),
              lowerIe = symbolicallyAddressedStore.end(), lowerIt = lowerIs;
@@ -80,8 +79,9 @@ void TxStore::MiddleStateStore::print(llvm::raw_ostream &stream,
       lowerIt->second->getContent()->print(stream, tabsNextNext);
       stream << "\n";
     }
-    stream << prefix << "]";
+    stream << prefix;
   }
+  stream << "]";
 }
 
 /**/
