@@ -76,7 +76,7 @@ void TxStore::MiddleStateStore::print(llvm::raw_ostream &stream,
 ref<TxStoreEntry> TxStore::find(ref<TxStateAddress> loc) const {
   TopStateStore::const_iterator storeIter = store.find(loc->getContext());
   if (storeIter != store.end()) {
-    return storeIter->second->find(loc);
+    return storeIter->second.find(loc);
   }
 
   ref<TxStoreEntry> nullEntry;
@@ -160,10 +160,10 @@ void TxStore::getConcreteStore(
     LowerInterpolantStore &map =
         concretelyAddressedStore[it->first->getValue()];
 
-    ref<MiddleStateStore> middleStore = it->second;
+    const MiddleStateStore &middleStore = it->second;
 
-    for (LowerStateStore::const_iterator it1 = middleStore->concreteBegin(),
-                                         ie1 = middleStore->concreteEnd();
+    for (LowerStateStore::const_iterator it1 = middleStore.concreteBegin(),
+                                         ie1 = middleStore.concreteEnd();
          it1 != ie1; ++it1) {
       concreteToInterpolant(it1->first, it1->second, replacements, coreOnly,
                             map);
@@ -192,10 +192,10 @@ void TxStore::getSymbolicStore(
     LowerInterpolantStore &map =
         symbolicallyAddressedStore[it->first->getValue()];
 
-    ref<MiddleStateStore> middleStore = it->second;
+    const MiddleStateStore &middleStore = it->second;
 
-    for (LowerStateStore::const_iterator it1 = middleStore->symbolicBegin(),
-                                         ie1 = middleStore->symbolicEnd();
+    for (LowerStateStore::const_iterator it1 = middleStore.symbolicBegin(),
+                                         ie1 = middleStore.symbolicEnd();
          it1 != ie1; ++it1) {
       symbolicToInterpolant(it1->first, it1->second, replacements, coreOnly,
                             map);
@@ -222,23 +222,22 @@ void TxStore::updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
   TopStateStore::iterator middleStoreIter = store.find(loc->getContext());
 
   if (middleStoreIter != store.end()) {
-    ref<MiddleStateStore> middleStore = middleStoreIter->second;
-    if (middleStore->hasAllocationInfo(loc->getAllocationInfo())) {
-      middleStore->updateStore(loc, address, value);
+    MiddleStateStore &middleStore = middleStoreIter->second;
+    if (middleStore.hasAllocationInfo(loc->getAllocationInfo())) {
+      middleStore.updateStore(loc, address, value);
       return;
     }
 
     // Here we save the old store
-    concretelyAddressedHistoricalStore.insert(middleStore->concreteBegin(),
-                                              middleStore->concreteEnd());
-    symbolicallyAddressedHistoricalStore.insert(middleStore->symbolicBegin(),
-                                                middleStore->symbolicEnd());
+    concretelyAddressedHistoricalStore.insert(middleStore.concreteBegin(),
+                                              middleStore.concreteEnd());
+    symbolicallyAddressedHistoricalStore.insert(middleStore.symbolicBegin(),
+                                                middleStore.symbolicEnd());
   }
 
-  ref<MiddleStateStore> newMiddleStateStore =
-      MiddleStateStore::create(loc->getAllocationInfo());
+  MiddleStateStore newMiddleStateStore(loc->getAllocationInfo());
   store[loc->getContext()] = newMiddleStateStore;
-  newMiddleStateStore->updateStore(loc, address, value);
+  newMiddleStateStore.updateStore(loc, address, value);
 }
 
 /// \brief Print the content of the object to the LLVM error stream
@@ -259,7 +258,7 @@ void TxStore::print(llvm::raw_ostream &stream,
          topIt != topIe; ++topIt) {
       topIt->first->print(stream, tabsNext);
       stream << ":\n";
-      topIt->second->print(stream, tabsNextNext);
+      topIt->second.print(stream, tabsNextNext);
     }
     stream << tabs << "]\n";
   }

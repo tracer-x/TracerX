@@ -61,13 +61,9 @@ public:
   typedef std::map<const llvm::Value *, LowerInterpolantStore>
   TopInterpolantStore;
   typedef std::map<ref<TxVariable>, ref<TxStoreEntry> > LowerStateStore;
-  typedef std::map<ref<AllocationContext>, ref<MiddleStateStore> >
-  TopStateStore;
+  typedef std::map<ref<AllocationContext>, MiddleStateStore> TopStateStore;
 
   class MiddleStateStore {
-  public:
-    unsigned refCount;
-
   private:
     LowerStateStore concretelyAddressedStore;
 
@@ -75,12 +71,17 @@ public:
 
     ref<AllocationInfo> allocInfo;
 
-    MiddleStateStore(ref<AllocationInfo> _allocInfo)
-        : refCount(0), allocInfo(_allocInfo) {}
 
   public:
-    static ref<MiddleStateStore> create(ref<AllocationInfo> allocInfo) {
-      return ref<MiddleStateStore>(new MiddleStateStore(allocInfo));
+    MiddleStateStore() {}
+
+    MiddleStateStore(ref<AllocationInfo> _allocInfo) : allocInfo(_allocInfo) {}
+
+    /// \brief The copy constructor
+    MiddleStateStore(const MiddleStateStore &obj) {
+      concretelyAddressedStore = obj.concretelyAddressedStore;
+      symbolicallyAddressedStore = obj.symbolicallyAddressedStore;
+      allocInfo = obj.allocInfo;
     }
 
     LowerStateStore::const_iterator concreteBegin() const {
