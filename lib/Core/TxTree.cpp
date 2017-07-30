@@ -869,6 +869,7 @@ bool SubsumptionTableEntry::subsumed(
              it1 = concretelyAddressedStore.begin(),
              ie1 = concretelyAddressedStore.end();
          it1 != ie1; ++it1) {
+      assert(!it1->second.empty() && "empty table entry with real index");
 
       const TxStore::LowerInterpolantStore &tabledConcreteMap = it1->second;
       const TxStore::LowerInterpolantStore &stateConcreteMap =
@@ -1137,6 +1138,8 @@ bool SubsumptionTableEntry::subsumed(
              it1 = symbolicallyAddressedStore.begin(),
              ie1 = symbolicallyAddressedStore.end();
          it1 != ie1; ++it1) {
+      assert(!it1->second.empty() && "empty table entry with real index");
+
       const TxStore::LowerInterpolantStore &tabledSymbolicMap = it1->second;
       const TxStore::LowerInterpolantStore &stateConcreteMap =
           _concretelyAddressedStore[it1->first];
