@@ -167,12 +167,7 @@ SubsumptionTableEntry::SubsumptionTableEntry(
       symbolicallyAddressedHistoricalStore);
 }
 
-SubsumptionTableEntry::~SubsumptionTableEntry() {
-  concretelyAddressedStore.clear();
-  symbolicallyAddressedStore.clear();
-  concretelyAddressedHistoricalStore.clear();
-  symbolicallyAddressedHistoricalStore.clear();
-}
+SubsumptionTableEntry::~SubsumptionTableEntry() {}
 
 ref<Expr> SubsumptionTableEntry::makeConstraint(
     ExecutionState &state, ref<TxInterpolantValue> tabledValue,
