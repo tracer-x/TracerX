@@ -866,8 +866,8 @@ bool SubsumptionTableEntry::subsumed(
 
     // Build constraints from concrete-address interpolant store
     for (TxStore::TopInterpolantStore::const_iterator
-             it1 = _concretelyAddressedStore.begin(),
-             ie1 = _concretelyAddressedStore.end();
+             it1 = concretelyAddressedStore.begin(),
+             ie1 = concretelyAddressedStore.end();
          it1 != ie1; ++it1) {
 
       const TxStore::LowerInterpolantStore &tabledConcreteMap = it1->second;
@@ -1134,8 +1134,8 @@ bool SubsumptionTableEntry::subsumed(
     TimerStatIncrementer t(symbolicallyAddressedStoreExpressionBuildTime);
     // Build constraints from symbolic-address interpolant store
     for (TxStore::TopInterpolantStore::const_iterator
-             it1 = _symbolicallyAddressedStore.begin(),
-             ie1 = _symbolicallyAddressedStore.end();
+             it1 = symbolicallyAddressedStore.begin(),
+             ie1 = symbolicallyAddressedStore.end();
          it1 != ie1; ++it1) {
       const TxStore::LowerInterpolantStore &tabledSymbolicMap = it1->second;
       const TxStore::LowerInterpolantStore &stateConcreteMap =
