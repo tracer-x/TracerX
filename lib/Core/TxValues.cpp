@@ -735,11 +735,11 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
   stream << ": ";
   address->print(stream);
   stream << "\n";
-  stream << prefix << "base: ";
+  stream << prefix << "base";
   if (!llvm::isa<ConstantExpr>(variable->getBase()))
     stream << " (symbolic)";
   stream << ": ";
-  variable->print(stream);
+  variable->getBase()->print(stream);
   stream << "\n";
   stream << prefix
          << "pointer to location object: " << reinterpret_cast<uintptr_t>(this);
