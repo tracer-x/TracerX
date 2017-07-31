@@ -129,14 +129,19 @@ void TxVariable::print(llvm::raw_ostream &stream,
   allocInfo->getContext()->getValue()->print(stream);
   stream << "\n";
 
-  stream << prefix << "stack:\n";
-  for (std::vector<llvm::Instruction *>::const_reverse_iterator
-           it = allocInfo->getContext()->getCallHistory().rbegin(),
-           ib = it, ie = allocInfo->getContext()->getCallHistory().rend();
-       it != ie; ++it) {
-    stream << tabsNext;
-    (*it)->print(stream);
+  stream << prefix << "stack:";
+  if (allocInfo->getContext()->getCallHistory().empty()) {
+    stream << " (empty)\n";
+  } else {
     stream << "\n";
+    for (std::vector<llvm::Instruction *>::const_reverse_iterator
+             it = allocInfo->getContext()->getCallHistory().rbegin(),
+             ib = it, ie = allocInfo->getContext()->getCallHistory().rend();
+         it != ie; ++it) {
+      stream << tabsNext;
+      (*it)->print(stream);
+      stream << "\n";
+    }
   }
   stream << prefix << "offset";
   if (!llvm::isa<ConstantExpr>(this->offset))
