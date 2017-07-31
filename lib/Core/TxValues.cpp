@@ -253,6 +253,13 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
 
   assert(useBound() && "bounds check must be enabled for this pointer");
 
+  if (allocationBounds.empty()) {
+    assert(!allocationOffsets.empty() && "offsets should not be empty");
+
+    // This means there is no constraint on the bounds
+    return ConstantExpr::create(1, Expr::Bool);
+  }
+
   // In principle, for a state to be subsumed, the subsuming state must be
   // weaker, which in this case means that it should specify less allocations,
   // so all allocations in the subsuming (this), should be specified by the
