@@ -390,7 +390,7 @@ public:
     return 1;
   }
 
-  bool useBound() { return !doNotUseBound; }
+  bool useBound() const { return !doNotUseBound; }
 
   bool isPointer() const { return !allocationOffsets.empty(); }
 
