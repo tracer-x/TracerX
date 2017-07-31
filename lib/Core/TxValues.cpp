@@ -251,6 +251,8 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
   ref<Expr> res;
 #ifdef ENABLE_Z3
 
+  assert(useBound() && "bounds check must be enabled for this pointer");
+
   // In principle, for a state to be subsumed, the subsuming state must be
   // weaker, which in this case means that it should specify less allocations,
   // so all allocations in the subsuming (this), should be specified by the
