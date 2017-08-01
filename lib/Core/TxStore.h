@@ -67,7 +67,7 @@ public:
 
   typedef std::map<ref<TxVariable>, ref<TxInterpolantValue> >
   LowerInterpolantStore;
-  typedef std::map<const llvm::Value *, LowerInterpolantStore>
+  typedef std::map<ref<AllocationContext>, LowerInterpolantStore>
   TopInterpolantStore;
   typedef std::map<ref<TxVariable>, ref<TxStoreEntry> > LowerStateStore;
   typedef std::map<ref<AllocationContext>, MiddleStateStore> TopStateStore;

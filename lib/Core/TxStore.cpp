@@ -171,7 +171,7 @@ void TxStore::getConcreteStore(
       continue;
 
     TopInterpolantStore::iterator storeIter =
-        concretelyAddressedStore.find(it->first->getValue());
+        concretelyAddressedStore.find(it->first);
 
     const MiddleStateStore &middleStore = it->second;
 
@@ -188,7 +188,7 @@ void TxStore::getConcreteStore(
       // The map is only added when it is not empty; this is to avoid entries
       // mapped to empty structure in concretelyAddressedStore
       if (!map.empty()) {
-        concretelyAddressedStore[it->first->getValue()] = map;
+        concretelyAddressedStore[it->first] = map;
       }
     } else {
       for (LowerStateStore::const_iterator it1 = middleStore.concreteBegin(),
@@ -220,7 +220,7 @@ void TxStore::getSymbolicStore(
       continue;
 
     TopInterpolantStore::iterator storeIter =
-        symbolicallyAddressedStore.find(it->first->getValue());
+        symbolicallyAddressedStore.find(it->first);
 
     const MiddleStateStore &middleStore = it->second;
 
@@ -237,7 +237,7 @@ void TxStore::getSymbolicStore(
       // The map is only added when it is not empty; this is to avoid entries
       // mapped to empty structure in symbolicallyAddressedStore
       if (!map.empty()) {
-        symbolicallyAddressedStore[it->first->getValue()] = map;
+        symbolicallyAddressedStore[it->first] = map;
       }
     } else {
       for (LowerStateStore::const_iterator it1 = middleStore.symbolicBegin(),
