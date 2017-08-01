@@ -892,27 +892,44 @@ bool SubsumptionTableEntry::subsumed(
                it2 = tabledConcreteMap.begin(),
                ie2 = tabledConcreteMap.end();
            it2 != ie2; ++it2) {
+        ref<TxInterpolantValue> stateValue;
 
-        // The address is not constrained by the current state, therefore
-        // the current state is incomparable to the stored interpolant,
-        // and we therefore fail the subsumption.
         if (!stateConcreteMap.count(it2->first)) {
-          if (debugSubsumptionLevel >= 1) {
-            std::string msg;
-            std::string padding(makeTabs(1));
-            llvm::raw_string_ostream stream(msg);
-            it2->first->print(stream, padding);
-            stream.flush();
-            klee_message("#%lu=>#%lu: Check failure as memory region in the "
-                         "table does not exist in the state:\n%s",
-                         state.txTreeNode->getNodeSequenceNumber(),
-                         nodeSequenceNumber, msg.c_str());
+          // The address is not found in the state, possibly due to differing
+          // base addresses. In such case, we try to find address translation
+          // here
+          for (TxStore::LowerInterpolantStore::const_iterator
+                   it3 = stateConcreteMap.begin(),
+                   ie3 = stateConcreteMap.end();
+               it3 != ie3; ++it3) {
+            if (it3->first->getOffset() == it2->first->getOffset()) {
+              stateValue = it3->second;
+              it3->first->getAllocationInfo()->translate(
+                  it2->first->getAllocationInfo(), unifiedBases);
+              break;
+            }
           }
-          return false;
+
+          // Fail the subsumption, since we could not translate the addresses
+          if (stateValue.isNull()) {
+            if (debugSubsumptionLevel >= 1) {
+              std::string msg;
+              std::string padding(makeTabs(1));
+              llvm::raw_string_ostream stream(msg);
+              it2->first->print(stream, padding);
+              stream.flush();
+              klee_message("#%lu=>#%lu: Check failure as memory region in the "
+                           "table does not exist in the state:\n%s",
+                           state.txTreeNode->getNodeSequenceNumber(),
+                           nodeSequenceNumber, msg.c_str());
+            }
+            return false;
+          }
+        } else {
+          stateValue = stateConcreteMap.at(it2->first);
         }
 
         const ref<TxInterpolantValue> tabledValue = it2->second;
-        ref<TxInterpolantValue> stateValue = stateConcreteMap.at(it2->first);
         ref<Expr> res;
 
         if (!stateValue.isNull()) {
