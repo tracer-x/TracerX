@@ -113,41 +113,10 @@ public:
       return allocInfo == _allocInfo;
     }
 
-    ref<TxStoreEntry> find(ref<TxStateAddress> loc) const {
-      ref<TxStoreEntry> ret;
-
-      if (loc->hasConstantAddress()) {
-        TxStore::LowerStateStore::const_iterator lowerStoreIter =
-            concretelyAddressedStore.find(loc->getAsVariable());
-
-        if (lowerStoreIter != concretelyAddressedStore.end()) {
-          ret = lowerStoreIter->second;
-        }
-      } else {
-        TxStore::LowerStateStore::const_iterator lowerStoreIter =
-            symbolicallyAddressedStore.find(loc->getAsVariable());
-        if (lowerStoreIter != symbolicallyAddressedStore.end()) {
-          ret = lowerStoreIter->second;
-        }
-      }
-
-      return ret;
-    }
+    ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;
 
     bool updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
-                     ref<TxStateValue> value) {
-      if (loc->getAllocationInfo() != allocInfo)
-        return false;
-
-      if (loc->hasConstantAddress()) {
-        concretelyAddressedStore[loc->getAsVariable()] =
-            ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
-      } else {
-        symbolicallyAddressedStore[loc->getAsVariable()] =
-            ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
-      }
-      return true;
-    }
+                     ref<TxStateValue> value);
 
     /// \brief Print the content of the object to the LLVM error stream
     void dump() const {

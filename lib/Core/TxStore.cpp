@@ -36,6 +36,44 @@ void TxStoreEntry::print(llvm::raw_ostream &stream,
 
 /**/
 
+ref<TxStoreEntry>
+TxStore::MiddleStateStore::find(ref<TxStateAddress> loc) const {
+  ref<TxStoreEntry> ret;
+
+  if (loc->hasConstantAddress()) {
+    TxStore::LowerStateStore::const_iterator lowerStoreIter =
+        concretelyAddressedStore.find(loc->getAsVariable());
+
+    if (lowerStoreIter != concretelyAddressedStore.end()) {
+      ret = lowerStoreIter->second;
+    }
+  } else {
+    TxStore::LowerStateStore::const_iterator lowerStoreIter =
+        symbolicallyAddressedStore.find(loc->getAsVariable());
+    if (lowerStoreIter != symbolicallyAddressedStore.end()) {
+      ret = lowerStoreIter->second;
+    }
+  }
+
+  return ret;
+}
+
+bool TxStore::MiddleStateStore::updateStore(ref<TxStateAddress> loc,
+                                            ref<TxStateValue> address,
+                                            ref<TxStateValue> value) {
+  if (loc->getAllocationInfo() != allocInfo)
+    return false;
+
+  if (loc->hasConstantAddress()) {
+    concretelyAddressedStore[loc->getAsVariable()] =
+        ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
+  } else {
+    symbolicallyAddressedStore[loc->getAsVariable()] =
+        ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
+  }
+  return true;
+}
+
 void TxStore::MiddleStateStore::print(llvm::raw_ostream &stream,
                                       const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
