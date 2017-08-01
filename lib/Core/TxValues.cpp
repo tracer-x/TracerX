@@ -23,8 +23,10 @@
 #include "klee/util/TxPrintUtil.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
+#include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
 #else
+#include <llvm/Function.h>
 #include <llvm/Type.h>
 #endif
 
@@ -103,6 +105,13 @@ void AllocationContext::print(llvm::raw_ostream &stream,
   std::string tabs = makeTabs(1);
   if (value) {
     stream << prefix << "Location: ";
+    if (llvm::Instruction *inst = llvm::dyn_cast<llvm::Instruction>(value)) {
+      if (llvm::BasicBlock *bb = inst->getParent()) {
+        if (llvm::Function *f = bb->getParent()) {
+          stream << f->getName().str() << "/";
+        }
+      }
+    }
     value->print(stream);
   }
   if (callHistory.size() > 0) {
