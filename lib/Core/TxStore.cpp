@@ -302,6 +302,9 @@ void TxStore::print(llvm::raw_ostream &stream,
     for (TopStateStore::const_iterator topIs = store.begin(),
                                        topIe = store.end(), topIt = topIs;
          topIt != topIe; ++topIt) {
+      if (topIt != topIs) {
+        stream << "\n";
+      }
       topIt->first->print(stream, tabsNext);
       stream << ":\n";
       topIt->second.print(stream, tabsNextNext);
