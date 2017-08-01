@@ -284,7 +284,8 @@ void TxStore::updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
 
   MiddleStateStore newMiddleStateStore(loc->getAllocationInfo());
   store[loc->getContext()] = newMiddleStateStore;
-  newMiddleStateStore.updateStore(loc, address, value);
+  MiddleStateStore &middleStateStore = store[loc->getContext()];
+  middleStateStore.updateStore(loc, address, value);
 }
 
 /// \brief Print the content of the object to the LLVM error stream
