@@ -529,8 +529,6 @@ public:
 
   ref<TxVariable> &getAsVariable() { return variable; }
 
-  llvm::Value *getValue() const { return variable->getValue(); }
-
   int compare(const TxStateAddress &other) const {
     int res = variable->compare(*(other.variable.get()));
     if (res)
