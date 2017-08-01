@@ -157,7 +157,7 @@ TxStore::concreteToInterpolant(ref<TxVariable> variable,
   if (!coreOnly) {
     map[variable] = entry->getContent()->getInterpolantStyleValue();
   } else if (entry->getContent()->isCore()) {
-// An address is in the core if it stores a value that is in the core
+    // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
     if (!NoExistential) {
       map[variable] =
@@ -179,7 +179,7 @@ TxStore::symbolicToInterpolant(ref<TxVariable> variable,
   if (!coreOnly) {
     map[variable] = entry->getContent()->getInterpolantStyleValue();
   } else if (entry->getContent()->isCore()) {
-// An address is in the core if it stores a value that is in the core
+    // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
     if (!NoExistential) {
       ref<TxVariable> address = TxStateAddress::create(
