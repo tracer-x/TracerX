@@ -386,7 +386,7 @@ class TxTreeNode {
 
   /// \brief List of the instructions in the node in a reverse order (used only
   /// in WP interpolation)
-  std::map<llvm::Instruction *, bool> reverseInstructionList;
+  std::map<KInstruction *, bool> reverseInstructionList;
 
   uint64_t nodeSequenceNumber;
 
@@ -475,8 +475,7 @@ public:
   /// \brief Retrieve the weakest precondition interpolant for this node as KLEE expression object
   ///
   /// \return The weakest precondition interpolant expression.
-  ref<Expr> getWPInterpolant() const;
-
+  ref<Expr> getWPInterpolant();
 
   /// \brief Extend the path condition with another constraint
   ///
@@ -884,12 +883,12 @@ public:
 
   /// \brief Store instruction in a node for computing weakest precondition
   /// interpolant
-  void storeInstruction(llvm::Instruction *instr);
+  void storeInstruction(KInstruction *instr);
 
   /// \brief Mark an instruction in a node which contributes to computing
   /// weakest precondition
   /// interpolant
-  void markInstruction(llvm::Instruction *instr);
+  void markInstruction(KInstruction *instr);
 
   /// \brief Print the content of the tree node object into a stream.
   ///
