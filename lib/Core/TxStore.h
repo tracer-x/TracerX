@@ -43,9 +43,7 @@ public:
 
   ~TxStoreEntry() {}
 
-  ref<TxInterpolantAddress> getIndex() {
-    return address->getInterpolantStyleAddress();
-  }
+  ref<TxVariable> getIndex() { return address->getAsVariable(); }
 
   ref<TxStateAddress> getAddress() { return address; }
 
@@ -56,36 +54,147 @@ public:
 
 class TxStore {
 public:
-  typedef std::map<ref<TxInterpolantAddress>, ref<TxInterpolantValue> >
+  class MiddleStateStore;
+
+  typedef std::map<ref<TxVariable>, ref<TxInterpolantValue> >
   LowerInterpolantStore;
   typedef std::map<const llvm::Value *, LowerInterpolantStore>
   TopInterpolantStore;
-  typedef std::map<ref<TxInterpolantAddress>, ref<TxStoreEntry> > StateStore;
+  typedef std::map<ref<TxVariable>, ref<TxStoreEntry> > LowerStateStore;
+  typedef std::map<ref<AllocationContext>, ref<MiddleStateStore> >
+  TopStateStore;
+
+  class MiddleStateStore {
+  public:
+    unsigned refCount;
+
+  private:
+    LowerStateStore concretelyAddressedStore;
+
+    LowerStateStore symbolicallyAddressedStore;
+
+    ref<AllocationInfo> allocInfo;
+
+    MiddleStateStore(ref<AllocationInfo> _allocInfo)
+        : refCount(0), allocInfo(_allocInfo) {}
+
+  public:
+    static ref<MiddleStateStore> create(ref<AllocationInfo> allocInfo) {
+      return ref<MiddleStateStore>(new MiddleStateStore(allocInfo));
+    }
+
+    LowerStateStore::const_iterator concreteBegin() const {
+      return concretelyAddressedStore.begin();
+    }
+
+    LowerStateStore::const_iterator concreteEnd() const {
+      return concretelyAddressedStore.end();
+    }
+
+    LowerStateStore::const_iterator symbolicBegin() const {
+      return symbolicallyAddressedStore.begin();
+    }
+
+    LowerStateStore::const_iterator symbolicEnd() const {
+      return symbolicallyAddressedStore.end();
+    }
+
+    bool hasAllocationInfo(ref<AllocationInfo> _allocInfo) const {
+      return allocInfo == _allocInfo;
+    }
+
+    ref<TxStoreEntry> find(ref<TxStateAddress> loc) const {
+      ref<TxStoreEntry> ret;
+
+      if (loc->hasConstantAddress()) {
+        TxStore::LowerStateStore::const_iterator lowerStoreIter =
+            concretelyAddressedStore.find(loc->getAsVariable());
+
+        if (lowerStoreIter != concretelyAddressedStore.end()) {
+          ret = lowerStoreIter->second;
+        }
+      } else {
+        TxStore::LowerStateStore::const_iterator lowerStoreIter =
+            symbolicallyAddressedStore.find(loc->getAsVariable());
+        if (lowerStoreIter != symbolicallyAddressedStore.end()) {
+          ret = lowerStoreIter->second;
+        }
+      }
+
+      return ret;
+    }
+
+    bool updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
+                     ref<TxStateValue> value) {
+      if (loc->getAllocationInfo() != allocInfo)
+        return false;
+
+      if (loc->hasConstantAddress()) {
+        concretelyAddressedStore[loc->getAsVariable()] =
+            ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
+      } else {
+        symbolicallyAddressedStore[loc->getAsVariable()] =
+            ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
+      }
+      return true;
+    }
+
+    /// \brief Print the content of the object to the LLVM error stream
+    void dump() const {
+      this->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+
+    /// \brief Print the content of the object into a stream.
+    ///
+    /// \param stream The stream to print the data to.
+    void print(llvm::raw_ostream &stream) const { print(stream, ""); }
+
+    /// \brief Print the content of the object into a stream.
+    ///
+    /// \param stream The stream to print the data to.
+    /// \param paddingAmount The number of whitespaces to be printed before each
+    /// line.
+    void print(llvm::raw_ostream &stream, const std::string &prefix) const;
+  };
 
 private:
-  /// \brief The mapping of concrete locations to stored value
-  StateStore concretelyAddressedStore;
+  /// \brief A concretely-addressed store of the earlier versions of all
+  /// addresses
+  LowerStateStore concretelyAddressedHistoricalStore;
 
-  /// \brief Ordered keys of the concretely-addressed store.
-  std::vector<ref<TxInterpolantAddress> > concretelyAddressedStoreKeys;
+  /// \brief A symbolically-addressed store of the earlier versions of all
+  /// addresses
+  LowerStateStore symbolicallyAddressedHistoricalStore;
 
-  /// \brief The mapping of symbolic locations to stored value
-  StateStore symbolicallyAddressedStore;
+  /// \brief The mapping of locations to stored value
+  TopStateStore store;
 
-  /// \brief Ordered keys of the symbolically-addressed store.
-  std::vector<ref<TxInterpolantAddress> > symbolicallyAddressedStoreKeys;
+  static void concreteToInterpolant(ref<TxVariable> variable,
+                                    ref<TxStoreEntry> entry,
+                                    std::set<const Array *> &replacements,
+                                    bool coreOnly, LowerInterpolantStore &map);
 
-  void getConcreteStore(
-      const std::vector<llvm::Instruction *> &callHistory,
-      const StateStore &store,
-      std::set<const Array *> &replacements, bool coreOnly,
-      TopInterpolantStore &concreteStore) const;
+  static void symbolicToInterpolant(ref<TxVariable> variable,
+                                    ref<TxStoreEntry> entry,
+                                    std::set<const Array *> &replacements,
+                                    bool coreOnly, LowerInterpolantStore &map);
 
-  void getSymbolicStore(
-      const std::vector<llvm::Instruction *> &callHistory,
-      const StateStore &store,
-      std::set<const Array *> &replacements, bool coreOnly,
-      TopInterpolantStore &symbolicStore) const;
+  static void
+  getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
+                   const TopStateStore &store,
+                   const LowerStateStore &historicalStore,
+                   std::set<const Array *> &replacements, bool coreOnly,
+                   TopInterpolantStore &concretelyAddressedStore,
+                   LowerInterpolantStore &concretelyAddressedHistoricalStore);
+
+  static void
+  getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
+                   const TopStateStore &store,
+                   const LowerStateStore &historicalStore,
+                   std::set<const Array *> &replacements, bool coreOnly,
+                   TopInterpolantStore &symbolicallyAddressedStore,
+                   LowerInterpolantStore &symbolicallyAddressedHistoricalStore);
 
 public:
   /// \brief Constructor for an empty store.
@@ -93,36 +202,21 @@ public:
 
   /// \brief The copy constructor of this class.
   TxStore(const TxStore &src)
-      : concretelyAddressedStore(src.concretelyAddressedStore),
-        symbolicallyAddressedStore(src.symbolicallyAddressedStore) {}
+      : concretelyAddressedHistoricalStore(
+            src.concretelyAddressedHistoricalStore),
+        symbolicallyAddressedHistoricalStore(
+            src.symbolicallyAddressedHistoricalStore),
+        store(src.store) {}
 
   ~TxStore() {
     // Delete the locally-constructed relations
-    concretelyAddressedStore.clear();
-    symbolicallyAddressedStore.clear();
+    concretelyAddressedHistoricalStore.clear();
+    symbolicallyAddressedHistoricalStore.clear();
+    store.clear();
   }
 
-  StateStore::iterator concreteFind(ref<TxStateAddress> loc) {
-    return concretelyAddressedStore.find(loc->getInterpolantStyleAddress());
-  }
-
-  StateStore::iterator concreteBegin() {
-    return concretelyAddressedStore.begin();
-  }
-
-  StateStore::iterator concreteEnd() { return concretelyAddressedStore.end(); }
-
-  StateStore::iterator symbolicFind(ref<TxStateAddress> loc) {
-    return symbolicallyAddressedStore.find(loc->getInterpolantStyleAddress());
-  }
-
-  StateStore::iterator symbolicBegin() {
-    return symbolicallyAddressedStore.begin();
-  }
-
-  StateStore::iterator symbolicEnd() {
-    return symbolicallyAddressedStore.end();
-  }
+  /// \brief Finds a store entry given an address
+  ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;
 
   /// \brief This retrieves the locations known at this state, and the
   /// expressions stored in the locations. Returns as the last argument a pair
@@ -136,11 +230,13 @@ public:
   /// bound ones.
   /// \param coreOnly Indicate whether we are retrieving only data
   /// for locations relevant to an unsatisfiability core.
-  void getStoredExpressions(const std::vector<llvm::Instruction *> &callHistory,
-                            std::set<const Array *> &replacements,
-                            bool coreOnly,
-                            TopInterpolantStore &_concretelyAddressedStore,
-                            TopInterpolantStore &_symbolicallyAddressedStore);
+  void getStoredExpressions(
+      const std::vector<llvm::Instruction *> &callHistory,
+      std::set<const Array *> &replacements, bool coreOnly,
+      TopInterpolantStore &_concretelyAddressedStore,
+      TopInterpolantStore &_symbolicallyAddressedStore,
+      LowerInterpolantStore &_concretelyAddressedHistoricalStore,
+      LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const;
 
   /// \brief Newly relate a location with its stored value, when the value is
   /// loaded from the location

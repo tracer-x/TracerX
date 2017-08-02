@@ -23,91 +23,196 @@ using namespace klee;
 
 namespace klee {
 
+void TxStore::MiddleStateStore::print(llvm::raw_ostream &stream,
+                                      const std::string &prefix) const {
+  std::string tabsNext = appendTab(prefix);
+  std::string tabsNextNext = appendTab(tabsNext);
+
+  allocInfo->print(stream, prefix);
+  stream << ":\n";
+  if (concretelyAddressedStore.empty()) {
+    stream << prefix << "concretely-addressed store = []\n";
+  } else {
+    stream << prefix << "concretely-addressed store = [\n";
+    for (LowerStateStore::const_iterator
+             lowerIs = concretelyAddressedStore.begin(),
+             lowerIe = concretelyAddressedStore.end(), lowerIt = lowerIs;
+         lowerIt != lowerIe; ++lowerIt) {
+      if (lowerIt != lowerIs)
+        stream << tabsNext << "------------------------------------------\n";
+      stream << tabsNext << "address:\n";
+      lowerIt->second->getAddress()->print(stream, tabsNextNext);
+      stream << "\n";
+      stream << tabsNext << "content:\n";
+      lowerIt->second->getContent()->print(stream, tabsNextNext);
+      stream << "\n";
+    }
+    stream << prefix << "]\n";
+  }
+
+  if (symbolicallyAddressedStore.empty()) {
+    stream << prefix << "symbolically-addressed store = []";
+  } else {
+    stream << prefix << "symbolically-addressed store = [\n";
+    for (LowerStateStore::const_iterator
+             lowerIs = symbolicallyAddressedStore.begin(),
+             lowerIe = symbolicallyAddressedStore.end(), lowerIt = lowerIs;
+         lowerIt != lowerIe; ++lowerIt) {
+      if (lowerIt != lowerIs)
+        stream << tabsNext << "------------------------------------------\n";
+      stream << tabsNext << "address:\n";
+      lowerIt->second->getAddress()->print(stream, tabsNextNext);
+      stream << "\n";
+      stream << tabsNext << "content:\n";
+      lowerIt->second->getContent()->print(stream, tabsNextNext);
+      stream << "\n";
+    }
+    stream << prefix << "]";
+  }
+}
+
+/**/
+
+ref<TxStoreEntry> TxStore::find(ref<TxStateAddress> loc) const {
+  TopStateStore::const_iterator storeIter = store.find(loc->getContext());
+  if (storeIter != store.end()) {
+    return storeIter->second->find(loc);
+  }
+
+  ref<TxStoreEntry> nullEntry;
+  return nullEntry;
+}
+
 void TxStore::getStoredExpressions(
     const std::vector<llvm::Instruction *> &callHistory,
     std::set<const Array *> &replacements, bool coreOnly,
     TopInterpolantStore &_concretelyAddressedStore,
-    TopInterpolantStore &_symbolicallyAddressedStore) {
-  getConcreteStore(callHistory, concretelyAddressedStore, replacements,
-                   coreOnly, _concretelyAddressedStore);
-  getSymbolicStore(callHistory, symbolicallyAddressedStore, replacements,
-                   coreOnly, _symbolicallyAddressedStore);
+    TopInterpolantStore &_symbolicallyAddressedStore,
+    LowerInterpolantStore &_concretelyAddressedHistoricalStore,
+    LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const {
+  getConcreteStore(callHistory, store, concretelyAddressedHistoricalStore,
+                   replacements, coreOnly, _concretelyAddressedStore,
+                   _concretelyAddressedHistoricalStore);
+  getSymbolicStore(callHistory, store, symbolicallyAddressedHistoricalStore,
+                   replacements, coreOnly, _symbolicallyAddressedStore,
+                   _symbolicallyAddressedHistoricalStore);
+}
+
+inline void
+TxStore::concreteToInterpolant(ref<TxVariable> variable,
+                               ref<TxStoreEntry> entry,
+                               std::set<const Array *> &replacements,
+                               bool coreOnly, LowerInterpolantStore &map) {
+  if (!coreOnly) {
+    map[variable] = entry->getContent()->getInterpolantStyleValue();
+  } else {
+// An address is in the core if it stores a value that is in the core
+#ifdef ENABLE_Z3
+    if (!NoExistential) {
+      map[variable] =
+          entry->getContent()->getInterpolantStyleValue(replacements);
+    } else {
+      map[variable] = entry->getContent()->getInterpolantStyleValue();
+    }
+#else
+    map[variable] = entry->getContent()->getInterpolantStyleValue(replacements);
+#endif
+  }
+}
+
+inline void
+TxStore::symbolicToInterpolant(ref<TxVariable> variable,
+                               ref<TxStoreEntry> entry,
+                               std::set<const Array *> &replacements,
+                               bool coreOnly, LowerInterpolantStore &map) {
+  if (!coreOnly) {
+    map[variable] = entry->getContent()->getInterpolantStyleValue();
+  } else if (entry->getContent()->isCore()) {
+// An address is in the core if it stores a value that is in the core
+#ifdef ENABLE_Z3
+    if (!NoExistential) {
+      ref<TxVariable> address = TxStateAddress::create(
+          entry->getAddress(), replacements)->getAsVariable();
+      map[address] =
+          entry->getContent()->getInterpolantStyleValue(replacements);
+    } else {
+      map[variable] = entry->getContent()->getInterpolantStyleValue();
+    }
+#else
+    ref<TxVariable> address = TxStateAddress::create(
+        entry->getAddress(), replacements)->getAsVariable();
+    map[address] = entry->getContent()->getInterpolantStyleValue(replacements);
+#endif
+  }
 }
 
 void TxStore::getConcreteStore(
     const std::vector<llvm::Instruction *> &callHistory,
-    const StateStore &store,
+    const TopStateStore &store, const LowerStateStore &historicalStore,
     std::set<const Array *> &replacements, bool coreOnly,
-    TopInterpolantStore &concreteStore) const {
-  for (StateStore::const_iterator it = store.begin(), ie = store.end();
+    TopInterpolantStore &concretelyAddressedStore,
+    LowerInterpolantStore &concretelyAddressedHistoricalStore) {
+  for (TopStateStore::const_iterator it = store.begin(), ie = store.end();
+       it != ie; ++it) {
+    if (!it->first->isPrefixOf(callHistory))
+      continue;
+
+    LowerInterpolantStore &map =
+        concretelyAddressedStore[it->first->getValue()];
+
+    ref<MiddleStateStore> middleStore = it->second;
+
+    for (LowerStateStore::const_iterator it1 = middleStore->concreteBegin(),
+                                         ie1 = middleStore->concreteEnd();
+         it1 != ie1; ++it1) {
+      concreteToInterpolant(it1->first, it1->second, replacements, coreOnly,
+                            map);
+    }
+  }
+
+  for (LowerStateStore::const_iterator it = historicalStore.begin(),
+                                       ie = historicalStore.end();
        it != ie; ++it) {
     if (!it->first->contextIsPrefixOf(callHistory))
       continue;
 
-    if (it->second.isNull())
-      continue;
-
-    if (!coreOnly) {
-      LowerInterpolantStore &map =
-          concreteStore[it->first->getContext()->getValue()];
-      map[it->first] = it->second->getContent()->getInterpolantStyleValue();
-    } else if (it->second->getContent()->isCore()) {
-      // An address is in the core if it stores a value that is in the core
-      LowerInterpolantStore &map =
-          concreteStore[it->first->getContext()->getValue()];
-#ifdef ENABLE_Z3
-      if (!NoExistential) {
-        map[it->first] =
-            it->second->getContent()->getInterpolantStyleValue(replacements);
-      } else {
-        map[it->first] = it->second->getContent()->getInterpolantStyleValue();
-      }
-#else
-      map[it->first] =
-          it->second->getContent()->getInterpolantStyleValue(replacements);
-#endif
-    }
+    concreteToInterpolant(it->first, it->second, replacements, coreOnly,
+                          concretelyAddressedHistoricalStore);
   }
 }
 
 void TxStore::getSymbolicStore(
     const std::vector<llvm::Instruction *> &callHistory,
-    const StateStore &store,
+    const TopStateStore &store, const LowerStateStore &historicalStore,
     std::set<const Array *> &replacements, bool coreOnly,
-    TopInterpolantStore &symbolicStore) const {
-  for (StateStore::const_iterator it = store.begin(), ie = store.end();
+    TopInterpolantStore &symbolicallyAddressedStore,
+    LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
+  for (TopStateStore::const_iterator it = store.begin(), ie = store.end();
+       it != ie; ++it) {
+    if (!it->first->isPrefixOf(callHistory))
+      continue;
+
+    LowerInterpolantStore &map =
+        symbolicallyAddressedStore[it->first->getValue()];
+
+    ref<MiddleStateStore> middleStore = it->second;
+
+    for (LowerStateStore::const_iterator it1 = middleStore->symbolicBegin(),
+                                         ie1 = middleStore->symbolicEnd();
+         it1 != ie1; ++it1) {
+      symbolicToInterpolant(it1->first, it1->second, replacements, coreOnly,
+                            map);
+    }
+  }
+
+  for (LowerStateStore::const_iterator it = historicalStore.begin(),
+                                       ie = historicalStore.end();
        it != ie; ++it) {
     if (!it->first->contextIsPrefixOf(callHistory))
       continue;
 
-    if (it->second.isNull())
-      continue;
-
-    if (!coreOnly) {
-      LowerInterpolantStore &map =
-          symbolicStore[it->first->getContext()->getValue()];
-      map[it->first] = it->second->getContent()->getInterpolantStyleValue();
-    } else if (it->second->getContent()->isCore()) {
-      // An address is in the core if it stores a value that is in the core
-      LowerInterpolantStore &map =
-          symbolicStore[it->first->getContext()->getValue()];
-#ifdef ENABLE_Z3
-      if (!NoExistential) {
-        ref<TxInterpolantAddress> address =
-            TxStateAddress::create(it->second->getAddress(), replacements)
-                ->getInterpolantStyleAddress();
-        map[address] =
-            it->second->getContent()->getInterpolantStyleValue(replacements);
-      } else {
-        map[it->first] = it->second->getContent()->getInterpolantStyleValue();
-      }
-#else
-      ref<TxVariable> address = TxStateAddress::create(
-          it->second->getAddress(), replacements)->getAsVariable();
-      map[address] =
-          it->second->getContent()->getInterpolantStyleValue(replacements);
-#endif
-    }
+    symbolicToInterpolant(it->first, it->second, replacements, coreOnly,
+                          symbolicallyAddressedHistoricalStore);
   }
 }
 
@@ -120,13 +225,26 @@ void TxStore::updateStoreWithLoadedValue(ref<TxStateAddress> loc,
 
 void TxStore::updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
                           ref<TxStateValue> value) {
-  if (loc->hasConstantAddress()) {
-    concretelyAddressedStore[loc->getInterpolantStyleAddress()] =
-        ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
-  } else {
-    symbolicallyAddressedStore[loc->getInterpolantStyleAddress()] =
-        ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
+  TopStateStore::iterator middleStoreIter = store.find(loc->getContext());
+
+  if (middleStoreIter != store.end()) {
+    ref<MiddleStateStore> middleStore = middleStoreIter->second;
+    if (middleStore->hasAllocationInfo(loc->getAllocationInfo())) {
+      middleStore->updateStore(loc, address, value);
+      return;
+    }
+
+    // Here we save the old store
+    concretelyAddressedHistoricalStore.insert(middleStore->concreteBegin(),
+                                              middleStore->concreteEnd());
+    symbolicallyAddressedHistoricalStore.insert(middleStore->symbolicBegin(),
+                                                middleStore->symbolicEnd());
   }
+
+  ref<MiddleStateStore> newMiddleStateStore =
+      MiddleStateStore::create(loc->getAllocationInfo());
+  store[loc->getContext()] = newMiddleStateStore;
+  newMiddleStateStore->updateStore(loc, address, value);
 }
 
 /// \brief Print the content of the object to the LLVM error stream
@@ -138,44 +256,18 @@ void TxStore::print(llvm::raw_ostream &stream,
   std::string tabsNext = appendTab(tabs);
   std::string tabsNextNext = appendTab(tabsNext);
 
-  if (concretelyAddressedStore.empty()) {
-    stream << tabs << "concrete store = []\n";
+  if (store.empty()) {
+    stream << tabs << "store = []\n";
   } else {
-    stream << tabs << "concrete store = [\n";
-    for (StateStore::const_iterator is = concretelyAddressedStore.begin(),
-                                    ie = concretelyAddressedStore.end(),
-                                    it = is;
-         it != ie; ++it) {
-      if (it != is)
-        stream << tabsNext << "------------------------------------------\n";
-      stream << tabsNext << "address:\n";
-      it->second->getAddress()->print(stream, tabsNextNext);
-      stream << "\n";
-      stream << tabsNext << "content:\n";
-      it->second->getContent()->print(stream, tabsNextNext);
-      stream << "\n";
+    stream << tabs << "store = [\n";
+    for (TopStateStore::const_iterator topIs = store.begin(),
+                                       topIe = store.end(), topIt = topIs;
+         topIt != topIe; ++topIt) {
+      topIt->first->print(stream, tabsNext);
+      stream << ":\n";
+      topIt->second->print(stream, tabsNextNext);
     }
     stream << tabs << "]\n";
-  }
-
-  if (symbolicallyAddressedStore.empty()) {
-    stream << tabs << "symbolic store = []\n";
-  } else {
-    stream << tabs << "symbolic store = [\n";
-    for (StateStore::const_iterator is = symbolicallyAddressedStore.begin(),
-                                    ie = symbolicallyAddressedStore.end(),
-                                    it = is;
-         it != ie; ++it) {
-      if (it != is)
-        stream << tabsNext << "------------------------------------------\n";
-      stream << tabsNext << "address:\n";
-      it->second->getAddress()->print(stream, tabsNextNext);
-      stream << "\n";
-      stream << tabsNext << "content:\n";
-      it->second->getContent()->print(stream, tabsNextNext);
-      stream << "\n";
-    }
-    stream << "]\n";
   }
 }
 }

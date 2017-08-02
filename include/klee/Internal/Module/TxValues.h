@@ -138,17 +138,86 @@ public:
   void print(llvm::raw_ostream &stream, const std::string &prefix) const;
 };
 
-/// \brief The address to be stored as an index in the subsumption table. This
-/// class wraps a memory location, supplying weaker address equality comparison
-/// for the purpose of subsumption checking
-class TxInterpolantAddress {
+class AllocationInfo {
 public:
   unsigned refCount;
 
 private:
-  /// \brief the context (allocation site and call history) of the allocation of
-  /// this address
   ref<AllocationContext> context;
+
+  ref<Expr> base;
+
+  uint64_t size;
+
+  AllocationInfo(ref<AllocationContext> &_context, ref<Expr> _base,
+                 uint64_t _size)
+      : refCount(0), context(_context), base(_base), size(_size) {}
+
+public:
+  ~AllocationInfo() {}
+
+  static ref<AllocationInfo> create(ref<AllocationContext> &context,
+                                    ref<Expr> base, uint64_t size) {
+    return ref<AllocationInfo>(new AllocationInfo(context, base, size));
+  }
+
+  ref<AllocationContext> getContext() { return context; }
+
+  ref<Expr> getBase() { return base; }
+
+  uint64_t getSize() { return size; }
+
+  /// \brief Translate this allocation info into another.
+  ///
+  /// \param other The other translation info to translate to
+  /// \param table The translation table. This table gets updated if this is a
+  /// new translation.
+  ///
+  /// \return true if the translation was successful, false otherwise.
+  bool
+  translate(ref<AllocationInfo> other,
+            std::map<ref<AllocationInfo>, ref<AllocationInfo> > &table) const;
+
+  int compare(const AllocationInfo &other) const;
+
+  /// \brief Print the content of the object to the LLVM error stream
+  void dump() const {
+    print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+
+  /// \brief Print the content of the object into a stream.
+  ///
+  /// \param stream The stream to print the data to.
+  void print(llvm::raw_ostream &stream) const {
+    std::string emptyString;
+    print(stream, emptyString);
+  }
+
+  /// \brief Print the content of the object into a stream.
+  ///
+  /// \param stream The stream to print the data to.
+  /// \param prefix Padding spaces to print before the actual data.
+  void print(llvm::raw_ostream &stream, const std::string &prefix) const;
+};
+
+/// \brief TxVariable represents a variable. Here a variable is distinct from an
+/// address: A variable takes different addresses throughout the execution: it
+/// is identified by only allocation site, callsite stack, and an offset. Given
+/// a variable, addresses can be ordered according to the time they are
+/// associated to the variable, and thus there is a notion of a more / less
+/// recent address associated to a variable.
+///
+/// A variable is also used as the index in the subsumption table: It provides a
+/// weaker equality comparison to addresses for the purpose of subsumption
+/// checking.
+class TxVariable {
+public:
+  unsigned refCount;
+
+private:
+  /// \brief The allocation information of this variable
+  ref<AllocationInfo> allocInfo;
 
   /// \brief The offset wrt. the allocation
   ref<Expr> offset;
@@ -160,13 +229,13 @@ private:
   uint64_t concreteOffset;
 
   /// \brief The copy constructor.
-  TxInterpolantAddress(const TxInterpolantAddress &src)
-      : refCount(0), context(src.context), offset(src.offset),
+  TxVariable(const TxVariable &src)
+      : refCount(0), allocInfo(src.allocInfo), offset(src.offset),
         isConcrete(src.isConcrete), concreteOffset(src.concreteOffset) {}
 
   /// \brief The normal constructor.
-  TxInterpolantAddress(ref<AllocationContext> _context, ref<Expr> _offset)
-      : refCount(0), context(_context), offset(_offset) {
+  TxVariable(ref<AllocationInfo> _allocInfo, ref<Expr> _offset)
+      : refCount(0), allocInfo(_allocInfo), offset(_offset) {
     isConcrete = false;
     concreteOffset = 0;
 
@@ -177,15 +246,19 @@ private:
   }
 
 public:
-  static ref<TxInterpolantAddress> create(ref<AllocationContext> context,
-                                          ref<Expr> offset) {
-    ref<TxInterpolantAddress> ret(new TxInterpolantAddress(context, offset));
+  static ref<TxVariable> create(ref<AllocationInfo> allocInfo,
+                                ref<Expr> offset) {
+    ref<TxVariable> ret(new TxVariable(allocInfo, offset));
     return ret;
   }
 
-  llvm::Value *getBase() const { return context->getValue(); }
+  ref<AllocationInfo> getAllocationInfo() const { return allocInfo; }
 
-  ref<AllocationContext> getContext() const { return context; }
+  llvm::Value *getValue() const { return allocInfo->getContext()->getValue(); }
+
+  ref<Expr> getBase() const { return allocInfo->getBase(); }
+
+  ref<AllocationContext> getContext() const { return allocInfo->getContext(); }
 
   ref<Expr> getOffset() const { return offset; }
 
@@ -206,8 +279,8 @@ public:
   /// but of different loop iterations. This does not make sense when comparing
   /// states for subsumption as in subsumption, related allocations in different
   /// paths may have different base addresses.
-  int compare(const TxInterpolantAddress &other) const {
-    int res = context->compare(*(other.context.get()));
+  int compare(const TxVariable &other) const {
+    int res = allocInfo->compare(*(other.allocInfo.get()));
     if (res)
       return res;
 
@@ -248,13 +321,13 @@ private:
   /// This constitutes the weakest liberal precondition of the memory checks
   /// against which the offsets of the pointer values of the current state are
   /// to be checked.
-  std::map<ref<AllocationContext>, std::set<ref<Expr> > > allocationBounds;
+  std::map<ref<AllocationInfo>, std::set<ref<Expr> > > allocationBounds;
 
   /// \brief In case the stored value was a pointer, then this should be a
   /// non-empty map mapping of allocation sites to the set of offsets. This is
   /// the offset values of the current state to be checked against the offset
   /// bounds.
-  std::map<ref<AllocationContext>, std::set<ref<Expr> > > allocationOffsets;
+  std::map<ref<AllocationInfo>, std::set<ref<Expr> > > allocationOffsets;
 
   /// \brief The id of this object
   uint64_t id;
@@ -326,12 +399,15 @@ public:
 
   bool isPointer() const { return !allocationOffsets.empty(); }
 
-  ref<Expr> getBoundsCheck(ref<TxInterpolantValue> svalue,
-                           std::set<ref<Expr> > &bounds,
-                           int debugSubsumptionLevel) const;
+  ref<Expr> getBoundsCheck(
+      ref<TxInterpolantValue> svalue, std::set<ref<Expr> > &bounds,
+      std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+      int debugSubsumptionLevel) const;
 
-  ref<Expr> getOffsetsCheck(ref<TxInterpolantValue> svalue,
-                            int debugSubsumptionLevel) const;
+  ref<Expr> getOffsetsCheck(
+      ref<TxInterpolantValue> svalue,
+      std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+      int debugSubsumptionLevel) const;
 
   ref<Expr> getExpression() const { return expr; }
 
@@ -354,14 +430,11 @@ public:
   unsigned refCount;
 
 private:
-  /// \brief Address for use in interpolants, with less information
-  ref<TxInterpolantAddress> interpolantStyleAddress;
+  /// \brief This address as a variable, with less information
+  ref<TxVariable> variable;
 
   /// \brief The absolute address
   ref<Expr> address;
-
-  /// \brief The base address
-  ref<Expr> base;
 
   /// \brief The expressions representing the bound on the offset, i.e., the
   /// interpolant, in case it is symbolic.
@@ -375,9 +448,7 @@ private:
 
   TxStateAddress(ref<AllocationContext> _context, ref<Expr> &_address,
                  ref<Expr> &_base, ref<Expr> &_offset, uint64_t _size)
-      : refCount(0), interpolantStyleAddress(
-                         TxInterpolantAddress::create(_context, _offset)),
-        concreteOffsetBound(_size), size(_size) {
+      : refCount(0), concreteOffsetBound(_size), size(_size) {
     bool unknownBase = false;
 
     if (ConstantExpr *co = llvm::dyn_cast<ConstantExpr>(_offset)) {
@@ -404,10 +475,12 @@ private:
       address = _address;
     }
 
+    ref<AllocationInfo> allocInfo;
     if (_base->getWidth() < pointerWidth) {
-      base = ZExtExpr::create(_base, pointerWidth);
+      allocInfo = AllocationInfo::create(
+          _context, ZExtExpr::create(_base, pointerWidth), _size);
     } else {
-      base = _base;
+      allocInfo = AllocationInfo::create(_context, _base, _size);
     }
 
     if (unknownBase) {
@@ -417,8 +490,11 @@ private:
       } else {
         tmpOffset = _offset;
       }
-      base = SubExpr::create(address, tmpOffset);
+      allocInfo = AllocationInfo::create(
+          _context, SubExpr::create(address, tmpOffset), _size);
     }
+
+    variable = TxVariable::create(allocInfo, _offset);
   }
 
 public:
@@ -442,36 +518,34 @@ public:
                                     ref<Expr> &offsetDelta) {
     ConstantExpr *c = llvm::dyn_cast<ConstantExpr>(offsetDelta);
     if (c && c->getZExtValue() == 0) {
-      ref<Expr> base = loc->base;
+      ref<Expr> base = loc->getBase();
       ref<Expr> offset = loc->getOffset();
       ref<TxStateAddress> ret(new TxStateAddress(loc->getContext(), address,
                                                  base, offset, loc->size));
       return ret;
     }
 
-    ref<Expr> base = loc->base;
+    ref<Expr> base = loc->getBase();
     ref<Expr> newOffset = AddExpr::create(loc->getOffset(), offsetDelta);
     ref<TxStateAddress> ret(new TxStateAddress(loc->getContext(), address, base,
                                                newOffset, loc->size));
     return ret;
   }
 
-  ref<TxInterpolantAddress> &getInterpolantStyleAddress() {
-    return interpolantStyleAddress;
-  }
+  ref<TxVariable> &getAsVariable() { return variable; }
 
-  llvm::Value *getValue() const { return interpolantStyleAddress->getBase(); }
+  llvm::Value *getValue() const { return variable->getValue(); }
 
   int compare(const TxStateAddress &other) const {
-    int res = interpolantStyleAddress->compare(
-        *(other.interpolantStyleAddress.get()));
+    int res = variable->compare(*(other.variable.get()));
     if (res)
       return res;
 
-    if (base == other.base)
+    // FIXME: Should this just be allocInfo == other.allocInfo?
+    if (variable->getBase() == other.variable->getBase())
       return 0;
 
-    if (base->hash() < other.base->hash())
+    if (variable->getBase()->hash() < other.variable->getBase()->hash())
       return -3;
 
     return 3;
@@ -490,19 +564,21 @@ public:
 
   ref<Expr> getAddress() const { return address; }
 
-  ref<Expr> getBase() const { return base; }
+  ref<Expr> getBase() const { return variable->getBase(); }
 
   const std::set<ref<Expr> > &getSymbolicOffsetBounds() const {
     return symbolicOffsetBounds;
   }
 
-  ref<AllocationContext> getContext() const {
-    return interpolantStyleAddress->getContext();
+  ref<AllocationContext> getContext() const { return variable->getContext(); }
+
+  ref<AllocationInfo> getAllocationInfo() const {
+    return variable->getAllocationInfo();
   }
 
   uint64_t getConcreteOffsetBound() const { return concreteOffsetBound; }
 
-  ref<Expr> getOffset() const { return interpolantStyleAddress->getOffset(); }
+  ref<Expr> getOffset() const { return variable->getOffset(); }
 
   uint64_t getSize() const { return size; }
 

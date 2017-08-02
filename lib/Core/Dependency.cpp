@@ -736,17 +736,7 @@ void Dependency::execute(llvm::Instruction *instr,
           ref<TxStateAddress> loc = *(locations.begin());
 
           // Check the possible mismatch between Tracer-X and KLEE loaded value
-          TxStore::StateStore::iterator storeIt = store.concreteFind(loc);
-          ref<TxStoreEntry> target;
-
-          if (storeIt == store.concreteEnd()) {
-            storeIt = store.symbolicFind(loc);
-            if (storeIt != store.symbolicEnd()) {
-              target = storeIt->second;
-              }
-          } else {
-              target = storeIt->second;
-          }
+          ref<TxStoreEntry> target = store.find(loc);
 
           if (!target.isNull() &&
               valueExpr != target->getContent()->getExpression()) {
@@ -820,42 +810,25 @@ void Dependency::execute(llvm::Instruction *instr,
       for (std::set<ref<TxStateAddress> >::iterator li = locations.begin(),
                                                     le = locations.end();
            li != le; ++li) {
-        ref<TxStoreEntry> addressValuePair;
-
-        TxStore::StateStore::iterator storeIter;
-        if ((*li)->hasConstantAddress()) {
-          storeIter = store.concreteFind(*li);
-          if (storeIter != store.concreteEnd()) {
-            addressValuePair = storeIter->second;
-          }
-        } else {
-          storeIter = store.symbolicFind(*li);
-          if (storeIter != store.symbolicEnd()) {
-            // FIXME: Here we assume that the expressions have to exactly be the
-            // same expression object. More properly, this should instead add an
-            // ite constraint onto the path condition.
-            addressValuePair = storeIter->second;
-          }
-        }
+        ref<TxStoreEntry> storeEntry = store.find(*li);
 
         // Build the loaded value
         ref<TxStateValue> loadedValue =
-            (addressValuePair.isNull() ||
-             addressValuePair->getContent()->getLocations().empty()) &&
+            (storeEntry.isNull() ||
+             storeEntry->getContent()->getLocations().empty()) &&
                     loadedType->isPointerTy()
                 ? getNewPointerValue(instr, callHistory, valueExpr, 0)
                 : getNewTxStateValue(instr, callHistory, valueExpr);
 
-        if (addressValuePair.isNull() ||
+        if (storeEntry.isNull() ||
             loadedValue->getExpression() !=
-                addressValuePair->getContent()->getExpression()) {
+                storeEntry->getContent()->getExpression()) {
           // We could not find the stored value, create a new one.
           store.updateStoreWithLoadedValue(*li, addressValue, loadedValue);
         } else {
-          addDependencyViaLocation(addressValuePair->getContent(), loadedValue,
-                                   *li);
+          addDependencyViaLocation(storeEntry->getContent(), loadedValue, *li);
           loadedValue->setLoadAddress(addressValue);
-          loadedValue->setStoreAddress(addressValuePair->getAddressValue());
+          loadedValue->setStoreAddress(storeEntry->getAddressValue());
         }
       }
       break;
