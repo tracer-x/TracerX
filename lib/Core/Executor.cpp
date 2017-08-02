@@ -1556,7 +1556,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
 
   if (WPInterpolant)
-    txTree->storeInstruction(i);
+    txTree->storeInstruction(ki);
 
   switch (i->getOpcode()) {
     // Control flow
