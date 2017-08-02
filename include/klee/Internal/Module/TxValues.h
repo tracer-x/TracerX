@@ -71,19 +71,6 @@ public:
     return callHistory;
   }
 
-  bool isPrefixOf(const std::vector<llvm::Instruction *> &_callHistory) const {
-    for (std::vector<llvm::Instruction *>::const_iterator
-             it1 = callHistory.begin(),
-             ie1 = callHistory.end(), it2 = _callHistory.begin(),
-             ie2 = _callHistory.end();
-         it1 != ie1; ++it1, ++it2) {
-      if (it2 == ie2 || (*it1) != (*it2)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   int compare(const AllocationContext &other) const {
     if (value == other.value) {
       // Please note the use of reverse iterator here, which improves
