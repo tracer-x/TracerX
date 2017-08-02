@@ -23,14 +23,76 @@
 #include "klee/util/TxPrintUtil.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
+#include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
 #else
+#include <llvm/Function.h>
 #include <llvm/Type.h>
 #endif
 
 using namespace klee;
 
 namespace klee {
+
+bool AllocationInfo::translate(
+    ref<AllocationInfo> other,
+    std::map<ref<AllocationInfo>, ref<AllocationInfo> > &table) const {
+  ref<AllocationContext> _context(context);
+  ref<AllocationInfo> self(new AllocationInfo(_context, base, size));
+
+  if (self == other)
+    return true;
+
+  std::map<ref<AllocationInfo>, ref<AllocationInfo> >::const_iterator it =
+      table.find(self);
+  if (it != table.end()) {
+    if (it->second != other) {
+      return false;
+    }
+    return true;
+  }
+
+  table[self] = other;
+  return true;
+}
+
+int AllocationInfo::compare(const AllocationInfo &other) const {
+  if (base == other.base) {
+    if (size == other.size) {
+      return 0;
+    }
+    if (size < other.size) {
+      return -1;
+    }
+    return 1;
+  } else if (ConstantExpr *cbx = llvm::dyn_cast<ConstantExpr>(base)) {
+    uint64_t cb = cbx->getZExtValue();
+    if (ConstantExpr *cbox = llvm::dyn_cast<ConstantExpr>(other.base)) {
+      uint64_t cbo = cbox->getZExtValue();
+      if (cb == cbo) {
+        if (size < other.size) {
+          return -1;
+        }
+        return 1;
+      } else if (cb < cbo)
+        return -1;
+      return 1;
+    }
+  }
+
+  if (base->hash() < other.base->hash())
+    return -1;
+  return 1;
+}
+
+void AllocationInfo::print(llvm::raw_ostream &stream,
+                           const std::string &prefix) const {
+  stream << prefix << "[base: ";
+  base->print(stream);
+  stream << ", size: " << size << "]";
+}
+
+/**/
 
 ref<AllocationContext> AllocationContext::create(
     llvm::Value *_value, const std::vector<llvm::Instruction *> &_callHistory) {
@@ -43,6 +105,13 @@ void AllocationContext::print(llvm::raw_ostream &stream,
   std::string tabs = makeTabs(1);
   if (value) {
     stream << prefix << "Location: ";
+    if (llvm::Instruction *inst = llvm::dyn_cast<llvm::Instruction>(value)) {
+      if (llvm::BasicBlock *bb = inst->getParent()) {
+        if (llvm::Function *f = bb->getParent()) {
+          stream << f->getName().str() << "/";
+        }
+      }
+    }
     value->print(stream);
   }
   if (callHistory.size() > 0) {
@@ -59,24 +128,29 @@ void AllocationContext::print(llvm::raw_ostream &stream,
 
 /**/
 
-void TxInterpolantAddress::print(llvm::raw_ostream &stream,
-                                 const std::string &prefix) const {
+void TxVariable::print(llvm::raw_ostream &stream,
+                       const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
   stream << prefix << "function/value: ";
-  if (outputFunctionName(context->getValue(), stream))
+  if (outputFunctionName(allocInfo->getContext()->getValue(), stream))
     stream << "/";
-  context->getValue()->print(stream);
+  allocInfo->getContext()->getValue()->print(stream);
   stream << "\n";
 
-  stream << prefix << "stack:\n";
-  for (std::vector<llvm::Instruction *>::const_reverse_iterator
-           it = context->getCallHistory().rbegin(),
-           ib = it, ie = context->getCallHistory().rend();
-       it != ie; ++it) {
-    stream << tabsNext;
-    (*it)->print(stream);
+  stream << prefix << "stack:";
+  if (allocInfo->getContext()->getCallHistory().empty()) {
+    stream << " (empty)\n";
+  } else {
     stream << "\n";
+    for (std::vector<llvm::Instruction *>::const_reverse_iterator
+             it = allocInfo->getContext()->getCallHistory().rbegin(),
+             ib = it, ie = allocInfo->getContext()->getCallHistory().rend();
+         it != ie; ++it) {
+      stream << tabsNext;
+      (*it)->print(stream);
+      stream << "\n";
+    }
   }
   stream << prefix << "offset";
   if (!llvm::isa<ConstantExpr>(this->offset))
@@ -106,8 +180,8 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
   for (std::set<ref<TxStateAddress> >::const_iterator it = _locations.begin(),
                                                       ie = _locations.end();
        it != ie; ++it) {
-    ref<AllocationContext> context =
-        (*it)->getContext(); // The allocation context
+    ref<AllocationInfo> allocInfo =
+        (*it)->getAllocationInfo(); // The allocation context
 
     ref<Expr> offset =
         shadowing
@@ -117,15 +191,15 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
     // We next build the offsets to be compared against stored allocation
     // offset bounds
     ConstantExpr *oe = llvm::dyn_cast<ConstantExpr>(offset);
-    if (oe && !allocationOffsets[context].empty()) {
+    if (oe && !allocationOffsets[allocInfo].empty()) {
       // Here we check if smaller offset exists, in which case we replace it
       // with the new offset; as we want the greater offset to possibly
       // violate an offset bound.
       std::set<ref<Expr> > res;
       uint64_t offsetInt = oe->getZExtValue();
       for (std::set<ref<Expr> >::iterator
-               it1 = allocationOffsets[context].begin(),
-               ie1 = allocationOffsets[context].end();
+               it1 = allocationOffsets[allocInfo].begin(),
+               ie1 = allocationOffsets[allocInfo].end();
            it1 != ie1; ++it1) {
         if (ConstantExpr *ce = llvm::dyn_cast<ConstantExpr>(*it1)) {
           uint64_t c = ce->getZExtValue();
@@ -136,9 +210,9 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
         }
         res.insert(*it1);
       }
-      allocationOffsets[context] = res;
+      allocationOffsets[allocInfo] = res;
     } else {
-      allocationOffsets[context].insert(offset);
+      allocationOffsets[allocInfo].insert(offset);
     }
   }
 
@@ -152,15 +226,15 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
     for (std::set<ref<TxStateAddress> >::const_iterator it = _locations.begin(),
                                                         ie = _locations.end();
          it != ie; ++it) {
-      ref<AllocationContext> context =
-          (*it)->getContext(); // The allocation site
+      ref<AllocationInfo> allocInfo =
+          (*it)->getAllocationInfo(); // The allocation info
 
       // Concrete bound
       uint64_t concreteBound = (*it)->getConcreteOffsetBound();
       std::set<ref<Expr> > newBounds;
 
       if (concreteBound > 0)
-        allocationBounds[context].insert(Expr::createPointer(concreteBound));
+        allocationBounds[allocInfo].insert(Expr::createPointer(concreteBound));
 
       // Symbolic bounds
       const std::set<ref<Expr> > &bounds = (*it)->getSymbolicOffsetBounds();
@@ -174,21 +248,31 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
               ShadowArray::getShadowExpression(*it1, replacements));
         }
         if (!shadowBounds.empty()) {
-          allocationBounds[context]
+          allocationBounds[allocInfo]
               .insert(shadowBounds.begin(), shadowBounds.end());
         }
       } else if (!bounds.empty()) {
-        allocationBounds[context].insert(bounds.begin(), bounds.end());
+        allocationBounds[allocInfo].insert(bounds.begin(), bounds.end());
       }
     }
   }
 }
 
-ref<Expr> TxInterpolantValue::getBoundsCheck(ref<TxInterpolantValue> stateValue,
-                                             std::set<ref<Expr> > &bounds,
-                                             int debugSubsumptionLevel) const {
+ref<Expr> TxInterpolantValue::getBoundsCheck(
+    ref<TxInterpolantValue> other, std::set<ref<Expr> > &bounds,
+    std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+    int debugSubsumptionLevel) const {
   ref<Expr> res;
 #ifdef ENABLE_Z3
+
+  assert(useBound() && "bounds check must be enabled for this pointer");
+
+  if (allocationBounds.empty()) {
+    assert(!allocationOffsets.empty() && "offsets should not be empty");
+
+    // This means there is no constraint on the bounds
+    return ConstantExpr::create(1, Expr::Bool);
+  }
 
   // In principle, for a state to be subsumed, the subsuming state must be
   // weaker, which in this case means that it should specify less allocations,
@@ -198,78 +282,84 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(ref<TxInterpolantValue> stateValue,
   // information from the argument object; in this way resulting in
   // less iterations compared to doing it the other way around.
   bool matchFound = false;
-  for (std::map<ref<AllocationContext>, std::set<ref<Expr> > >::const_iterator
-           it = allocationBounds.begin(),
-           ie = allocationBounds.end();
-       it != ie; ++it) {
-    std::set<ref<Expr> > tabledBounds = it->second;
-    std::map<ref<AllocationContext>, std::set<ref<Expr> > >::iterator iter =
-        stateValue->allocationOffsets.find(it->first);
-    if (iter == stateValue->allocationOffsets.end()) {
+  for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
+           selfBoundsListIt = allocationBounds.begin(),
+           selfBoundsListIe = allocationBounds.end();
+       selfBoundsListIt != selfBoundsListIe; ++selfBoundsListIt) {
+    std::set<ref<Expr> > selfBounds = selfBoundsListIt->second;
+    std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::iterator
+    otherOffsetsListIt = other->allocationOffsets.find(selfBoundsListIt->first);
+    if (otherOffsetsListIt == other->allocationOffsets.end()) {
       continue;
     }
     matchFound = true;
 
-    std::set<ref<Expr> > stateOffsets = iter->second;
+    std::set<ref<Expr> > otherOffsets = otherOffsetsListIt->second;
 
-    assert(!tabledBounds.empty() && "tabled bounds empty");
+    assert(!selfBounds.empty() && "tabled bounds empty");
 
-    if (stateOffsets.empty()) {
+    if (otherOffsets.empty()) {
       if (debugSubsumptionLevel >= 3) {
         std::string msg;
         llvm::raw_string_ostream stream(msg);
-        it->first->print(stream);
+        selfBoundsListIt->first->print(stream);
         stream.flush();
         klee_message("No offset defined in state for %s", msg.c_str());
       }
       return ConstantExpr::create(0, Expr::Bool);
     }
 
-    for (std::set<ref<Expr> >::const_iterator it1 = stateOffsets.begin(),
-                                              ie1 = stateOffsets.end();
-         it1 != ie1; ++it1) {
-      for (std::set<ref<Expr> >::const_iterator it2 = tabledBounds.begin(),
-                                                ie2 = tabledBounds.end();
-           it2 != ie2; ++it2) {
-        if (ConstantExpr *tabledBound = llvm::dyn_cast<ConstantExpr>(*it2)) {
-          uint64_t tabledBoundInt = tabledBound->getZExtValue();
-          if (ConstantExpr *stateOffset = llvm::dyn_cast<ConstantExpr>(*it1)) {
-            if (tabledBoundInt > 0) {
-              uint64_t stateOffsetInt = stateOffset->getZExtValue();
-              if (stateOffsetInt >= tabledBoundInt) {
+    for (std::set<ref<Expr> >::const_iterator
+             otherOffsetsIt = otherOffsets.begin(),
+             otherOffsetsIe = otherOffsets.end();
+         otherOffsetsIt != otherOffsetsIe; ++otherOffsetsIt) {
+      for (std::set<ref<Expr> >::const_iterator
+               selfBoundsIt = selfBounds.begin(),
+               selfBoundsIe = selfBounds.end();
+           selfBoundsIt != selfBoundsIe; ++selfBoundsIt) {
+        if (ConstantExpr *selfBoundObj =
+                llvm::dyn_cast<ConstantExpr>(*selfBoundsIt)) {
+          uint64_t selfBound = selfBoundObj->getZExtValue();
+          if (ConstantExpr *otherOffsetObj =
+                  llvm::dyn_cast<ConstantExpr>(*otherOffsetsIt)) {
+            if (selfBound > 0) {
+              uint64_t otherOffset = otherOffsetObj->getZExtValue();
+              if (otherOffset >= selfBound) {
                 if (debugSubsumptionLevel >= 3) {
                   std::string msg;
                   llvm::raw_string_ostream stream(msg);
-                  it->first->print(stream);
+                  selfBoundsListIt->first->print(stream);
                   stream.flush();
                   klee_message("Offset %lu out of bound %lu for %s",
-                               stateOffsetInt, tabledBoundInt, msg.c_str());
+                               otherOffset, selfBound, msg.c_str());
                 }
                 return ConstantExpr::create(0, Expr::Bool);
               } else {
-                bounds.insert(*it2);
+                bounds.insert(*selfBoundsIt);
                 continue;
               }
             }
-          } else if (tabledBoundInt > 0) {
+          } else if (selfBound > 0) {
             // Symbolic state offset, but concrete tabled bound. Here the bound
             // is known (non-zero), so we create constraints
             if (res.isNull()) {
-              res = UltExpr::create(*it1, *it2);
+              res = UltExpr::create(*otherOffsetsIt, *selfBoundsIt);
             } else {
-              res = AndExpr::create(UltExpr::create(*it1, *it2), res);
+              res = AndExpr::create(
+                  UltExpr::create(*otherOffsetsIt, *selfBoundsIt), res);
             }
-            bounds.insert(*it2);
+            bounds.insert(*selfBoundsIt);
           }
           continue;
         }
         // Create constraints for symbolic bounds
         if (res.isNull()) {
-          res = UltExpr::create(*it1, *it2);
+          res = UltExpr::create(*otherOffsetsIt, *selfBoundsIt);
         } else {
-          res = AndExpr::create(UltExpr::create(*it1, *it2), res);
+          res = AndExpr::create(UltExpr::create(*otherOffsetsIt, *selfBoundsIt),
+                                res);
         }
-        bounds.insert(*it2);
+        bounds.insert(*selfBoundsIt);
       }
     }
   }
@@ -278,16 +368,69 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(ref<TxInterpolantValue> stateValue,
   if (res.isNull()) {
     if (matchFound)
       return ConstantExpr::create(1, Expr::Bool);
-    else
+    else {
+      // Match not found; we force match via address translation
+      for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
+               selfBoundsListIt = allocationBounds.begin(),
+               selfBoundsListIe = allocationBounds.end();
+           selfBoundsListIt != selfBoundsListIe && !matchFound;
+           ++selfBoundsListIt) {
+        for (std::map<ref<AllocationInfo>,
+                      std::set<ref<Expr> > >::const_iterator
+                 otherOffsetsListIt = other->allocationOffsets.begin(),
+                 otherOffsetsListIe = other->allocationOffsets.end();
+             otherOffsetsListIt != otherOffsetsListIe && !matchFound;
+             ++otherOffsetsListIt) {
+          uint64_t selfSize = selfBoundsListIt->first->getSize(),
+                   otherSize = otherOffsetsListIt->first->getSize();
+          if (selfSize == otherSize) {
+            // Allocation sizes match
+            const std::set<ref<Expr> > &selfBounds = selfBoundsListIt->second;
+            const std::set<ref<Expr> > &otherOffsets =
+                otherOffsetsListIt->second;
+            ref<Expr> expr;
+            for (std::set<ref<Expr> >::const_iterator
+                     selfBoundsIt = selfBounds.begin(),
+                     selfBoundsIe = selfBounds.end();
+                 selfBoundsIt != selfBoundsIe; ++selfBoundsIt) {
+              for (std::set<ref<Expr> >::const_iterator
+                       otherOffsetsIt = otherOffsets.begin(),
+                       otherOffsetsIe = otherOffsets.end();
+                   otherOffsetsIt != otherOffsetsIe; ++otherOffsetsIt) {
+                // Create constraints for offset equalities
+                if (expr.isNull()) {
+                  expr = UltExpr::create(*otherOffsetsIt, *selfBoundsIt);
+                } else {
+                  expr = AndExpr::create(
+                      UltExpr::create(*otherOffsetsIt, *selfBoundsIt), expr);
+                }
+              }
+            }
+
+            if (!expr.isNull() && !expr->isFalse()) {
+              if (otherOffsetsListIt->first->translate(selfBoundsListIt->first,
+                                                       unifiedBases)) {
+                res = expr;
+                matchFound = true;
+              }
+            }
+          }
+        }
+      }
+      if (matchFound)
+        return res;
+
       return ConstantExpr::create(0, Expr::Bool);
+    }
   }
 #endif // ENABLE_Z3
   return res;
 }
 
-ref<Expr>
-TxInterpolantValue::getOffsetsCheck(ref<TxInterpolantValue> stateValue,
-                                    int debugSubsumptionLevel) const {
+ref<Expr> TxInterpolantValue::getOffsetsCheck(
+    ref<TxInterpolantValue> other,
+    std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+    int debugSubsumptionLevel) const {
   ref<Expr> res;
 #ifdef ENABLE_Z3
 
@@ -299,51 +442,56 @@ TxInterpolantValue::getOffsetsCheck(ref<TxInterpolantValue> stateValue,
   // information from the argument object; in this way resulting in
   // less iterations compared to doing it the other way around.
   bool matchFound = false;
-  for (std::map<ref<AllocationContext>, std::set<ref<Expr> > >::const_iterator
-           it = allocationOffsets.begin(),
-           ie = allocationOffsets.end();
-       it != ie; ++it) {
-    const std::set<ref<Expr> > &tabledOffsets = it->second;
-    std::map<ref<AllocationContext>, std::set<ref<Expr> > >::iterator iter =
-        stateValue->allocationOffsets.find(it->first);
-    if (iter == stateValue->allocationOffsets.end()) {
+  for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
+           selfOffsetsListIt = allocationOffsets.begin(),
+           selfOffsetsListIe = allocationOffsets.end();
+       selfOffsetsListIt != selfOffsetsListIe; ++selfOffsetsListIt) {
+    const std::set<ref<Expr> > &selfOffsets = selfOffsetsListIt->second;
+    std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::iterator
+    otherOffsetsListIt =
+        other->allocationOffsets.find(selfOffsetsListIt->first);
+    if (otherOffsetsListIt == other->allocationOffsets.end()) {
       continue;
     }
     matchFound = true;
 
-    std::set<ref<Expr> > &stateOffsets = iter->second;
+    std::set<ref<Expr> > &otherOffsets = otherOffsetsListIt->second;
 
-    assert(!tabledOffsets.empty() && "tabled offsets empty");
+    assert(!selfOffsets.empty() && "tabled offsets empty");
 
-    if (stateOffsets.empty()) {
+    if (otherOffsets.empty()) {
       if (debugSubsumptionLevel >= 3) {
         std::string msg;
         llvm::raw_string_ostream stream(msg);
-        it->first->print(stream);
+        selfOffsetsListIt->first->print(stream);
         stream.flush();
         klee_message("No offset defined in state for %s", msg.c_str());
       }
       return ConstantExpr::create(0, Expr::Bool);
     }
 
-    for (std::set<ref<Expr> >::const_iterator it1 = stateOffsets.begin(),
-                                              ie1 = stateOffsets.end();
-         it1 != ie1; ++it1) {
-      for (std::set<ref<Expr> >::const_iterator it2 = tabledOffsets.begin(),
-                                                ie2 = tabledOffsets.end();
-           it2 != ie2; ++it2) {
-        if (ConstantExpr *tabledOffset = llvm::dyn_cast<ConstantExpr>(*it2)) {
-          uint64_t tabledOffsetInt = tabledOffset->getZExtValue();
-          if (ConstantExpr *stateOffset = llvm::dyn_cast<ConstantExpr>(*it1)) {
-            uint64_t stateOffsetInt = stateOffset->getZExtValue();
-            if (stateOffsetInt != tabledOffsetInt) {
+    for (std::set<ref<Expr> >::const_iterator
+             otherOffsetsIt = otherOffsets.begin(),
+             otherOffsetsIe = otherOffsets.end();
+         otherOffsetsIt != otherOffsetsIe; ++otherOffsetsIt) {
+      for (std::set<ref<Expr> >::const_iterator
+               selfOffsetsIt = selfOffsets.begin(),
+               selfOffsetsIe = selfOffsets.end();
+           selfOffsetsIt != selfOffsetsIe; ++selfOffsetsIt) {
+        if (ConstantExpr *selfOffsetObj =
+                llvm::dyn_cast<ConstantExpr>(*selfOffsetsIt)) {
+          uint64_t selfOffset = selfOffsetObj->getZExtValue();
+          if (ConstantExpr *otherOffsetObj =
+                  llvm::dyn_cast<ConstantExpr>(*otherOffsetsIt)) {
+            uint64_t otherOffset = otherOffsetObj->getZExtValue();
+            if (otherOffset != selfOffset) {
               if (debugSubsumptionLevel >= 3) {
                 std::string msg;
                 llvm::raw_string_ostream stream(msg);
-                it->first->print(stream);
+                selfOffsetsListIt->first->print(stream);
                 stream.flush();
                 klee_message("Offset %lu does not equal %lu for %s",
-                             stateOffsetInt, tabledOffsetInt, msg.c_str());
+                             otherOffset, selfOffset, msg.c_str());
               }
               return ConstantExpr::create(0, Expr::Bool);
             }
@@ -352,9 +500,10 @@ TxInterpolantValue::getOffsetsCheck(ref<TxInterpolantValue> stateValue,
 
         // Create constraints for offset equalities
         if (res.isNull()) {
-          res = EqExpr::create(*it1, *it2);
+          res = EqExpr::create(*otherOffsetsIt, *selfOffsetsIt);
         } else {
-          res = AndExpr::create(EqExpr::create(*it1, *it2), res);
+          res = AndExpr::create(EqExpr::create(*otherOffsetsIt, *selfOffsetsIt),
+                                res);
         }
       }
     }
@@ -364,8 +513,60 @@ TxInterpolantValue::getOffsetsCheck(ref<TxInterpolantValue> stateValue,
   if (res.isNull()) {
     if (matchFound)
       return ConstantExpr::create(1, Expr::Bool);
-    else
+    else {
+      // Match not found; we force match via address translation
+      for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
+               selfOffsetsListIt = allocationOffsets.begin(),
+               selfOffsetsListIe = allocationOffsets.end();
+           selfOffsetsListIt != selfOffsetsListIe && !matchFound;
+           ++selfOffsetsListIt) {
+        for (std::map<ref<AllocationInfo>,
+                      std::set<ref<Expr> > >::const_iterator
+                 otherOffsetsListIt = other->allocationOffsets.begin(),
+                 otherOffsetsListIe = other->allocationOffsets.end();
+             otherOffsetsListIt != otherOffsetsListIe && !matchFound;
+             ++otherOffsetsListIt) {
+          uint64_t selfSize = selfOffsetsListIt->first->getSize(),
+                   otherSize = otherOffsetsListIt->first->getSize();
+          if (selfSize == otherSize) {
+            // Allocation sizes match
+            const std::set<ref<Expr> > &selfOffsets = selfOffsetsListIt->second;
+            const std::set<ref<Expr> > &otherOffsets =
+                otherOffsetsListIt->second;
+            ref<Expr> expr;
+            for (std::set<ref<Expr> >::const_iterator
+                     selfOffsetsIt = selfOffsets.begin(),
+                     selfOffsetsIe = selfOffsets.end();
+                 selfOffsetsIt != selfOffsetsIe; ++selfOffsetsIt) {
+              for (std::set<ref<Expr> >::const_iterator
+                       otherOffsetsIt = otherOffsets.begin(),
+                       otherOffsetsIe = otherOffsets.end();
+                   otherOffsetsIt != otherOffsetsIe; ++otherOffsetsIt) {
+                // Create constraints for offset equalities
+                if (expr.isNull()) {
+                  expr = EqExpr::create(*otherOffsetsIt, *selfOffsetsIt);
+                } else {
+                  expr = AndExpr::create(
+                      EqExpr::create(*otherOffsetsIt, *selfOffsetsIt), expr);
+                }
+              }
+            }
+
+            if (!expr.isNull() && !expr->isFalse()) {
+              if (otherOffsetsListIt->first->translate(selfOffsetsListIt->first,
+                                                       unifiedBases)) {
+                res = expr;
+                matchFound = true;
+              }
+            }
+          }
+        }
+      }
+      if (matchFound)
+        return res;
+
       return ConstantExpr::create(0, Expr::Bool);
+    }
   }
 #endif // ENABLE_Z3
   return res;
@@ -380,9 +581,15 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
   std::string nextTabs = appendTab(prefix);
   bool offsetDisplayed = false;
 
+  stream << prefix << "function/value: ";
+  if (outputFunctionName(value, stream))
+      stream << "/";
+  value->print(stream);
+  stream << "\n";
+
   if (!doNotUseBound && !allocationBounds.empty()) {
     stream << prefix << "BOUNDS:";
-    for (std::map<ref<AllocationContext>, std::set<ref<Expr> > >::const_iterator
+    for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
              it = allocationBounds.begin(),
              ie = allocationBounds.end();
          it != ie; ++it) {
@@ -407,7 +614,7 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
     if (offsetDisplayed)
       stream << "\n";
     stream << prefix << "OFFSETS:";
-    for (std::map<ref<AllocationContext>, std::set<ref<Expr> > >::const_iterator
+    for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
              it = allocationOffsets.begin(),
              ie = allocationOffsets.end();
          it != ie; ++it) {
@@ -522,7 +729,8 @@ TxStateAddress::create(ref<TxStateAddress> loc,
                        std::set<const Array *> &replacements) {
   ref<Expr> _address(
       ShadowArray::getShadowExpression(loc->address, replacements)),
-      _base(ShadowArray::getShadowExpression(loc->base, replacements)),
+      _base(ShadowArray::getShadowExpression(loc->variable->getBase(),
+                                             replacements)),
       _offset(ShadowArray::getShadowExpression(loc->getOffset(), replacements));
   ref<TxStateAddress> ret(new TxStateAddress(loc->getContext(), _address, _base,
                                              _offset, loc->size));
@@ -533,7 +741,7 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
                            const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
-  interpolantStyleAddress->print(stream, prefix);
+  variable->print(stream, prefix);
   stream << "\n";
   stream << prefix << "address";
   if (!llvm::isa<ConstantExpr>(address))
@@ -541,11 +749,11 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
   stream << ": ";
   address->print(stream);
   stream << "\n";
-  stream << prefix << "base: ";
-  if (!llvm::isa<ConstantExpr>(base))
+  stream << prefix << "base";
+  if (!llvm::isa<ConstantExpr>(variable->getBase()))
     stream << " (symbolic)";
   stream << ": ";
-  base->print(stream);
+  variable->getBase()->print(stream);
   stream << "\n";
   stream << prefix
          << "pointer to location object: " << reinterpret_cast<uintptr_t>(this);

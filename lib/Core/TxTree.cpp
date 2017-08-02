@@ -147,10 +147,10 @@ void PathCondition::print(llvm::raw_ostream &stream) const {
 
 /**/
 
-Statistic SubsumptionTableEntry::concreteStoreExpressionBuildTime(
-    "concreteStoreExpressionBuildTime", "concreteStoreTime");
-Statistic SubsumptionTableEntry::symbolicStoreExpressionBuildTime(
-    "symbolicStoreExpressionBuildTime", "symbolicStoreTime");
+Statistic SubsumptionTableEntry::concretelyAddressedStoreExpressionBuildTime(
+    "concretelyAddressedStoreExpressionBuildTime", "concreteStoreTime");
+Statistic SubsumptionTableEntry::symbolicallyAddressedStoreExpressionBuildTime(
+    "symbolicallyAddressedStoreExpressionBuildTime", "symbolicStoreTime");
 Statistic SubsumptionTableEntry::solverAccessTime("solverAccessTime",
                                                   "solverAccessTime");
 
@@ -161,13 +161,90 @@ SubsumptionTableEntry::SubsumptionTableEntry(
   existentials.clear();
   interpolant = node->getInterpolant(existentials);
 
-  node->getStoredCoreExpressions(callHistory, existentials,
-                                 concreteAddressStore, symbolicAddressStore);
+  node->getStoredCoreExpressions(
+      callHistory, existentials, concretelyAddressedStore,
+      symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
+      symbolicallyAddressedHistoricalStore);
 }
 
-SubsumptionTableEntry::~SubsumptionTableEntry() {
-  concreteAddressStore.clear();
-  symbolicAddressStore.clear();
+SubsumptionTableEntry::~SubsumptionTableEntry() {}
+
+ref<Expr> SubsumptionTableEntry::makeConstraint(
+    ExecutionState &state, ref<TxInterpolantValue> tabledValue,
+    ref<TxInterpolantValue> stateValue, ref<Expr> tabledOffset,
+    ref<Expr> stateOffset,
+    std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > > &corePointerValues,
+    std::set<ref<TxInterpolantValue> > &coreExactPointerValues,
+    std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+    int debugSubsumptionLevel) const {
+  ref<Expr> constraint;
+
+  if (tabledValue->getExpression()->getWidth() !=
+      stateValue->getExpression()->getWidth()) {
+    // We conservatively require that the addresses should not be
+    // equal whenever their values are of different width
+    constraint = EqExpr::create(ConstantExpr::create(0, Expr::Bool),
+                                EqExpr::create(tabledOffset, stateOffset));
+  } else if (Dependency::boundInterpolation() && tabledValue->isPointer() &&
+             stateValue->isPointer()) {
+    if (!ExactAddressInterpolant && tabledValue->useBound()) {
+      std::set<ref<Expr> > bounds;
+      ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
+          stateValue, bounds, unifiedBases, debugSubsumptionLevel);
+
+      if (!boundsCheck->isTrue()) {
+        if (!boundsCheck->isFalse()) {
+          // Implication: if tabled (interpolant)'s address == state address
+          // then bounds check must hold
+          constraint =
+              EqExpr::create(ConstantExpr::create(0, Expr::Bool),
+                             EqExpr::create(tabledOffset, stateOffset));
+          constraint = OrExpr::create(constraint, boundsCheck);
+        } else {
+          if (debugSubsumptionLevel >= 1) {
+            std::string msg;
+            klee_message("#%lu=>#%lu: Check failure due to failure in "
+                         "memory bounds check%s",
+                         state.txTreeNode->getNodeSequenceNumber(),
+                         nodeSequenceNumber, msg.c_str());
+          }
+
+          assert(constraint.isNull() && "must return a null constraint");
+          return constraint;
+        }
+      }
+
+      // We record the LLVM value of the pointer
+      corePointerValues[stateValue] = bounds;
+    } else {
+      ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
+          stateValue, unifiedBases, debugSubsumptionLevel);
+      if (offsetsCheck->isFalse()) {
+        if (debugSubsumptionLevel >= 1) {
+          klee_message("#%lu=>#%lu: Check failure due to failure in "
+                       "offset equality check",
+                       state.txTreeNode->getNodeSequenceNumber(),
+                       nodeSequenceNumber);
+        }
+        return constraint;
+      }
+      if (!offsetsCheck->isTrue())
+        constraint = offsetsCheck;
+
+      // We record the value of the pointer for interpolation marking
+      coreExactPointerValues.insert(stateValue);
+    }
+  } else {
+    // Implication: if tabledConcreteAddress == stateSymbolicAddress,
+    // then tabledValue->getExpression() ==
+    // stateValue->getExpression()
+    constraint = OrExpr::create(
+        EqExpr::create(ConstantExpr::create(0, Expr::Bool),
+                       EqExpr::create(tabledOffset, stateOffset)),
+        EqExpr::create(tabledValue->getExpression(),
+                       stateValue->getExpression()));
+  }
+  return constraint;
 }
 
 bool
@@ -751,8 +828,10 @@ ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
 
 bool SubsumptionTableEntry::subsumed(
     TimingSolver *solver, ExecutionState &state, double timeout,
-    TxStore::TopInterpolantStore &concretelyAddressedStore,
-    TxStore::TopInterpolantStore &symbolicallyAddressedStore,
+    TxStore::TopInterpolantStore &_concretelyAddressedStore,
+    TxStore::TopInterpolantStore &_symbolicallyAddressedStore,
+    TxStore::LowerInterpolantStore &_concretelyAddressedHistoricalStore,
+    TxStore::LowerInterpolantStore &_symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
   // Tell the solver implementation that we are checking for subsumption for
@@ -771,26 +850,32 @@ bool SubsumptionTableEntry::subsumed(
 
   ref<Expr> stateEqualityConstraints;
 
-  // Pointer values in the core for memory bounds interpolation
+  // Translation of allocation in the current state into an allocation in the
+  // tabled interpolant. This translation is used to equate absolute address
+  // values for allocations of matching sizes.
+  std::map<ref<AllocationInfo>, ref<AllocationInfo> > unifiedBases;
+
+  // Pointer values in the core for memory bounds interpolation.
   std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > > corePointerValues;
 
   // Pointer values in the core for exact equality
   std::set<ref<TxInterpolantValue> > coreExactPointerValues;
 
   {
-    TimerStatIncrementer t(concreteStoreExpressionBuildTime);
+    TimerStatIncrementer t(concretelyAddressedStoreExpressionBuildTime);
 
     // Build constraints from concrete-address interpolant store
     for (TxStore::TopInterpolantStore::const_iterator
-             it1 = concreteAddressStore.begin(),
-             ie1 = concreteAddressStore.end();
+             it1 = concretelyAddressedStore.begin(),
+             ie1 = concretelyAddressedStore.end();
          it1 != ie1; ++it1) {
+      assert(!it1->second.empty() && "empty table entry with real index");
 
       const TxStore::LowerInterpolantStore &tabledConcreteMap = it1->second;
       const TxStore::LowerInterpolantStore &stateConcreteMap =
-          concretelyAddressedStore[it1->first];
+          _concretelyAddressedStore[it1->first];
       const TxStore::LowerInterpolantStore &stateSymbolicMap =
-          symbolicallyAddressedStore[it1->first];
+          _symbolicallyAddressedStore[it1->first];
 
       // If the current state is empty, subsumption fails.
       if (stateConcreteMap.empty() && stateSymbolicMap.empty()) {
@@ -807,27 +892,44 @@ bool SubsumptionTableEntry::subsumed(
                it2 = tabledConcreteMap.begin(),
                ie2 = tabledConcreteMap.end();
            it2 != ie2; ++it2) {
+        ref<TxInterpolantValue> stateValue;
 
-        // The address is not constrained by the current state, therefore
-        // the current state is incomparable to the stored interpolant,
-        // and we therefore fail the subsumption.
         if (!stateConcreteMap.count(it2->first)) {
-          if (debugSubsumptionLevel >= 1) {
-            std::string msg;
-            std::string padding(makeTabs(1));
-            llvm::raw_string_ostream stream(msg);
-            it2->first->print(stream, padding);
-            stream.flush();
-            klee_message("#%lu=>#%lu: Check failure as memory region in the "
-                         "table does not exist in the state:\n%s",
-                         state.txTreeNode->getNodeSequenceNumber(),
-                         nodeSequenceNumber, msg.c_str());
+          // The address is not found in the state, possibly due to differing
+          // base addresses. In such case, we try to find address translation
+          // here
+          for (TxStore::LowerInterpolantStore::const_iterator
+                   it3 = stateConcreteMap.begin(),
+                   ie3 = stateConcreteMap.end();
+               it3 != ie3; ++it3) {
+            if (it3->first->getOffset() == it2->first->getOffset()) {
+              stateValue = it3->second;
+              it3->first->getAllocationInfo()->translate(
+                  it2->first->getAllocationInfo(), unifiedBases);
+              break;
+            }
           }
-          return false;
+
+          // Fail the subsumption, since we could not translate the addresses
+          if (stateValue.isNull()) {
+            if (debugSubsumptionLevel >= 1) {
+              std::string msg;
+              std::string padding(makeTabs(1));
+              llvm::raw_string_ostream stream(msg);
+              it2->first->print(stream, padding);
+              stream.flush();
+              klee_message("#%lu=>#%lu: Check failure as memory region in the "
+                           "table does not exist in the state:\n%s",
+                           state.txTreeNode->getNodeSequenceNumber(),
+                           nodeSequenceNumber, msg.c_str());
+            }
+            return false;
+          }
+        } else {
+          stateValue = stateConcreteMap.at(it2->first);
         }
 
         const ref<TxInterpolantValue> tabledValue = it2->second;
-        ref<TxInterpolantValue> stateValue = stateConcreteMap.at(it2->first);
         ref<Expr> res;
 
         if (!stateValue.isNull()) {
@@ -849,7 +951,7 @@ bool SubsumptionTableEntry::subsumed(
             if (!ExactAddressInterpolant && tabledValue->useBound()) {
               std::set<ref<Expr> > bounds;
               ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
-                  stateValue, bounds, debugSubsumptionLevel);
+                  stateValue, bounds, unifiedBases, debugSubsumptionLevel);
               if (boundsCheck->isFalse()) {
                 if (debugSubsumptionLevel >= 1) {
                   std::string msg;
@@ -867,7 +969,7 @@ bool SubsumptionTableEntry::subsumed(
               corePointerValues[stateValue] = bounds;
             } else {
               ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
-                  stateValue, debugSubsumptionLevel);
+                  stateValue, unifiedBases, debugSubsumptionLevel);
 
               if (offsetsCheck->isFalse()) {
                 if (debugSubsumptionLevel >= 1) {
@@ -963,89 +1065,18 @@ bool SubsumptionTableEntry::subsumed(
             if (it2->first->getContext() != it3->first->getContext())
               continue;
 
-            ref<Expr> stateSymbolicOffset = it3->first->getOffset();
-            ref<Expr> newTerm;
+            ref<Expr> constraint = makeConstraint(
+                state, it2->second, it3->second, it2->first->getOffset(),
+                it3->first->getOffset(), corePointerValues,
+                coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
 
-            stateValue = it3->second;
+            if (constraint.isNull())
+              return false;
 
-            if (tabledValue->getExpression()->getWidth() !=
-                stateValue->getExpression()->getWidth()) {
-              // We conservatively require that the addresses should not be
-              // equal whenever their values are of different width
-              newTerm = EqExpr::create(
-                  ConstantExpr::create(0, Expr::Bool),
-                  EqExpr::create(tabledConcreteOffset, stateSymbolicOffset));
-
-            } else if (Dependency::boundInterpolation() &&
-                       tabledValue->isPointer() && stateValue->isPointer()) {
-              if (!ExactAddressInterpolant && tabledValue->useBound()) {
-                std::set<ref<Expr> > bounds;
-                ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
-                    stateValue, bounds, debugSubsumptionLevel);
-
-                if (!boundsCheck->isTrue()) {
-                  newTerm = EqExpr::create(ConstantExpr::create(0, Expr::Bool),
-                                           EqExpr::create(tabledConcreteOffset,
-                                                          stateSymbolicOffset));
-
-                  if (!boundsCheck->isFalse()) {
-                    // Implication: if tabledConcreteAddress ==
-                    // stateSymbolicAddress then bounds check must hold
-                    newTerm = OrExpr::create(newTerm, boundsCheck);
-                  }
-                }
-
-                // We record the LLVM value of the pointer
-                corePointerValues[stateValue] = bounds;
-              } else {
-                ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
-                    stateValue, debugSubsumptionLevel);
-
-                if (offsetsCheck->isFalse()) {
-                  if (debugSubsumptionLevel >= 1) {
-                    klee_message("#%lu=>#%lu: Check failure due to failure in "
-                                 "offset equality check",
-                                 state.txTreeNode->getNodeSequenceNumber(),
-                                 nodeSequenceNumber);
-                  }
-                  return false;
-                }
-                if (!offsetsCheck->isTrue())
-                  res = offsetsCheck;
-
-                // We record the value of the pointer for interpolation marking
-                coreExactPointerValues.insert(stateValue);
-              }
-            } else {
-              // Implication: if tabledConcreteAddress == stateSymbolicAddress,
-              // then tabledValue->getExpression() ==
-              // stateValue->getExpression()
-              newTerm = OrExpr::create(
-                  EqExpr::create(ConstantExpr::create(0, Expr::Bool),
-                                 EqExpr::create(tabledConcreteOffset,
-                                                stateSymbolicOffset)),
-                  EqExpr::create(tabledValue->getExpression(),
-                                 stateValue->getExpression()));
-            }
             if (!conjunction.isNull()) {
-              conjunction = AndExpr::create(newTerm, conjunction);
+              conjunction = AndExpr::create(constraint, conjunction);
             } else {
-              // Implication: if tabledConcreteAddress == stateSymbolicAddress,
-              // then tabledValue == stateValue
-              newTerm = OrExpr::create(
-                  EqExpr::create(ConstantExpr::create(0, Expr::Bool),
-                                 EqExpr::create(tabledConcreteOffset,
-                                                stateSymbolicOffset)),
-                  EqExpr::create(tabledValue->getExpression(),
-                                 stateValue->getExpression()));
-            }
-
-            if (!newTerm.isNull()) {
-              if (!conjunction.isNull()) {
-                conjunction = AndExpr::create(newTerm, conjunction);
-              } else {
-                conjunction = newTerm;
-              }
+              conjunction = constraint;
             }
           }
           // If there were corresponding concrete as well as symbolic
@@ -1064,20 +1095,73 @@ bool SubsumptionTableEntry::subsumed(
         }
       }
     }
+
+    //------------------------------------------------------------------------
+    // Historical concretely-addressed store
+    //------------------------------------------------------------------------
+    for (TxStore::LowerInterpolantStore::const_iterator
+             it1 = concretelyAddressedHistoricalStore.begin(),
+             ie1 = concretelyAddressedHistoricalStore.end();
+         it1 != ie1; ++it1) {
+      ref<Expr> constraint;
+      TxStore::LowerInterpolantStore::const_iterator stateIt =
+          _concretelyAddressedHistoricalStore.find(it1->first);
+
+      if (stateIt == _concretelyAddressedHistoricalStore.end()) {
+        // FIXME: This is horribly inefficient: should implement better indexing
+        // based on the allocation info instead
+        bool matchFound = false;
+        for (TxStore::LowerInterpolantStore::const_iterator
+                 it2 = _symbolicallyAddressedHistoricalStore.begin(),
+                 ie2 = _symbolicallyAddressedHistoricalStore.end();
+             it2 != ie2; ++it2) {
+          if (it1->first->getAllocationInfo() ==
+              it2->first->getAllocationInfo()) {
+            matchFound = true;
+            constraint = makeConstraint(
+                state, it1->second, it2->second, it1->first->getOffset(),
+                it2->first->getOffset(), corePointerValues,
+                coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
+            if (constraint.isNull())
+              return false;
+            if (stateEqualityConstraints.isNull()) {
+              stateEqualityConstraints = constraint;
+            } else {
+              stateEqualityConstraints =
+                  AndExpr::create(constraint, stateEqualityConstraints);
+            }
+          }
+        }
+        if (!matchFound)
+          return false;
+      } else {
+        constraint = EqExpr::create(it1->second->getExpression(),
+                                    stateIt->second->getExpression());
+      }
+
+      if (stateEqualityConstraints.isNull()) {
+        stateEqualityConstraints = constraint;
+      } else {
+        stateEqualityConstraints =
+            AndExpr::create(constraint, stateEqualityConstraints);
+      }
+    }
   }
 
   {
-    TimerStatIncrementer t(symbolicStoreExpressionBuildTime);
+    TimerStatIncrementer t(symbolicallyAddressedStoreExpressionBuildTime);
     // Build constraints from symbolic-address interpolant store
     for (TxStore::TopInterpolantStore::const_iterator
-             it1 = symbolicAddressStore.begin(),
-             ie1 = symbolicAddressStore.end();
+             it1 = symbolicallyAddressedStore.begin(),
+             ie1 = symbolicallyAddressedStore.end();
          it1 != ie1; ++it1) {
+      assert(!it1->second.empty() && "empty table entry with real index");
+
       const TxStore::LowerInterpolantStore &tabledSymbolicMap = it1->second;
       const TxStore::LowerInterpolantStore &stateConcreteMap =
-          concretelyAddressedStore[it1->first];
+          _concretelyAddressedStore[it1->first];
       const TxStore::LowerInterpolantStore &stateSymbolicMap =
-          symbolicallyAddressedStore[it1->first];
+          _symbolicallyAddressedStore[it1->first];
 
       ref<Expr> conjunction;
 
@@ -1085,8 +1169,6 @@ bool SubsumptionTableEntry::subsumed(
                it2 = tabledSymbolicMap.begin(),
                ie2 = tabledSymbolicMap.end();
            it2 != ie2; ++it2) {
-        ref<Expr> tabledSymbolicOffset = it2->first->getOffset();
-        ref<TxInterpolantValue> tabledValue = it2->second;
 
         for (TxStore::LowerInterpolantStore::const_iterator
                  it3 = stateConcreteMap.begin(),
@@ -1098,74 +1180,19 @@ bool SubsumptionTableEntry::subsumed(
           if (it2->first->getContext() != it3->first->getContext())
             continue;
 
-          ref<Expr> stateConcreteOffset = it3->first->getOffset();
-          ref<TxInterpolantValue> stateValue = it3->second;
-          ref<Expr> newTerm;
+          ref<Expr> constraint = makeConstraint(
+              state, it2->second, it3->second, it2->first->getOffset(),
+              it3->first->getOffset(), corePointerValues,
+              coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
 
-          if (tabledValue->getExpression()->getWidth() !=
-              stateValue->getExpression()->getWidth()) {
-            // We conservatively require that the addresses should not be equal
-            // whenever their values are of different width
-            newTerm = EqExpr::create(
-                ConstantExpr::create(0, Expr::Bool),
-                EqExpr::create(tabledSymbolicOffset, stateConcreteOffset));
-          } else if (Dependency::boundInterpolation() &&
-                     tabledValue->isPointer() && stateValue->isPointer()) {
-            if (!ExactAddressInterpolant && tabledValue->useBound()) {
-              std::set<ref<Expr> > bounds;
-              ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
-                  stateValue, bounds, debugSubsumptionLevel);
+          if (constraint.isNull())
+            return false;
 
-              if (!boundsCheck->isTrue()) {
-                newTerm = EqExpr::create(
-                    ConstantExpr::create(0, Expr::Bool),
-                    EqExpr::create(tabledSymbolicOffset, stateConcreteOffset));
-
-                if (!boundsCheck->isFalse()) {
-                  // Implication: if tabledConcreteAddress ==
-                  // stateSymbolicAddress
-                  // then bounds check must hold
-                  newTerm = OrExpr::create(newTerm, boundsCheck);
-                }
-              }
-
-              // We record the LLVM value of the pointer
-              corePointerValues[stateValue] = bounds;
-            } else {
-              ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
-                  stateValue, debugSubsumptionLevel);
-
-              if (!offsetsCheck->isTrue()) {
-                newTerm = EqExpr::create(
-                    ConstantExpr::create(0, Expr::Bool),
-                    EqExpr::create(tabledSymbolicOffset, stateConcreteOffset));
-
-                if (!offsetsCheck->isFalse()) {
-                  // Implication: if tabledConcreteAddress ==
-                  // stateSymbolicAddress then offsets must be equal
-                  newTerm = OrExpr::create(newTerm, offsetsCheck);
-                }
-              }
-
-              // We record the value of the pointer for interpolation marking
-              coreExactPointerValues.insert(stateValue);
-            }
-          } else {
-            // Implication: if tabledSymbolicAddress == stateConcreteAddress,
-            // then tabledValue == stateValue
-            newTerm = OrExpr::create(
-                EqExpr::create(
-                    ConstantExpr::create(0, Expr::Bool),
-                    EqExpr::create(tabledSymbolicOffset, stateConcreteOffset)),
-                EqExpr::create(tabledValue->getExpression(),
-                               stateValue->getExpression()));
-          }
-
-          if (!newTerm.isNull()) {
+          if (!constraint.isNull()) {
             if (!conjunction.isNull()) {
-              conjunction = AndExpr::create(newTerm, conjunction);
+              conjunction = AndExpr::create(constraint, conjunction);
             } else {
-              conjunction = newTerm;
+              conjunction = constraint;
             }
           }
         }
@@ -1180,77 +1207,19 @@ bool SubsumptionTableEntry::subsumed(
           if (it2->first->getContext() != it3->first->getContext())
             continue;
 
-          ref<Expr> stateSymbolicOffset = it3->first->getOffset();
-          ref<TxInterpolantValue> stateValue = it3->second;
-          ref<Expr> newTerm;
+          ref<Expr> constraint = makeConstraint(
+              state, it2->second, it3->second, it2->first->getOffset(),
+              it3->first->getOffset(), corePointerValues,
+              coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
 
-          if (tabledValue->getExpression()->getWidth() !=
-              stateValue->getExpression()->getWidth()) {
-            // We conservatively require that the addresses should not be equal
-            // whenever their values are of different width
-            newTerm = EqExpr::create(
-                ConstantExpr::create(0, Expr::Bool),
-                EqExpr::create(tabledSymbolicOffset, stateSymbolicOffset));
-          } else if (Dependency::boundInterpolation() &&
-                     tabledValue->isPointer() && stateValue->isPointer()) {
-            if (!ExactAddressInterpolant && tabledValue->useBound()) {
-              std::set<ref<Expr> > bounds;
-              ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
-                  stateValue, bounds, debugSubsumptionLevel);
+          if (constraint.isNull())
+            return false;
 
-              if (!boundsCheck->isTrue()) {
-                newTerm = EqExpr::create(
-                    ConstantExpr::create(0, Expr::Bool),
-                    EqExpr::create(tabledSymbolicOffset, stateSymbolicOffset));
-
-                if (!boundsCheck->isFalse()) {
-                  // Implication: if tabledConcreteAddress ==
-                  // stateSymbolicAddress
-                  // then bounds check must hold
-                  newTerm = OrExpr::create(newTerm, boundsCheck);
-                }
-              }
-
-              // We record the LLVM value of the pointer
-              corePointerValues[stateValue] = bounds;
-            } else {
-              std::set<ref<Expr> > bounds;
-              ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
-                  stateValue, debugSubsumptionLevel);
-
-              if (!offsetsCheck->isTrue()) {
-                newTerm = EqExpr::create(
-                    ConstantExpr::create(0, Expr::Bool),
-                    EqExpr::create(tabledSymbolicOffset, stateSymbolicOffset));
-
-                if (!offsetsCheck->isFalse()) {
-                  // Implication: if tabledConcreteAddress ==
-                  // stateSymbolicAddress then offsets must be equal
-                  newTerm = OrExpr::create(newTerm, offsetsCheck);
-                }
-              }
-
-              // We record the value of the pointer
-              coreExactPointerValues.insert(stateValue);
-            }
-          } else {
-            // Implication: if tabledSymbolicAddress == stateSymbolicAddress
-            // then tabledValue == stateValue
-            newTerm = OrExpr::create(
-                EqExpr::create(
-                    ConstantExpr::create(0, Expr::Bool),
-                    EqExpr::create(tabledSymbolicOffset, stateSymbolicOffset)),
-                EqExpr::create(tabledValue->getExpression(),
-                               stateValue->getExpression()));
-          }
-
-          if (!newTerm.isNull()) {
             if (!conjunction.isNull()) {
-              conjunction = AndExpr::create(newTerm, conjunction);
+              conjunction = AndExpr::create(constraint, conjunction);
             } else {
-              conjunction = newTerm;
+              conjunction = constraint;
             }
-          }
         }
       }
 
@@ -1260,6 +1229,66 @@ bool SubsumptionTableEntry::subsumed(
                  ? conjunction
                  : AndExpr::create(conjunction, stateEqualityConstraints));
       }
+    }
+
+    //------------------------------------------------------------------------
+    // Historical symbolically-addressed store
+    //------------------------------------------------------------------------
+    for (TxStore::LowerInterpolantStore::const_iterator
+             it1 = symbolicallyAddressedHistoricalStore.begin(),
+             ie1 = symbolicallyAddressedHistoricalStore.end();
+         it1 != ie1; ++it1) {
+      bool matchFound = false;
+      // FIXME: This is horribly inefficient: should implement better indexing
+      // based on allocation info instead
+      for (TxStore::LowerInterpolantStore::const_iterator
+               it2 = _concretelyAddressedHistoricalStore.begin(),
+               ie2 = _concretelyAddressedHistoricalStore.end();
+           it2 != ie2; ++it2) {
+        if (it1->first->getAllocationInfo() ==
+            it2->first->getAllocationInfo()) {
+          ref<Expr> constraint = makeConstraint(
+              state, it1->second, it2->second, it1->first->getOffset(),
+              it2->first->getOffset(), corePointerValues,
+              coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
+          if (constraint.isNull())
+            return false;
+          if (stateEqualityConstraints.isNull()) {
+            stateEqualityConstraints = constraint;
+          } else {
+            stateEqualityConstraints =
+                AndExpr::create(constraint, stateEqualityConstraints);
+          }
+          matchFound = true;
+        }
+      }
+
+      // FIXME: This is horribly inefficient: should implement better indexing
+      // based on allocation info instead
+      for (TxStore::LowerInterpolantStore::const_iterator
+               it2 = _symbolicallyAddressedHistoricalStore.begin(),
+               ie2 = _symbolicallyAddressedHistoricalStore.end();
+           it2 != ie2; ++it2) {
+        if (it1->first->getAllocationInfo() ==
+            it2->first->getAllocationInfo()) {
+          ref<Expr> constraint = makeConstraint(
+              state, it1->second, it2->second, it1->first->getOffset(),
+              it2->first->getOffset(), corePointerValues,
+              coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
+          if (constraint.isNull())
+            return false;
+          if (stateEqualityConstraints.isNull()) {
+            stateEqualityConstraints = constraint;
+          } else {
+            stateEqualityConstraints =
+                AndExpr::create(constraint, stateEqualityConstraints);
+          }
+          matchFound = true;
+        }
+      }
+
+      if (!matchFound)
+        return false;
     }
   }
 
@@ -1582,13 +1611,13 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
     interpolant->print(stream);
   else
     stream << "(empty)";
-  stream << "\n";
 
-  if (!concreteAddressStore.empty()) {
-    stream << prefix << "concrete store = [\n";
+  stream << "\n" << prefix << "concretely-addressed store = [";
+  if (!concretelyAddressedStore.empty()) {
+    stream << "\n";
     for (TxStore::TopInterpolantStore::const_iterator
-             is1 = concreteAddressStore.begin(),
-             ie1 = concreteAddressStore.end(), it1 = is1;
+             is1 = concretelyAddressedStore.begin(),
+             ie1 = concretelyAddressedStore.end(), it1 = is1;
          it1 != ie1; ++it1) {
       for (TxStore::LowerInterpolantStore::const_iterator
                is2 = it1->second.begin(),
@@ -1604,14 +1633,16 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
         stream << "\n";
       }
     }
-    stream << prefix << "]\n";
+    stream << prefix;
   }
+  stream << "]";
 
-  if (!symbolicAddressStore.empty()) {
-    stream << prefix << "symbolic store = [\n";
+  stream << "\n" << prefix << "symbolically-addressed store = [";
+  if (!symbolicallyAddressedStore.empty()) {
+    stream << "\n";
     for (TxStore::TopInterpolantStore::const_iterator
-             is1 = symbolicAddressStore.begin(),
-             ie1 = symbolicAddressStore.end(), it1 = is1;
+             is1 = symbolicallyAddressedStore.begin(),
+             ie1 = symbolicallyAddressedStore.end(), it1 = is1;
          it1 != ie1; ++it1) {
       for (TxStore::LowerInterpolantStore::const_iterator
                is2 = it1->second.begin(),
@@ -1627,11 +1658,52 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
         stream << "\n";
       }
     }
-    stream << "]\n";
+    stream << prefix;
   }
+  stream << "]";
 
+  stream << "\n" << prefix << "concretely-addressed historical store = [";
+  if (!concretelyAddressedHistoricalStore.empty()) {
+    stream << "\n";
+    for (TxStore::LowerInterpolantStore::const_iterator
+             is1 = concretelyAddressedHistoricalStore.begin(),
+             ie1 = concretelyAddressedHistoricalStore.end(), it1 = is1;
+         it1 != ie1; ++it1) {
+      if (it1 != is1)
+        stream << tabsNext << "------------------------------------------\n";
+      stream << tabsNext << "address:\n";
+      it1->first->print(stream, tabsNextNext);
+      stream << "\n";
+      stream << tabsNext << "content:\n";
+      it1->second->print(stream, tabsNextNext);
+      stream << "\n";
+    }
+    stream << prefix;
+  }
+  stream << "]";
+
+  stream << "\n" << prefix << "symbolically-addressed historical store = [";
+  if (!symbolicallyAddressedHistoricalStore.empty()) {
+    stream << "\n";
+    for (TxStore::LowerInterpolantStore::const_iterator
+             is1 = symbolicallyAddressedHistoricalStore.begin(),
+             ie1 = symbolicallyAddressedHistoricalStore.end(), it1 = is1;
+         it1 != ie1; ++it1) {
+      if (it1 != is1)
+        stream << tabsNext << "------------------------------------------\n";
+      stream << tabsNext << "address:\n";
+      it1->first->print(stream, tabsNextNext);
+      stream << "\n";
+      stream << tabsNext << "content:\n";
+      it1->second->print(stream, tabsNextNext);
+      stream << "\n";
+    }
+    stream << prefix;
+  }
+  stream << "]";
+
+  stream << "\n" << prefix << "existentials = [";
   if (!existentials.empty()) {
-    stream << prefix << "existentials = [";
     for (std::set<const Array *>::const_iterator is = existentials.begin(),
                                                  ie = existentials.end(),
                                                  it = is;
@@ -1640,8 +1712,8 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
         stream << ", ";
       stream << (*it)->name;
     }
-    stream << "]\n";
   }
+  stream << "]";
 }
 
 void SubsumptionTableEntry::printStat(std::stringstream &stream) {
@@ -1652,11 +1724,11 @@ void SubsumptionTableEntry::printStat(std::stringstream &stream) {
             "(failed) = " << stats::subsumptionQueryCount.getValue() << " ("
          << stats::subsumptionQueryFailureCount.getValue() << ")\n";
   stream << "KLEE: done:     Concrete store expression build time (ms) = "
-         << ((double)concreteStoreExpressionBuildTime.getValue()) / 1000
-         << "\n";
+         << ((double)concretelyAddressedStoreExpressionBuildTime.getValue()) /
+                1000 << "\n";
   stream << "KLEE: done:     Symbolic store expression build time (ms) = "
-         << ((double)symbolicStoreExpressionBuildTime.getValue()) / 1000
-         << "\n";
+         << ((double)symbolicallyAddressedStoreExpressionBuildTime.getValue()) /
+                1000 << "\n";
   stream << "KLEE: done:     Solver access time (ms) = "
          << ((double)solverAccessTime.getValue()) / 1000 << "\n";
 }
@@ -1842,17 +1914,22 @@ bool SubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
 
     TxStore::TopInterpolantStore concretelyAddressedStore;
     TxStore::TopInterpolantStore symbolicallyAddressedStore;
+    TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore;
+    TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore;
 
-    txTreeNode->getStoredExpressions(txTreeNode->entryCallHistory,
-                                     concretelyAddressedStore,
-                                     symbolicallyAddressedStore);
+    txTreeNode->getStoredExpressions(
+        txTreeNode->entryCallHistory, concretelyAddressedStore,
+        symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
+        symbolicallyAddressedHistoricalStore);
 
     // Iterate the subsumption table entry with reverse iterator because
     // the successful subsumption mostly happen in the newest entry.
     for (EntryIterator it = iterPair.first, ie = iterPair.second; it != ie;
          ++it) {
-      if ((*it)->subsumed(solver, state, timeout, concretelyAddressedStore,
-                          symbolicallyAddressedStore, debugSubsumptionLevel)) {
+      if ((*it)->subsumed(
+              solver, state, timeout, concretelyAddressedStore,
+              symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
+              symbolicallyAddressedHistoricalStore, debugSubsumptionLevel)) {
         // We mark as subsumed such that the node will not be
         // stored into table (the table already contains a more
         // general entry).
@@ -2325,7 +2402,10 @@ void TxTreeNode::bindReturnValue(llvm::CallInst *site, llvm::Instruction *inst,
 void TxTreeNode::getStoredExpressions(
     const std::vector<llvm::Instruction *> &_callHistory,
     TxStore::TopInterpolantStore &concretelyAddressedStore,
-    TxStore::TopInterpolantStore &symbolicallyAddressedStore) const {
+    TxStore::TopInterpolantStore &symbolicallyAddressedStore,
+    TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
+    TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore)
+    const {
   TimerStatIncrementer t(getStoredExpressionsTime);
   std::set<const Array *> dummyReplacements;
 
@@ -2333,25 +2413,30 @@ void TxTreeNode::getStoredExpressions(
   // the allocations to be stored in subsumption table should be obtained
   // from the parent node.
   if (parent)
-    parent->dependency->getStoredExpressions(_callHistory, dummyReplacements,
-                                             false, concretelyAddressedStore,
-                                             symbolicallyAddressedStore);
+    parent->dependency->getStoredExpressions(
+        _callHistory, dummyReplacements, false, concretelyAddressedStore,
+        symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
+        symbolicallyAddressedHistoricalStore);
 }
 
 void TxTreeNode::getStoredCoreExpressions(
     const std::vector<llvm::Instruction *> &_callHistory,
     std::set<const Array *> &replacements,
     TxStore::TopInterpolantStore &concretelyAddressedStore,
-    TxStore::TopInterpolantStore &symbolicallyAddressedStore) const {
+    TxStore::TopInterpolantStore &symbolicallyAddressedStore,
+    TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
+    TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore)
+    const {
   TimerStatIncrementer t(getStoredCoreExpressionsTime);
 
   // Since a program point index is a first statement in a basic block,
   // the allocations to be stored in subsumption table should be obtained
   // from the parent node.
   if (parent)
-    parent->dependency->getStoredExpressions(_callHistory, replacements, true,
-                                             concretelyAddressedStore,
-                                             symbolicallyAddressedStore);
+    parent->dependency->getStoredExpressions(
+        _callHistory, replacements, true, concretelyAddressedStore,
+        symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
+        symbolicallyAddressedHistoricalStore);
 }
 
 uint64_t TxTreeNode::getInstructionsDepth() { return instructionsDepth; }

@@ -179,8 +179,9 @@ public:
 /// subset of the path condition (the SubsumptionTableEntry#interpolant
 /// field), plus the fragment of memory (allocations). They are components
 /// that are needed to ensure the previously-seen conclusions. The memory
-/// fragments are stored in either SubsumptionTableEntry#concreteAddressStore
-/// or SubsumptionTableEntry#symbolicAddressStore, depending on whether
+/// fragments are stored in either
+/// SubsumptionTableEntry#concretelyAddressedStore
+/// or SubsumptionTableEntry#symbolicallyAddressedStore, depending on whether
 /// the memory fragment is concretely addressed or symbolically addressed.
 /// Both fields are multi-level maps that are first indexed by the LLVM
 /// value that represents the allocation (e.g., the call to <b>malloc</b>,
@@ -221,17 +222,35 @@ class SubsumptionTableEntry {
   };
 #endif
 
-  static Statistic concreteStoreExpressionBuildTime;
-  static Statistic symbolicStoreExpressionBuildTime;
+  static Statistic concretelyAddressedStoreExpressionBuildTime;
+  static Statistic symbolicallyAddressedStoreExpressionBuildTime;
   static Statistic solverAccessTime;
 
   ref<Expr> interpolant;
 
-  TxStore::TopInterpolantStore concreteAddressStore;
+  TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore;
 
-  TxStore::TopInterpolantStore symbolicAddressStore;
+  TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore;
+
+  TxStore::TopInterpolantStore concretelyAddressedStore;
+
+  TxStore::TopInterpolantStore symbolicallyAddressedStore;
 
   std::set<const Array *> existentials;
+
+  /// \brief A procedure for building subsumption check constraints using
+  /// symbolically-addressed store elements
+  ///
+  /// \return A null expression upon failure, otherwise the constructed
+  /// constraint
+  ref<Expr> makeConstraint(
+      ExecutionState &state, ref<TxInterpolantValue> tabledValue,
+      ref<TxInterpolantValue> stateValue, ref<Expr> tabledOffset,
+      ref<Expr> stateOffset, std::map<ref<TxInterpolantValue>,
+                                      std::set<ref<Expr> > > &corePointerValues,
+      std::set<ref<TxInterpolantValue> > &coreExactPointerValues,
+      std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+      int debugSubsumptionLevel) const;
 
   /// \brief Test for the existence of a variable in a set in an expression.
   ///
@@ -311,8 +330,8 @@ class SubsumptionTableEntry {
                                        ref<Expr> equalities);
 
   bool empty() {
-    return interpolant.isNull() && concreteAddressStore.empty() &&
-           symbolicAddressStore.empty();
+    return interpolant.isNull() && concretelyAddressedStore.empty() &&
+           symbolicallyAddressedStore.empty();
   }
 
   /// \brief For printing member functions running time statistics,
@@ -328,10 +347,13 @@ public:
 
   ~SubsumptionTableEntry();
 
-  bool subsumed(TimingSolver *solver, ExecutionState &state, double timeout,
-                TxStore::TopInterpolantStore &concretelyAddressedStore,
-                TxStore::TopInterpolantStore &symbolicallyAddressedStore,
-                int debugSubsumptionLevel);
+  bool subsumed(
+      TimingSolver *solver, ExecutionState &state, double timeout,
+      TxStore::TopInterpolantStore &_concretelyAddressedStore,
+      TxStore::TopInterpolantStore &_symbolicallyAddressedStore,
+      TxStore::LowerInterpolantStore &_concretelyAddressedHistoricalStore,
+      TxStore::LowerInterpolantStore &_symbolicallyAddressedHistoricalStore,
+      int debugSubsumptionLevel);
 
   /// Tests if the argument is a variable. A variable here is defined to be
   /// either a symbolic concatenation or a symbolic read. A concatenation in
@@ -498,7 +520,10 @@ public:
   void getStoredExpressions(
       const std::vector<llvm::Instruction *> &callHistory,
       TxStore::TopInterpolantStore &concretelyAddressedStore,
-      TxStore::TopInterpolantStore &symbolicallyAddressedStore) const;
+      TxStore::TopInterpolantStore &symbolicallyAddressedStore,
+      TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
+      TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore)
+      const;
 
   /// \brief This retrieves the allocations known at this state, and the
   /// expressions stored in the allocations, as long as the allocation is
@@ -515,7 +540,10 @@ public:
       const std::vector<llvm::Instruction *> &callHistory,
       std::set<const Array *> &replacements,
       TxStore::TopInterpolantStore &concretelyAddressedStore,
-      TxStore::TopInterpolantStore &symbolicallyAddressedStore) const;
+      TxStore::TopInterpolantStore &symbolicallyAddressedStore,
+      TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
+      TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore)
+      const;
 
   void incInstructionsDepth();
 

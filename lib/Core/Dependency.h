@@ -167,7 +167,7 @@ namespace klee {
 
   private:
     /// The store
-    TxStore store;
+    TxStore *store;
 
     /// \brief Previous path condition
     Dependency *parent;
@@ -348,23 +348,39 @@ namespace klee {
     /// of the store part indexed by constants, and the store part indexed by
     /// symbolic expressions.
     ///
+    /// \param callHistory The current call history context of the state
     /// \param replacements The replacement bound variables when
     /// retrieving state for creating subsumption table entry: As the
     /// resulting expression will be used for storing in the
     /// subsumption table, the variables need to be replaced with the
     /// bound ones.
-    /// \param coreOnly Indicate whether we are retrieving only data
+    /// \param coreOnly Indicates whether we are retrieving only data
     /// for locations relevant to an unsatisfiability core.
+    /// \param [out] concretelyAddressedStore The output concretely-addressed
+    /// store.
+    /// \param [out] symbolicallyAddressedStore The output
+    /// symbolically-addressed store.
+    /// \param [out] concretelyAddressedHistoricalStore The output
+    /// concretely-addressed historical store, whose domain consists of
+    /// historical concrete addresses that are no longer valid due to exiting of
+    /// scope.
+    /// \param [out] symbolicallyAddressedHistoricalStore The output
+    /// symbolically-addressed historical store, whose domain consists of
+    /// historical symbolic addresses that are no longer valid due to exiting of
+    /// scope.
     ///
     /// \sa TxStore#getStoredExpressions()
     void getStoredExpressions(
         const std::vector<llvm::Instruction *> &callHistory,
         std::set<const Array *> &replacements, bool coreOnly,
         TxStore::TopInterpolantStore &concretelyAddressedStore,
-        TxStore::TopInterpolantStore &symbolicallyAddressedStore) {
-      store.getStoredExpressions(callHistory, replacements, coreOnly,
-                                 concretelyAddressedStore,
-                                 symbolicallyAddressedStore);
+        TxStore::TopInterpolantStore &symbolicallyAddressedStore,
+        TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
+        TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
+      store->getStoredExpressions(
+          callHistory, replacements, coreOnly, concretelyAddressedStore,
+          symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
+          symbolicallyAddressedHistoricalStore);
     }
 
     ref<TxStateValue>
