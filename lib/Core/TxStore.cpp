@@ -205,9 +205,6 @@ void TxStore::getConcreteStore(
     LowerInterpolantStore &concretelyAddressedHistoricalStore) {
   for (TopStateStore::const_iterator it = store.begin(), ie = store.end();
        it != ie; ++it) {
-    if (!it->first->isPrefixOf(callHistory))
-      continue;
-
     TopInterpolantStore::iterator storeIter =
         concretelyAddressedStore.find(it->first);
 
@@ -254,9 +251,6 @@ void TxStore::getSymbolicStore(
     LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
   for (TopStateStore::const_iterator it = store.begin(), ie = store.end();
        it != ie; ++it) {
-    if (!it->first->isPrefixOf(callHistory))
-      continue;
-
     TopInterpolantStore::iterator storeIter =
         symbolicallyAddressedStore.find(it->first);
 
