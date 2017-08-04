@@ -60,16 +60,17 @@ TxStore::MiddleStateStore::find(ref<TxStateAddress> loc) const {
 
 bool TxStore::MiddleStateStore::updateStore(ref<TxStateAddress> loc,
                                             ref<TxStateValue> address,
-                                            ref<TxStateValue> value) {
+                                            ref<TxStateValue> value,
+                                            uint64_t _depth) {
   if (loc->getAllocationInfo() != allocInfo)
     return false;
 
   if (loc->hasConstantAddress()) {
     concretelyAddressedStore[loc->getAsVariable()] =
-        ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
+        ref<TxStoreEntry>(new TxStoreEntry(loc, address, value, _depth));
   } else {
     symbolicallyAddressedStore[loc->getAsVariable()] =
-        ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
+        ref<TxStoreEntry>(new TxStoreEntry(loc, address, value, _depth));
   }
   return true;
 }
@@ -303,7 +304,7 @@ void TxStore::updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
   if (middleStoreIter != store.end()) {
     MiddleStateStore &middleStore = middleStoreIter->second;
     if (middleStore.hasAllocationInfo(loc->getAllocationInfo())) {
-      middleStore.updateStore(loc, address, value);
+      middleStore.updateStore(loc, address, value, depth);
       return;
     }
 
@@ -317,7 +318,7 @@ void TxStore::updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
   MiddleStateStore newMiddleStateStore(loc->getAllocationInfo());
   store[loc->getContext()] = newMiddleStateStore;
   MiddleStateStore &middleStateStore = store[loc->getContext()];
-  middleStateStore.updateStore(loc, address, value);
+  middleStateStore.updateStore(loc, address, value, depth);
 }
 
 /// \brief Print the content of the object to the LLVM error stream

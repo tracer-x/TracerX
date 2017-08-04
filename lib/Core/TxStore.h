@@ -35,11 +35,14 @@ private:
 
   ref<TxStateValue> content;
 
+  /// \brief The creation depth of this entry
+  uint64_t depth;
+
 public:
   TxStoreEntry(ref<TxStateAddress> _address, ref<TxStateValue> _addressValue,
-               ref<TxStateValue> _content)
+               ref<TxStateValue> _content, uint64_t _depth)
       : refCount(0), address(_address), addressValue(_addressValue),
-        content(_content) {}
+        content(_content), depth(_depth) {}
 
   ~TxStoreEntry() {}
 
@@ -50,6 +53,8 @@ public:
   ref<TxStateValue> getAddressValue() { return addressValue; }
 
   ref<TxStateValue> getContent() { return content; }
+
+  uint64_t getDepth() { return depth; }
 
   void dump() const {
     print(llvm::errs());
@@ -116,7 +121,7 @@ public:
     ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;
 
     bool updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
-                     ref<TxStateValue> value);
+                     ref<TxStateValue> value, uint64_t depth);
 
     /// \brief Print the content of the object to the LLVM error stream
     void dump() const {
