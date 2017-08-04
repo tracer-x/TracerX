@@ -181,8 +181,8 @@ namespace klee {
     /// \brief The data layout of the analysis target program
     llvm::DataLayout *targetData;
 
-    /// Map of globals to their bound address. This also includes
-    /// globals that have no representative object (i.e. functions). This member
+    /// \brief Map of globals to their bound address. This also includes globals
+    /// that have no representative object (i.e. functions). This member
     /// variable is just a pointer to the one in klee::Executor.
     std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
 
