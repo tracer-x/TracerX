@@ -149,6 +149,9 @@ private:
   /// \brief The mapping of locations to stored value
   TopStateStore store;
 
+  /// \brief The depth level of this store
+  uint64_t depth;
+
   static void concreteToInterpolant(ref<TxVariable> variable,
                                     ref<TxStoreEntry> entry,
                                     std::set<const Array *> &replacements,
@@ -176,7 +179,7 @@ private:
                    LowerInterpolantStore &symbolicallyAddressedHistoricalStore);
 
   /// \brief Constructor for an empty store.
-  TxStore() {}
+  TxStore() : depth(0) {}
 
 public:
   ~TxStore() {}
@@ -192,6 +195,7 @@ public:
     ret->symbolicallyAddressedHistoricalStore =
         src->symbolicallyAddressedHistoricalStore;
     ret->store = src->store;
+    ret->depth = src->depth + 1;
     return ret;
   }
 
