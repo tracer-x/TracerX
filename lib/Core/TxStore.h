@@ -157,8 +157,8 @@ private:
   /// \brief The depth level of this store
   uint64_t depth;
 
-  /// \brief The parent of this store
-  TxStore *parent;
+  /// \brief The parent and left and right children of this store
+  TxStore *parent, *left, *right;
 
   static void concreteToInterpolant(ref<TxVariable> variable,
                                     ref<TxStoreEntry> entry,
@@ -187,12 +187,11 @@ private:
                    LowerInterpolantStore &symbolicallyAddressedHistoricalStore);
 
   /// \brief Constructor for an empty store.
-  TxStore() : depth(0), parent(0) {}
+  TxStore() : depth(0), parent(0), left(0), right(0) {}
 
 public:
   ~TxStore() {}
 
-  /// \brief Copy from another object
   static TxStore *create(TxStore *src) {
     TxStore *ret = new TxStore();
     if (!src) {
@@ -207,6 +206,10 @@ public:
     ret->parent = src;
     return ret;
   }
+
+  void setLeftChild(TxStore *child) { left = child; }
+
+  void setRightChild(TxStore *child) { right = child; }
 
   /// \brief Finds a store entry given an address
   ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;

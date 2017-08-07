@@ -459,10 +459,16 @@ namespace klee {
     static bool boundInterpolation(llvm::Value *val = 0);
 
     /// \brief Set the left child
-    void setLeftChild(Dependency *child) { left = child; }
+    void setLeftChild(Dependency *child) {
+      left = child;
+      store->setLeftChild(child->store);
+    }
 
     /// \brief Set the right child
-    void setRightChild(Dependency *child) { right = child; }
+    void setRightChild(Dependency *child) {
+      right = child;
+      store->setRightChild(child->store);
+    }
 
     /// \brief Print the content of the object to the LLVM error stream
     void dump() const {
