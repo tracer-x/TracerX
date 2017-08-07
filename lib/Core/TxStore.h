@@ -157,6 +157,9 @@ private:
   /// \brief The depth level of this store
   uint64_t depth;
 
+  /// \brief The parent of this store
+  TxStore *parent;
+
   static void concreteToInterpolant(ref<TxVariable> variable,
                                     ref<TxStoreEntry> entry,
                                     std::set<const Array *> &replacements,
@@ -184,7 +187,7 @@ private:
                    LowerInterpolantStore &symbolicallyAddressedHistoricalStore);
 
   /// \brief Constructor for an empty store.
-  TxStore() : depth(0) {}
+  TxStore() : depth(0), parent(0) {}
 
 public:
   ~TxStore() {}
@@ -201,6 +204,7 @@ public:
         src->symbolicallyAddressedHistoricalStore;
     ret->internalStore = src->internalStore;
     ret->depth = src->depth + 1;
+    ret->parent = src;
     return ret;
   }
 
