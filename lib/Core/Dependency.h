@@ -169,8 +169,8 @@ namespace klee {
     /// The store
     TxStore *store;
 
-    /// \brief Previous path condition
-    Dependency *parent;
+    /// \brief Parent and left and right children of the dependency information
+    Dependency *parent, *left, *right;
 
     /// \brief Argument values to be passed onto callee
     std::vector<ref<TxStateValue> > argumentValuesList;
@@ -341,6 +341,13 @@ namespace klee {
 
     ~Dependency();
 
+    static Dependency *
+    createRoot(llvm::DataLayout *targetData,
+               std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
+                   globalAddresses) {
+      return new Dependency(0, targetData, globalAddresses);
+    }
+
     Dependency *cdr() const;
 
     /// \brief This retrieves the locations known at this state, and the
@@ -450,6 +457,12 @@ namespace klee {
 
     /// \brief Tests if bound interpolation shold be enabled
     static bool boundInterpolation(llvm::Value *val = 0);
+
+    /// \brief Set the left child
+    void setLeftChild(Dependency *child) { left = child; }
+
+    /// \brief Set the right child
+    void setRightChild(Dependency *child) { right = child; }
 
     /// \brief Print the content of the object to the LLVM error stream
     void dump() const {

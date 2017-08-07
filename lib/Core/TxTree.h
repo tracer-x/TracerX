@@ -482,11 +482,13 @@ class TxTreeNode {
 
   TxTreeNode *createLeftChild() {
     left = new TxTreeNode(this, targetData, globalAddresses);
+    dependency->setLeftChild(left->dependency);
     return left;
   }
 
   TxTreeNode *createRightChild() {
     right = new TxTreeNode(this, targetData, globalAddresses);
+    dependency->setRightChild(right->dependency);
     return right;
   }
 

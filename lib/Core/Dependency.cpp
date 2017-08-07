@@ -431,7 +431,7 @@ void Dependency::populateArgumentValuesList(
 Dependency::Dependency(
     Dependency *parent, llvm::DataLayout *_targetData,
     std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses)
-    : parent(parent), targetData(_targetData),
+    : parent(parent), left(0), right(0), targetData(_targetData),
       globalAddresses(_globalAddresses) {
   if (parent) {
     store = TxStore::create(parent->store);
