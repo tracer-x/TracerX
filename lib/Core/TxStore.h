@@ -152,7 +152,7 @@ private:
   LowerStateStore symbolicallyAddressedHistoricalStore;
 
   /// \brief The mapping of locations to stored value
-  TopStateStore store;
+  TopStateStore internalStore;
 
   /// \brief The depth level of this store
   uint64_t depth;
@@ -199,7 +199,7 @@ public:
         src->concretelyAddressedHistoricalStore;
     ret->symbolicallyAddressedHistoricalStore =
         src->symbolicallyAddressedHistoricalStore;
-    ret->store = src->store;
+    ret->internalStore = src->internalStore;
     ret->depth = src->depth + 1;
     return ret;
   }

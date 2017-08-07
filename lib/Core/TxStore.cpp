@@ -126,8 +126,9 @@ void TxStore::MiddleStateStore::print(llvm::raw_ostream &stream,
 /**/
 
 ref<TxStoreEntry> TxStore::find(ref<TxStateAddress> loc) const {
-  TopStateStore::const_iterator storeIter = store.find(loc->getContext());
-  if (storeIter != store.end()) {
+  TopStateStore::const_iterator storeIter =
+      internalStore.find(loc->getContext());
+  if (storeIter != internalStore.end()) {
     return storeIter->second.find(loc);
   }
 
@@ -142,11 +143,13 @@ void TxStore::getStoredExpressions(
     TopInterpolantStore &_symbolicallyAddressedStore,
     LowerInterpolantStore &_concretelyAddressedHistoricalStore,
     LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const {
-  getConcreteStore(callHistory, store, concretelyAddressedHistoricalStore,
-                   replacements, coreOnly, _concretelyAddressedStore,
+  getConcreteStore(callHistory, internalStore,
+                   concretelyAddressedHistoricalStore, replacements, coreOnly,
+                   _concretelyAddressedStore,
                    _concretelyAddressedHistoricalStore);
-  getSymbolicStore(callHistory, store, symbolicallyAddressedHistoricalStore,
-                   replacements, coreOnly, _symbolicallyAddressedStore,
+  getSymbolicStore(callHistory, internalStore,
+                   symbolicallyAddressedHistoricalStore, replacements, coreOnly,
+                   _symbolicallyAddressedStore,
                    _symbolicallyAddressedHistoricalStore);
 }
 
@@ -299,9 +302,10 @@ void TxStore::updateStoreWithLoadedValue(ref<TxStateAddress> loc,
 
 void TxStore::updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
                           ref<TxStateValue> value) {
-  TopStateStore::iterator middleStoreIter = store.find(loc->getContext());
+  TopStateStore::iterator middleStoreIter =
+      internalStore.find(loc->getContext());
 
-  if (middleStoreIter != store.end()) {
+  if (middleStoreIter != internalStore.end()) {
     MiddleStateStore &middleStore = middleStoreIter->second;
     if (middleStore.hasAllocationInfo(loc->getAllocationInfo())) {
       middleStore.updateStore(loc, address, value, depth);
@@ -316,8 +320,8 @@ void TxStore::updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
   }
 
   MiddleStateStore newMiddleStateStore(loc->getAllocationInfo());
-  store[loc->getContext()] = newMiddleStateStore;
-  MiddleStateStore &middleStateStore = store[loc->getContext()];
+  internalStore[loc->getContext()] = newMiddleStateStore;
+  MiddleStateStore &middleStateStore = internalStore[loc->getContext()];
   middleStateStore.updateStore(loc, address, value, depth);
 }
 
@@ -331,10 +335,11 @@ void TxStore::print(llvm::raw_ostream &stream,
   std::string tabsNextNext = appendTab(tabsNext);
 
   stream << tabs << "store = [";
-  if (!store.empty()) {
+  if (!internalStore.empty()) {
     stream << "\n";
-    for (TopStateStore::const_iterator topIs = store.begin(),
-                                       topIe = store.end(), topIt = topIs;
+    for (TopStateStore::const_iterator topIs = internalStore.begin(),
+                                       topIe = internalStore.end(),
+                                       topIt = topIs;
          topIt != topIe; ++topIt) {
       if (topIt != topIs) {
         stream << "\n";
