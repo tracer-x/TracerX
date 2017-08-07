@@ -2048,7 +2048,7 @@ TxTree::TxTree(
   currentTxTreeNode = 0;
   assert(_targetData && "target data layout not provided");
   if (!_root->txTreeNode) {
-    currentTxTreeNode = new TxTreeNode(0, _targetData, _globalAddresses);
+    currentTxTreeNode = TxTreeNode::createRoot(_targetData, _globalAddresses);
   }
   root = currentTxTreeNode;
 }
@@ -2372,10 +2372,8 @@ void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
 void TxTreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
   TimerStatIncrementer t(splitTime);
   assert(left == 0 && right == 0);
-  leftData->txTreeNode = left =
-      new TxTreeNode(this, targetData, globalAddresses);
-  rightData->txTreeNode = right =
-      new TxTreeNode(this, targetData, globalAddresses);
+  leftData->txTreeNode = createLeftChild();
+  rightData->txTreeNode = createRightChild();
 }
 
 void TxTreeNode::execute(llvm::Instruction *instr,

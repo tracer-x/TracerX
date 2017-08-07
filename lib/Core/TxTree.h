@@ -474,6 +474,22 @@ class TxTreeNode {
 
   ~TxTreeNode();
 
+  static TxTreeNode *createRoot(llvm::DataLayout *targetData,
+                                std::map<const llvm::GlobalValue *,
+                                         ref<ConstantExpr> > *globalAddresses) {
+    return new TxTreeNode(0, targetData, globalAddresses);
+  }
+
+  TxTreeNode *createLeftChild() {
+    left = new TxTreeNode(this, targetData, globalAddresses);
+    return left;
+  }
+
+  TxTreeNode *createRightChild() {
+    right = new TxTreeNode(this, targetData, globalAddresses);
+    return right;
+  }
+
 public:
   bool isSubsumed;
 
