@@ -422,7 +422,6 @@ class TxTreeNode {
   /// purposes
   static uint64_t nextNodeSequenceNumber;
 
-private:
   /// \brief The path condition
   PathCondition *pathCondition;
 
@@ -451,16 +450,6 @@ private:
   /// is just a pointer to the one in klee::Executor.
   std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
 
-public:
-  bool isSubsumed;
-
-  /// \brief The entry call history
-  std::vector<llvm::Instruction *> entryCallHistory;
-
-  /// \brief The current call history
-  std::vector<llvm::Instruction *> callHistory;
-
-private:
   void setProgramPoint(llvm::Instruction *instr) {
     if (!programPoint)
       programPoint = reinterpret_cast<uintptr_t>(instr);
@@ -477,7 +466,23 @@ private:
   void execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args,
                bool symbolicExecutionError);
 
+  void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
+
+  TxTreeNode(TxTreeNode *_parent, llvm::DataLayout *_targetData,
+             std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
+                 _globalAddresses);
+
+  ~TxTreeNode();
+
 public:
+  bool isSubsumed;
+
+  /// \brief The entry call history
+  std::vector<llvm::Instruction *> entryCallHistory;
+
+  /// \brief The current call history
+  std::vector<llvm::Instruction *> callHistory;
+
   uintptr_t getProgramPoint() { return programPoint; }
 
   uint64_t getNodeSequenceNumber() { return nodeSequenceNumber; }
@@ -574,15 +579,6 @@ public:
   ///
   /// \param stream The stream to print the data to.
   void print(llvm::raw_ostream &stream) const;
-
-private:
-  TxTreeNode(TxTreeNode *_parent, llvm::DataLayout *_targetData,
-             std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
-                 _globalAddresses);
-
-  ~TxTreeNode();
-
-  void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
 };
 
 /// \brief The top-level structure that implements abstraction learning.
