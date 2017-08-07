@@ -154,6 +154,12 @@ private:
   /// \brief The mapping of locations to stored value
   TopStateStore internalStore;
 
+  /// \brief Store elements used by left path
+  std::set<ref<TxStoreEntry> > usedByLeftPath;
+
+  /// \brief Store elements used by right path
+  std::set<ref<TxStoreEntry> > usedByRightPath;
+
   /// \brief The depth level of this store
   uint64_t depth;
 
