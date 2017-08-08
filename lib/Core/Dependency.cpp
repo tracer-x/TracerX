@@ -860,13 +860,8 @@ void Dependency::execute(llvm::Instruction *instr,
         }
       }
 
-      std::set<ref<TxStateAddress> > locations = addressValue->getLocations();
-
-      for (std::set<ref<TxStateAddress> >::iterator it = locations.begin(),
-                                                    ie = locations.end();
-           it != ie; ++it) {
-        store->updateStore(*it, addressValue, storedValue);
-      }
+      store->updateStore(addressValue->getLocations(), addressValue,
+                         storedValue);
       break;
     }
     case llvm::Instruction::Trunc:
@@ -1070,13 +1065,7 @@ void Dependency::executeMakeSymbolic(
     }
   }
 
-  std::set<ref<TxStateAddress> > locations = addressValue->getLocations();
-
-  for (std::set<ref<TxStateAddress> >::iterator it = locations.begin(),
-                                                ie = locations.end();
-       it != ie; ++it) {
-    store->updateStore(*it, addressValue, storedValue);
-  }
+  store->updateStore(addressValue->getLocations(), addressValue, storedValue);
 }
 
 void Dependency::executePHI(llvm::Instruction *instr,

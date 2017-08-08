@@ -310,33 +310,39 @@ void TxStore::getSymbolicStore(
 void TxStore::updateStoreWithLoadedValue(ref<TxStateAddress> loc,
                                          ref<TxStateValue> address,
                                          ref<TxStateValue> value) {
-  updateStore(loc, address, value);
+  std::set<ref<TxStateAddress> > locations;
+  locations.insert(loc);
+  updateStore(locations, address, value);
   value->setLoadAddress(address);
 }
 
-void TxStore::updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
-                          ref<TxStateValue> value) {
-  TopStateStore::iterator middleStoreIter =
-      internalStore.find(loc->getContext());
+void TxStore::updateStore(const std::set<ref<TxStateAddress> > &locations,
+                          ref<TxStateValue> address, ref<TxStateValue> value) {
+  for (std::set<ref<TxStateAddress> >::const_iterator it = locations.begin(),
+                                                      ie = locations.end();
+       it != ie; ++it) {
+    TopStateStore::iterator middleStoreIter =
+        internalStore.find((*it)->getContext());
 
-  if (middleStoreIter != internalStore.end()) {
-    MiddleStateStore &middleStore = middleStoreIter->second;
-    if (middleStore.hasAllocationInfo(loc->getAllocationInfo())) {
-      middleStore.updateStore(loc, address, value, depth);
-      return;
+    if (middleStoreIter != internalStore.end()) {
+      MiddleStateStore &middleStore = middleStoreIter->second;
+      if (middleStore.hasAllocationInfo((*it)->getAllocationInfo())) {
+        middleStore.updateStore((*it), address, value, depth);
+        return;
+      }
+
+      // Here we save the old store
+      concretelyAddressedHistoricalStore.insert(middleStore.concreteBegin(),
+                                                middleStore.concreteEnd());
+      symbolicallyAddressedHistoricalStore.insert(middleStore.symbolicBegin(),
+                                                  middleStore.symbolicEnd());
     }
 
-    // Here we save the old store
-    concretelyAddressedHistoricalStore.insert(middleStore.concreteBegin(),
-                                              middleStore.concreteEnd());
-    symbolicallyAddressedHistoricalStore.insert(middleStore.symbolicBegin(),
-                                                middleStore.symbolicEnd());
+    MiddleStateStore newMiddleStateStore((*it)->getAllocationInfo());
+    internalStore[(*it)->getContext()] = newMiddleStateStore;
+    MiddleStateStore &middleStateStore = internalStore[(*it)->getContext()];
+    middleStateStore.updateStore((*it), address, value, depth);
   }
-
-  MiddleStateStore newMiddleStateStore(loc->getAllocationInfo());
-  internalStore[loc->getContext()] = newMiddleStateStore;
-  MiddleStateStore &middleStateStore = internalStore[loc->getContext()];
-  middleStateStore.updateStore(loc, address, value, depth);
 }
 
 /// \brief Print the content of the object to the LLVM error stream

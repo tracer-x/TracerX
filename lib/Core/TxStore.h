@@ -255,8 +255,8 @@ public:
                                   ref<TxStateValue> value);
 
   /// \brief Newly relate an location with its stored value
-  void updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
-                   ref<TxStateValue> value);
+  void updateStore(const std::set<ref<TxStateAddress> > &locations,
+                   ref<TxStateValue> address, ref<TxStateValue> value);
 
   /// \brief Print the content of the object to the LLVM error stream
   void dump() const {
