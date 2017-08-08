@@ -674,10 +674,14 @@ public:
 
   void disableBoundInterpolation() { doNotInterpolateBound = true; }
 
+  /// \brief Set the address this value was loaded from for inclusion in the
+  /// interpolant
   void setLoadAddress(ref<TxStateValue> _loadAddress);
 
   ref<TxStateValue> getLoadAddress() { return loadAddress; }
 
+  /// \brief Set the address this value was stored into for inclusion in the
+  /// interpolant
   void setStoreAddress(ref<TxStateValue> _storeAddress);
 
   ref<TxStateValue> getStoreAddress() { return storeAddress; }
