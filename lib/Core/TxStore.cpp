@@ -143,12 +143,10 @@ void TxStore::getStoredExpressions(
     TopInterpolantStore &_symbolicallyAddressedStore,
     LowerInterpolantStore &_concretelyAddressedHistoricalStore,
     LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const {
-  getConcreteStore(callHistory, internalStore,
-                   concretelyAddressedHistoricalStore, replacements, coreOnly,
+  getConcreteStore(callHistory, replacements, coreOnly,
                    _concretelyAddressedStore,
                    _concretelyAddressedHistoricalStore);
-  getSymbolicStore(callHistory, internalStore,
-                   symbolicallyAddressedHistoricalStore, replacements, coreOnly,
+  getSymbolicStore(callHistory, replacements, coreOnly,
                    _symbolicallyAddressedStore,
                    _symbolicallyAddressedHistoricalStore);
 }
@@ -203,18 +201,18 @@ TxStore::symbolicToInterpolant(ref<TxVariable> variable,
 
 void TxStore::getConcreteStore(
     const std::vector<llvm::Instruction *> &callHistory,
-    const TopStateStore &store, const LowerStateStore &historicalStore,
     std::set<const Array *> &replacements, bool coreOnly,
-    TopInterpolantStore &concretelyAddressedStore,
-    LowerInterpolantStore &concretelyAddressedHistoricalStore) {
-  for (TopStateStore::const_iterator it = store.begin(), ie = store.end();
+    TopInterpolantStore &_concretelyAddressedStore,
+    LowerInterpolantStore &_concretelyAddressedHistoricalStore) const {
+  for (TopStateStore::const_iterator it = internalStore.begin(),
+                                     ie = internalStore.end();
        it != ie; ++it) {
     TopInterpolantStore::iterator storeIter =
-        concretelyAddressedStore.find(it->first);
+        _concretelyAddressedStore.find(it->first);
 
     const MiddleStateStore &middleStore = it->second;
 
-    if (storeIter == concretelyAddressedStore.end()) {
+    if (storeIter == _concretelyAddressedStore.end()) {
       LowerInterpolantStore map;
 
       for (LowerStateStore::const_iterator it1 = middleStore.concreteBegin(),
@@ -227,7 +225,7 @@ void TxStore::getConcreteStore(
       // The map is only added when it is not empty; this is to avoid entries
       // mapped to empty structure in concretelyAddressedStore
       if (!map.empty()) {
-        concretelyAddressedStore[it->first] = map;
+        _concretelyAddressedStore[it->first] = map;
       }
     } else {
       for (LowerStateStore::const_iterator it1 = middleStore.concreteBegin(),
@@ -239,28 +237,29 @@ void TxStore::getConcreteStore(
     }
   }
 
-  for (LowerStateStore::const_iterator it = historicalStore.begin(),
-                                       ie = historicalStore.end();
+  for (LowerStateStore::const_iterator
+           it = concretelyAddressedHistoricalStore.begin(),
+           ie = concretelyAddressedHistoricalStore.end();
        it != ie; ++it) {
     concreteToInterpolant(it->first, it->second, replacements, coreOnly,
-                          concretelyAddressedHistoricalStore);
+                          _concretelyAddressedHistoricalStore);
   }
 }
 
 void TxStore::getSymbolicStore(
     const std::vector<llvm::Instruction *> &callHistory,
-    const TopStateStore &store, const LowerStateStore &historicalStore,
     std::set<const Array *> &replacements, bool coreOnly,
-    TopInterpolantStore &symbolicallyAddressedStore,
-    LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
-  for (TopStateStore::const_iterator it = store.begin(), ie = store.end();
+    TopInterpolantStore &_symbolicallyAddressedStore,
+    LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const {
+  for (TopStateStore::const_iterator it = internalStore.begin(),
+                                     ie = internalStore.end();
        it != ie; ++it) {
     TopInterpolantStore::iterator storeIter =
-        symbolicallyAddressedStore.find(it->first);
+        _symbolicallyAddressedStore.find(it->first);
 
     const MiddleStateStore &middleStore = it->second;
 
-    if (storeIter == symbolicallyAddressedStore.end()) {
+    if (storeIter == _symbolicallyAddressedStore.end()) {
       LowerInterpolantStore map;
 
       for (LowerStateStore::const_iterator it1 = middleStore.symbolicBegin(),
@@ -273,7 +272,7 @@ void TxStore::getSymbolicStore(
       // The map is only added when it is not empty; this is to avoid entries
       // mapped to empty structure in symbolicallyAddressedStore
       if (!map.empty()) {
-        symbolicallyAddressedStore[it->first] = map;
+        _symbolicallyAddressedStore[it->first] = map;
       }
     } else {
       for (LowerStateStore::const_iterator it1 = middleStore.symbolicBegin(),
@@ -285,11 +284,12 @@ void TxStore::getSymbolicStore(
     }
   }
 
-  for (LowerStateStore::const_iterator it = historicalStore.begin(),
-                                       ie = historicalStore.end();
+  for (LowerStateStore::const_iterator
+           it = symbolicallyAddressedHistoricalStore.begin(),
+           ie = symbolicallyAddressedHistoricalStore.end();
        it != ie; ++it) {
     symbolicToInterpolant(it->first, it->second, replacements, coreOnly,
-                          symbolicallyAddressedHistoricalStore);
+                          _symbolicallyAddressedHistoricalStore);
   }
 }
 

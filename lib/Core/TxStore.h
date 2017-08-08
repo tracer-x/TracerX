@@ -185,21 +185,17 @@ private:
                                     std::set<const Array *> &replacements,
                                     bool coreOnly, LowerInterpolantStore &map);
 
-  static void
-  getConcreteStore(const std::vector<llvm::Instruction *> &callHistory,
-                   const TopStateStore &store,
-                   const LowerStateStore &historicalStore,
-                   std::set<const Array *> &replacements, bool coreOnly,
-                   TopInterpolantStore &concretelyAddressedStore,
-                   LowerInterpolantStore &concretelyAddressedHistoricalStore);
+  void getConcreteStore(
+      const std::vector<llvm::Instruction *> &callHistory,
+      std::set<const Array *> &replacements, bool coreOnly,
+      TopInterpolantStore &_concretelyAddressedStore,
+      LowerInterpolantStore &_concretelyAddressedHistoricalStore) const;
 
-  static void
-  getSymbolicStore(const std::vector<llvm::Instruction *> &callHistory,
-                   const TopStateStore &store,
-                   const LowerStateStore &historicalStore,
-                   std::set<const Array *> &replacements, bool coreOnly,
-                   TopInterpolantStore &symbolicallyAddressedStore,
-                   LowerInterpolantStore &symbolicallyAddressedHistoricalStore);
+  void getSymbolicStore(
+      const std::vector<llvm::Instruction *> &callHistory,
+      std::set<const Array *> &replacements, bool coreOnly,
+      TopInterpolantStore &_symbolicallyAddressedStore,
+      LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const;
 
   /// \brief Constructor for an empty store.
   TxStore() : depth(0), parent(0), left(0), right(0) {}
