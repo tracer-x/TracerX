@@ -151,14 +151,21 @@ void TxStore::getStoredExpressions(
                    _symbolicallyAddressedHistoricalStore);
 }
 
-inline void
-TxStore::concreteToInterpolant(ref<TxVariable> variable,
-                               ref<TxStoreEntry> entry,
-                               std::set<const Array *> &replacements,
-                               bool coreOnly, LowerInterpolantStore &map) {
+inline void TxStore::concreteToInterpolant(
+    ref<TxVariable> variable, ref<TxStoreEntry> entry,
+    std::set<const Array *> &replacements, bool coreOnly,
+    LowerInterpolantStore &map, bool leftRetrieval) const {
   if (!coreOnly) {
     map[variable] = entry->getContent()->getInterpolantStyleValue();
   } else if (entry->getContent()->isCore()) {
+    // Do not add to the map if entry is not used
+    if (leftRetrieval) {
+      if (usedByLeftPath.find(entry) == usedByLeftPath.end())
+        return;
+    } else if (usedByRightPath.find(entry) == usedByRightPath.end()) {
+      return;
+    }
+
     // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
     if (!NoExistential) {
@@ -173,14 +180,21 @@ TxStore::concreteToInterpolant(ref<TxVariable> variable,
   }
 }
 
-inline void
-TxStore::symbolicToInterpolant(ref<TxVariable> variable,
-                               ref<TxStoreEntry> entry,
-                               std::set<const Array *> &replacements,
-                               bool coreOnly, LowerInterpolantStore &map) {
+inline void TxStore::symbolicToInterpolant(
+    ref<TxVariable> variable, ref<TxStoreEntry> entry,
+    std::set<const Array *> &replacements, bool coreOnly,
+    LowerInterpolantStore &map, bool leftRetrieval) const {
   if (!coreOnly) {
     map[variable] = entry->getContent()->getInterpolantStyleValue();
   } else if (entry->getContent()->isCore()) {
+    // Do not add to the map if entry is not used
+    if (leftRetrieval) {
+      if (usedByLeftPath.find(entry) == usedByLeftPath.end())
+        return;
+    } else if (usedByRightPath.find(entry) == usedByRightPath.end()) {
+      return;
+    }
+
     // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
     if (!NoExistential) {
@@ -219,7 +233,7 @@ void TxStore::getConcreteStore(
                                            ie1 = middleStore.concreteEnd();
            it1 != ie1; ++it1) {
         concreteToInterpolant(it1->first, it1->second, replacements, coreOnly,
-                              map);
+                              map, leftRetrieval);
       }
 
       // The map is only added when it is not empty; this is to avoid entries
@@ -232,7 +246,7 @@ void TxStore::getConcreteStore(
                                            ie1 = middleStore.concreteEnd();
            it1 != ie1; ++it1) {
         concreteToInterpolant(it1->first, it1->second, replacements, coreOnly,
-                              storeIter->second);
+                              storeIter->second, leftRetrieval);
       }
     }
   }
@@ -242,7 +256,7 @@ void TxStore::getConcreteStore(
            ie = concretelyAddressedHistoricalStore.end();
        it != ie; ++it) {
     concreteToInterpolant(it->first, it->second, replacements, coreOnly,
-                          _concretelyAddressedHistoricalStore);
+                          _concretelyAddressedHistoricalStore, leftRetrieval);
   }
 }
 
@@ -266,7 +280,7 @@ void TxStore::getSymbolicStore(
                                            ie1 = middleStore.symbolicEnd();
            it1 != ie1; ++it1) {
         symbolicToInterpolant(it1->first, it1->second, replacements, coreOnly,
-                              map);
+                              map, leftRetrieval);
       }
 
       // The map is only added when it is not empty; this is to avoid entries
@@ -279,7 +293,7 @@ void TxStore::getSymbolicStore(
                                            ie1 = middleStore.symbolicEnd();
            it1 != ie1; ++it1) {
         symbolicToInterpolant(it1->first, it1->second, replacements, coreOnly,
-                              storeIter->second);
+                              storeIter->second, leftRetrieval);
       }
     }
   }
@@ -289,7 +303,7 @@ void TxStore::getSymbolicStore(
            ie = symbolicallyAddressedHistoricalStore.end();
        it != ie; ++it) {
     symbolicToInterpolant(it->first, it->second, replacements, coreOnly,
-                          _symbolicallyAddressedHistoricalStore);
+                          _symbolicallyAddressedHistoricalStore, leftRetrieval);
   }
 }
 

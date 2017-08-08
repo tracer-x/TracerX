@@ -175,15 +175,15 @@ private:
   /// \brief The parent and left and right children of this store
   TxStore *parent, *left, *right;
 
-  static void concreteToInterpolant(ref<TxVariable> variable,
-                                    ref<TxStoreEntry> entry,
-                                    std::set<const Array *> &replacements,
-                                    bool coreOnly, LowerInterpolantStore &map);
+  void concreteToInterpolant(ref<TxVariable> variable, ref<TxStoreEntry> entry,
+                             std::set<const Array *> &replacements,
+                             bool coreOnly, LowerInterpolantStore &map,
+                             bool leftRetrieval) const;
 
-  static void symbolicToInterpolant(ref<TxVariable> variable,
-                                    ref<TxStoreEntry> entry,
-                                    std::set<const Array *> &replacements,
-                                    bool coreOnly, LowerInterpolantStore &map);
+  void symbolicToInterpolant(ref<TxVariable> variable, ref<TxStoreEntry> entry,
+                             std::set<const Array *> &replacements,
+                             bool coreOnly, LowerInterpolantStore &map,
+                             bool leftRetrieval) const;
 
   void getConcreteStore(
       const std::vector<llvm::Instruction *> &callHistory,
