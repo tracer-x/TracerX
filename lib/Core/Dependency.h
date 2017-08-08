@@ -363,6 +363,9 @@ namespace klee {
     /// bound ones.
     /// \param coreOnly Indicates whether we are retrieving only data
     /// for locations relevant to an unsatisfiability core.
+    /// \param leftRetrieval Whether the retrieval is requested by the left
+    /// child of the store, otherwise, we assume it is requested by the right
+    /// child of the store.
     /// \param [out] concretelyAddressedStore The output concretely-addressed
     /// store.
     /// \param [out] symbolicallyAddressedStore The output
@@ -380,14 +383,16 @@ namespace klee {
     void getStoredExpressions(
         const std::vector<llvm::Instruction *> &callHistory,
         std::set<const Array *> &replacements, bool coreOnly,
+        bool leftRetrieval,
         TxStore::TopInterpolantStore &concretelyAddressedStore,
         TxStore::TopInterpolantStore &symbolicallyAddressedStore,
         TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
         TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
-      store->getStoredExpressions(
-          callHistory, replacements, coreOnly, concretelyAddressedStore,
-          symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
-          symbolicallyAddressedHistoricalStore);
+      store->getStoredExpressions(callHistory, replacements, coreOnly,
+                                  leftRetrieval, concretelyAddressedStore,
+                                  symbolicallyAddressedStore,
+                                  concretelyAddressedHistoricalStore,
+                                  symbolicallyAddressedHistoricalStore);
     }
 
     ref<TxStateValue>

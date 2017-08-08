@@ -2410,11 +2410,20 @@ void TxTreeNode::getStoredExpressions(
   // Since a program point index is a first statement in a basic block,
   // the allocations to be stored in subsumption table should be obtained
   // from the parent node.
-  if (parent)
+  if (parent) {
+    bool leftRetrieval = false;
+
+    if (parent->left == this)
+      leftRetrieval = true;
+    else
+      assert(parent->right == this && "mismatched tree edge");
+
     parent->dependency->getStoredExpressions(
-        _callHistory, dummyReplacements, false, concretelyAddressedStore,
-        symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
+        _callHistory, dummyReplacements, false, leftRetrieval,
+        concretelyAddressedStore, symbolicallyAddressedStore,
+        concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);
+  }
 }
 
 void TxTreeNode::getStoredCoreExpressions(
@@ -2430,11 +2439,20 @@ void TxTreeNode::getStoredCoreExpressions(
   // Since a program point index is a first statement in a basic block,
   // the allocations to be stored in subsumption table should be obtained
   // from the parent node.
-  if (parent)
+  if (parent) {
+    bool leftRetrieval = false;
+
+    if (parent->left == this)
+      leftRetrieval = true;
+    else
+      assert(parent->right == this && "mismatched tree edge");
+
     parent->dependency->getStoredExpressions(
-        _callHistory, replacements, true, concretelyAddressedStore,
-        symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
+        _callHistory, replacements, true, leftRetrieval,
+        concretelyAddressedStore, symbolicallyAddressedStore,
+        concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);
+  }
 }
 
 uint64_t TxTreeNode::getInstructionsDepth() { return instructionsDepth; }

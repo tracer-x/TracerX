@@ -138,15 +138,15 @@ ref<TxStoreEntry> TxStore::find(ref<TxStateAddress> loc) const {
 
 void TxStore::getStoredExpressions(
     const std::vector<llvm::Instruction *> &callHistory,
-    std::set<const Array *> &replacements, bool coreOnly,
+    std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
     TopInterpolantStore &_concretelyAddressedStore,
     TopInterpolantStore &_symbolicallyAddressedStore,
     LowerInterpolantStore &_concretelyAddressedHistoricalStore,
     LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const {
-  getConcreteStore(callHistory, replacements, coreOnly,
+  getConcreteStore(callHistory, replacements, coreOnly, leftRetrieval,
                    _concretelyAddressedStore,
                    _concretelyAddressedHistoricalStore);
-  getSymbolicStore(callHistory, replacements, coreOnly,
+  getSymbolicStore(callHistory, replacements, coreOnly, leftRetrieval,
                    _symbolicallyAddressedStore,
                    _symbolicallyAddressedHistoricalStore);
 }
@@ -201,7 +201,7 @@ TxStore::symbolicToInterpolant(ref<TxVariable> variable,
 
 void TxStore::getConcreteStore(
     const std::vector<llvm::Instruction *> &callHistory,
-    std::set<const Array *> &replacements, bool coreOnly,
+    std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
     TopInterpolantStore &_concretelyAddressedStore,
     LowerInterpolantStore &_concretelyAddressedHistoricalStore) const {
   for (TopStateStore::const_iterator it = internalStore.begin(),
@@ -248,7 +248,7 @@ void TxStore::getConcreteStore(
 
 void TxStore::getSymbolicStore(
     const std::vector<llvm::Instruction *> &callHistory,
-    std::set<const Array *> &replacements, bool coreOnly,
+    std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
     TopInterpolantStore &_symbolicallyAddressedStore,
     LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const {
   for (TopStateStore::const_iterator it = internalStore.begin(),
