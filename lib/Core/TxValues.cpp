@@ -764,16 +764,16 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
 
 void TxStateValue::setLoadAddress(ref<TxStateValue> _loadAddress) {
   loadAddress = _loadAddress;
-  allLoadAddresses.insert(_loadAddress->getLocations().begin(),
-                          _loadAddress->getLocations().end());
+  allLoadAddresses.insert(_loadAddress->locations.begin(),
+                          _loadAddress->locations.end());
   entryList.insert(_loadAddress->entryList.begin(),
                    _loadAddress->entryList.end());
 }
 
 void TxStateValue::setStoreAddress(ref<TxStateValue> _storeAddress) {
   storeAddress = _storeAddress;
-  allLoadAddresses.insert(_storeAddress->getLocations().begin(),
-                          _storeAddress->getLocations().end());
+  allLoadAddresses.insert(_storeAddress->locations.begin(),
+                          _storeAddress->locations.end());
   entryList.insert(_storeAddress->entryList.begin(),
                    _storeAddress->entryList.end());
 }
