@@ -258,6 +258,9 @@ public:
   void updateStore(const std::set<ref<TxStateAddress> > &locations,
                    ref<TxStateValue> address, ref<TxStateValue> value);
 
+  /// \brief Register the entries in the entry list as used
+  void markUsed(const std::set<ref<TxStoreEntry> > &entryList);
+
   /// \brief Print the content of the object to the LLVM error stream
   void dump() const {
     this->print(llvm::errs());
