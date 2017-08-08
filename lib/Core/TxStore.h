@@ -56,6 +56,15 @@ public:
 
   uint64_t getDepth() { return depth; }
 
+  /// \brief A simple pointer comparison
+  int compare(const TxStoreEntry &other) const {
+    if (this < &other)
+      return -1;
+    if (this > &other)
+      return 1;
+    return 0;
+  }
+
   void dump() const {
     print(llvm::errs());
     llvm::errs() << "\n";
