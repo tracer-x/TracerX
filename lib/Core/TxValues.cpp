@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ShadowArray.h"
+#include "TxStore.cpp"
 
 #include "klee/Internal/Module/TxValues.h"
 #include "klee/Internal/Support/ErrorHandling.h"
@@ -760,6 +761,40 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
 }
 
 /**/
+
+void TxStateValue::setLoadAddress(ref<TxStateValue> _loadAddress) {
+  loadAddress = _loadAddress;
+  allLoadAddresses.insert(_loadAddress->getLocations().begin(),
+                          _loadAddress->getLocations().end());
+  entryList.insert(_loadAddress->entryList.begin(),
+                   _loadAddress->entryList.end());
+}
+
+void TxStateValue::setStoreAddress(ref<TxStateValue> _storeAddress) {
+  storeAddress = _storeAddress;
+  allLoadAddresses.insert(_storeAddress->getLocations().begin(),
+                          _storeAddress->getLocations().end());
+  entryList.insert(_storeAddress->entryList.begin(),
+                   _storeAddress->entryList.end());
+}
+
+void TxStateValue::addDependency(ref<TxStateValue> source,
+                                 ref<TxStateAddress> via) {
+  sources[source] = via;
+  if (via.isNull()) {
+    allLoadAddresses.insert(source->allLoadAddresses.begin(),
+                            source->allLoadAddresses.end());
+    entryList.insert(source->entryList.begin(), source->entryList.end());
+  }
+}
+
+inline void TxStateValue::addStoreEntry(ref<TxStoreEntry> entry) {
+  entryList.insert(entry);
+}
+
+const std::set<ref<TxStoreEntry> > &TxStateValue::getEntryList() const {
+  return entryList;
+}
 
 void TxStateValue::print(llvm::raw_ostream &stream,
                          const std::string &prefix) const {

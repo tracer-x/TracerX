@@ -42,6 +42,8 @@ class TxStateAddress;
 
 class TxStateValue;
 
+class TxStoreEntry;
+
 class AllocationContext {
 
 public:
@@ -630,6 +632,9 @@ private:
   /// \brief All load addresses, transitively
   std::set<ref<TxStateAddress> > allLoadAddresses;
 
+  /// \brief Store entries this value is dependent upon
+  std::set<ref<TxStoreEntry> > entryList;
+
   TxStateValue(llvm::Value *value,
                const std::vector<llvm::Instruction *> &_callHistory,
                ref<Expr> _valueExpr)
@@ -669,31 +674,23 @@ public:
 
   void disableBoundInterpolation() { doNotInterpolateBound = true; }
 
-  void setLoadAddress(ref<TxStateValue> _loadAddress) {
-    loadAddress = _loadAddress;
-    allLoadAddresses.insert(_loadAddress->getLocations().begin(),
-                            _loadAddress->getLocations().end());
-  }
+  void setLoadAddress(ref<TxStateValue> _loadAddress);
 
   ref<TxStateValue> getLoadAddress() { return loadAddress; }
 
-  void setStoreAddress(ref<TxStateValue> _storeAddress) {
-    storeAddress = _storeAddress;
-    allLoadAddresses.insert(_storeAddress->getLocations().begin(),
-                            _storeAddress->getLocations().end());
-  }
+  void setStoreAddress(ref<TxStateValue> _storeAddress);
 
   ref<TxStateValue> getStoreAddress() { return storeAddress; }
 
   /// \brief The core routine for adding flow dependency between source and
   /// target value
-  void addDependency(ref<TxStateValue> source, ref<TxStateAddress> via) {
-    sources[source] = via;
-    if (via.isNull()) {
-      allLoadAddresses.insert(source->allLoadAddresses.begin(),
-                              source->allLoadAddresses.end());
-    }
-  }
+  void addDependency(ref<TxStateValue> source, ref<TxStateAddress> via);
+
+  /// \brief Add the store entry used to store the value used to compute this
+  /// value
+  void addStoreEntry(ref<TxStoreEntry> entry);
+
+  const std::set<ref<TxStoreEntry> > &getEntryList() const;
 
   const std::map<ref<TxStateValue>, ref<TxStateAddress> > &getSources() {
     return sources;
