@@ -784,8 +784,8 @@ void TxStateValue::addDependency(ref<TxStateValue> source,
   if (via.isNull()) {
     allLoadAddresses.insert(source->allLoadAddresses.begin(),
                             source->allLoadAddresses.end());
-    entryList.insert(source->entryList.begin(), source->entryList.end());
   }
+  entryList.insert(source->entryList.begin(), source->entryList.end());
 }
 
 inline void TxStateValue::addStoreEntry(ref<TxStoreEntry> entry) {

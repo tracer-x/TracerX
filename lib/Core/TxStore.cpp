@@ -65,12 +65,16 @@ bool TxStore::MiddleStateStore::updateStore(ref<TxStateAddress> loc,
   if (loc->getAllocationInfo() != allocInfo)
     return false;
 
+  ref<TxStoreEntry> entry(new TxStoreEntry(loc, address, value, _depth));
+
+  // We associate this value with the store entry, signifying that the entry is
+  // important whenever the value is used. This is used for computing the
+  // interpolant.
+  value->addStoreEntry(entry);
   if (loc->hasConstantAddress()) {
-    concretelyAddressedStore[loc->getAsVariable()] =
-        ref<TxStoreEntry>(new TxStoreEntry(loc, address, value, _depth));
+    concretelyAddressedStore[loc->getAsVariable()] = entry;
   } else {
-    symbolicallyAddressedStore[loc->getAsVariable()] =
-        ref<TxStoreEntry>(new TxStoreEntry(loc, address, value, _depth));
+    symbolicallyAddressedStore[loc->getAsVariable()] = entry;
   }
   return true;
 }
