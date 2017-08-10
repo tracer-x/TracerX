@@ -24,6 +24,9 @@ namespace klee {
 /// \brief The class that implements weakest precondition interpolant.
 class WeakestPreCondition {
 
+  std::set<llvm::Value *> markedVariables;
+  ref<Expr> WPExpr;
+
 public:
   WeakestPreCondition();
 
@@ -31,8 +34,10 @@ public:
 
   // \brief Preprocessing phase: marking the instructions that contribute
   // to the target or an infeasible path.
-  std::set<llvm::Value *>
-  markVariables(std::map<KInstruction *, bool> reverseInstructionList);
+  void markVariables(std::map<KInstruction *, bool> reverseInstructionList);
+
+  // \brief Generate and return the weakest precondition expression.
+  ref<Expr> GenerateWP();
 };
 }
 #endif /* WP_H_ */
