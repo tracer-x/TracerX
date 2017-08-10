@@ -25,9 +25,9 @@
 #include "klee/TimerStatIncrementer.h"
 #include "klee/util/ExprVisitor.h"
 #include "klee/util/TxTreeGraph.h"
-
 #include "llvm/Support/raw_ostream.h"
 #include "TxDependency.h"
+#include "WP.h"
 
 namespace klee {
 
@@ -326,6 +326,8 @@ public:
   void dump() const {
     this->print(llvm::errs());
     llvm::errs() << "\n";
+    this->printWP(llvm::errs());
+    llvm::errs() << "\n";
   }
 
   void print(llvm::raw_ostream &stream) const;
@@ -334,11 +336,11 @@ public:
 
   void print(llvm::raw_ostream &stream, const std::string &prefix) const;
 
-  void PrintWP(llvm::raw_ostream &stream) const;
+  void printWP(llvm::raw_ostream &stream) const;
 
-  void PrintWP(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
+  void printWP(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
 
-  void PrintWP(llvm::raw_ostream &stream, const std::string &prefix) const;
+  void printWP(llvm::raw_ostream &stream, const std::string &prefix) const;
 };
 
 /// \brief The Tracer-X symbolic execution tree node.
@@ -379,6 +381,13 @@ class TxTreeNode {
 
   /// \brief Value dependencies
   TxDependency *dependency;
+
+  // \brief Instance of weakest precondition class used to generate WP
+  // interpolant
+  WeakestPreCondition *wp;
+
+  /// \brief Value dependencies
+  ref<Expr> childWPInterpolant[2];
 
   TxTreeNode *parent, *left, *right;
 
@@ -476,6 +485,12 @@ public:
   ///
   /// \return The weakest precondition interpolant expression.
   ref<Expr> getWPInterpolant();
+
+  /// \brief Store the child WP interpolants in the parent node
+  void setChildWPInterpolant(ref<Expr> interpolant);
+
+  /// \brief Get the stored child WP interpolants in the parent node
+  ref<Expr> getChildWPInterpolant(int flag);
 
   /// \brief Extend the path condition with another constraint
   ///

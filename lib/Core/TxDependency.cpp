@@ -15,6 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "TxDependency.h"
+#include "TxShadowArray.h"
+#include <klee/util/ArrayCache.h>
 
 #include "Context.h"
 #include "klee/CommandLine.h"
@@ -62,6 +64,31 @@ TxDependency::registerNewTxStateValue(llvm::Value *value,
                                       ref<TxStateValue> vvalue) {
   valuesMap[value].push_back(vvalue);
   return vvalue;
+}
+ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
+                                 const Array *tmpArray) {
+
+  if (!value->hasName()) {
+    klee_error("Dependency::getAddress:Instruction has no name!\n");
+  }
+  const Array *symArray = TxShadowArray::getSymbolicArray(value->getName());
+  if (symArray != NULL) {
+    ref<Expr> Res(0);
+    unsigned NumBytes = symArray->getDomain() / 8;
+    assert(symArray->getDomain() == NumBytes * 8 && "Invalid read size!");
+    for (unsigned i = 0; i != NumBytes; ++i) {
+      unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
+      ref<Expr> Byte =
+          ReadExpr::create(UpdateList(symArray, 0),
+                           ConstantExpr::alloc(idx, symArray->getDomain()));
+      Res = i ? ConcatExpr::create(Byte, Res) : Byte;
+    }
+    return Res;
+  }
+  // Todo: tmpArray object should be reclaimed sometime later
+  tmpArray =
+      ac->CreateArray(value->getName(), value->getType()->getIntegerBitWidth());
+  return Expr::createTempRead(tmpArray, value->getType()->getIntegerBitWidth());
 }
 
 ref<TxStateValue> TxDependency::getLatestValue(
