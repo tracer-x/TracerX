@@ -16,7 +16,6 @@
 #include "TxTree.h"
 
 #include "TimingSolver.h"
-#include "WP.h"
 
 #include <klee/CommandLine.h>
 #include <klee/Expr.h>
@@ -1629,29 +1628,26 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
   stream << "]";
 }
 
-void TxSubsumptionTableEntry::PrintWP(llvm::raw_ostream &stream) const {
-  PrintWP(stream, 0);
+void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream) const {
+  printWP(stream, 0);
 }
 
-void TxSubsumptionTableEntry::PrintWP(llvm::raw_ostream &stream,
+void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
                                     const unsigned paddingAmount) const {
-  PrintWP(stream, makeTabs(paddingAmount));
+  printWP(stream, makeTabs(paddingAmount));
 }
 
-void TxSubsumptionTableEntry::PrintWP(llvm::raw_ostream &stream,
+void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
                                     const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
   std::string tabsNextNext = appendTab(tabsNext);
 
-  stream << prefix << "------------ WP Subsumption Table Entry ------------\n";
-  stream << prefix << "Program point = " << programPoint << "\n";
-  stream << prefix << "wp interpolant = ";
+  stream << prefix << "\nwp interpolant = ";
   if (!wpInterpolant.isNull())
     wpInterpolant->print(stream);
   else
     stream << "(empty)";
   stream << "\n";
-  stream << prefix << "--------- END of WP Subsumption Table Entry ---------\n";
 }
 
 void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
@@ -2078,6 +2074,7 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
         std::string msg;
         llvm::raw_string_ostream out(msg);
         entry->print(out);
+        entry->printWP(out);
         out.flush();
         klee_message("%s", msg.c_str());
       }
@@ -2273,6 +2270,9 @@ TxTreeNode::TxTreeNode(
   // Inherit the abstract dependency or NULL
   dependency = new TxDependency(_parent ? _parent->dependency : 0, _targetData,
                                 _globalAddresses);
+  wp = new WeakestPreCondition();
+  childWPInterpolant[0] = wp->False();
+  childWPInterpolant[1] = wp->False();
 }
 
 TxTreeNode::~TxTreeNode() {
@@ -2291,17 +2291,49 @@ ref<Expr> TxTreeNode::getInterpolant(
 ref<Expr> TxTreeNode::getWPInterpolant() {
   TimerStatIncrementer t(getWPInterpolantTime);
 
-  WeakestPreCondition *wp = new WeakestPreCondition();
-  // Preprocessing phase: marking the instructions that contribute
-  // to the target or an infeasible path.
-  std::set<llvm::Value *> markedVariables =
-      wp->markVariables(reverseInstructionList);
+  ref<Expr> expr;
+  bool markAllFlag;
+  if (childWPInterpolant[0] == wp->False() &&
+      childWPInterpolant[1] == wp->False()) {
+    wp->resetWPExpr();
+    // Preprocessing phase: marking the instructions that contribute
+    // to the target or an infeasible path.
+    reverseInstructionList = wp->markVariables(reverseInstructionList);
 
-  //TODO: Generate weakest precondition from pathCondition and/or BB instructions
-  ref<Expr> expr = 0;
+    // Generate weakest precondition from pathCondition and/or BB instructions
+    markAllFlag = 0;
+    expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
+    this->parent->setChildWPInterpolant(expr);
+  } else {
+    // TODO: Perform the intersection of the child interpolants
+    // The following is a temporary intersection.
+    expr = AndExpr::create(childWPInterpolant[0], childWPInterpolant[1]);
+
+    // Setting the intersection of child nodes as the target in the of the nodes
+    wp->setWPExpr(expr);
+
+    // Generate weakest precondition from pathCondition and/or BB instructions
+    // All instructions are marked
+    markAllFlag = 1;
+    expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
+    this->parent->setChildWPInterpolant(expr);
+  }
   return expr;
 }
 
+void TxTreeNode::setChildWPInterpolant(ref<Expr> interpolant) {
+  if (childWPInterpolant[0] == wp->False())
+    childWPInterpolant[0] = interpolant;
+  else
+    childWPInterpolant[1] = interpolant;
+}
+
+ref<Expr> TxTreeNode::getChildWPInterpolant(int flag) {
+  if (flag == 0)
+    return childWPInterpolant[0];
+  else
+    return childWPInterpolant[1];
+}
 
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
   TimerStatIncrementer t(addConstraintTime);
