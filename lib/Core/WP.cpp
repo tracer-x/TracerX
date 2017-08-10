@@ -28,9 +28,9 @@ WeakestPreCondition::WeakestPreCondition() {}
 
 WeakestPreCondition::~WeakestPreCondition() {}
 
-std::set<llvm::Value *> WeakestPreCondition::markVariables(
+void WeakestPreCondition::markVariables(
     std::map<KInstruction *, bool> reverseInstructionList) {
-  std::set<llvm::Value *> markedVariables;
+
   for (std::map<KInstruction *, bool>::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
@@ -87,5 +87,6 @@ std::set<llvm::Value *> WeakestPreCondition::markVariables(
       }
     }
   }
-  return markedVariables;
 }
+
+ref<Expr> WeakestPreCondition::GenerateWP() { return WPExpr; }

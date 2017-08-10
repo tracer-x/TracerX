@@ -2293,11 +2293,11 @@ ref<Expr> TxTreeNode::getWPInterpolant() {
   WeakestPreCondition *wp = new WeakestPreCondition();
   // Preprocessing phase: marking the instructions that contribute
   // to the target or an infeasible path.
-  std::set<llvm::Value *> markedVariables =
-      wp->markVariables(reverseInstructionList);
+  wp->markVariables(reverseInstructionList);
 
-  //TODO: Generate weakest precondition from pathCondition and/or BB instructions
-  ref<Expr> expr = 0;
+  // Generate weakest precondition from pathCondition and/or BB instructions
+  ref<Expr> expr = wp->GenerateWP();
+
   return expr;
 }
 
