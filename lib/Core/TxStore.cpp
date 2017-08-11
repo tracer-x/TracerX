@@ -359,45 +359,40 @@ void TxStore::markUsed(const std::set<ref<TxStoreEntry> > &entryList) {
                                                     ie = entryList.end();
        it != ie; ++it) {
     uint64_t entryDepth = (*it)->getDepth();
-    if (entryDepth == depth) {
-      usedByLeftPath.insert(*it);
-      usedByRightPath.insert(*it);
-      continue;
-    } else {
-      assert(entryDepth < depth && "invalid depth");
 
-      // We now register the used entry as used after it was instantiated in
-      // previous depth levels
-      TxStore *prev = 0, *current = parent;
-      while (current && entryDepth <= current->depth) {
-        const TxStore *constPrev;
-        if (!prev) {
-          constPrev = this;
-        } else {
-          constPrev = prev;
-        }
-        if (current->left == constPrev) {
-          std::set<ref<TxStoreEntry> >::iterator usedEntryIter =
-              current->usedByLeftPath.find(*it);
-          if (usedEntryIter == current->usedByLeftPath.end()) {
-            current->usedByLeftPath.insert(*it);
-          } else {
-            break;
-          }
-        } else if (current->right == constPrev) {
-          std::set<ref<TxStoreEntry> >::iterator usedEntryIter =
-              current->usedByRightPath.find(*it);
-          if (usedEntryIter == current->usedByRightPath.end()) {
-            current->usedByRightPath.insert(*it);
-          } else {
-            break;
-          }
-        } else {
-          assert(!"child is neither left not right");
-        }
-        prev = current;
-        current = current->parent;
+    assert(entryDepth <= depth && "invalid depth");
+
+    // We now register the used entry as used after it was instantiated in
+    // previous depth levels
+    TxStore *prev = 0, *current = parent;
+    while (current && entryDepth <= current->depth) {
+      const TxStore *constPrev;
+      if (!prev) {
+        constPrev = this;
+      } else {
+        constPrev = prev;
       }
+      if (current->left == constPrev) {
+        std::set<ref<TxStoreEntry> >::iterator usedEntryIter =
+            current->usedByLeftPath.find(*it);
+        if (usedEntryIter == current->usedByLeftPath.end()) {
+          current->usedByLeftPath.insert(*it);
+        } else {
+          break;
+        }
+      } else if (current->right == constPrev) {
+        std::set<ref<TxStoreEntry> >::iterator usedEntryIter =
+            current->usedByRightPath.find(*it);
+        if (usedEntryIter == current->usedByRightPath.end()) {
+          current->usedByRightPath.insert(*it);
+        } else {
+          break;
+        }
+      } else {
+        assert(!"child is neither left not right");
+      }
+      prev = current;
+      current = current->parent;
     }
   }
 }
