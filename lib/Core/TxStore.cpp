@@ -31,7 +31,7 @@ void TxStoreEntry::print(llvm::raw_ostream &stream,
   address->print(stream, tabsNext);
   stream << "\n";
   stream << prefix << "content:\n";
-  content->print(stream, tabsNext);
+  content->printMinimal(stream, tabsNext);
 }
 
 /**/

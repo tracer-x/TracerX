@@ -642,23 +642,6 @@ private:
         id(reinterpret_cast<uint64_t>(this)), callHistory(_callHistory),
         doNotInterpolateBound(false), directUseCount(0) {}
 
-  /// \brief Print the content of the object, but without showing its source
-  /// values.
-  ///
-  /// \param stream The stream to print the data to.
-  void printNoDependency(llvm::raw_ostream &stream) const {
-    std::string emptyString;
-    printNoDependency(stream, emptyString);
-  }
-
-  /// \brief Print the content of the object, but without showing its source
-  /// values.
-  ///
-  /// \param stream The stream to print the data to.
-  /// \param prefix Padding spaces to print before the actual data.
-  void printNoDependency(llvm::raw_ostream &stream,
-                         const std::string &prefix) const;
-
 public:
   ~TxStateValue() { locations.clear(); }
 
@@ -753,6 +736,20 @@ public:
     return TxInterpolantValue::create(value, valueExpr, canInterpolateBound(),
                                       coreReasons, locations, replacements);
   }
+
+  /// \brief Print minimal information about this object.
+  ///
+  /// \param stream The stream to print the data to.
+  void printMinimal(llvm::raw_ostream &stream) const {
+    std::string emptyString;
+    printMinimal(stream, emptyString);
+  }
+
+  /// \brief Print minimal information about this object.
+  ///
+  /// \param stream The stream to print the data to.
+  /// \param prefix Padding spaces to print before the actual data.
+  void printMinimal(llvm::raw_ostream &stream, const std::string &prefix) const;
 
   /// \brief Print the content of the object into a stream
   ///

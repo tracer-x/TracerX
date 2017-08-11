@@ -800,7 +800,19 @@ void TxStateValue::print(llvm::raw_ostream &stream,
                          const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
-  printNoDependency(stream, prefix);
+  printMinimal(stream, prefix);
+
+  if (entryList.empty()) {
+    stream << prefix << "not dependent on store\n";
+  } else {
+    stream << prefix << "loaded from store entries:";
+    for (std::set<ref<TxStoreEntry> >::const_iterator it = entryList.begin(),
+                                                      ie = entryList.end();
+         it != ie; ++it) {
+      stream << "\n";
+      (*it)->print(stream, tabsNext);
+    }
+  }
 
   stream << "\n";
   if (sources.empty()) {
@@ -814,7 +826,7 @@ void TxStateValue::print(llvm::raw_ostream &stream,
       stream << "\n";
       if (it != is)
         stream << tabsNext << "------------------------------------------\n";
-      (*it->first).printNoDependency(stream, tabsNext);
+      (*it->first).printMinimal(stream, tabsNext);
       if (!it->second.isNull()) {
         stream << " via\n";
         (*it->second).print(stream, tabsNext);
@@ -823,8 +835,8 @@ void TxStateValue::print(llvm::raw_ostream &stream,
   }
 }
 
-void TxStateValue::printNoDependency(llvm::raw_ostream &stream,
-                                     const std::string &prefix) const {
+void TxStateValue::printMinimal(llvm::raw_ostream &stream,
+                                const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
   if (core) {
@@ -853,14 +865,5 @@ void TxStateValue::printNoDependency(llvm::raw_ostream &stream,
   stream << "\n";
   stream << prefix
          << "pointer to location object: " << reinterpret_cast<uintptr_t>(this);
-  if (!entryList.empty()) {
-    stream << prefix << "loaded from store entries:";
-    for (std::set<ref<TxStoreEntry> >::const_iterator it = entryList.begin(),
-                                                      ie = entryList.end();
-         it != ie; ++it) {
-      stream << "\n";
-      (*it)->print(stream, tabsNext);
-    }
-  }
 }
 }
