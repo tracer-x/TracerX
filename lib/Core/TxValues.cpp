@@ -853,5 +853,14 @@ void TxStateValue::printNoDependency(llvm::raw_ostream &stream,
   stream << "\n";
   stream << prefix
          << "pointer to location object: " << reinterpret_cast<uintptr_t>(this);
+  if (!entryList.empty()) {
+    stream << prefix << "loaded from store entries:";
+    for (std::set<ref<TxStoreEntry> >::const_iterator it = entryList.begin(),
+                                                      ie = entryList.end();
+         it != ie; ++it) {
+      stream << "\n";
+      (*it)->print(stream, tabsNext);
+    }
+  }
 }
 }
