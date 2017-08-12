@@ -59,25 +59,27 @@ TxStore::MiddleStateStore::find(ref<TxStateAddress> loc) const {
   return ret;
 }
 
-bool TxStore::MiddleStateStore::updateStore(ref<TxStateAddress> loc,
-                                            ref<TxStateValue> address,
-                                            ref<TxStateValue> value,
-                                            uint64_t _depth) {
-  if (loc->getAllocationInfo() != allocInfo)
-    return false;
+ref<TxStoreEntry> TxStore::MiddleStateStore::updateStore(
+    ref<TxStateAddress> loc, ref<TxStateValue> address, ref<TxStateValue> value,
+    uint64_t _depth) {
+  ref<TxStoreEntry> ret;
 
-  ref<TxStoreEntry> entry(new TxStoreEntry(loc, address, value, _depth));
+  // Return null entry in case allocation info do not match
+  if (loc->getAllocationInfo() != allocInfo)
+    return ret;
+
+  ret = ref<TxStoreEntry>(new TxStoreEntry(loc, address, value, _depth));
 
   // We associate this value with the store entry, signifying that the entry is
   // important whenever the value is used. This is used for computing the
   // interpolant.
-  value->addStoreEntry(entry);
+  value->addStoreEntry(ret);
   if (loc->hasConstantAddress()) {
-    concretelyAddressedStore[loc->getAsVariable()] = entry;
+    concretelyAddressedStore[loc->getAsVariable()] = ret;
   } else {
-    symbolicallyAddressedStore[loc->getAsVariable()] = entry;
+    symbolicallyAddressedStore[loc->getAsVariable()] = ret;
   }
-  return true;
+  return ret;
 }
 
 void TxStore::MiddleStateStore::print(llvm::raw_ostream &stream,

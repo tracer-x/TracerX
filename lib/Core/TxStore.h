@@ -129,8 +129,9 @@ public:
 
     ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;
 
-    bool updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
-                     ref<TxStateValue> value, uint64_t depth);
+    ref<TxStoreEntry> updateStore(ref<TxStateAddress> loc,
+                                  ref<TxStateValue> address,
+                                  ref<TxStateValue> value, uint64_t depth);
 
     /// \brief Print the content of the object to the LLVM error stream
     void dump() const {
