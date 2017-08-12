@@ -69,11 +69,6 @@ ref<TxStoreEntry> TxStore::MiddleStateStore::updateStore(
     return ret;
 
   ret = ref<TxStoreEntry>(new TxStoreEntry(loc, address, value, _depth));
-
-  // We associate this value with the store entry, signifying that the entry is
-  // important whenever the value is used. This is used for computing the
-  // interpolant.
-  value->addStoreEntry(ret);
   if (loc->hasConstantAddress()) {
     concretelyAddressedStore[loc->getAsVariable()] = ret;
   } else {
@@ -325,6 +320,12 @@ void TxStore::updateStoreWithLoadedValue(ref<TxStateAddress> loc,
 
 void TxStore::updateStore(const std::set<ref<TxStateAddress> > &locations,
                           ref<TxStateValue> address, ref<TxStateValue> value) {
+  if (locations.empty())
+    return;
+
+  // We want to renew the table entry list, so we first remove the old ones
+  value->resetStoreEntryList();
+
   for (std::set<ref<TxStateAddress> >::const_iterator it = locations.begin(),
                                                       ie = locations.end();
        it != ie; ++it) {
@@ -334,7 +335,14 @@ void TxStore::updateStore(const std::set<ref<TxStateAddress> > &locations,
     if (middleStoreIter != internalStore.end()) {
       MiddleStateStore &middleStore = middleStoreIter->second;
       if (middleStore.hasAllocationInfo((*it)->getAllocationInfo())) {
-        middleStore.updateStore((*it), address, value, depth);
+        ref<TxStoreEntry> entry =
+            middleStore.updateStore((*it), address, value, depth);
+        if (!entry.isNull()) {
+          // We associate this value with the store entry, signifying that the
+          // entry is important whenever the value is used. This is used for
+          // computing the interpolant.
+          value->addStoreEntry(entry);
+        }
         return;
       }
 
@@ -348,7 +356,14 @@ void TxStore::updateStore(const std::set<ref<TxStateAddress> > &locations,
     MiddleStateStore newMiddleStateStore((*it)->getAllocationInfo());
     internalStore[(*it)->getContext()] = newMiddleStateStore;
     MiddleStateStore &middleStateStore = internalStore[(*it)->getContext()];
-    middleStateStore.updateStore((*it), address, value, depth);
+    ref<TxStoreEntry> entry =
+        middleStateStore.updateStore((*it), address, value, depth);
+    if (!entry.isNull()) {
+      // We associate this value with the store entry, signifying that the entry
+      // is important whenever the value is used. This is used for computing the
+      // interpolant.
+      value->addStoreEntry(entry);
+    }
   }
 
   // Here we also mark the entries used to build the value and the address as

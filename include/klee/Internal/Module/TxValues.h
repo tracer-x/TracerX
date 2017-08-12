@@ -677,6 +677,10 @@ public:
   /// value
   void addStoreEntry(ref<TxStoreEntry> entry);
 
+  /// \brief Clear the contents of the list of entries this value was loaded
+  /// from
+  void resetStoreEntryList() { entryList.clear(); }
+
   const std::set<ref<TxStoreEntry> > &getEntryList() const;
 
   const std::map<ref<TxStateValue>, ref<TxStateAddress> > &getSources() {
