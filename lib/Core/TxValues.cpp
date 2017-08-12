@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ShadowArray.h"
-#include "TxStore.cpp"
+#include "TxStore.h"
 
 #include "klee/Internal/Module/TxValues.h"
 #include "klee/Internal/Support/ErrorHandling.h"
@@ -788,7 +788,7 @@ void TxStateValue::addDependency(ref<TxStateValue> source,
   entryList.insert(source->entryList.begin(), source->entryList.end());
 }
 
-inline void TxStateValue::addStoreEntry(ref<TxStoreEntry> entry) {
+void TxStateValue::addStoreEntry(ref<TxStoreEntry> entry) {
   entryList.insert(entry);
 }
 
