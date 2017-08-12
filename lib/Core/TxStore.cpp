@@ -323,6 +323,10 @@ void TxStore::updateStore(const std::set<ref<TxStateAddress> > &locations,
   if (locations.empty())
     return;
 
+  // Here we also mark the entries used to build the value as used. Only used
+  // entries will be in the interpolant
+  markUsed(value->getEntryList());
+
   // We want to renew the table entry list, so we first remove the old ones
   value->resetStoreEntryList();
 
@@ -365,11 +369,6 @@ void TxStore::updateStore(const std::set<ref<TxStateAddress> > &locations,
       value->addStoreEntry(entry);
     }
   }
-
-  // Here we also mark the entries used to build the value and the address as
-  // used. Only used entries will be in the interpolant
-  markUsed(value->getEntryList());
-  markUsed(address->getEntryList());
 }
 
 void TxStore::markUsed(const std::set<ref<TxStoreEntry> > &entryList) {

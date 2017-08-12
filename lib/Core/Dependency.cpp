@@ -1197,6 +1197,7 @@ void Dependency::bindReturnValue(llvm::CallInst *site,
 void Dependency::markAllValues(ref<TxStateValue> value,
                                const std::string &reason) {
   markFlow(value, reason);
+  store->markUsed(value->getEntryList());
 }
 
 void Dependency::markAllValues(llvm::Value *val, ref<Expr> expr,
@@ -1207,6 +1208,7 @@ void Dependency::markAllValues(llvm::Value *val, ref<Expr> expr,
     return;
 
   markFlow(value, reason);
+  store->markUsed(value->getEntryList());
 }
 
 bool Dependency::markAllPointerValues(llvm::Value *val, ref<Expr> address,
@@ -1217,7 +1219,9 @@ bool Dependency::markAllPointerValues(llvm::Value *val, ref<Expr> address,
   if (value.isNull())
     return false;
 
-  return markPointerFlow(value, value, bounds, reason);
+  bool ret = markPointerFlow(value, value, bounds, reason);
+  store->markUsed(value->getEntryList());
+  return ret;
 }
 
 /// \brief Tests if bound interpolation shold be enabled
