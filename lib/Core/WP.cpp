@@ -105,8 +105,7 @@ std::map<KInstruction *, bool> WeakestPreCondition::markVariables(
 ref<Expr> WeakestPreCondition::GenerateWP(
     std::map<KInstruction *, bool> reverseInstructionList) {
 
-  // Converting Instructions to Expressions
-  ref<Expr> wpExpr = eb->False();
+  klee_message("**********WP Interpolant Start************");
   std::map<llvm::Value *, ref<Expr> > wpMap;
   for (std::map<KInstruction *, bool>::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
@@ -117,6 +116,9 @@ ref<Expr> WeakestPreCondition::GenerateWP(
     } else {
       // Retrieve the instruction
       llvm::Instruction *i = (*it).first->inst;
+      klee_message("Printing LLVM Instruction: ");
+      i->dump();
+      klee_message("---------------------------------------------");
 
       switch (i->getOpcode()) {
 
@@ -306,8 +308,12 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         klee_message("+++++++++++++++++++++++++++++++++++++++++++++");
       }
       }
+      klee_message("**** Weakest PreCondition ****");
+      WPExpr->dump();
+      klee_message("***************************************");
     }
   }
+  klee_message("**********Generating WP finished**********");
 
   return WPExpr;
 }
@@ -365,9 +371,9 @@ ref<Expr> WeakestPreCondition::getLHS(llvm::Instruction *i) {
 }
 
 void WeakestPreCondition::updateWPExpr(ref<Expr> result) {
-  if (WPExpr == eb->False())
+  if (WPExpr == eb->False()) {
     WPExpr = result;
-  else {
+  } else {
     this->substituteExpr(result);
     this->simplifyWPExpr();
   }
@@ -378,6 +384,7 @@ void WeakestPreCondition::substituteExpr(ref<Expr> result) {
   case Expr::Eq: {
     const ref<Expr> lhs = result->getKid(0);
     const ref<Expr> rhs = result->getKid(1);
+
     WPExpr = this->substituteExpr(WPExpr, lhs, rhs);
     break;
   }
@@ -391,11 +398,10 @@ ref<Expr> WeakestPreCondition::substituteExpr(ref<Expr> base,
                                               const ref<Expr> lhs,
                                               const ref<Expr> rhs) {
 
-  if (base.compare(lhs))
+  if (base.compare(lhs) == 0)
     return rhs;
   else {
     switch (base->getKind()) {
-
     case Expr::InvalidKind:
     case Expr::Constant: {
       return base;
