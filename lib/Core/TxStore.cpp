@@ -17,6 +17,7 @@
 #include "TxStore.h"
 
 #include "klee/CommandLine.h"
+#include "klee/Internal/Module/TxValues.h"
 #include "klee/util/TxPrintUtil.h"
 
 using namespace klee;
@@ -27,11 +28,12 @@ void TxStoreEntry::print(llvm::raw_ostream &stream,
                          const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
+  stream << prefix << "creation depth: " << depth << "\n";
   stream << prefix << "address:\n";
   address->print(stream, tabsNext);
   stream << "\n";
   stream << prefix << "content:\n";
-  content->print(stream, tabsNext);
+  content->printMinimal(stream, tabsNext);
 }
 
 /**/
@@ -58,20 +60,22 @@ TxStore::MiddleStateStore::find(ref<TxStateAddress> loc) const {
   return ret;
 }
 
-bool TxStore::MiddleStateStore::updateStore(ref<TxStateAddress> loc,
-                                            ref<TxStateValue> address,
-                                            ref<TxStateValue> value) {
-  if (loc->getAllocationInfo() != allocInfo)
-    return false;
+ref<TxStoreEntry> TxStore::MiddleStateStore::updateStore(
+    ref<TxStateAddress> loc, ref<TxStateValue> address, ref<TxStateValue> value,
+    uint64_t _depth) {
+  ref<TxStoreEntry> ret;
 
+  // Return null entry in case allocation info do not match
+  if (loc->getAllocationInfo() != allocInfo)
+    return ret;
+
+  ret = ref<TxStoreEntry>(new TxStoreEntry(loc, address, value, _depth));
   if (loc->hasConstantAddress()) {
-    concretelyAddressedStore[loc->getAsVariable()] =
-        ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
+    concretelyAddressedStore[loc->getAsVariable()] = ret;
   } else {
-    symbolicallyAddressedStore[loc->getAsVariable()] =
-        ref<TxStoreEntry>(new TxStoreEntry(loc, address, value));
+    symbolicallyAddressedStore[loc->getAsVariable()] = ret;
   }
-  return true;
+  return ret;
 }
 
 void TxStore::MiddleStateStore::print(llvm::raw_ostream &stream,
@@ -125,8 +129,9 @@ void TxStore::MiddleStateStore::print(llvm::raw_ostream &stream,
 /**/
 
 ref<TxStoreEntry> TxStore::find(ref<TxStateAddress> loc) const {
-  TopStateStore::const_iterator storeIter = store.find(loc->getContext());
-  if (storeIter != store.end()) {
+  TopStateStore::const_iterator storeIter =
+      internalStore.find(loc->getContext());
+  if (storeIter != internalStore.end()) {
     return storeIter->second.find(loc);
   }
 
@@ -136,27 +141,34 @@ ref<TxStoreEntry> TxStore::find(ref<TxStateAddress> loc) const {
 
 void TxStore::getStoredExpressions(
     const std::vector<llvm::Instruction *> &callHistory,
-    std::set<const Array *> &replacements, bool coreOnly,
+    std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
     TopInterpolantStore &_concretelyAddressedStore,
     TopInterpolantStore &_symbolicallyAddressedStore,
     LowerInterpolantStore &_concretelyAddressedHistoricalStore,
     LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const {
-  getConcreteStore(callHistory, store, concretelyAddressedHistoricalStore,
-                   replacements, coreOnly, _concretelyAddressedStore,
+  getConcreteStore(callHistory, replacements, coreOnly, leftRetrieval,
+                   _concretelyAddressedStore,
                    _concretelyAddressedHistoricalStore);
-  getSymbolicStore(callHistory, store, symbolicallyAddressedHistoricalStore,
-                   replacements, coreOnly, _symbolicallyAddressedStore,
+  getSymbolicStore(callHistory, replacements, coreOnly, leftRetrieval,
+                   _symbolicallyAddressedStore,
                    _symbolicallyAddressedHistoricalStore);
 }
 
-inline void
-TxStore::concreteToInterpolant(ref<TxVariable> variable,
-                               ref<TxStoreEntry> entry,
-                               std::set<const Array *> &replacements,
-                               bool coreOnly, LowerInterpolantStore &map) {
+inline void TxStore::concreteToInterpolant(
+    ref<TxVariable> variable, ref<TxStoreEntry> entry,
+    std::set<const Array *> &replacements, bool coreOnly,
+    LowerInterpolantStore &map, bool leftRetrieval) const {
   if (!coreOnly) {
     map[variable] = entry->getContent()->getInterpolantStyleValue();
   } else if (entry->getContent()->isCore()) {
+    // Do not add to the map if entry is not used
+    if (leftRetrieval) {
+      if (usedByLeftPath.find(entry) == usedByLeftPath.end())
+        return;
+    } else if (usedByRightPath.find(entry) == usedByRightPath.end()) {
+      return;
+    }
+
     // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
     if (!NoExistential) {
@@ -171,14 +183,21 @@ TxStore::concreteToInterpolant(ref<TxVariable> variable,
   }
 }
 
-inline void
-TxStore::symbolicToInterpolant(ref<TxVariable> variable,
-                               ref<TxStoreEntry> entry,
-                               std::set<const Array *> &replacements,
-                               bool coreOnly, LowerInterpolantStore &map) {
+inline void TxStore::symbolicToInterpolant(
+    ref<TxVariable> variable, ref<TxStoreEntry> entry,
+    std::set<const Array *> &replacements, bool coreOnly,
+    LowerInterpolantStore &map, bool leftRetrieval) const {
   if (!coreOnly) {
     map[variable] = entry->getContent()->getInterpolantStyleValue();
   } else if (entry->getContent()->isCore()) {
+    // Do not add to the map if entry is not used
+    if (leftRetrieval) {
+      if (usedByLeftPath.find(entry) == usedByLeftPath.end())
+        return;
+    } else if (usedByRightPath.find(entry) == usedByRightPath.end()) {
+      return;
+    }
+
     // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
     if (!NoExistential) {
@@ -199,125 +218,204 @@ TxStore::symbolicToInterpolant(ref<TxVariable> variable,
 
 void TxStore::getConcreteStore(
     const std::vector<llvm::Instruction *> &callHistory,
-    const TopStateStore &store, const LowerStateStore &historicalStore,
-    std::set<const Array *> &replacements, bool coreOnly,
-    TopInterpolantStore &concretelyAddressedStore,
-    LowerInterpolantStore &concretelyAddressedHistoricalStore) {
-  for (TopStateStore::const_iterator it = store.begin(), ie = store.end();
+    std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
+    TopInterpolantStore &_concretelyAddressedStore,
+    LowerInterpolantStore &_concretelyAddressedHistoricalStore) const {
+  for (TopStateStore::const_iterator it = internalStore.begin(),
+                                     ie = internalStore.end();
        it != ie; ++it) {
     TopInterpolantStore::iterator storeIter =
-        concretelyAddressedStore.find(it->first);
+        _concretelyAddressedStore.find(it->first);
 
     const MiddleStateStore &middleStore = it->second;
 
-    if (storeIter == concretelyAddressedStore.end()) {
+    if (storeIter == _concretelyAddressedStore.end()) {
       LowerInterpolantStore map;
 
       for (LowerStateStore::const_iterator it1 = middleStore.concreteBegin(),
                                            ie1 = middleStore.concreteEnd();
            it1 != ie1; ++it1) {
         concreteToInterpolant(it1->first, it1->second, replacements, coreOnly,
-                              map);
+                              map, leftRetrieval);
       }
 
       // The map is only added when it is not empty; this is to avoid entries
       // mapped to empty structure in concretelyAddressedStore
       if (!map.empty()) {
-        concretelyAddressedStore[it->first] = map;
+        _concretelyAddressedStore[it->first] = map;
       }
     } else {
       for (LowerStateStore::const_iterator it1 = middleStore.concreteBegin(),
                                            ie1 = middleStore.concreteEnd();
            it1 != ie1; ++it1) {
         concreteToInterpolant(it1->first, it1->second, replacements, coreOnly,
-                              storeIter->second);
+                              storeIter->second, leftRetrieval);
       }
     }
   }
 
-  for (LowerStateStore::const_iterator it = historicalStore.begin(),
-                                       ie = historicalStore.end();
+  for (LowerStateStore::const_iterator
+           it = concretelyAddressedHistoricalStore.begin(),
+           ie = concretelyAddressedHistoricalStore.end();
        it != ie; ++it) {
     concreteToInterpolant(it->first, it->second, replacements, coreOnly,
-                          concretelyAddressedHistoricalStore);
+                          _concretelyAddressedHistoricalStore, leftRetrieval);
   }
 }
 
 void TxStore::getSymbolicStore(
     const std::vector<llvm::Instruction *> &callHistory,
-    const TopStateStore &store, const LowerStateStore &historicalStore,
-    std::set<const Array *> &replacements, bool coreOnly,
-    TopInterpolantStore &symbolicallyAddressedStore,
-    LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
-  for (TopStateStore::const_iterator it = store.begin(), ie = store.end();
+    std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
+    TopInterpolantStore &_symbolicallyAddressedStore,
+    LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const {
+  for (TopStateStore::const_iterator it = internalStore.begin(),
+                                     ie = internalStore.end();
        it != ie; ++it) {
     TopInterpolantStore::iterator storeIter =
-        symbolicallyAddressedStore.find(it->first);
+        _symbolicallyAddressedStore.find(it->first);
 
     const MiddleStateStore &middleStore = it->second;
 
-    if (storeIter == symbolicallyAddressedStore.end()) {
+    if (storeIter == _symbolicallyAddressedStore.end()) {
       LowerInterpolantStore map;
 
       for (LowerStateStore::const_iterator it1 = middleStore.symbolicBegin(),
                                            ie1 = middleStore.symbolicEnd();
            it1 != ie1; ++it1) {
         symbolicToInterpolant(it1->first, it1->second, replacements, coreOnly,
-                              map);
+                              map, leftRetrieval);
       }
 
       // The map is only added when it is not empty; this is to avoid entries
       // mapped to empty structure in symbolicallyAddressedStore
       if (!map.empty()) {
-        symbolicallyAddressedStore[it->first] = map;
+        _symbolicallyAddressedStore[it->first] = map;
       }
     } else {
       for (LowerStateStore::const_iterator it1 = middleStore.symbolicBegin(),
                                            ie1 = middleStore.symbolicEnd();
            it1 != ie1; ++it1) {
         symbolicToInterpolant(it1->first, it1->second, replacements, coreOnly,
-                              storeIter->second);
+                              storeIter->second, leftRetrieval);
       }
     }
   }
 
-  for (LowerStateStore::const_iterator it = historicalStore.begin(),
-                                       ie = historicalStore.end();
+  for (LowerStateStore::const_iterator
+           it = symbolicallyAddressedHistoricalStore.begin(),
+           ie = symbolicallyAddressedHistoricalStore.end();
        it != ie; ++it) {
     symbolicToInterpolant(it->first, it->second, replacements, coreOnly,
-                          symbolicallyAddressedHistoricalStore);
+                          _symbolicallyAddressedHistoricalStore, leftRetrieval);
   }
 }
 
 void TxStore::updateStoreWithLoadedValue(ref<TxStateAddress> loc,
                                          ref<TxStateValue> address,
                                          ref<TxStateValue> value) {
-  updateStore(loc, address, value);
+  std::set<ref<TxStateAddress> > locations;
+  locations.insert(loc);
+  updateStore(locations, address, value);
   value->setLoadAddress(address);
 }
 
-void TxStore::updateStore(ref<TxStateAddress> loc, ref<TxStateValue> address,
-                          ref<TxStateValue> value) {
-  TopStateStore::iterator middleStoreIter = store.find(loc->getContext());
+void TxStore::updateStore(const std::set<ref<TxStateAddress> > &locations,
+                          ref<TxStateValue> address, ref<TxStateValue> value) {
+  if (locations.empty())
+    return;
 
-  if (middleStoreIter != store.end()) {
-    MiddleStateStore &middleStore = middleStoreIter->second;
-    if (middleStore.hasAllocationInfo(loc->getAllocationInfo())) {
-      middleStore.updateStore(loc, address, value);
-      return;
+  // Here we also mark the entries used to build the value as used. Only used
+  // entries will be in the interpolant
+  markUsed(value->getEntryList());
+
+  // We want to renew the table entry list, so we first remove the old ones
+  value->resetStoreEntryList();
+
+  for (std::set<ref<TxStateAddress> >::const_iterator it = locations.begin(),
+                                                      ie = locations.end();
+       it != ie; ++it) {
+    TopStateStore::iterator middleStoreIter =
+        internalStore.find((*it)->getContext());
+
+    if (middleStoreIter != internalStore.end()) {
+      MiddleStateStore &middleStore = middleStoreIter->second;
+      if (middleStore.hasAllocationInfo((*it)->getAllocationInfo())) {
+        ref<TxStoreEntry> entry =
+            middleStore.updateStore((*it), address, value, depth);
+        if (!entry.isNull()) {
+          // We associate this value with the store entry, signifying that the
+          // entry is important whenever the value is used. This is used for
+          // computing the interpolant.
+          value->addStoreEntry(entry);
+        }
+        return;
+      }
+
+      // Here we save the old store
+      concretelyAddressedHistoricalStore.insert(middleStore.concreteBegin(),
+                                                middleStore.concreteEnd());
+      symbolicallyAddressedHistoricalStore.insert(middleStore.symbolicBegin(),
+                                                  middleStore.symbolicEnd());
     }
 
-    // Here we save the old store
-    concretelyAddressedHistoricalStore.insert(middleStore.concreteBegin(),
-                                              middleStore.concreteEnd());
-    symbolicallyAddressedHistoricalStore.insert(middleStore.symbolicBegin(),
-                                                middleStore.symbolicEnd());
+    MiddleStateStore newMiddleStateStore((*it)->getAllocationInfo());
+    internalStore[(*it)->getContext()] = newMiddleStateStore;
+    MiddleStateStore &middleStateStore = internalStore[(*it)->getContext()];
+    ref<TxStoreEntry> entry =
+        middleStateStore.updateStore((*it), address, value, depth);
+    if (!entry.isNull()) {
+      // We associate this value with the store entry, signifying that the entry
+      // is important whenever the value is used. This is used for computing the
+      // interpolant.
+      value->addStoreEntry(entry);
+    }
   }
+}
 
-  MiddleStateStore newMiddleStateStore(loc->getAllocationInfo());
-  store[loc->getContext()] = newMiddleStateStore;
-  MiddleStateStore &middleStateStore = store[loc->getContext()];
-  middleStateStore.updateStore(loc, address, value);
+void TxStore::markUsed(const std::set<ref<TxStoreEntry> > &entryList) {
+  for (std::set<ref<TxStoreEntry> >::const_iterator it = entryList.begin(),
+                                                    ie = entryList.end();
+       it != ie; ++it) {
+    uint64_t entryDepth = (*it)->getDepth();
+
+    if (entryDepth == depth)
+      continue;
+
+    assert(entryDepth < depth && "invalid depth");
+
+    // We now register the used entry as used after it was instantiated in
+    // previous depth levels
+    TxStore *prev = 0, *current = parent;
+    while (current && entryDepth <= current->depth) {
+      const TxStore *constPrev;
+      if (!prev) {
+        constPrev = this;
+      } else {
+        constPrev = prev;
+      }
+      if (current->left == constPrev) {
+        std::set<ref<TxStoreEntry> >::iterator usedEntryIter =
+            current->usedByLeftPath.find(*it);
+        if (usedEntryIter == current->usedByLeftPath.end()) {
+          current->usedByLeftPath.insert(*it);
+        } else {
+          break;
+        }
+      } else if (current->right == constPrev) {
+        std::set<ref<TxStoreEntry> >::iterator usedEntryIter =
+            current->usedByRightPath.find(*it);
+        if (usedEntryIter == current->usedByRightPath.end()) {
+          current->usedByRightPath.insert(*it);
+        } else {
+          break;
+        }
+      } else {
+        assert(!"child is neither left not right");
+      }
+      prev = current;
+      current = current->parent;
+    }
+  }
 }
 
 /// \brief Print the content of the object to the LLVM error stream
@@ -330,10 +428,11 @@ void TxStore::print(llvm::raw_ostream &stream,
   std::string tabsNextNext = appendTab(tabsNext);
 
   stream << tabs << "store = [";
-  if (!store.empty()) {
+  if (!internalStore.empty()) {
     stream << "\n";
-    for (TopStateStore::const_iterator topIs = store.begin(),
-                                       topIe = store.end(), topIt = topIs;
+    for (TopStateStore::const_iterator topIs = internalStore.begin(),
+                                       topIe = internalStore.end(),
+                                       topIt = topIs;
          topIt != topIe; ++topIt) {
       if (topIt != topIs) {
         stream << "\n";

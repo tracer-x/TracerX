@@ -42,6 +42,8 @@ class TxStateAddress;
 
 class TxStateValue;
 
+class TxStoreEntry;
+
 class AllocationContext {
 
 public:
@@ -630,29 +632,15 @@ private:
   /// \brief All load addresses, transitively
   std::set<ref<TxStateAddress> > allLoadAddresses;
 
+  /// \brief Store entries this value is dependent upon
+  std::set<ref<TxStoreEntry> > entryList;
+
   TxStateValue(llvm::Value *value,
                const std::vector<llvm::Instruction *> &_callHistory,
                ref<Expr> _valueExpr)
       : refCount(0), value(value), valueExpr(_valueExpr), core(false),
         id(reinterpret_cast<uint64_t>(this)), callHistory(_callHistory),
         doNotInterpolateBound(false), directUseCount(0) {}
-
-  /// \brief Print the content of the object, but without showing its source
-  /// values.
-  ///
-  /// \param stream The stream to print the data to.
-  void printNoDependency(llvm::raw_ostream &stream) const {
-    std::string emptyString;
-    printNoDependency(stream, emptyString);
-  }
-
-  /// \brief Print the content of the object, but without showing its source
-  /// values.
-  ///
-  /// \param stream The stream to print the data to.
-  /// \param prefix Padding spaces to print before the actual data.
-  void printNoDependency(llvm::raw_ostream &stream,
-                         const std::string &prefix) const;
 
 public:
   ~TxStateValue() { locations.clear(); }
@@ -669,31 +657,31 @@ public:
 
   void disableBoundInterpolation() { doNotInterpolateBound = true; }
 
-  void setLoadAddress(ref<TxStateValue> _loadAddress) {
-    loadAddress = _loadAddress;
-    allLoadAddresses.insert(_loadAddress->getLocations().begin(),
-                            _loadAddress->getLocations().end());
-  }
+  /// \brief Set the address this value was loaded from for inclusion in the
+  /// interpolant
+  void setLoadAddress(ref<TxStateValue> _loadAddress);
 
   ref<TxStateValue> getLoadAddress() { return loadAddress; }
 
-  void setStoreAddress(ref<TxStateValue> _storeAddress) {
-    storeAddress = _storeAddress;
-    allLoadAddresses.insert(_storeAddress->getLocations().begin(),
-                            _storeAddress->getLocations().end());
-  }
+  /// \brief Set the address this value was stored into for inclusion in the
+  /// interpolant
+  void setStoreAddress(ref<TxStateValue> _storeAddress);
 
   ref<TxStateValue> getStoreAddress() { return storeAddress; }
 
   /// \brief The core routine for adding flow dependency between source and
   /// target value
-  void addDependency(ref<TxStateValue> source, ref<TxStateAddress> via) {
-    sources[source] = via;
-    if (via.isNull()) {
-      allLoadAddresses.insert(source->allLoadAddresses.begin(),
-                              source->allLoadAddresses.end());
-    }
-  }
+  void addDependency(ref<TxStateValue> source, ref<TxStateAddress> via);
+
+  /// \brief Add the store entry used to store the value used to compute this
+  /// value
+  void addStoreEntry(ref<TxStoreEntry> entry);
+
+  /// \brief Clear the contents of the list of entries this value was loaded
+  /// from
+  void resetStoreEntryList() { entryList.clear(); }
+
+  const std::set<ref<TxStoreEntry> > &getEntryList() const;
 
   const std::map<ref<TxStateValue>, ref<TxStateAddress> > &getSources() {
     return sources;
@@ -752,6 +740,20 @@ public:
     return TxInterpolantValue::create(value, valueExpr, canInterpolateBound(),
                                       coreReasons, locations, replacements);
   }
+
+  /// \brief Print minimal information about this object.
+  ///
+  /// \param stream The stream to print the data to.
+  void printMinimal(llvm::raw_ostream &stream) const {
+    std::string emptyString;
+    printMinimal(stream, emptyString);
+  }
+
+  /// \brief Print minimal information about this object.
+  ///
+  /// \param stream The stream to print the data to.
+  /// \param prefix Padding spaces to print before the actual data.
+  void printMinimal(llvm::raw_ostream &stream, const std::string &prefix) const;
 
   /// \brief Print the content of the object into a stream
   ///

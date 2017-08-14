@@ -2048,7 +2048,7 @@ TxTree::TxTree(
   currentTxTreeNode = 0;
   assert(_targetData && "target data layout not provided");
   if (!_root->txTreeNode) {
-    currentTxTreeNode = new TxTreeNode(0, _targetData, _globalAddresses);
+    currentTxTreeNode = TxTreeNode::createRoot(_targetData, _globalAddresses);
   }
   root = currentTxTreeNode;
 }
@@ -2372,10 +2372,8 @@ void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
 void TxTreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
   TimerStatIncrementer t(splitTime);
   assert(left == 0 && right == 0);
-  leftData->txTreeNode = left =
-      new TxTreeNode(this, targetData, globalAddresses);
-  rightData->txTreeNode = right =
-      new TxTreeNode(this, targetData, globalAddresses);
+  leftData->txTreeNode = createLeftChild();
+  rightData->txTreeNode = createRightChild();
 }
 
 void TxTreeNode::execute(llvm::Instruction *instr,
@@ -2412,11 +2410,20 @@ void TxTreeNode::getStoredExpressions(
   // Since a program point index is a first statement in a basic block,
   // the allocations to be stored in subsumption table should be obtained
   // from the parent node.
-  if (parent)
+  if (parent) {
+    bool leftRetrieval = false;
+
+    if (parent->left == this)
+      leftRetrieval = true;
+    else
+      assert(parent->right == this && "mismatched tree edge");
+
     parent->dependency->getStoredExpressions(
-        _callHistory, dummyReplacements, false, concretelyAddressedStore,
-        symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
+        _callHistory, dummyReplacements, false, leftRetrieval,
+        concretelyAddressedStore, symbolicallyAddressedStore,
+        concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);
+  }
 }
 
 void TxTreeNode::getStoredCoreExpressions(
@@ -2432,11 +2439,20 @@ void TxTreeNode::getStoredCoreExpressions(
   // Since a program point index is a first statement in a basic block,
   // the allocations to be stored in subsumption table should be obtained
   // from the parent node.
-  if (parent)
+  if (parent) {
+    bool leftRetrieval = false;
+
+    if (parent->left == this)
+      leftRetrieval = true;
+    else
+      assert(parent->right == this && "mismatched tree edge");
+
     parent->dependency->getStoredExpressions(
-        _callHistory, replacements, true, concretelyAddressedStore,
-        symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
+        _callHistory, replacements, true, leftRetrieval,
+        concretelyAddressedStore, symbolicallyAddressedStore,
+        concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);
+  }
 }
 
 uint64_t TxTreeNode::getInstructionsDepth() { return instructionsDepth; }

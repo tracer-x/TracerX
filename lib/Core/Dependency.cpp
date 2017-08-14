@@ -431,7 +431,7 @@ void Dependency::populateArgumentValuesList(
 Dependency::Dependency(
     Dependency *parent, llvm::DataLayout *_targetData,
     std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses)
-    : parent(parent), targetData(_targetData),
+    : parent(parent), left(0), right(0), targetData(_targetData),
       globalAddresses(_globalAddresses) {
   if (parent) {
     store = TxStore::create(parent->store);
@@ -860,13 +860,8 @@ void Dependency::execute(llvm::Instruction *instr,
         }
       }
 
-      std::set<ref<TxStateAddress> > locations = addressValue->getLocations();
-
-      for (std::set<ref<TxStateAddress> >::iterator it = locations.begin(),
-                                                    ie = locations.end();
-           it != ie; ++it) {
-        store->updateStore(*it, addressValue, storedValue);
-      }
+      store->updateStore(addressValue->getLocations(), addressValue,
+                         storedValue);
       break;
     }
     case llvm::Instruction::Trunc:
@@ -1070,13 +1065,7 @@ void Dependency::executeMakeSymbolic(
     }
   }
 
-  std::set<ref<TxStateAddress> > locations = addressValue->getLocations();
-
-  for (std::set<ref<TxStateAddress> >::iterator it = locations.begin(),
-                                                ie = locations.end();
-       it != ie; ++it) {
-    store->updateStore(*it, addressValue, storedValue);
-  }
+  store->updateStore(addressValue->getLocations(), addressValue, storedValue);
 }
 
 void Dependency::executePHI(llvm::Instruction *instr,
@@ -1208,6 +1197,7 @@ void Dependency::bindReturnValue(llvm::CallInst *site,
 void Dependency::markAllValues(ref<TxStateValue> value,
                                const std::string &reason) {
   markFlow(value, reason);
+  store->markUsed(value->getEntryList());
 }
 
 void Dependency::markAllValues(llvm::Value *val, ref<Expr> expr,
@@ -1218,6 +1208,7 @@ void Dependency::markAllValues(llvm::Value *val, ref<Expr> expr,
     return;
 
   markFlow(value, reason);
+  store->markUsed(value->getEntryList());
 }
 
 bool Dependency::markAllPointerValues(llvm::Value *val, ref<Expr> address,
@@ -1228,7 +1219,9 @@ bool Dependency::markAllPointerValues(llvm::Value *val, ref<Expr> address,
   if (value.isNull())
     return false;
 
-  return markPointerFlow(value, value, bounds, reason);
+  bool ret = markPointerFlow(value, value, bounds, reason);
+  store->markUsed(value->getEntryList());
+  return ret;
 }
 
 /// \brief Tests if bound interpolation shold be enabled

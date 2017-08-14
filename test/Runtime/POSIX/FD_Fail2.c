@@ -1,6 +1,6 @@
 // RUN: %llvmgcc %s -emit-llvm -O0 -c -o %t1.bc
 // RUN: rm -rf %t.klee-out
-// RUN: %klee --output-dir=%t.klee-out --libc=uclibc --posix-runtime --search=dfs %t1.bc --sym-files 1 10 --max-fail 2
+// RUN: %klee --no-interpolation --output-dir=%t.klee-out --libc=uclibc --posix-runtime --search=dfs %t1.bc --sym-files 1 10 --max-fail 2
 //
 // Check that generated assembly doesn't use puts to output strings
 // RUN: FileCheck -input-file=%t.klee-out/assembly.ll %s

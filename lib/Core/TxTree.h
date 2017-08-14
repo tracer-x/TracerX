@@ -422,7 +422,6 @@ class TxTreeNode {
   /// purposes
   static uint64_t nextNodeSequenceNumber;
 
-private:
   /// \brief The path condition
   PathCondition *pathCondition;
 
@@ -446,21 +445,11 @@ private:
   /// \brief The data layout of the analysis target
   llvm::DataLayout *targetData;
 
-  /// Map of globals to their bound address. This also includes
-  /// globals that have no representative object (i.e. functions). This member
-  /// variable is just a pointer to the one in klee::Executor.
+  /// \brief Map of globals to their bound address. This also includes globals
+  /// that have no representative object (i.e. functions). This member variable
+  /// is just a pointer to the one in klee::Executor.
   std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
 
-public:
-  bool isSubsumed;
-
-  /// \brief The entry call history
-  std::vector<llvm::Instruction *> entryCallHistory;
-
-  /// \brief The current call history
-  std::vector<llvm::Instruction *> callHistory;
-
-private:
   void setProgramPoint(llvm::Instruction *instr) {
     if (!programPoint)
       programPoint = reinterpret_cast<uintptr_t>(instr);
@@ -477,7 +466,41 @@ private:
   void execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args,
                bool symbolicExecutionError);
 
+  void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
+
+  TxTreeNode(TxTreeNode *_parent, llvm::DataLayout *_targetData,
+             std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
+                 _globalAddresses);
+
+  ~TxTreeNode();
+
+  static TxTreeNode *createRoot(llvm::DataLayout *targetData,
+                                std::map<const llvm::GlobalValue *,
+                                         ref<ConstantExpr> > *globalAddresses) {
+    return new TxTreeNode(0, targetData, globalAddresses);
+  }
+
+  TxTreeNode *createLeftChild() {
+    left = new TxTreeNode(this, targetData, globalAddresses);
+    dependency->setLeftChild(left->dependency);
+    return left;
+  }
+
+  TxTreeNode *createRightChild() {
+    right = new TxTreeNode(this, targetData, globalAddresses);
+    dependency->setRightChild(right->dependency);
+    return right;
+  }
+
 public:
+  bool isSubsumed;
+
+  /// \brief The entry call history
+  std::vector<llvm::Instruction *> entryCallHistory;
+
+  /// \brief The current call history
+  std::vector<llvm::Instruction *> callHistory;
+
   uintptr_t getProgramPoint() { return programPoint; }
 
   uint64_t getNodeSequenceNumber() { return nodeSequenceNumber; }
@@ -574,15 +597,6 @@ public:
   ///
   /// \param stream The stream to print the data to.
   void print(llvm::raw_ostream &stream) const;
-
-private:
-  TxTreeNode(TxTreeNode *_parent, llvm::DataLayout *_targetData,
-             std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
-                 _globalAddresses);
-
-  ~TxTreeNode();
-
-  void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
 };
 
 /// \brief The top-level structure that implements abstraction learning.

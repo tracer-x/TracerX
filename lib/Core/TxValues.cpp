@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ShadowArray.h"
+#include "TxStore.h"
 
 #include "klee/Internal/Module/TxValues.h"
 #include "klee/Internal/Support/ErrorHandling.h"
@@ -761,11 +762,57 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
 
 /**/
 
+void TxStateValue::setLoadAddress(ref<TxStateValue> _loadAddress) {
+  loadAddress = _loadAddress;
+  allLoadAddresses.insert(_loadAddress->locations.begin(),
+                          _loadAddress->locations.end());
+  entryList.insert(_loadAddress->entryList.begin(),
+                   _loadAddress->entryList.end());
+}
+
+void TxStateValue::setStoreAddress(ref<TxStateValue> _storeAddress) {
+  storeAddress = _storeAddress;
+  allLoadAddresses.insert(_storeAddress->locations.begin(),
+                          _storeAddress->locations.end());
+  entryList.insert(_storeAddress->entryList.begin(),
+                   _storeAddress->entryList.end());
+}
+
+void TxStateValue::addDependency(ref<TxStateValue> source,
+                                 ref<TxStateAddress> via) {
+  sources[source] = via;
+  if (via.isNull()) {
+    allLoadAddresses.insert(source->allLoadAddresses.begin(),
+                            source->allLoadAddresses.end());
+  }
+  entryList.insert(source->entryList.begin(), source->entryList.end());
+}
+
+void TxStateValue::addStoreEntry(ref<TxStoreEntry> entry) {
+  entryList.insert(entry);
+}
+
+const std::set<ref<TxStoreEntry> > &TxStateValue::getEntryList() const {
+  return entryList;
+}
+
 void TxStateValue::print(llvm::raw_ostream &stream,
                          const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
-  printNoDependency(stream, prefix);
+  printMinimal(stream, prefix);
+
+  if (entryList.empty()) {
+    stream << prefix << "not dependent on store\n";
+  } else {
+    stream << prefix << "loaded from store entries:";
+    for (std::set<ref<TxStoreEntry> >::const_iterator it = entryList.begin(),
+                                                      ie = entryList.end();
+         it != ie; ++it) {
+      stream << "\n";
+      (*it)->print(stream, tabsNext);
+    }
+  }
 
   stream << "\n";
   if (sources.empty()) {
@@ -779,7 +826,7 @@ void TxStateValue::print(llvm::raw_ostream &stream,
       stream << "\n";
       if (it != is)
         stream << tabsNext << "------------------------------------------\n";
-      (*it->first).printNoDependency(stream, tabsNext);
+      (*it->first).printMinimal(stream, tabsNext);
       if (!it->second.isNull()) {
         stream << " via\n";
         (*it->second).print(stream, tabsNext);
@@ -788,8 +835,8 @@ void TxStateValue::print(llvm::raw_ostream &stream,
   }
 }
 
-void TxStateValue::printNoDependency(llvm::raw_ostream &stream,
-                                     const std::string &prefix) const {
+void TxStateValue::printMinimal(llvm::raw_ostream &stream,
+                                const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
   if (core) {

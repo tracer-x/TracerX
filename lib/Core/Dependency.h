@@ -169,8 +169,8 @@ namespace klee {
     /// The store
     TxStore *store;
 
-    /// \brief Previous path condition
-    Dependency *parent;
+    /// \brief Parent and left and right children of the dependency information
+    Dependency *parent, *left, *right;
 
     /// \brief Argument values to be passed onto callee
     std::vector<ref<TxStateValue> > argumentValuesList;
@@ -181,8 +181,8 @@ namespace klee {
     /// \brief The data layout of the analysis target program
     llvm::DataLayout *targetData;
 
-    /// Map of globals to their bound address. This also includes
-    /// globals that have no representative object (i.e. functions). This member
+    /// \brief Map of globals to their bound address. This also includes globals
+    /// that have no representative object (i.e. functions). This member
     /// variable is just a pointer to the one in klee::Executor.
     std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
 
@@ -341,6 +341,13 @@ namespace klee {
 
     ~Dependency();
 
+    static Dependency *
+    createRoot(llvm::DataLayout *targetData,
+               std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
+                   globalAddresses) {
+      return new Dependency(0, targetData, globalAddresses);
+    }
+
     Dependency *cdr() const;
 
     /// \brief This retrieves the locations known at this state, and the
@@ -356,6 +363,9 @@ namespace klee {
     /// bound ones.
     /// \param coreOnly Indicates whether we are retrieving only data
     /// for locations relevant to an unsatisfiability core.
+    /// \param leftRetrieval Whether the retrieval is requested by the left
+    /// child of the store, otherwise, we assume it is requested by the right
+    /// child of the store.
     /// \param [out] concretelyAddressedStore The output concretely-addressed
     /// store.
     /// \param [out] symbolicallyAddressedStore The output
@@ -373,14 +383,16 @@ namespace klee {
     void getStoredExpressions(
         const std::vector<llvm::Instruction *> &callHistory,
         std::set<const Array *> &replacements, bool coreOnly,
+        bool leftRetrieval,
         TxStore::TopInterpolantStore &concretelyAddressedStore,
         TxStore::TopInterpolantStore &symbolicallyAddressedStore,
         TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
         TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
-      store->getStoredExpressions(
-          callHistory, replacements, coreOnly, concretelyAddressedStore,
-          symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
-          symbolicallyAddressedHistoricalStore);
+      store->getStoredExpressions(callHistory, replacements, coreOnly,
+                                  leftRetrieval, concretelyAddressedStore,
+                                  symbolicallyAddressedStore,
+                                  concretelyAddressedHistoricalStore,
+                                  symbolicallyAddressedHistoricalStore);
     }
 
     ref<TxStateValue>
@@ -450,6 +462,18 @@ namespace klee {
 
     /// \brief Tests if bound interpolation shold be enabled
     static bool boundInterpolation(llvm::Value *val = 0);
+
+    /// \brief Set the left child
+    void setLeftChild(Dependency *child) {
+      left = child;
+      store->setLeftChild(child->store);
+    }
+
+    /// \brief Set the right child
+    void setRightChild(Dependency *child) {
+      right = child;
+      store->setRightChild(child->store);
+    }
 
     /// \brief Print the content of the object to the LLVM error stream
     void dump() const {
