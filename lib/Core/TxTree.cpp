@@ -359,6 +359,11 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
 
   ref<Expr> newInterpolant;
 
+  // fullEqualityConstraint will necessarily be part of the return value of this
+  // function, so we check for existentials in it before proceeding further.
+  hasExistentialsOnly =
+      !hasVariableNotInSet(expr->variables, fullEqualityConstraint);
+
   for (std::vector<ref<Expr> >::iterator it = interpolantPack.begin(),
                                          ie = interpolantPack.end();
        it != ie; ++it) {
@@ -436,6 +441,10 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
     } else {
       newInterpolant = interpolantAtom;
     }
+
+    hasExistentialsOnly =
+        (hasExistentialsOnly &&
+         !hasVariableNotInSet(expr->variables, interpolantAtom));
   }
 
   ref<Expr> newBody;
@@ -446,6 +455,9 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
 
     newBody = AndExpr::create(newInterpolant, fullEqualityConstraint);
   } else {
+    hasExistentialsOnly =
+        (hasExistentialsOnly &&
+         !hasVariableNotInSet(expr->variables, simplifiedInterpolant));
     newBody = AndExpr::create(simplifiedInterpolant, fullEqualityConstraint);
   }
 
