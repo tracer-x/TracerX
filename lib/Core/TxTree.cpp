@@ -1460,8 +1460,15 @@ bool SubsumptionTableEntry::subsumed(
           z3solver->setCoreSolverTimeout(0);
           delete z3solver;
 
-          if (!success || result != Solver::True)
+          if (!success || result != Solver::True) {
+            if (debugSubsumptionLevel >= 1) {
+              klee_message("#%lu=>#%lu: Check failure as solved did not decide "
+                           "validity of existentially-quantified query",
+                           state.txTreeNode->getNodeSequenceNumber(),
+                           nodeSequenceNumber);
+            }
             return false;
+          }
         }
 
 
@@ -1477,8 +1484,14 @@ bool SubsumptionTableEntry::subsumed(
         success = solver->evaluate(state, expr, result, unsatCore);
         solver->setTimeout(0);
 
-        if (!success || result != Solver::True)
+        if (!success || result != Solver::True) {
+          if (debugSubsumptionLevel >= 1) {
+            klee_message(
+                "#%lu=>#%lu: Check failure as solved did not decide validity",
+                state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
+          }
           return false;
+        }
       }
     } else {
       // expr is a constant expression
