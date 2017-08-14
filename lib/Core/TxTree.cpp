@@ -359,6 +359,11 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
 
   ref<Expr> newInterpolant;
 
+  // fullEqualityConstraint will necessarily be part of the return value of this
+  // function, so we check for existentials in it before proceeding further.
+  hasExistentialsOnly =
+      !hasVariableNotInSet(expr->variables, fullEqualityConstraint);
+
   for (std::vector<ref<Expr> >::iterator it = interpolantPack.begin(),
                                          ie = interpolantPack.end();
        it != ie; ++it) {
@@ -436,6 +441,10 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
     } else {
       newInterpolant = interpolantAtom;
     }
+
+    hasExistentialsOnly =
+        (hasExistentialsOnly &&
+         !hasVariableNotInSet(expr->variables, interpolantAtom));
   }
 
   ref<Expr> newBody;
@@ -446,6 +455,9 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
 
     newBody = AndExpr::create(newInterpolant, fullEqualityConstraint);
   } else {
+    hasExistentialsOnly =
+        (hasExistentialsOnly &&
+         !hasVariableNotInSet(expr->variables, simplifiedInterpolant));
     newBody = AndExpr::create(simplifiedInterpolant, fullEqualityConstraint);
   }
 
@@ -1411,31 +1423,22 @@ bool SubsumptionTableEntry::subsumed(
         }
 
         if (exprHasNoFreeVariables) {
-          // In case the query expression has no free variables, we reformulate
-          // the solver call as satisfiability check of the body of the query
-          // expression.
-          ConstraintManager constraints;
+          // In case the query expression has no free variables, subsumption
+          // check succeeds, as the tabled interpolant with
+          // existentially-quantified variables was constructed from satisfiable
+          // path.
 
-          ref<Expr> falseExpr = ConstantExpr::create(0, Expr::Bool);
-          constraints.addConstraint(expr->getKid(0));
-
-          if (debugSubsumptionLevel >= 2) {
-            klee_message("Querying for satisfiability check:\n%s",
-                         PrettyExpressionBuilder::constructQuery(
-                             constraints, falseExpr).c_str());
+          if (debugSubsumptionLevel >= 1) {
+            std::string msg = "";
+            if (!corePointerValues.empty()) {
+              msg += " (with successful memory bound checks)";
+            }
+            klee_message("#%lu=>#%lu: Check success as query expression "
+                         "contains only bound variables%s",
+                         state.txTreeNode->getNodeSequenceNumber(),
+                         nodeSequenceNumber, msg.c_str());
           }
 
-          bool noSolution;
-          solver->setTimeout(timeout);
-          success = solver->solver->mustBeTrue(Query(constraints, falseExpr),
-                                               noSolution);
-          solver->setTimeout(0);
-
-          if (!success || noSolution)
-            return false;
-
-          // We can return here as there is no need to compute the
-          // interpolation.
           return true;
         } else {
           if (debugSubsumptionLevel >= 2) {
