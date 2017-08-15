@@ -36,7 +36,15 @@ using namespace klee;
 
 /**/
 
-WeakestPreCondition::WeakestPreCondition() { WPExpr = eb->False(); }
+WeakestPreCondition::WeakestPreCondition() {
+  WPExpr = eb->False();
+
+  // Used to represent constants during the simplification of WPExpr to
+  // canonical form
+
+  const Array *array = ac.CreateArray("const", 128);
+  constValues = Expr::createTempRead(array, Expr::Int32);
+}
 
 WeakestPreCondition::~WeakestPreCondition() {}
 
@@ -99,14 +107,23 @@ std::map<KInstruction *, bool> WeakestPreCondition::markVariables(
       }
     }
   }
+
+  // Printing reverseInstructionList will be omitted in the final commit
+  /*for (std::map<KInstruction *, bool>::const_reverse_iterator
+           it = reverseInstructionList.rbegin(),
+           ie = reverseInstructionList.rend();
+       it != ie; ++it) {
+          (*it).first->inst->dump();
+          llvm::errs() <<  " " << (*it).second << "\n";
+  }*/
   return reverseInstructionList;
 }
 
 ref<Expr> WeakestPreCondition::GenerateWP(
     std::map<KInstruction *, bool> reverseInstructionList) {
 
+  // This log will be omitted in the final commit
   klee_message("**********WP Interpolant Start************");
-  std::map<llvm::Value *, ref<Expr> > wpMap;
   for (std::map<KInstruction *, bool>::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
@@ -116,6 +133,7 @@ ref<Expr> WeakestPreCondition::GenerateWP(
     } else {
       // Retrieve the instruction
       llvm::Instruction *i = (*it).first->inst;
+      // This log will be omitted in the final commit
       klee_message("Printing LLVM Instruction: ");
       i->dump();
       klee_message("---------------------------------------------");
@@ -301,18 +319,36 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         break;
       }
 
+      case llvm::Instruction::Load: {
+        // Do nothing, Load instructions are handled by the
+        // generateExprFromOperand
+        // function in binary operations
+        break;
+      }
+
+      case llvm::Instruction::Store: {
+
+        ref<Expr> left = this->generateExprFromOperand(i, 0);
+        ref<Expr> right = this->generateExprFromOperand(i, 1);
+        ref<Expr> result = EqExpr::create(right, left);
+        this->updateWPExpr(result);
+        break;
+      }
+
       default: {
         klee_message("+++++++++++++++++++++++++++++++++++++++++++++");
         klee_message("LLVM Instruction Not Implemeneted Yet: ");
         i->dump();
-        klee_message("+++++++++++++++++++++++++++++++++++++++++++++");
+        klee_error("+++++++++++++++++++++++++++++++++++++++++++++");
       }
       }
+      // This log will be omitted in the final commit
       klee_message("**** Weakest PreCondition ****");
       WPExpr->dump();
       klee_message("***************************************");
     }
   }
+  // This log will be omitted in the final commit
   klee_message("**********Generating WP finished**********");
 
   return WPExpr;
@@ -338,6 +374,7 @@ ref<Expr> WeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
       arrayName = alloca->getName();
     else {
       arrayName = "tmpAlloca";
+      klee_error("Instruction has no name: tmpAlloca!\n");
     }
     unsigned arrayWidth = Expr::Int32;
     array = ac.CreateArray(arrayName, arrayWidth);
@@ -348,6 +385,7 @@ ref<Expr> WeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
       arrayName = operand1->getName();
     else {
       arrayName = "tmp";
+      klee_error("Instruction has no name: tmp!\n");
     }
     unsigned arrayWidth = Expr::Int32;
     array = ac.CreateArray(arrayName, arrayWidth);
@@ -363,6 +401,7 @@ ref<Expr> WeakestPreCondition::getLHS(llvm::Instruction *i) {
     arrayName = i->getName();
   else {
     arrayName = "tmpLHS";
+    klee_error("Instruction has no name: tmpLHS!\n");
   }
   unsigned arrayWidth = Expr::Int32;
   array = ac.CreateArray(arrayName, arrayWidth);
@@ -464,4 +503,126 @@ ref<Expr> WeakestPreCondition::substituteExpr(ref<Expr> base,
   return base;
 }
 
-void WeakestPreCondition::simplifyWPExpr() {}
+void WeakestPreCondition::simplifyWPExpr() {
+
+  switch (WPExpr->getKind()) {
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge: {
+    ref<Expr> kids[2];
+    kids[0] = WPExpr->getKid(0);
+    kids[1] = WPExpr->getKid(1);
+    std::map<ref<Expr>, uint64_t> *newLinearTerm =
+        new std::map<ref<Expr>, uint64_t>;
+    if (isa<ConstantExpr>(kids[1])) {
+      ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[1]);
+      insertTerm(newLinearTerm, constant->getZExtValue(), constValues);
+    } else {
+      newLinearTerm = this->simplifyWPTerm(newLinearTerm, kids[1]);
+    }
+    newLinearTerm = this->simplifyWPTerm(newLinearTerm, kids[0]);
+    convertToExpr(newLinearTerm);
+    delete newLinearTerm;
+    break;
+  }
+  default: {
+    klee_message("Error while parsing WP Expression:");
+    WPExpr->dump();
+    klee_error("All WP Expressions should be in the form LinearTerm CMP "
+               "Constant. Ex. X + 2Y < 5");
+  }
+  }
+}
+
+std::map<ref<Expr>, uint64_t> *WeakestPreCondition::simplifyWPTerm(
+    std::map<ref<Expr>, uint64_t> *newLinearTerm, ref<Expr> linearTerm) {
+  if (isa<ConstantExpr>(linearTerm)) {
+    ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(linearTerm);
+    insertTerm(newLinearTerm, (-1) * constant->getZExtValue(), constValues);
+  } else {
+    switch (linearTerm->getKind()) {
+    case Expr::Concat:
+    case Expr::Read: {
+      insertTerm(newLinearTerm, 1, linearTerm);
+      break;
+    }
+    case Expr::Add:
+    case Expr::Sub: {
+      ref<Expr> kids[2];
+      kids[0] = linearTerm->getKid(0);
+      simplifyWPTerm(newLinearTerm, kids[0]);
+      kids[1] = linearTerm->getKid(1);
+      simplifyWPTerm(newLinearTerm, kids[1]);
+      break;
+    }
+    case Expr::Mul:
+    case Expr::UDiv:
+    case Expr::SDiv: {
+      ref<Expr> kids[2];
+      kids[0] = linearTerm->getKid(0);
+      kids[1] = linearTerm->getKid(1);
+      if (isa<ConstantExpr>(kids[0]) && isa<ReadExpr>(kids[1])) {
+        ref<ConstantExpr> coeff = dyn_cast<ConstantExpr>(kids[0]);
+        insertTerm(newLinearTerm, coeff->getZExtValue(), kids[1]);
+      } else {
+        klee_message(
+            "Error while parsing WP Expression. Not in canonical form:");
+        linearTerm->dump();
+        klee_error("The Coefficient should come first. Ex. 2*M");
+      }
+      break;
+    }
+    default: {
+      linearTerm->dump();
+      klee_error("LHS simplification for this term is not implemented yet");
+    }
+    }
+  }
+  return newLinearTerm;
+}
+
+void WeakestPreCondition::insertTerm(
+    std::map<ref<Expr>, uint64_t> *newLinearTerm, uint64_t coeff,
+    const ref<Expr> variable) {
+  std::map<ref<Expr>, uint64_t>::iterator it = newLinearTerm->find(variable);
+  if (it == newLinearTerm->end())
+    newLinearTerm->insert(std::pair<ref<Expr>, uint64_t>(variable, coeff));
+  else
+    it->second = it->second + coeff;
+}
+
+void WeakestPreCondition::convertToExpr(
+    std::map<ref<Expr>, uint64_t> *newLinearTerm) {
+  ref<Expr> kids[2];
+  ref<Expr> temp = eb->False();
+  for (std::map<ref<Expr>, uint64_t>::const_iterator
+           it = newLinearTerm->begin(),
+           ie = newLinearTerm->end();
+       it != ie; ++it) {
+    if (it->first == constValues) {
+      kids[1] = ConstantExpr::create(it->second, Expr::Int32);
+    } else {
+      ref<Expr> lhs;
+      if (it->second == 1) {
+        lhs = it->first;
+      } else {
+        lhs = MulExpr::create(ConstantExpr::create(it->second, Expr::Int32),
+                              it->first);
+      }
+      if (temp == eb->False()) {
+        temp = lhs;
+      } else {
+        temp = AddExpr::create(lhs, temp);
+      }
+    }
+  }
+  kids[0] = temp;
+  WPExpr = WPExpr->rebuild(kids);
+}
