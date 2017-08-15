@@ -1227,11 +1227,11 @@ bool SubsumptionTableEntry::subsumed(
           if (constraint.isNull())
             return false;
 
-            if (!conjunction.isNull()) {
-              conjunction = AndExpr::create(constraint, conjunction);
-            } else {
-              conjunction = constraint;
-            }
+          if (!conjunction.isNull()) {
+            conjunction = AndExpr::create(constraint, conjunction);
+          } else {
+            conjunction = constraint;
+          }
         }
       }
 
@@ -1471,7 +1471,6 @@ bool SubsumptionTableEntry::subsumed(
           }
         }
 
-
       } else {
         if (debugSubsumptionLevel >= 2) {
           klee_message("Querying for subsumption check:\n%s",
@@ -1550,55 +1549,55 @@ bool SubsumptionTableEntry::subsumed(
       return false;
     }
 
-      // State subsumed, we mark needed constraints on the
-      // path condition.
-      if (debugSubsumptionLevel >= 1) {
-        std::string msg = "";
-        if (!corePointerValues.empty()) {
-          msg += " (with successful memory bound checks)";
-        }
-        klee_message("#%lu=>#%lu: Check success as solver decided validity%s",
-                     state.txTreeNode->getNodeSequenceNumber(),
-                     nodeSequenceNumber, msg.c_str());
+    // State subsumed, we mark needed constraints on the
+    // path condition.
+    if (debugSubsumptionLevel >= 1) {
+      std::string msg = "";
+      if (!corePointerValues.empty()) {
+        msg += " (with successful memory bound checks)";
       }
+      klee_message("#%lu=>#%lu: Check success as solver decided validity%s",
+                   state.txTreeNode->getNodeSequenceNumber(),
+                   nodeSequenceNumber, msg.c_str());
+    }
 
-      // We create path condition marking structure and mark core constraints
-      state.txTreeNode->unsatCoreInterpolation(unsatCore);
+    // We create path condition marking structure and mark core constraints
+    state.txTreeNode->unsatCoreInterpolation(unsatCore);
 
-      if (Dependency::boundInterpolation() && !ExactAddressInterpolant) {
-        // We build memory bounds interpolants from pointer values
-        std::string reason = "";
-        if (debugSubsumptionLevel >= 1) {
-          llvm::raw_string_ostream stream(reason);
-          llvm::Instruction *instr = state.pc->inst;
-          stream << "interpolating memory bound for subsumption at ";
-          if (instr->getParent()->getParent()) {
-            std::string functionName(
-                instr->getParent()->getParent()->getName().str());
-            stream << functionName << ": ";
-            if (llvm::MDNode *n = instr->getMetadata("dbg")) {
-              llvm::DILocation loc(n);
-              stream << "Line " << loc.getLineNumber();
-            } else {
-              instr->print(stream);
-            }
+    if (Dependency::boundInterpolation() && !ExactAddressInterpolant) {
+      // We build memory bounds interpolants from pointer values
+      std::string reason = "";
+      if (debugSubsumptionLevel >= 1) {
+        llvm::raw_string_ostream stream(reason);
+        llvm::Instruction *instr = state.pc->inst;
+        stream << "interpolating memory bound for subsumption at ";
+        if (instr->getParent()->getParent()) {
+          std::string functionName(
+              instr->getParent()->getParent()->getName().str());
+          stream << functionName << ": ";
+          if (llvm::MDNode *n = instr->getMetadata("dbg")) {
+            llvm::DILocation loc(n);
+            stream << "Line " << loc.getLineNumber();
           } else {
             instr->print(stream);
           }
-        }
-        for (std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > >::iterator
-                 it = corePointerValues.begin(),
-                 ie = corePointerValues.end();
-             it != ie; ++it) {
-          bool memoryError = state.txTreeNode->pointerValuesInterpolation(
-              it->first->getValue(), it->first->getExpression(), it->second,
-              reason);
-          assert(!memoryError &&
-                 "interpolation should not result in memory error");
+        } else {
+          instr->print(stream);
         }
       }
+      for (std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > >::iterator
+               it = corePointerValues.begin(),
+               ie = corePointerValues.end();
+           it != ie; ++it) {
+        bool memoryError = state.txTreeNode->pointerValuesInterpolation(
+            it->first->getValue(), it->first->getExpression(), it->second,
+            reason);
+        assert(!memoryError &&
+               "interpolation should not result in memory error");
+      }
+    }
 
-      return true;
+    return true;
   }
 #endif /* ENABLE_Z3 */
   return false;
