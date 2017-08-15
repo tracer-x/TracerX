@@ -262,6 +262,18 @@ class SubsumptionTableEntry {
   static bool hasVariableInSet(std::set<const Array *> &existentials,
                                ref<Expr> expr);
 
+  /// \brief Here we try to get bound-variables-free conjunction, if there is no
+  /// constraints with both bound and non-bound variables.
+  ///
+  /// \param existentials A set of variables (KLEE arrays).
+  /// \param expr The original conjunction of constrains to test
+  /// \return a conjuction of constraints without bound variables, in case there
+  /// is no costraint with both bound and non-bound variables, otherwise a null
+  /// expression.
+  static ref<Expr>
+  getBoundFreeConjunction(std::set<const Array *> &existentials,
+                          ref<Expr> expr);
+
   /// \brief Test for the non-existence of a variable in a set in an expression.
   ///
   /// \param existentials A set of variables (KLEE arrays).

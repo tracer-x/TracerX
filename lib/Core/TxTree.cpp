@@ -266,6 +266,33 @@ SubsumptionTableEntry::hasVariableInSet(std::set<const Array *> &existentials,
   return false;
 }
 
+ref<Expr> SubsumptionTableEntry::getBoundFreeConjunction(
+    std::set<const Array *> &existentials, ref<Expr> expr) {
+
+  if (llvm::isa<AndExpr>(expr)) {
+    ref<Expr> boundFree1 =
+        getBoundFreeConjunction(existentials, expr->getKid(0));
+    if (boundFree1.isNull())
+      return boundFree1;
+    ref<Expr> boundFree2 =
+        getBoundFreeConjunction(existentials, expr->getKid(1));
+    if (boundFree2.isNull())
+      return boundFree2;
+    return AndExpr::create(boundFree1, boundFree2);
+  }
+
+  if (hasVariableInSet(existentials, expr)) {
+    if (hasVariableNotInSet(existentials, expr)) {
+      ref<Expr> nullExpr;
+      return nullExpr;
+    }
+    return ConstantExpr::create(1, Expr::Bool);
+  }
+
+  // expr has no existentials, may even have no variables
+  return expr;
+}
+
 bool SubsumptionTableEntry::hasVariableNotInSet(
     std::set<const Array *> &existentials, ref<Expr> expr) {
   for (int i = 0, numKids = expr->getNumKids(); i < numKids; ++i) {
@@ -1441,24 +1468,40 @@ bool SubsumptionTableEntry::subsumed(
 
           return true;
         } else {
+          // Here we try to get bound-variables-free conjunction, if there is
+          // no constraint with both bound and non-bound variables
+          if (ExistsExpr *existsExpr = llvm::dyn_cast<ExistsExpr>(expr)) {
+            ref<Expr> boundFree(getBoundFreeConjunction(existsExpr->variables,
+                                                        existsExpr->getKid(0)));
+
+            if (!boundFree.isNull()) {
+              expr = boundFree;
+            }
+          }
+
           if (debugSubsumptionLevel >= 2) {
             klee_message("Querying for subsumption check:\n%s",
                          PrettyExpressionBuilder::constructQuery(
                              state.constraints, expr).c_str());
           }
 
-          // Instantiate a new Z3 solver to make sure we use Z3
-          // without pre-solving optimizations. It would be nice
-          // in the future to just run solver->evaluate so that
-          // the optimizations can be used, but this requires
-          // handling of quantified expressions by KLEE's pre-solving
-          // procedure, which does not exist currently.
-          Z3Solver *z3solver = new Z3Solver();
-          z3solver->setCoreSolverTimeout(timeout);
-          success = z3solver->directComputeValidity(
-              Query(state.constraints, expr), result, unsatCore);
-          z3solver->setCoreSolverTimeout(0);
-          delete z3solver;
+          if (llvm::isa<ExistsExpr>(expr)) {
+            // We instantiate a new Z3 solver to make sure that we use Z3
+            // without pre-solving optimizations. It would be nice in the future
+            // to just run solver->evaluate so that the optimizations can be
+            // used, but this requires handling of quantified expressions by
+            // KLEE's pre-solving procedure, which does not exist currently.
+            Z3Solver *z3solver = new Z3Solver();
+            z3solver->setCoreSolverTimeout(timeout);
+            success = z3solver->directComputeValidity(
+                Query(state.constraints, expr), result, unsatCore);
+            z3solver->setCoreSolverTimeout(0);
+            delete z3solver;
+          } else {
+            solver->setTimeout(timeout);
+            success = solver->evaluate(state, expr, result, unsatCore);
+            solver->setTimeout(0);
+          }
 
           if (!success || result != Solver::True) {
             if (debugSubsumptionLevel >= 1) {
