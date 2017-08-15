@@ -31,6 +31,9 @@ class WeakestPreCondition {
   friend class ExecutionState;
 
   std::set<llvm::Value *> markedVariables;
+  // Used to represent constants during the simplification of WPExpr to
+  // canonical form
+  ref<Expr> constValues;
   ref<Expr> WPExpr;
   ExprBuilder *eb;
   ArrayCache ac;
@@ -68,6 +71,20 @@ public:
 
   // \brief Convert the weakest precondition expression to canonical form
   void simplifyWPExpr();
+
+  // \brief Simplify terms in the weakest precondition expression to canonical
+  // form
+  std::map<ref<Expr>, uint64_t> *
+  simplifyWPTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
+                 ref<Expr> linearTerm);
+
+  // \brief Insert a variable with coefficient in newLinearTerm
+  void insertTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm, uint64_t coeff,
+                  ref<Expr> variable);
+
+  // \brief Convert newLinearTerm to an expression and store it at WPExpr(in
+  // canonical form)
+  void convertToExpr(std::map<ref<Expr>, uint64_t> *newLinearTerm);
 };
 }
 #endif /* WP_H_ */
