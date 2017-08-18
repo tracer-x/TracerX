@@ -25,9 +25,9 @@
 #include "klee/TimerStatIncrementer.h"
 #include "klee/util/ExprVisitor.h"
 #include "klee/util/TxTreeGraph.h"
-
 #include "llvm/Support/raw_ostream.h"
 #include "TxDependency.h"
+#include "WP.h"
 
 namespace klee {
 
@@ -380,6 +380,13 @@ class TxTreeNode {
   /// \brief Value dependencies
   TxDependency *dependency;
 
+  // \brief Instance of weakest precondition class used to generate WP
+  // interpolant
+  WeakestPreCondition *wp;
+
+  /// \brief Value dependencies
+  ref<Expr> childWPInterpolant[2];
+
   TxTreeNode *parent, *left, *right;
 
   uintptr_t programPoint;
@@ -476,6 +483,12 @@ public:
   ///
   /// \return The weakest precondition interpolant expression.
   ref<Expr> getWPInterpolant();
+
+  /// \brief Store the child WP interpolants in the parent node
+  void setChildWPInterpolant(ref<Expr> interpolant);
+
+  /// \brief Get the stored child WP interpolants in the parent node
+  ref<Expr> getChildWPInterpolant(int flag);
 
   /// \brief Extend the path condition with another constraint
   ///

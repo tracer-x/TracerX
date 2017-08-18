@@ -20,8 +20,8 @@
 #include <klee/Expr.h>
 #include <klee/Internal/Support/ErrorHandling.h>
 
-#include "Dependency.h"
-#include "ShadowArray.h"
+#include "TxDependency.h"
+#include "TxShadowArray.h"
 #include "TimingSolver.h"
 
 #include <fstream>
@@ -120,7 +120,7 @@ std::map<KInstruction *, bool> WeakestPreCondition::markVariables(
 }
 
 ref<Expr> WeakestPreCondition::GenerateWP(
-    std::map<KInstruction *, bool> reverseInstructionList) {
+    std::map<KInstruction *, bool> reverseInstructionList, bool markAllFlag) {
 
   // This log will be omitted in the final commit
   klee_message("**********WP Interpolant Start************");
@@ -128,9 +128,7 @@ ref<Expr> WeakestPreCondition::GenerateWP(
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
        it != ie; ++it) {
-    if ((*it).second == false) {
-
-    } else {
+    if ((*it).second == true || markAllFlag == true) {
       // Retrieve the instruction
       llvm::Instruction *i = (*it).first->inst;
       // This log will be omitted in the final commit
