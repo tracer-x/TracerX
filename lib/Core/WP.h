@@ -44,13 +44,21 @@ public:
 
   ~WeakestPreCondition();
 
+  ref<Expr> True() { return eb->True(); };
+  ref<Expr> False() { return eb->False(); };
+
+  void resetWPExpr() { WPExpr = eb->False(); }
+
+  void setWPExpr(ref<Expr> expr) { WPExpr = expr; }
+
   // \brief Preprocessing phase: marking the instructions that contribute
   // to the target or an infeasible path.
   std::map<KInstruction *, bool>
   markVariables(std::map<KInstruction *, bool> reverseInstructionList);
 
   // \brief Generate and return the weakest precondition expression.
-  ref<Expr> GenerateWP(std::map<KInstruction *, bool> reverseInstructionList);
+  ref<Expr> GenerateWP(std::map<KInstruction *, bool> reverseInstructionList,
+                       bool markAllFlag);
 
   // \brief Generate expression from operand of an instruction
   ref<Expr> generateExprFromOperand(llvm::Instruction *i, int operand);

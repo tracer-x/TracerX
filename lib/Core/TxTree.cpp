@@ -16,7 +16,6 @@
 #include "TxTree.h"
 
 #include "TimingSolver.h"
-#include "WP.h"
 
 #include <klee/CommandLine.h>
 #include <klee/Expr.h>
@@ -2272,6 +2271,9 @@ TxTreeNode::TxTreeNode(
   // Inherit the abstract dependency or NULL
   dependency = new TxDependency(_parent ? _parent->dependency : 0, _targetData,
                                 _globalAddresses);
+  wp = new WeakestPreCondition();
+  childWPInterpolant[0] = wp->False();
+  childWPInterpolant[1] = wp->False();
 }
 
 TxTreeNode::~TxTreeNode() {
@@ -2290,17 +2292,48 @@ ref<Expr> TxTreeNode::getInterpolant(
 ref<Expr> TxTreeNode::getWPInterpolant() {
   TimerStatIncrementer t(getWPInterpolantTime);
 
-  WeakestPreCondition *wp = new WeakestPreCondition();
-  // Preprocessing phase: marking the instructions that contribute
-  // to the target or an infeasible path.
-  reverseInstructionList = wp->markVariables(reverseInstructionList);
+  ref<Expr> expr;
+  bool markAllFlag;
+  if (childWPInterpolant[0] == wp->False() &&
+      childWPInterpolant[1] == wp->False()) {
+    wp->resetWPExpr();
+    // Preprocessing phase: marking the instructions that contribute
+    // to the target or an infeasible path.
+    reverseInstructionList = wp->markVariables(reverseInstructionList);
 
-  // Generate weakest precondition from pathCondition and/or BB instructions
-  ref<Expr> expr = wp->GenerateWP(reverseInstructionList);
+    // Generate weakest precondition from pathCondition and/or BB instructions
+    markAllFlag = 0;
+    expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
+    this->parent->setChildWPInterpolant(expr);
+  } else {
+    // TODO: Perform the intersection of the child interpolants
+    // The following is a temporary intersection.
+    expr = AndExpr::create(childWPInterpolant[0], childWPInterpolant[1]);
+    // TODO: Store the generated WP at choice point
 
+    wp->setWPExpr(expr);
+
+    // Generate weakest precondition from pathCondition and/or BB instructions
+    markAllFlag = 1;
+    expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
+    this->parent->setChildWPInterpolant(expr);
+  }
   return expr;
 }
 
+void TxTreeNode::setChildWPInterpolant(ref<Expr> interpolant) {
+  if (childWPInterpolant[0] == wp->False())
+    childWPInterpolant[0] = interpolant;
+  else
+    childWPInterpolant[1] = interpolant;
+}
+
+ref<Expr> TxTreeNode::getChildWPInterpolant(int flag) {
+  if (flag == 0)
+    return childWPInterpolant[0];
+  else
+    return childWPInterpolant[1];
+}
 
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
   TimerStatIncrementer t(addConstraintTime);
