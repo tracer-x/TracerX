@@ -434,10 +434,12 @@ Dependency::Dependency(
     : parent(parent), left(0), right(0), targetData(_targetData),
       globalAddresses(_globalAddresses) {
   if (parent) {
+    pathCondition = TxPathCondition::create(parent->pathCondition);
     store = TxStore::create(parent->store);
     debugSubsumptionLevel = parent->debugSubsumptionLevel;
     debugStateLevel = parent->debugStateLevel;
   } else {
+    pathCondition = TxPathCondition::create(0);
     store = TxStore::create(0);
 #ifdef ENABLE_Z3
     debugSubsumptionLevel = DebugSubsumption;
@@ -457,6 +459,7 @@ Dependency::~Dependency() {
        it != ie; ++it) {
     it->second.clear();
   }
+  delete pathCondition;
   delete store;
   valuesMap.clear();
 }

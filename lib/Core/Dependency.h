@@ -17,6 +17,7 @@
 #ifndef KLEE_DEPENDENCY_H
 #define KLEE_DEPENDENCY_H
 
+#include "TxPathCondition.h"
 #include "TxStore.h"
 
 #include "klee/Config/Version.h"
@@ -158,6 +159,7 @@ namespace klee {
   /// with modified offsets according to the offset argument of the
   /// instruction.
   ///
+  /// \see TxPathCondition
   /// \see TxTree
   /// \see TxTreeNode
   /// \see TxStore
@@ -166,7 +168,10 @@ namespace klee {
   class Dependency {
 
   private:
-    /// The store
+    /// \brief The path condition manager
+    TxPathCondition *pathCondition;
+
+    /// \brief The store
     TxStore *store;
 
     /// \brief Parent and left and right children of the dependency information
@@ -466,12 +471,14 @@ namespace klee {
     /// \brief Set the left child
     void setLeftChild(Dependency *child) {
       left = child;
+      pathCondition->setLeftChild(child->pathCondition);
       store->setLeftChild(child->store);
     }
 
     /// \brief Set the right child
     void setRightChild(Dependency *child) {
       right = child;
+      pathCondition->setRightChild(child->pathCondition);
       store->setRightChild(child->store);
     }
 
