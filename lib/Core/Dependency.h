@@ -482,6 +482,11 @@ namespace klee {
       store->setRightChild(child->store);
     }
 
+    /// \brief Add constraint onto the path condition
+    void addConstraint(ref<Expr> constraint) {
+      pathCondition->addConstraint(constraint);
+    }
+
     /// \brief Print the content of the object to the LLVM error stream
     void dump() const {
       this->print(llvm::errs());

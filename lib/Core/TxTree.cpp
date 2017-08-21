@@ -2424,6 +2424,7 @@ void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
   TimerStatIncrementer t(addConstraintTime);
   pathCondition = new PathCondition(constraint, dependency, condition,
                                     callHistory, pathCondition);
+  dependency->addConstraint(constraint);
   graph->addPathCondition(this, pathCondition, constraint);
 }
 
