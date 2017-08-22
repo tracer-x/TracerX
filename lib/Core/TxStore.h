@@ -24,57 +24,6 @@
 
 namespace klee {
 
-class TxStoreEntry {
-public:
-  unsigned refCount;
-
-private:
-  ref<TxStateAddress> address;
-
-  ref<TxStateValue> addressValue;
-
-  ref<TxStateValue> content;
-
-  /// \brief The creation depth of this entry
-  uint64_t depth;
-
-public:
-  TxStoreEntry(ref<TxStateAddress> _address, ref<TxStateValue> _addressValue,
-               ref<TxStateValue> _content, uint64_t _depth)
-      : refCount(0), address(_address), addressValue(_addressValue),
-        content(_content), depth(_depth) {}
-
-  ~TxStoreEntry() {}
-
-  ref<TxVariable> getIndex() { return address->getAsVariable(); }
-
-  ref<TxStateAddress> getAddress() { return address; }
-
-  ref<TxStateValue> getAddressValue() { return addressValue; }
-
-  ref<TxStateValue> getContent() { return content; }
-
-  uint64_t getDepth() { return depth; }
-
-  /// \brief A simple pointer comparison
-  int compare(const TxStoreEntry &other) const {
-    if (this < &other)
-      return -1;
-    if (this > &other)
-      return 1;
-    return 0;
-  }
-
-  void dump() const {
-    print(llvm::errs());
-    llvm::errs() << "\n";
-  }
-
-  void print(llvm::raw_ostream &stream) const { print(stream, ""); }
-
-  void print(llvm::raw_ostream &stream, const std::string &prefix) const;
-};
-
 class TxStore {
 public:
   class MiddleStateStore;
