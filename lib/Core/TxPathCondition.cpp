@@ -142,6 +142,32 @@ void TxPathCondition::unsatCoreInterpolation(
   }
 }
 
+ref<Expr>
+TxPathCondition::packInterpolant(std::set<const Array *> &replacements) const {
+  ref<Expr> res;
+  std::set<ref<PCConstraint> > *usedList;
+
+  if (parent) {
+    if (parent->left == this) {
+      usedList = &(parent->usedByLeftPath);
+    } else {
+      usedList = &(parent->usedByRightPath);
+    }
+
+    for (std::set<ref<PCConstraint> >::iterator it = usedList->begin(),
+                                                ie = usedList->end();
+         it != ie; ++it) {
+      if (res.isNull()) {
+        res = (*it)->packInterpolant(replacements);
+      } else {
+        res = AndExpr::create((*it)->packInterpolant(replacements), res);
+      }
+    }
+  }
+
+  return res;
+}
+
 void TxPathCondition::print(llvm::raw_ostream &stream) const {
   print(stream, 0);
 }
