@@ -1627,29 +1627,26 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
   stream << "]";
 }
 
-void TxSubsumptionTableEntry::PrintWP(llvm::raw_ostream &stream) const {
-  PrintWP(stream, 0);
+void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream) const {
+  printWP(stream, 0);
 }
 
-void TxSubsumptionTableEntry::PrintWP(llvm::raw_ostream &stream,
+void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
                                     const unsigned paddingAmount) const {
-  PrintWP(stream, makeTabs(paddingAmount));
+  printWP(stream, makeTabs(paddingAmount));
 }
 
-void TxSubsumptionTableEntry::PrintWP(llvm::raw_ostream &stream,
+void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
                                     const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
   std::string tabsNextNext = appendTab(tabsNext);
 
-  stream << prefix << "------------ WP Subsumption Table Entry ------------\n";
-  stream << prefix << "Program point = " << programPoint << "\n";
-  stream << prefix << "wp interpolant = ";
+  stream << prefix << "\nwp interpolant = ";
   if (!wpInterpolant.isNull())
     wpInterpolant->print(stream);
   else
     stream << "(empty)";
   stream << "\n";
-  stream << prefix << "--------- END of WP Subsumption Table Entry ---------\n";
 }
 
 void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
@@ -2076,6 +2073,7 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
         std::string msg;
         llvm::raw_string_ostream out(msg);
         entry->print(out);
+        entry->printWP(out);
         out.flush();
         klee_message("%s", msg.c_str());
       }
@@ -2309,11 +2307,12 @@ ref<Expr> TxTreeNode::getWPInterpolant() {
     // TODO: Perform the intersection of the child interpolants
     // The following is a temporary intersection.
     expr = AndExpr::create(childWPInterpolant[0], childWPInterpolant[1]);
-    // TODO: Store the generated WP at choice point
 
+    // Setting the intersection of child nodes as the target in the of the nodes
     wp->setWPExpr(expr);
 
     // Generate weakest precondition from pathCondition and/or BB instructions
+    // All instructions are marked
     markAllFlag = 1;
     expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
     this->parent->setChildWPInterpolant(expr);

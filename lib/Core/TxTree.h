@@ -326,6 +326,8 @@ public:
   void dump() const {
     this->print(llvm::errs());
     llvm::errs() << "\n";
+    this->printWP(llvm::errs());
+    llvm::errs() << "\n";
   }
 
   void print(llvm::raw_ostream &stream) const;
@@ -334,11 +336,11 @@ public:
 
   void print(llvm::raw_ostream &stream, const std::string &prefix) const;
 
-  void PrintWP(llvm::raw_ostream &stream) const;
+  void printWP(llvm::raw_ostream &stream) const;
 
-  void PrintWP(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
+  void printWP(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
 
-  void PrintWP(llvm::raw_ostream &stream, const std::string &prefix) const;
+  void printWP(llvm::raw_ostream &stream, const std::string &prefix) const;
 };
 
 /// \brief The Tracer-X symbolic execution tree node.
