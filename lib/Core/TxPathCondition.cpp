@@ -72,32 +72,35 @@ void TxPathCondition::PCConstraint::print(llvm::raw_ostream &stream) const {
 
 void TxPathCondition::addConstraint(ref<Expr> constraint,
                                     ref<TxStateValue> condition) {
-  pcDepth[constraint] = depth;
+  ref<PCConstraint> pcConstraint(new PCConstraint(constraint, condition, depth));
+  pcDepth[constraint] = pcConstraint;
   if (llvm::isa<OrExpr>(constraint)) {
     // FIXME: Break up disjunction into its components, because each disjunct is
     // solved separately. The or constraint was due to state merge. Hence, the
     // following is just a makeshift for when state merge is properly
     // implemented.
-    pcDepth[constraint->getKid(0)] = depth;
-    pcDepth[constraint->getKid(1)] = depth;
+    pcDepth[constraint->getKid(0)] = pcConstraint;
+    pcDepth[constraint->getKid(1)] = pcConstraint;
   }
 }
 
 void TxPathCondition::unsatCoreInterpolation(
     const std::vector<ref<Expr> > &unsatCore) {
-  std::map<uint64_t, std::set<ref<Expr> > > depthToConstraintSet;
+  std::map<uint64_t, std::set<ref<PCConstraint> > > depthToConstraintSet;
   std::set<uint64_t> keySet;
   std::vector<uint64_t> sortedKeys;
 
   for (std::vector<ref<Expr> >::const_iterator it = unsatCore.begin(),
                                                ie = unsatCore.end();
        it != ie; ++it) {
-    std::map<ref<Expr>, uint64_t>::iterator pcDepthIter = pcDepth.find(*it);
+    std::map<ref<Expr>, ref<PCConstraint> >::iterator pcDepthIter =
+        pcDepth.find(*it);
     // FIXME: Sometimes some constraints are not in the PC. This is
     // because constraints are not properly added at state merge.
     if (pcDepthIter != pcDepth.end()) {
-      depthToConstraintSet[pcDepthIter->second].insert(*it);
-      keySet.insert(pcDepthIter->second);
+      ref<PCConstraint> &pcConstraint = pcDepthIter->second;
+      depthToConstraintSet[pcConstraint->getDepth()].insert(pcConstraint);
+      keySet.insert(pcConstraint->getDepth());
     }
   }
 
@@ -108,11 +111,11 @@ void TxPathCondition::unsatCoreInterpolation(
 
   std::sort(sortedKeys.begin(), sortedKeys.end());
 
-  std::set<ref<Expr> > currentSet;
+  std::set<ref<PCConstraint> > currentSet;
   for (std::vector<uint64_t>::iterator it = sortedKeys.begin(),
                                        ie = sortedKeys.end();
        it != ie; ++it) {
-    std::set<ref<Expr> > constraintSet = depthToConstraintSet[*it];
+    std::set<ref<PCConstraint> > &constraintSet = depthToConstraintSet[*it];
     currentSet.insert(constraintSet.begin(), constraintSet.end());
     depthToConstraintSet[*it] = currentSet;
   }
@@ -122,7 +125,8 @@ void TxPathCondition::unsatCoreInterpolation(
                                                ie = sortedKeys.rend();
        it != ie; ++it) {
     uint64_t constraintDepth = *it;
-    std::set<ref<Expr> > &constraintSet = depthToConstraintSet[constraintDepth];
+    std::set<ref<PCConstraint> > &constraintSet =
+        depthToConstraintSet[constraintDepth];
 
     while (currentPC && currentPC->depth > constraintDepth) {
       if (currentPC->parent->left == currentPC) {

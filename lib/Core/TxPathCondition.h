@@ -70,13 +70,13 @@ public:
 
 private:
   /// \brief The path condition, with the levels each one is introduced
-  std::map<ref<Expr>, uint64_t> pcDepth;
+  std::map<ref<Expr>, ref<PCConstraint> > pcDepth;
 
   /// \brief Store elements used by left path
-  std::set<ref<Expr> > usedByLeftPath;
+  std::set<ref<PCConstraint> > usedByLeftPath;
 
   /// \brief Store elements used by right path
-  std::set<ref<Expr> > usedByRightPath;
+  std::set<ref<PCConstraint> > usedByRightPath;
 
   /// \brief The depth level of this store
   uint64_t depth;
