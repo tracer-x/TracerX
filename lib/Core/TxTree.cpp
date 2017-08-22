@@ -2416,7 +2416,7 @@ TxTreeNode::~TxTreeNode() {
 ref<Expr>
 TxTreeNode::getInterpolant(std::set<const Array *> &replacements) const {
   TimerStatIncrementer t(getInterpolantTime);
-  ref<Expr> expr = this->pathCondition->packInterpolant(replacements);
+  ref<Expr> expr = dependency->packInterpolant(replacements);
   return expr;
 }
 
@@ -2520,30 +2520,7 @@ void TxTreeNode::incInstructionsDepth() { ++instructionsDepth; }
 
 void
 TxTreeNode::unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore) {
-  // State subsumed, we mark needed constraints on the path condition. We create
-  // path condition marking structure to mark core constraints
-  std::map<Expr *, PathCondition *> markerMap;
-  for (PathCondition *it = pathCondition; it != 0; it = it->cdr()) {
-    if (llvm::isa<OrExpr>(it->car())) {
-      // FIXME: Break up disjunction into its components, because each disjunct
-      // is solved separately. The or constraint was due to state merge.
-      // Hence, the following is just a makeshift for when state merge is
-      // properly implemented.
-      markerMap[it->car()->getKid(0).get()] = it;
-      markerMap[it->car()->getKid(1).get()] = it;
-    }
-    markerMap[it->car().get()] = it;
-  }
-
-  for (std::vector<ref<Expr> >::const_iterator it1 = unsatCore.begin(),
-                                               ie1 = unsatCore.end();
-       it1 != ie1; ++it1) {
-    // FIXME: Sometimes some constraints are not in the PC. This is
-    // because constraints are not properly added at state merge.
-    PathCondition *cond = markerMap[it1->get()];
-    if (cond)
-      cond->setAsCore(dependency->debugSubsumptionLevel);
-  }
+  dependency->unsatCoreInterpolation(unsatCore);
 }
 
 void TxTreeNode::dump() const {

@@ -489,6 +489,17 @@ namespace klee {
           constraint, getLatestValue(condition, callHistory, constraint, true));
     }
 
+    /// \brief Retrieve the path condition interpolant
+    ref<Expr> packInterpolant(std::set<const Array *> &replacements) const {
+      return pathCondition->packInterpolant(replacements);
+    }
+
+    /// \brief Marking the core constraints on the path condition, and all the
+    /// relevant values on the dependency graph, given an unsatistiability core.
+    void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore) {
+      pathCondition->unsatCoreInterpolation(unsatCore);
+    }
+
     /// \brief Print the content of the object to the LLVM error stream
     void dump() const {
       this->print(llvm::errs());
