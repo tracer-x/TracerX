@@ -13,11 +13,62 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "ShadowArray.h"
 #include "TxPathCondition.h"
+#include "klee/CommandLine.h"
 
 using namespace klee;
 
 namespace klee {
+
+TxPathCondition::PCConstraint::PCConstraint(ref<Expr> _constraint,
+                                            ref<TxStateValue> _condition,
+                                            uint64_t _depth)
+    : refCount(0), constraint(_constraint), shadowConstraint(_constraint),
+      shadowed(false), condition(_condition), depth(_depth) {}
+
+TxPathCondition::PCConstraint::~PCConstraint() {}
+
+ref<Expr> TxPathCondition::PCConstraint::packInterpolant(
+    std::set<const Array *> &replacements) {
+  ref<Expr> res;
+  if (!shadowed) {
+#ifdef ENABLE_Z3
+    shadowConstraint =
+        (NoExistential ? constraint : ShadowArray::getShadowExpression(
+                                          constraint, replacements));
+#else
+    shadowConstraint = constraint;
+#endif
+    shadowed = true;
+    boundVariables.insert(replacements.begin(), replacements.end());
+  } else {
+    // Already shadowed, we add the bound variables
+    replacements.insert(boundVariables.begin(), boundVariables.end());
+  }
+  if (!res.isNull()) {
+    res = AndExpr::create(res, shadowConstraint);
+  } else {
+    res = shadowConstraint;
+  }
+  return res;
+}
+
+int TxPathCondition::PCConstraint::compare(const PCConstraint &other) const {
+  Expr &otherExpr = *(other.constraint.get());
+  return constraint->compare(otherExpr);
+}
+
+void TxPathCondition::PCConstraint::dump() const {
+  this->print(llvm::errs());
+  llvm::errs() << "\n";
+}
+
+void TxPathCondition::PCConstraint::print(llvm::raw_ostream &stream) const {
+  constraint->print(stream);
+}
+
+/**/
 
 void TxPathCondition::addConstraint(ref<Expr> constraint) {
   pcDepth[constraint] = depth;
