@@ -105,7 +105,7 @@ public:
 
   void setRightChild(TxPathCondition *child) { right = child; }
 
-  void addConstraint(ref<Expr> constraint);
+  void addConstraint(ref<Expr> constraint, ref<TxStateValue> condition);
 
   void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore);
 

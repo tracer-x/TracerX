@@ -70,7 +70,8 @@ void TxPathCondition::PCConstraint::print(llvm::raw_ostream &stream) const {
 
 /**/
 
-void TxPathCondition::addConstraint(ref<Expr> constraint) {
+void TxPathCondition::addConstraint(ref<Expr> constraint,
+                                    ref<TxStateValue> condition) {
   pcDepth[constraint] = depth;
   if (llvm::isa<OrExpr>(constraint)) {
     // FIXME: Break up disjunction into its components, because each disjunct is
