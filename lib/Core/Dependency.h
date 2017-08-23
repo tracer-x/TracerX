@@ -483,9 +483,10 @@ namespace klee {
     }
 
     /// \brief Add constraint onto the path condition
-    void addConstraint(ref<Expr> constraint, llvm::Value *condition,
-                       std::vector<llvm::Instruction *> &callHistory) {
-      pathCondition->addConstraint(
+    ref<TxPathCondition::PCConstraint>
+    addConstraint(ref<Expr> constraint, llvm::Value *condition,
+                  std::vector<llvm::Instruction *> &callHistory) {
+      return pathCondition->addConstraint(
           constraint, getLatestValue(condition, callHistory, constraint, true));
     }
 

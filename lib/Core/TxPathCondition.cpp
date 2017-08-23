@@ -70,8 +70,9 @@ void TxPathCondition::PCConstraint::print(llvm::raw_ostream &stream) const {
 
 /**/
 
-void TxPathCondition::addConstraint(ref<Expr> constraint,
-                                    ref<TxStateValue> condition) {
+ref<TxPathCondition::PCConstraint>
+TxPathCondition::addConstraint(ref<Expr> constraint,
+                               ref<TxStateValue> condition) {
   ref<PCConstraint> pcConstraint(new PCConstraint(constraint, condition, depth));
   pcDepth[constraint] = pcConstraint;
   if (llvm::isa<OrExpr>(constraint)) {
@@ -82,6 +83,7 @@ void TxPathCondition::addConstraint(ref<Expr> constraint,
     pcDepth[constraint->getKid(0)] = pcConstraint;
     pcDepth[constraint->getKid(1)] = pcConstraint;
   }
+  return pcConstraint;
 }
 
 void TxPathCondition::unsatCoreInterpolation(
