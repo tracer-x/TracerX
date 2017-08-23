@@ -32,59 +32,6 @@
 
 namespace klee {
 
-/// \brief A node in a singly-linked list of conditions which constitute the
-/// path condition.
-class PathCondition {
-  /// \brief KLEE expression
-  ref<Expr> constraint;
-
-  /// \brief KLEE expression with variables (arrays) replaced by their shadows
-  ref<Expr> shadowConstraint;
-
-  /// \brief If shadow constraint had been generated: We generate shadow
-  /// constraint on demand only when the constraint is required in an
-  /// interpolant.
-  bool shadowed;
-
-  /// \brief The set of bound variables
-  std::set<const Array *> boundVariables;
-
-  /// \brief The dependency information for the current interpolation tree node
-  Dependency *dependency;
-
-  /// \brief the condition value from which the constraint was generated
-  ref<TxStateValue> condition;
-
-  /// \brief When true, indicates that the constraint should be included in the
-  /// interpolant
-  bool core;
-
-  /// \brief Previous path condition
-  PathCondition *tail;
-
-public:
-  PathCondition(ref<Expr> &constraint, Dependency *dependency,
-                llvm::Value *condition,
-                const std::vector<llvm::Instruction *> &callHistory,
-                PathCondition *prev);
-
-  ~PathCondition();
-
-  ref<Expr> car() const;
-
-  PathCondition *cdr() const;
-
-  void setAsCore(int debugSubsumptionLevel);
-
-  bool isCore() const;
-
-  ref<Expr> packInterpolant(std::set<const Array *> &replacements);
-
-  void dump() const;
-
-  void print(llvm::raw_ostream &stream) const;
-};
-
 class SubsumptionTable {
   typedef std::deque<SubsumptionTableEntry *>::const_reverse_iterator
   EntryIterator;
