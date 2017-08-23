@@ -24,20 +24,6 @@ using namespace klee;
 
 namespace klee {
 
-void TxStoreEntry::print(llvm::raw_ostream &stream,
-                         const std::string &prefix) const {
-  std::string tabsNext = appendTab(prefix);
-
-  stream << prefix << "creation depth: " << depth << "\n";
-  stream << prefix << "address:\n";
-  address->print(stream, tabsNext);
-  stream << "\n";
-  stream << prefix << "content:\n";
-  content->printMinimal(stream, tabsNext);
-}
-
-/**/
-
 ref<TxStoreEntry>
 TxStore::MiddleStateStore::find(ref<TxStateAddress> loc) const {
   ref<TxStoreEntry> ret;

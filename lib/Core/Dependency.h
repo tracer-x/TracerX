@@ -17,6 +17,7 @@
 #ifndef KLEE_DEPENDENCY_H
 #define KLEE_DEPENDENCY_H
 
+#include "TxPathCondition.h"
 #include "TxStore.h"
 
 #include "klee/Config/Version.h"
@@ -158,6 +159,7 @@ namespace klee {
   /// with modified offsets according to the offset argument of the
   /// instruction.
   ///
+  /// \see TxPathCondition
   /// \see TxTree
   /// \see TxTreeNode
   /// \see TxStore
@@ -166,7 +168,10 @@ namespace klee {
   class Dependency {
 
   private:
-    /// The store
+    /// \brief The path condition manager
+    TxPathCondition *pathCondition;
+
+    /// \brief The store
     TxStore *store;
 
     /// \brief Parent and left and right children of the dependency information
@@ -466,13 +471,34 @@ namespace klee {
     /// \brief Set the left child
     void setLeftChild(Dependency *child) {
       left = child;
+      pathCondition->setLeftChild(child->pathCondition);
       store->setLeftChild(child->store);
     }
 
     /// \brief Set the right child
     void setRightChild(Dependency *child) {
       right = child;
+      pathCondition->setRightChild(child->pathCondition);
       store->setRightChild(child->store);
+    }
+
+    /// \brief Add constraint onto the path condition
+    ref<PCConstraint>
+    addConstraint(ref<Expr> constraint, llvm::Value *condition,
+                  std::vector<llvm::Instruction *> &callHistory) {
+      return pathCondition->addConstraint(
+          constraint, getLatestValue(condition, callHistory, constraint, true));
+    }
+
+    /// \brief Retrieve the path condition interpolant
+    ref<Expr> packInterpolant(std::set<const Array *> &replacements) const {
+      return pathCondition->packInterpolant(replacements);
+    }
+
+    /// \brief Marking the core constraints on the path condition, and all the
+    /// relevant values on the dependency graph, given an unsatistiability core.
+    void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore) {
+      pathCondition->unsatCoreInterpolation(unsatCore);
     }
 
     /// \brief Print the content of the object to the LLVM error stream

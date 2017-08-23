@@ -39,114 +39,6 @@
 
 using namespace klee;
 
-/**/
-
-PathCondition::PathCondition(
-    ref<Expr> &constraint, Dependency *dependency, llvm::Value *_condition,
-    const std::vector<llvm::Instruction *> &callHistory, PathCondition *prev)
-    : constraint(constraint), shadowConstraint(constraint), shadowed(false),
-      dependency(dependency), core(false), tail(prev) {
-  ref<TxStateValue> emptyCondition;
-  if (dependency) {
-    condition =
-        dependency->getLatestValue(_condition, callHistory, constraint, true);
-    assert(!condition.isNull() && "null constraint on path condition");
-  } else {
-    condition = emptyCondition;
-  }
-}
-
-PathCondition::~PathCondition() {}
-
-ref<Expr> PathCondition::car() const { return constraint; }
-
-PathCondition *PathCondition::cdr() const { return tail; }
-
-void PathCondition::setAsCore(int debugSubsumptionLevel) {
-  // We mark all values to which this constraint depends
-  std::string reason = "";
-  if (debugSubsumptionLevel >= 1) {
-    llvm::raw_string_ostream stream(reason);
-    stream << "path condition [";
-    constraint->print(stream);
-    stream << "] of [";
-    if (llvm::Instruction *inst =
-            llvm::dyn_cast<llvm::Instruction>(condition->getValue())) {
-      if (inst->getParent()->getParent()) {
-        stream << inst->getParent()->getParent()->getName().str() << ": ";
-      }
-      if (llvm::MDNode *n = inst->getMetadata("dbg")) {
-        llvm::DILocation loc(n);
-        stream << loc.getLineNumber();
-      } else {
-        condition->getValue()->print(stream);
-      }
-    } else {
-      condition->getValue()->print(stream);
-    }
-    stream << "]";
-    stream.flush();
-  }
-  dependency->markAllValues(condition, reason);
-
-  // We mark this constraint itself as core
-  core = true;
-
-  // We mark constraint as core in the search tree graph as well.
-  TxTreeGraph::setAsCore(this);
-}
-
-bool PathCondition::isCore() const { return core; }
-
-ref<Expr>
-PathCondition::packInterpolant(std::set<const Array *> &replacements) {
-  ref<Expr> res;
-  for (PathCondition *it = this; it != 0; it = it->tail) {
-    if (it->core) {
-      if (!it->shadowed) {
-#ifdef ENABLE_Z3
-        it->shadowConstraint =
-            (NoExistential ? it->constraint
-                           : ShadowArray::getShadowExpression(it->constraint,
-                                                              replacements));
-#else
-        it->shadowConstraint = it->constraint;
-#endif
-        it->shadowed = true;
-        it->boundVariables.insert(replacements.begin(), replacements.end());
-      } else {
-        // Already shadowed, we add the bound variables
-        replacements.insert(it->boundVariables.begin(),
-                            it->boundVariables.end());
-      }
-      if (!res.isNull()) {
-        res = AndExpr::create(res, it->shadowConstraint);
-      } else {
-        res = it->shadowConstraint;
-      }
-    }
-  }
-  return res;
-}
-
-void PathCondition::dump() const {
-  this->print(llvm::errs());
-  llvm::errs() << "\n";
-}
-
-void PathCondition::print(llvm::raw_ostream &stream) const {
-  stream << "[";
-  for (const PathCondition *it = this; it != 0; it = it->tail) {
-    it->constraint->print(stream);
-    stream << ": " << (it->core ? "core" : "non-core");
-    if (it->tail != 0)
-      stream << ",";
-  }
-  stream << "]";
-}
-
-/**/
-
 Statistic SubsumptionTableEntry::concretelyAddressedStoreExpressionBuildTime(
     "concretelyAddressedStoreExpressionBuildTime", "concreteStoreTime");
 Statistic SubsumptionTableEntry::symbolicallyAddressedStoreExpressionBuildTime(
@@ -2384,10 +2276,7 @@ TxTreeNode::TxTreeNode(
       instructionsDepth(_parent ? _parent->instructionsDepth : 0),
       targetData(_targetData), globalAddresses(_globalAddresses),
       isSubsumed(false) {
-
-  pathCondition = 0;
   if (_parent) {
-    pathCondition = _parent->pathCondition;
     entryCallHistory = _parent->callHistory;
     callHistory = _parent->callHistory;
   }
@@ -2398,17 +2287,6 @@ TxTreeNode::TxTreeNode(
 }
 
 TxTreeNode::~TxTreeNode() {
-  // Only delete the path condition if it's not
-  // also the parent's path condition
-  PathCondition *ie = parent ? parent->pathCondition : 0;
-
-  PathCondition *it = pathCondition;
-  while (it != ie) {
-    PathCondition *tmp = it;
-    it = it->cdr();
-    delete tmp;
-  }
-
   if (dependency)
     delete dependency;
 }
@@ -2416,15 +2294,15 @@ TxTreeNode::~TxTreeNode() {
 ref<Expr>
 TxTreeNode::getInterpolant(std::set<const Array *> &replacements) const {
   TimerStatIncrementer t(getInterpolantTime);
-  ref<Expr> expr = this->pathCondition->packInterpolant(replacements);
+  ref<Expr> expr = dependency->packInterpolant(replacements);
   return expr;
 }
 
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
   TimerStatIncrementer t(addConstraintTime);
-  pathCondition = new PathCondition(constraint, dependency, condition,
-                                    callHistory, pathCondition);
-  graph->addPathCondition(this, pathCondition, constraint);
+  ref<PCConstraint> pcConstraint =
+      dependency->addConstraint(constraint, condition, callHistory);
+  graph->addPathCondition(this, pcConstraint.get(), constraint);
 }
 
 void TxTreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
@@ -2519,30 +2397,7 @@ void TxTreeNode::incInstructionsDepth() { ++instructionsDepth; }
 
 void
 TxTreeNode::unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore) {
-  // State subsumed, we mark needed constraints on the path condition. We create
-  // path condition marking structure to mark core constraints
-  std::map<Expr *, PathCondition *> markerMap;
-  for (PathCondition *it = pathCondition; it != 0; it = it->cdr()) {
-    if (llvm::isa<OrExpr>(it->car())) {
-      // FIXME: Break up disjunction into its components, because each disjunct
-      // is solved separately. The or constraint was due to state merge.
-      // Hence, the following is just a makeshift for when state merge is
-      // properly implemented.
-      markerMap[it->car()->getKid(0).get()] = it;
-      markerMap[it->car()->getKid(1).get()] = it;
-    }
-    markerMap[it->car().get()] = it;
-  }
-
-  for (std::vector<ref<Expr> >::const_iterator it1 = unsatCore.begin(),
-                                               ie1 = unsatCore.end();
-       it1 != ie1; ++it1) {
-    // FIXME: Sometimes some constraints are not in the PC. This is
-    // because constraints are not properly added at state merge.
-    PathCondition *cond = markerMap[it1->get()];
-    if (cond)
-      cond->setAsCore(dependency->debugSubsumptionLevel);
-  }
+  dependency->unsatCoreInterpolation(unsatCore);
 }
 
 void TxTreeNode::dump() const {
@@ -2563,13 +2418,6 @@ void TxTreeNode::print(llvm::raw_ostream &stream,
 
   stream << tabs << "TxTreeNode\n";
   stream << tabsNext << "node Id = " << programPoint << "\n";
-  stream << tabsNext << "pathCondition = ";
-  if (pathCondition == 0) {
-    stream << "NULL";
-  } else {
-    pathCondition->print(stream);
-  }
-  stream << "\n";
   stream << tabsNext << "Left:\n";
   if (!left) {
     stream << tabsNext << "NULL\n";
