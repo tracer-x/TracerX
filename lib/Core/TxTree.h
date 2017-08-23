@@ -395,12 +395,6 @@ public:
 
 /// \brief The Tracer-X symbolic execution tree node.
 ///
-/// This class is a higher-level wrapper to the path condition (referenced
-/// by the member variable TxTreeNode#pathCondition of type PathCondition), and
-/// the shadow
-/// memory for memory dependency computation (referenced by the member
-/// variable TxTreeNode#dependency of type Dependency).
-///
 /// Each Tracer-X tree node has an associated KLEE execution state
 /// (implemented using the type ExecutionState) from which it is referenced
 /// via the member variable ExecutionState#txTreeNode.
@@ -412,7 +406,6 @@ public:
 /// \see TxTree
 /// \see Dependency
 /// \see SubsumptionTableEntry
-/// \see PathCondition
 class TxTreeNode {
   friend class TxTree;
 
@@ -433,9 +426,6 @@ class TxTreeNode {
   /// \brief Counter for the next visited node id for logging and debugging
   /// purposes
   static uint64_t nextNodeSequenceNumber;
-
-  /// \brief The path condition
-  PathCondition *pathCondition;
 
   /// \brief Value dependencies
   Dependency *dependency;

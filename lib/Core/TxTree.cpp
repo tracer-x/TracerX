@@ -2381,10 +2381,7 @@ TxTreeNode::TxTreeNode(
       instructionsDepth(_parent ? _parent->instructionsDepth : 0),
       targetData(_targetData), globalAddresses(_globalAddresses),
       isSubsumed(false) {
-
-  pathCondition = 0;
   if (_parent) {
-    pathCondition = _parent->pathCondition;
     entryCallHistory = _parent->callHistory;
     callHistory = _parent->callHistory;
   }
@@ -2395,17 +2392,6 @@ TxTreeNode::TxTreeNode(
 }
 
 TxTreeNode::~TxTreeNode() {
-  // Only delete the path condition if it's not
-  // also the parent's path condition
-  PathCondition *ie = parent ? parent->pathCondition : 0;
-
-  PathCondition *it = pathCondition;
-  while (it != ie) {
-    PathCondition *tmp = it;
-    it = it->cdr();
-    delete tmp;
-  }
-
   if (dependency)
     delete dependency;
 }
@@ -2419,8 +2405,6 @@ TxTreeNode::getInterpolant(std::set<const Array *> &replacements) const {
 
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
   TimerStatIncrementer t(addConstraintTime);
-  pathCondition = new PathCondition(constraint, dependency, condition,
-                                    callHistory, pathCondition);
   ref<PCConstraint> pcConstraint =
       dependency->addConstraint(constraint, condition, callHistory);
   graph->addPathCondition(this, pcConstraint.get(), constraint);
@@ -2539,13 +2523,6 @@ void TxTreeNode::print(llvm::raw_ostream &stream,
 
   stream << tabs << "TxTreeNode\n";
   stream << tabsNext << "node Id = " << programPoint << "\n";
-  stream << tabsNext << "pathCondition = ";
-  if (pathCondition == 0) {
-    stream << "NULL";
-  } else {
-    pathCondition->print(stream);
-  }
-  stream << "\n";
   stream << tabsNext << "Left:\n";
   if (!left) {
     stream << tabsNext << "NULL\n";
