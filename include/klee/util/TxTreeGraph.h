@@ -27,7 +27,7 @@ namespace klee {
 
 class ExecutionState;
 
-class PathCondition;
+class PCConstraint;
 
 class SubsumptionTableEntry;
 
@@ -66,7 +66,7 @@ private:
     bool subsumed;
 
     /// \brief Conditions under which this node is visited from its parent
-    std::map<PathCondition *, std::pair<std::string, bool> > pathConditionTable;
+    std::map<PCConstraint *, std::pair<std::string, bool> > pathConditionTable;
 
     /// \brief Human-readable identifier of this node
     std::string name;
@@ -132,7 +132,7 @@ private:
   std::map<TxTreeNode *, TxTreeGraph::Node *> txTreeNodeMap;
   std::map<SubsumptionTableEntry *, TxTreeGraph::Node *> tableEntryMap;
   std::vector<TxTreeGraph::NumberedEdge *> subsumptionEdges;
-  std::map<PathCondition *, TxTreeGraph::Node *> pathConditionMap;
+  std::map<PCConstraint *, TxTreeGraph::Node *> pathConditionMap;
 
   /// \brief The set of known leaves
   std::set<TxTreeGraph::Node *> leaves;
@@ -183,13 +183,13 @@ public:
                              SubsumptionTableEntry *entry);
 
   static void addPathCondition(TxTreeNode *txTreeNode,
-                               PathCondition *pathCondition,
+                               PCConstraint *pathCondition,
                                ref<Expr> condition);
 
   static void addTableEntryMapping(TxTreeNode *txTreeNode,
                                    SubsumptionTableEntry *entry);
 
-  static void setAsCore(PathCondition *pathCondition);
+  static void setAsCore(PCConstraint *pathCondition);
 
   static void setError(const ExecutionState &state,
                        TxTreeGraph::Error errorType);

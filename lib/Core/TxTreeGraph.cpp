@@ -108,7 +108,7 @@ std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
     }
   }
   stream << "\\l";
-  for (std::map<PathCondition *, std::pair<std::string, bool> >::const_iterator
+  for (std::map<PCConstraint *, std::pair<std::string, bool> >::const_iterator
            it = node->pathConditionTable.begin(),
            ie = node->pathConditionTable.end();
        it != ie; ++it) {
@@ -348,7 +348,7 @@ void TxTreeGraph::markAsSubsumed(TxTreeNode *txTreeNode,
 }
 
 void TxTreeGraph::addPathCondition(TxTreeNode *txTreeNode,
-                                   PathCondition *pathCondition,
+                                   PCConstraint *pathCondition,
                                    ref<Expr> condition) {
   if (!OUTPUT_INTERPOLATION_TREE)
     return;
@@ -375,7 +375,7 @@ void TxTreeGraph::addTableEntryMapping(TxTreeNode *txTreeNode,
   instance->tableEntryMap[entry] = node;
 }
 
-void TxTreeGraph::setAsCore(PathCondition *pathCondition) {
+void TxTreeGraph::setAsCore(PCConstraint *pathCondition) {
   if (!OUTPUT_INTERPOLATION_TREE)
     return;
 

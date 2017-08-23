@@ -91,9 +91,6 @@ void PathCondition::setAsCore(int debugSubsumptionLevel) {
 
   // We mark this constraint itself as core
   core = true;
-
-  // We mark constraint as core in the search tree graph as well.
-  TxTreeGraph::setAsCore(this);
 }
 
 bool PathCondition::isCore() const { return core; }
@@ -2426,7 +2423,7 @@ void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
                                     callHistory, pathCondition);
   ref<PCConstraint> pcConstraint =
       dependency->addConstraint(constraint, condition, callHistory);
-  graph->addPathCondition(this, pathCondition, constraint);
+  graph->addPathCondition(this, pcConstraint.get(), constraint);
 }
 
 void TxTreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
