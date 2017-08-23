@@ -179,6 +179,18 @@ void TxPathCondition::print(llvm::raw_ostream &stream,
                             const unsigned paddingAmount) const {
   std::string tabs = makeTabs(paddingAmount);
   std::string tabsNext = appendTab(tabs);
-  std::string tabsNextNext = appendTab(tabsNext);
+
+  stream << tabs << "path condition = [";
+  for (std::map<ref<Expr>, ref<PCConstraint> >::const_iterator
+           is = pcDepth.begin(),
+           it = is, ie = pcDepth.end();
+       it != ie; ++it) {
+    if (it != is)
+      stream << ",";
+    stream << "\n";
+    stream << tabsNext;
+    it->first->print(stream);
+  }
+  stream << "]";
 }
 }
