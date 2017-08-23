@@ -22,53 +22,50 @@
 
 namespace klee {
 
-class TxPathCondition {
-
+/// \brief A conjunct on the path condition
+class PCConstraint {
 public:
-  /// \brief A conjunct on the path condition
-  class PCConstraint {
-  public:
-    unsigned refCount;
-
-  private:
-    /// \brief KLEE expression
-    ref<Expr> constraint;
-
-    /// \brief KLEE expression with variables (arrays) replaced by their shadows
-    ref<Expr> shadowConstraint;
-
-    /// \brief If shadow constraint had been generated: We generate shadow
-    /// constraint on demand only when the constraint is required in an
-    /// interpolant.
-    bool shadowed;
-
-    /// \brief The set of bound variables
-    std::set<const Array *> boundVariables;
-
-    /// \brief the condition value from which the constraint was generated
-    ref<TxStateValue> condition;
-
-    /// \brief The depth this condition was introduced
-    uint64_t depth;
-
-  public:
-    PCConstraint(ref<Expr> _constraint, ref<TxStateValue> _condition,
-                 uint64_t _depth);
-
-    ~PCConstraint();
-
-    ref<Expr> packInterpolant(std::set<const Array *> &replacements);
-
-    uint64_t getDepth() const { return depth; }
-
-    int compare(const PCConstraint &other) const;
-
-    void dump() const;
-
-    void print(llvm::raw_ostream &stream) const;
-  };
+  unsigned refCount;
 
 private:
+  /// \brief KLEE expression
+  ref<Expr> constraint;
+
+  /// \brief KLEE expression with variables (arrays) replaced by their shadows
+  ref<Expr> shadowConstraint;
+
+  /// \brief If shadow constraint had been generated: We generate shadow
+  /// constraint on demand only when the constraint is required in an
+  /// interpolant.
+  bool shadowed;
+
+  /// \brief The set of bound variables
+  std::set<const Array *> boundVariables;
+
+  /// \brief the condition value from which the constraint was generated
+  ref<TxStateValue> condition;
+
+  /// \brief The depth this condition was introduced
+  uint64_t depth;
+
+public:
+  PCConstraint(ref<Expr> _constraint, ref<TxStateValue> _condition,
+               uint64_t _depth);
+
+  ~PCConstraint();
+
+  ref<Expr> packInterpolant(std::set<const Array *> &replacements);
+
+  uint64_t getDepth() const { return depth; }
+
+  int compare(const PCConstraint &other) const;
+
+  void dump() const;
+
+  void print(llvm::raw_ostream &stream) const;
+};
+
+class TxPathCondition {
   /// \brief The path condition, with the levels each one is introduced
   std::map<ref<Expr>, ref<PCConstraint> > pcDepth;
 
@@ -105,8 +102,8 @@ public:
 
   void setRightChild(TxPathCondition *child) { right = child; }
 
-  ref<TxPathCondition::PCConstraint> addConstraint(ref<Expr> constraint,
-                                                   ref<TxStateValue> condition);
+  ref<PCConstraint> addConstraint(ref<Expr> constraint,
+                                  ref<TxStateValue> condition);
 
   void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore);
 
