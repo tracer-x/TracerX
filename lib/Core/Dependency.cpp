@@ -1625,6 +1625,9 @@ void Dependency::print(llvm::raw_ostream &stream,
                        const unsigned paddingAmount) const {
   std::string tabs = makeTabs(paddingAmount);
 
+  pathCondition->print(stream, paddingAmount);
+  stream << "\n";
+
   store->print(stream, paddingAmount);
 
   if (parent) {
