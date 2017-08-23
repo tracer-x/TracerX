@@ -15,7 +15,9 @@
 
 #include "ShadowArray.h"
 #include "TxPathCondition.h"
+
 #include "klee/CommandLine.h"
+#include "klee/util/TxTreeGraph.h"
 
 using namespace klee;
 
@@ -100,6 +102,8 @@ void TxPathCondition::unsatCoreInterpolation(
       ref<PCConstraint> &pcConstraint = pcDepthIter->second;
       depthToConstraintSet[pcConstraint->getDepth()].insert(pcConstraint);
       keySet.insert(pcConstraint->getDepth());
+
+      TxTreeGraph::setAsCore(pcConstraint.get());
     }
   }
 
