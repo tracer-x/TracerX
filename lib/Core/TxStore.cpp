@@ -364,10 +364,10 @@ void TxStore::markUsed(const std::set<ref<TxStoreEntry> > &entryList) {
        it != ie; ++it) {
     uint64_t entryDepth = (*it)->getDepth();
 
-    if (entryDepth == depth)
+    // Note that it is possible that entryDepth > depth, due to the association
+    // of values with newly-created entries in TxStore::updateStore().
+    if (entryDepth >= depth)
       continue;
-
-    assert(entryDepth < depth && "invalid depth");
 
     // We now register the used entry as used after it was instantiated in
     // previous depth levels
