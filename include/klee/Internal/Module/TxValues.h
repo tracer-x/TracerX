@@ -629,9 +629,6 @@ private:
   /// \brief Direct use count of this value by another value in all interpolants
   uint64_t directUseCount;
 
-  /// \brief All load addresses, transitively
-  std::set<ref<TxStateAddress> > allLoadAddresses;
-
   /// \brief Store entries this value is dependent upon
   std::set<ref<TxStoreEntry> > entryList;
 
@@ -686,8 +683,6 @@ public:
   const std::map<ref<TxStateValue>, ref<TxStateAddress> > &getSources() {
     return sources;
   }
-
-  std::set<ref<TxStateAddress> > getLoadLocations() { return allLoadAddresses; }
 
   int compare(const TxStateValue other) const {
     if (id == other.id)
