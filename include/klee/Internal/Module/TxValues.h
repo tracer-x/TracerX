@@ -616,21 +616,18 @@ private:
   /// pointer; instead, use exact address
   bool doNotInterpolateBound;
 
-  /// \brief The load address of this value, in case it was a load instruction
-  ref<TxStateValue> loadAddress;
+  /// \brief The load addresses of this value: These are the addresses the loads
+  /// that influence this value was executed on
+  std::set<ref<TxStateValue> > loadAddresses;
 
-  /// \brief The address by which the loaded value was stored, in case this
-  /// was a load instruction
-  ref<TxStateValue> storeAddress;
+  /// \brief The addresses by which this loaded value was stored
+  std::set<ref<TxStateValue> > storeAddresses;
 
   /// \brief Reasons for this value to be in the core
   std::set<std::string> coreReasons;
 
   /// \brief Direct use count of this value by another value in all interpolants
   uint64_t directUseCount;
-
-  /// \brief All load addresses, transitively
-  std::set<ref<TxStateAddress> > allLoadAddresses;
 
   /// \brief Store entries this value is dependent upon
   std::set<ref<TxStoreEntry> > entryList;
@@ -659,15 +656,15 @@ public:
 
   /// \brief Set the address this value was loaded from for inclusion in the
   /// interpolant
-  void setLoadAddress(ref<TxStateValue> _loadAddress);
+  void addLoadAddress(ref<TxStateValue> _loadAddress);
 
-  ref<TxStateValue> getLoadAddress() { return loadAddress; }
+  std::set<ref<TxStateValue> > &getLoadAddresses() { return loadAddresses; }
 
   /// \brief Set the address this value was stored into for inclusion in the
   /// interpolant
-  void setStoreAddress(ref<TxStateValue> _storeAddress);
+  void addStoreAddress(ref<TxStateValue> _storeAddress);
 
-  ref<TxStateValue> getStoreAddress() { return storeAddress; }
+  std::set<ref<TxStateValue> > &getStoreAddresses() { return storeAddresses; }
 
   /// \brief The core routine for adding flow dependency between source and
   /// target value
@@ -686,8 +683,6 @@ public:
   const std::map<ref<TxStateValue>, ref<TxStateAddress> > &getSources() {
     return sources;
   }
-
-  std::set<ref<TxStateAddress> > getLoadLocations() { return allLoadAddresses; }
 
   int compare(const TxStateValue other) const {
     if (id == other.id)

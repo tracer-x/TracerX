@@ -776,28 +776,28 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
 
 /**/
 
-void TxStateValue::setLoadAddress(ref<TxStateValue> _loadAddress) {
-  loadAddress = _loadAddress;
-  allLoadAddresses.insert(_loadAddress->locations.begin(),
-                          _loadAddress->locations.end());
-  entryList.insert(_loadAddress->entryList.begin(),
-                   _loadAddress->entryList.end());
+void TxStateValue::addLoadAddress(ref<TxStateValue> loadAddress) {
+  loadAddresses.insert(loadAddress);
+  entryList.insert(loadAddress->entryList.begin(),
+                   loadAddress->entryList.end());
 }
 
-void TxStateValue::setStoreAddress(ref<TxStateValue> _storeAddress) {
-  storeAddress = _storeAddress;
-  allLoadAddresses.insert(_storeAddress->locations.begin(),
-                          _storeAddress->locations.end());
-  entryList.insert(_storeAddress->entryList.begin(),
-                   _storeAddress->entryList.end());
+void TxStateValue::addStoreAddress(ref<TxStateValue> storeAddress) {
+  storeAddresses.insert(storeAddress);
+  entryList.insert(storeAddress->entryList.begin(),
+                   storeAddress->entryList.end());
 }
 
 void TxStateValue::addDependency(ref<TxStateValue> source,
                                  ref<TxStateAddress> via) {
-  sources[source] = via;
   if (via.isNull()) {
-    allLoadAddresses.insert(source->allLoadAddresses.begin(),
-                            source->allLoadAddresses.end());
+    loadAddresses.insert(source->loadAddresses.begin(),
+                         source->loadAddresses.end());
+    storeAddresses.insert(source->storeAddresses.begin(),
+                          source->storeAddresses.end());
+    sources.insert(source->sources.begin(), source->sources.end());
+  } else {
+    sources[source] = via;
   }
   entryList.insert(source->entryList.begin(), source->entryList.end());
 }
