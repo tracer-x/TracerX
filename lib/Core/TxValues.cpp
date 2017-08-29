@@ -790,7 +790,11 @@ void TxStateValue::setStoreAddress(ref<TxStateValue> _storeAddress) {
 
 void TxStateValue::addDependency(ref<TxStateValue> source,
                                  ref<TxStateAddress> via) {
-  sources[source] = via;
+  if (via.isNull()) {
+    sources.insert(source->sources.begin(), source->sources.end());
+  } else {
+    sources[source] = via;
+  }
   entryList.insert(source->entryList.begin(), source->entryList.end());
 }
 
