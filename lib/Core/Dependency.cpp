@@ -294,29 +294,22 @@ void Dependency::addDependencyToNonPointer(ref<TxStateValue> source,
   target->addDependency(source, nullLocation);
 }
 
-std::vector<ref<TxStateValue> >
+std::set<ref<TxStateValue> >
 Dependency::directFlowSources(ref<TxStateValue> target) const {
-  std::vector<ref<TxStateValue> > ret;
+  std::set<ref<TxStateValue> > ret;
   std::map<ref<TxStateValue>, ref<TxStateAddress> > sources =
       target->getSources();
-  ref<TxStateValue> loadAddress = target->getLoadAddress(),
-                    storeAddress = target->getStoreAddress();
+  std::set<ref<TxStateValue> > &loadAddresses = target->getLoadAddresses();
+  std::set<ref<TxStateValue> > &storeAddresses = target->getStoreAddresses();
 
   for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::iterator it =
            sources.begin();
        it != sources.end(); ++it) {
-    ret.push_back(it->first);
+    ret.insert(it->first);
   }
 
-  if (!loadAddress.isNull()) {
-    ret.push_back(loadAddress);
-    if (!storeAddress.isNull() && storeAddress != loadAddress) {
-      ret.push_back(storeAddress);
-    }
-  } else if (!storeAddress.isNull()) {
-    ret.push_back(storeAddress);
-  }
-
+  ret.insert(loadAddresses.begin(), loadAddresses.end());
+  ret.insert(storeAddresses.begin(), storeAddresses.end());
   return ret;
 }
 
@@ -338,9 +331,9 @@ void Dependency::markFlow(ref<TxStateValue> target, const std::string &reason,
   target->setAsCore(reason);
   target->disableBoundInterpolation();
 
-  std::vector<ref<TxStateValue> > stepSources = directFlowSources(target);
-  for (std::vector<ref<TxStateValue> >::iterator it = stepSources.begin(),
-                                                 ie = stepSources.end();
+  std::set<ref<TxStateValue> > stepSources = directFlowSources(target);
+  for (std::set<ref<TxStateValue> >::iterator it = stepSources.begin(),
+                                              ie = stepSources.end();
        it != ie; ++it) {
     markFlow(*it, reason, incrementDirectUseCount);
   }
@@ -401,8 +394,18 @@ bool Dependency::markPointerFlow(ref<TxStateValue> target,
   }
 
   // We use normal marking with markFlow for load/store addresses
-  markFlow(target->getLoadAddress(), reason, incrementDirectUseCount);
-  markFlow(target->getStoreAddress(), reason, incrementDirectUseCount);
+  for (std::set<ref<TxStateValue> >::iterator
+           it = target->getLoadAddresses().begin(),
+           ie = target->getLoadAddresses().end();
+       it != ie; ++it) {
+    markFlow(*it, reason, incrementDirectUseCount);
+  }
+  for (std::set<ref<TxStateValue> >::iterator
+           it = target->getStoreAddresses().begin(),
+           ie = target->getStoreAddresses().end();
+       it != ie; ++it) {
+    markFlow(*it, reason, incrementDirectUseCount);
+  }
 
   return memoryError;
 }
@@ -832,8 +835,8 @@ void Dependency::execute(llvm::Instruction *instr,
           store->updateStoreWithLoadedValue(*li, addressValue, loadedValue);
         } else {
           addDependencyViaLocation(storeEntry->getContent(), loadedValue, *li);
-          loadedValue->setLoadAddress(addressValue);
-          loadedValue->setStoreAddress(storeEntry->getAddressValue());
+          loadedValue->addLoadAddress(addressValue);
+          loadedValue->addStoreAddress(storeEntry->getAddressValue());
         }
       }
       break;

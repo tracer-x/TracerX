@@ -302,7 +302,7 @@ void TxStore::updateStoreWithLoadedValue(ref<TxStateAddress> loc,
   std::set<ref<TxStateAddress> > locations;
   locations.insert(loc);
   updateStore(locations, address, value);
-  value->setLoadAddress(address);
+  value->addLoadAddress(address);
 }
 
 void TxStore::updateStore(const std::set<ref<TxStateAddress> > &locations,
