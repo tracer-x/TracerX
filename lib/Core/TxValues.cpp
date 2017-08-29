@@ -671,7 +671,8 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
 /**/
 
 bool TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
-                                       std::set<ref<Expr> > &_bounds) {
+                                       std::set<ref<Expr> > &_bounds,
+                                       bool &boundUpdated) {
   const std::set<ref<TxStateAddress> > &locations =
       checkedAddress->getLocations();
   std::set<ref<Expr> > bounds(_bounds);
@@ -706,6 +707,7 @@ bool TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
                   if (!elementStructType->isLiteral() &&
                       elementType->getStructName() == "struct.dirent") {
                     concreteOffsetBound = newBound;
+                    boundUpdated = true;
                     continue;
                   }
                 }
@@ -713,6 +715,7 @@ bool TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
 
               if (newBound > offsetInt) {
                 concreteOffsetBound = newBound;
+                boundUpdated = true;
               } else {
                 // Incorrect bounds would pass this assertion, as long as the
                 // value of the checked offset is reasonable (non-negative). We
@@ -734,6 +737,7 @@ bool TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
 
       symbolicOffsetBounds.insert(
           SubExpr::create(*it1, SubExpr::create(checkedOffset, getOffset())));
+      boundUpdated = true;
     }
   }
   return false;
