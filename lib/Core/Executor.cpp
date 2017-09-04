@@ -1816,8 +1816,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         ++bit;
       }
     }
-    if (INTERPOLATION_ENABLED)
-      txTree->execute(i);
     break;
  }
   case Instruction::Unreachable:
