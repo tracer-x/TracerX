@@ -1211,12 +1211,6 @@ void Dependency::bindReturnValue(llvm::CallInst *site,
   }
 }
 
-void Dependency::markAllValues(ref<TxStateValue> value,
-                               const std::string &reason) {
-  markFlow(value, reason);
-  store->markUsed(value->getEntryList());
-}
-
 void Dependency::markAllValues(llvm::Value *val, ref<Expr> expr,
                                const std::string &reason) {
   ref<TxStateValue> value = getLatestValueForMarking(val, expr);
