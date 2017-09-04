@@ -1697,6 +1697,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     ref<Expr> cond = eval(ki, 0, state).value;
     BasicBlock *bb = si->getParent();
 
+    // For interpolation
+    ref<Expr> oldCond = cond;
+
     cond = toUnique(state, cond);
     if (ConstantExpr *CE = dyn_cast<ConstantExpr>(cond)) {
       // Somewhat gross to create these all the time, but fine till we
@@ -1710,6 +1713,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       unsigned index = si->findCaseValue(ci);
 #endif
       transferToBasicBlock(si->getSuccessor(index), si->getParent(), state);
+
+      if (INTERPOLATION_ENABLED)
+        txTree->execute(i, oldCond);
     } else {
       // Handle possible different branch targets
 
@@ -1749,6 +1755,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
                it = expressionOrder.begin(),
                itE = expressionOrder.end();
            it != itE; ++it) {
+        std::vector<ref<Expr> > unsatCore;
         ref<Expr> match = EqExpr::create(cond, it->first);
 
         // Make sure that the default value does not contain this target's value
@@ -1756,7 +1763,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
         // Check if control flow could take this case
         bool result;
-        bool success = solver->mayBeTrue(state, match, result);
+        bool success = solver->mayBeTrue(state, match, result, unsatCore);
         assert(success && "FIXME: Unhandled solver failure");
         (void) success;
         if (result) {
@@ -1778,12 +1785,17 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           if (res.second) {
             bbOrder.push_back(caseSuccessor);
           }
+        } else if (INTERPOLATION_ENABLED) {
+          // The solver returned no solution, which means there is an infeasible
+          // branch: Mark the unsatisfiability core
+          state.txTreeNode->unsatCoreInterpolation(unsatCore);
         }
       }
 
       // Check if control could take the default case
+      std::vector<ref<Expr> > unsatCore;
       bool res;
-      bool success = solver->mayBeTrue(state, defaultValue, res);
+      bool success = solver->mayBeTrue(state, defaultValue, res, unsatCore);
       assert(success && "FIXME: Unhandled solver failure");
       (void) success;
       if (res) {
@@ -1793,6 +1805,10 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         if (ret.second) {
           bbOrder.push_back(si->getDefaultDest());
         }
+      } else if (INTERPOLATION_ENABLED) {
+        // The solver returned no solution, which means the default branch
+        // cannot be taken: Mark the unsatisfiability core
+        state.txTreeNode->unsatCoreInterpolation(unsatCore);
       }
 
       // Fork the current state with each state having one of the possible
@@ -2973,6 +2989,13 @@ void Executor::run(ExecutionState &initialState) {
       unsigned numSeeds = it->second.size();
       ExecutionState &state = *lastState;
       KInstruction *ki = state.pc;
+
+      if (INTERPOLATION_ENABLED) {
+        // We synchronize the node id to that of the state. The node id is set
+        // only when it was the address of the first instruction in the node.
+        txTree->setCurrentINode(state);
+      }
+
       stepInstruction(state);
 
       executeInstruction(state, ki);
