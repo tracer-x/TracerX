@@ -61,8 +61,9 @@ bool TimingSolver::evaluate(const ExecutionState &state, ref<Expr> expr,
   return success;
 }
 
-bool TimingSolver::mustBeTrue(const ExecutionState& state, ref<Expr> expr, 
-                              bool &result) {
+bool TimingSolver::mustBeTrue(const ExecutionState &state, ref<Expr> expr,
+                              bool &result,
+                              std::vector<ref<Expr> > &unsatCore) {
   // Fast path, to avoid timer and OS overhead.
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(expr)) {
     result = CE->isTrue() ? true : false;
@@ -75,7 +76,13 @@ bool TimingSolver::mustBeTrue(const ExecutionState& state, ref<Expr> expr,
   if (simplifyExprs)
     expr = state.constraints.simplifyExpr(expr, simplificationCore);
 
-  bool success = solver->mustBeTrue(Query(state.constraints, expr), result);
+  bool success =
+      solver->mustBeTrue(Query(state.constraints, expr), result, unsatCore);
+
+  if (INTERPOLATION_ENABLED && simplifyExprs) {
+    unsatCore.insert(unsatCore.begin(), simplificationCore.begin(),
+                     simplificationCore.end());
+  }
 
   sys::TimeValue delta = util::getWallTimeVal();
   delta -= now;
@@ -85,24 +92,26 @@ bool TimingSolver::mustBeTrue(const ExecutionState& state, ref<Expr> expr,
   return success;
 }
 
-bool TimingSolver::mustBeFalse(const ExecutionState& state, ref<Expr> expr,
-                               bool &result) {
-  return mustBeTrue(state, Expr::createIsZero(expr), result);
+bool TimingSolver::mustBeFalse(const ExecutionState &state, ref<Expr> expr,
+                               bool &result,
+                               std::vector<ref<Expr> > &unsatCore) {
+  return mustBeTrue(state, Expr::createIsZero(expr), result, unsatCore);
 }
 
-bool TimingSolver::mayBeTrue(const ExecutionState& state, ref<Expr> expr, 
-                             bool &result) {
+bool TimingSolver::mayBeTrue(const ExecutionState &state, ref<Expr> expr,
+                             bool &result, std::vector<ref<Expr> > &unsatCore) {
   bool res;
-  if (!mustBeFalse(state, expr, res))
+  if (!mustBeFalse(state, expr, res, unsatCore))
     return false;
   result = !res;
   return true;
 }
 
-bool TimingSolver::mayBeFalse(const ExecutionState& state, ref<Expr> expr, 
-                              bool &result) {
+bool TimingSolver::mayBeFalse(const ExecutionState &state, ref<Expr> expr,
+                              bool &result,
+                              std::vector<ref<Expr> > &unsatCore) {
   bool res;
-  if (!mustBeTrue(state, expr, res))
+  if (!mustBeTrue(state, expr, res, unsatCore))
     return false;
   result = !res;
   return true;

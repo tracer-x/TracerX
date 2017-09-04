@@ -49,13 +49,38 @@ namespace klee {
     bool evaluate(const ExecutionState &, ref<Expr>, Solver::Validity &result,
                   std::vector<ref<Expr> > &unsatCore);
 
-    bool mustBeTrue(const ExecutionState&, ref<Expr>, bool &result);
+    bool mustBeTrue(const ExecutionState &, ref<Expr>, bool &result,
+                    std::vector<ref<Expr> > &unsatCore);
 
-    bool mustBeFalse(const ExecutionState&, ref<Expr>, bool &result);
+    bool mustBeFalse(const ExecutionState &, ref<Expr>, bool &result,
+                     std::vector<ref<Expr> > &unsatCore);
 
-    bool mayBeTrue(const ExecutionState&, ref<Expr>, bool &result);
+    bool mayBeTrue(const ExecutionState &, ref<Expr>, bool &result,
+                   std::vector<ref<Expr> > &unsatCore);
 
-    bool mayBeFalse(const ExecutionState&, ref<Expr>, bool &result);
+    bool mayBeFalse(const ExecutionState &, ref<Expr>, bool &result,
+                    std::vector<ref<Expr> > &unsatCore);
+
+    bool mustBeTrue(const ExecutionState &state, ref<Expr> expr, bool &result) {
+      std::vector<ref<Expr> > dummyUnsatCore;
+      return mustBeTrue(state, expr, result, dummyUnsatCore);
+    }
+
+    bool mustBeFalse(const ExecutionState &state, ref<Expr> expr,
+                     bool &result) {
+      std::vector<ref<Expr> > dummyUnsatCore;
+      return mustBeFalse(state, expr, result, dummyUnsatCore);
+    }
+
+    bool mayBeTrue(const ExecutionState &state, ref<Expr> expr, bool &result) {
+      std::vector<ref<Expr> > dummyUnsatCore;
+      return mayBeTrue(state, expr, result, dummyUnsatCore);
+    }
+
+    bool mayBeFalse(const ExecutionState &state, ref<Expr> expr, bool &result) {
+      std::vector<ref<Expr> > dummyUnsatCore;
+      return mayBeFalse(state, expr, result, dummyUnsatCore);
+    }
 
     bool getValue(const ExecutionState &, ref<Expr> expr, 
                   ref<ConstantExpr> &result);

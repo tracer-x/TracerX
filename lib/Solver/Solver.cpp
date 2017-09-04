@@ -46,7 +46,8 @@ bool Solver::evaluate(const Query& query, Validity &result,
   return impl->computeValidity(query, result, unsatCore);
 }
 
-bool Solver::mustBeTrue(const Query& query, bool &result) {
+bool Solver::mustBeTrue(const Query &query, bool &result,
+                        std::vector<ref<Expr> > &unsatCore) {
   assert(query.expr->getWidth() == Expr::Bool && "Invalid expression type!");
 
   // Maintain invariants implementations expect.
@@ -55,7 +56,6 @@ bool Solver::mustBeTrue(const Query& query, bool &result) {
     return true;
   }
 
-  std::vector<ref<Expr> > unsatCore;
   return impl->computeTruth(query, result, unsatCore);
 }
 
