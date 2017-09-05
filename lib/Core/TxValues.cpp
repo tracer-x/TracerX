@@ -819,6 +819,7 @@ void TxStateValue::print(llvm::raw_ostream &stream,
   std::string tabsNext = appendTab(prefix);
 
   printMinimal(stream, prefix);
+  stream << "\n";
 
   if (entryList.empty()) {
     stream << prefix << "not dependent on store\n";
