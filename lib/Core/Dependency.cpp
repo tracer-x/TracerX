@@ -709,6 +709,26 @@ void Dependency::execute(llvm::Instruction *instr,
       }
       break;
     }
+    case llvm::Instruction::Switch: {
+      // This handles only the case when the switch argument can be reduced to a
+      // constant. Here we interpolate since a constant switch argument means
+      // that there are infeasible branches.
+
+      std::string reason = "";
+      if (debugSubsumptionLevel > 1) {
+        llvm::raw_string_ostream stream(reason);
+        stream << "infeasible switch case [";
+        stream << instr->getParent()->getParent()->getName().str() << ": ";
+        if (llvm::MDNode *n = instr->getMetadata("dbg")) {
+          llvm::DILocation loc(n);
+          stream << "Line " << loc.getLineNumber();
+        }
+        stream << "]";
+        stream.flush();
+      }
+      markAllValues(instr->getOperand(0), argExpr, reason);
+      break;
+    }
     default: { assert(!"unhandled unary instruction"); }
     }
     return;
@@ -1209,12 +1229,6 @@ void Dependency::bindReturnValue(llvm::CallInst *site,
     if (!value.isNull())
       addDependency(value, getNewTxStateValue(site, callHistory, returnValue));
   }
-}
-
-void Dependency::markAllValues(ref<TxStateValue> value,
-                               const std::string &reason) {
-  markFlow(value, reason);
-  store->markUsed(value->getEntryList());
 }
 
 void Dependency::markAllValues(llvm::Value *val, ref<Expr> expr,

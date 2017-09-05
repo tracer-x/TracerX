@@ -440,10 +440,6 @@ namespace klee {
                          std::vector<llvm::Instruction *> &callHistory,
                          llvm::Instruction *inst, ref<Expr> returnValue);
 
-    /// \brief Given a versioned value, retrieve all its sources and mark them
-    /// as in the core.
-    void markAllValues(ref<TxStateValue> value, const std::string &reason);
-
     /// \brief Given an LLVM value, retrieve all its sources and mark them as in
     /// the core.
     void markAllValues(llvm::Value *value, ref<Expr> expr,
