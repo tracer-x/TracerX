@@ -2057,7 +2057,12 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
 
     // As the node is about to be deleted, it must have been completely
     // traversed, hence the correct time to table the interpolant.
-    if (!dumping && !node->isSubsumed && node->storable) {
+    //
+    // We don't create an interpolant for an error node of generic error type:
+    // This is because a generic error returns no information (true), which
+    // should not be used for subsuming.
+    if (!dumping && !node->isSubsumed && node->storable &&
+        !node->genericError) {
       int debugSubsumptionLevel = node->dependency->debugSubsumptionLevel;
 
       if (debugSubsumptionLevel >= 2) {
@@ -2084,8 +2089,9 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
       }
     }
 
-    delete node;
     if (p) {
+      if (!p->genericError)
+        p->genericError = node->genericError;
       if (node == p->left) {
         p->left = 0;
       } else {
@@ -2093,6 +2099,7 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
         p->right = 0;
       }
     }
+    delete node;
     node = p;
   } while (node && !node->left && !node->right);
 #endif

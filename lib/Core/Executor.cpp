@@ -3297,12 +3297,14 @@ void Executor::terminateStateOnError(ExecutionState &state,
     interpreterHandler->incBranchingDepthOnErrorTermination(state.depth);
     interpreterHandler->incInstructionsDepthOnErrorTermination(
         state.txTreeNode->getInstructionsDepth());
+
     if (termReason == Executor::Assert) {
       TxTreeGraph::setError(state, TxTreeGraph::ASSERTION);
     } else if (termReason == Executor::Ptr &&
                messaget.str() == "memory error: out of bound pointer") {
       TxTreeGraph::setError(state, TxTreeGraph::MEMORY);
     } else {
+      state.txTreeNode->setGenericError();
       TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
     }
   }
