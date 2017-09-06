@@ -399,6 +399,9 @@ class TxTreeNode {
   /// is just a pointer to the one in klee::Executor.
   std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
 
+  /// \brief Indicates that a generic error was encountered in this node
+  bool genericError;
+
   void setProgramPoint(llvm::Instruction *instr) {
     if (!programPoint)
       programPoint = reinterpret_cast<uintptr_t>(instr);
@@ -538,6 +541,8 @@ public:
                                        const std::string &reason) {
     dependency->markAllValues(value, address, reason);
   }
+
+  void setGenericError() { genericError = true; }
 
   /// \brief Print the content of the tree node object to the LLVM error stream.
   void dump() const;
