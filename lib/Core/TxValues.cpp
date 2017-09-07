@@ -880,7 +880,10 @@ void TxStateValue::printMinimal(llvm::raw_ostream &stream,
   value->print(stream);
   stream << "\n";
   stream << prefix << "expression: ";
-  valueExpr->print(stream);
+  if (!valueExpr.isNull())
+    valueExpr->print(stream);
+  else
+    stream << "NULL";
   stream << "\n";
   stream << prefix
          << "pointer to location object: " << reinterpret_cast<uintptr_t>(this);
