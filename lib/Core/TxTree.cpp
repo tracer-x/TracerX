@@ -1502,6 +1502,50 @@ ref<Expr> TxSubsumptionTableEntry::getInterpolant() const {
 
 ref<Expr> TxSubsumptionTableEntry::getWPInterpolant() const { return wpInterpolant; }
 
+TxStore::LowerInterpolantStore
+TxSubsumptionTableEntry::getConcretelyAddressedHistoricalStore() const {
+  return concretelyAddressedHistoricalStore;
+}
+
+TxStore::LowerInterpolantStore
+TxSubsumptionTableEntry::getSymbolicallyAddressedHistoricalStore() const {
+  return symbolicallyAddressedHistoricalStore;
+}
+
+TxStore::TopInterpolantStore
+TxSubsumptionTableEntry::getConcretelyAddressedStore() const {
+  return concretelyAddressedStore;
+}
+
+TxStore::TopInterpolantStore
+TxSubsumptionTableEntry::getSymbolicallyAddressedStore() const {
+  return symbolicallyAddressedStore;
+}
+
+void TxSubsumptionTableEntry::setInterpolant(ref<Expr> _interpolant) {
+  interpolant = _interpolant;
+}
+
+void TxSubsumptionTableEntry::setConcretelyAddressedHistoricalStore(
+    TxStore::LowerInterpolantStore _concretelyAddressedHistoricalStore) {
+  concretelyAddressedHistoricalStore = _concretelyAddressedHistoricalStore;
+}
+
+void TxSubsumptionTableEntry::setSymbolicallyAddressedHistoricalStore(
+    TxStore::LowerInterpolantStore _symbolicallyAddressedHistoricalStore) {
+  symbolicallyAddressedHistoricalStore = _symbolicallyAddressedHistoricalStore;
+}
+
+void TxSubsumptionTableEntry::setConcretelyAddressedStore(
+    TxStore::TopInterpolantStore _concretelyAddressedStore) {
+  concretelyAddressedStore = _concretelyAddressedStore;
+}
+
+void TxSubsumptionTableEntry::setSymbolicallyAddressedStore(
+    TxStore::TopInterpolantStore _symbolicallyAddressedStore) {
+  symbolicallyAddressedStore = _symbolicallyAddressedStore;
+}
+
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
   print(stream, 0);
 }
@@ -1639,8 +1683,6 @@ void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
 
 void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
                                     const std::string &prefix) const {
-  std::string tabsNext = appendTab(prefix);
-  std::string tabsNextNext = appendTab(tabsNext);
 
   stream << prefix << "\nwp interpolant = ";
   if (!wpInterpolant.isNull())
@@ -2038,8 +2080,9 @@ void TxTree::setCurrentINode(ExecutionState &state) {
   TxTreeGraph::setCurrentNode(state, currentTxTreeNode->nodeSequenceNumber);
 }
 
-void TxTree::remove(TxTreeNode *node, bool dumping) {
+void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 #ifdef ENABLE_Z3
+  TxTreeNode *node = state->txTreeNode;
   TimerStatIncrementer t(removeTime);
   assert(!node->left && !node->right);
   do {
@@ -2067,6 +2110,30 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
           new TxSubsumptionTableEntry(node, node->entryCallHistory);
       TxSubsumptionTable::insert(node->getProgramPoint(),
                                  node->entryCallHistory, entry);
+
+      ref<Expr> WPExpr = entry->getWPInterpolant();
+      Solver::Validity result;
+      std::vector<ref<Expr> > unsatCore;
+      ref<Expr> WPExprInstantiated = ConstantExpr::create(0, 32);
+      if (node->parent)
+        WPExprInstantiated = node->wp->instantiateWPExpression(
+            node->parent->dependency, node->parent->callHistory, WPExpr);
+      bool success =
+          solver->evaluate(*state, WPExprInstantiated, result, unsatCore);
+      if (success != true)
+        klee_error("TxTree::remove: Implication test failed");
+      if (result == Solver::True) {
+        entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
+      } else {
+        // If the result of implication is Solver::False and/or
+        // Solver::Unknown the chance that the WP interpolant
+        // improves the interpolant from the deletion algorithm
+        // is slim. As a result, in such cases the interpolant
+        // from deletion is not changed.
+      }
+
+      TxSubsumptionTable::insert(node->getProgramPoint(), node->entryCallHistory,
+                               entry);
 
       TxTreeGraph::addTableEntryMapping(node, entry);
 
@@ -2270,7 +2337,9 @@ TxTreeNode::TxTreeNode(
   // Inherit the abstract dependency or NULL
   dependency = new TxDependency(_parent ? _parent->dependency : 0, _targetData,
                                 _globalAddresses);
-  wp = new WeakestPreCondition();
+
+  // Set the child WP Interpolant to true
+  wp = new WeakestPreCondition(this, this->dependency);
   childWPInterpolant[0] = wp->False();
   childWPInterpolant[1] = wp->False();
 }
@@ -2303,11 +2372,11 @@ ref<Expr> TxTreeNode::getWPInterpolant() {
     // Generate weakest precondition from pathCondition and/or BB instructions
     markAllFlag = 0;
     expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
-    this->parent->setChildWPInterpolant(expr);
+    expr->dump();
+    if (parent)
+      this->parent->setChildWPInterpolant(expr);
   } else {
-    // TODO: Perform the intersection of the child interpolants
-    // The following is a temporary intersection.
-    expr = AndExpr::create(childWPInterpolant[0], childWPInterpolant[1]);
+    expr = wp->intersectExpr(childWPInterpolant[0], childWPInterpolant[1]);
 
     // Setting the intersection of child nodes as the target in the of the nodes
     wp->setWPExpr(expr);
@@ -2316,7 +2385,8 @@ ref<Expr> TxTreeNode::getWPInterpolant() {
     // All instructions are marked
     markAllFlag = 1;
     expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
-    this->parent->setChildWPInterpolant(expr);
+    if (parent)
+      this->parent->setChildWPInterpolant(expr);
   }
   return expr;
 }
