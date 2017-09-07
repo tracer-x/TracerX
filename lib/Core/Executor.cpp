@@ -2837,7 +2837,7 @@ void Executor::updateStates(ExecutionState *current) {
       seedMap.erase(it3);
     processTree->remove(es->ptreeNode);
     if (INTERPOLATION_ENABLED)
-      txTree->remove(es->txTreeNode, (current == 0));
+      txTree->remove(es,solver, (current == 0));
     delete es;
   }
   removedStates.clear();
@@ -3183,7 +3183,7 @@ void Executor::terminateState(ExecutionState &state) {
     processTree->remove(state.ptreeNode);
 
     if (INTERPOLATION_ENABLED)
-      txTree->remove(state.txTreeNode, false);
+      txTree->remove(&state,solver, false);
     delete &state;
   }
 }

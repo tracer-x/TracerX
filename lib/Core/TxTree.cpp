@@ -1638,8 +1638,6 @@ void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
 
 void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
                                     const std::string &prefix) const {
-  std::string tabsNext = appendTab(prefix);
-  std::string tabsNextNext = appendTab(tabsNext);
 
   stream << prefix << "\nwp interpolant = ";
   if (!wpInterpolant.isNull())
@@ -2037,8 +2035,9 @@ void TxTree::setCurrentINode(ExecutionState &state) {
   TxTreeGraph::setCurrentNode(state, currentTxTreeNode->nodeSequenceNumber);
 }
 
-void TxTree::remove(TxTreeNode *node, bool dumping) {
+void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 #ifdef ENABLE_Z3
+  TxTreeNode *node = state->txTreeNode;
   TimerStatIncrementer t(removeTime);
   assert(!node->left && !node->right);
   do {
@@ -2067,6 +2066,25 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
       TxSubsumptionTable::insert(node->getProgramPoint(),
                                  node->entryCallHistory, entry);
 
+      ref<Expr> WPExpr = entry->getWPInterpolant();
+      Solver::Validity result;
+      std::vector<ref<Expr> > unsatCore;
+      // Todo: The variables in WPExpr should be instantiated by their
+      // latest value for the implication test.
+      Query *q = new Query(state->constraints, WPExpr);
+      bool success = solver->evaluate(*state, WPExpr, result, unsatCore);
+      if (success != true)
+        klee_error("TxTree::remove: Implication test failed");
+      if (result == Solver::True) {
+        // Todo: Update the interpolant from the deletion algorithm
+        // w.r.t. the weakest precondition
+      }
+
+      // If the result of implication is Solver::False and/or
+      // Solver::Unknown the chance that the WP interpolant
+      // improves the interpolant from the deletion algorithm
+      // is slim. As a result, in such cases the interpolant
+      // from deletion is not changed.
       TxTreeGraph::addTableEntryMapping(node, entry);
 
       if (debugSubsumptionLevel >= 2) {
@@ -2269,7 +2287,9 @@ TxTreeNode::TxTreeNode(
   // Inherit the abstract dependency or NULL
   dependency = new TxDependency(_parent ? _parent->dependency : 0, _targetData,
                                 _globalAddresses);
-  wp = new WeakestPreCondition();
+
+  // Set the child WP Interpolant to true
+  wp = new WeakestPreCondition(this, this->dependency);
   childWPInterpolant[0] = wp->False();
   childWPInterpolant[1] = wp->False();
 }

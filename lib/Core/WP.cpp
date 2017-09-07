@@ -37,7 +37,7 @@ using namespace klee;
 /**/
 
 WeakestPreCondition::WeakestPreCondition(TxTreeNode *_node,
-                                         Dependency *_dependency) {
+                                         TxDependency *_dependency) {
   WPExpr = eb->False();
 
   // Used to represent constants during the simplification of WPExpr to

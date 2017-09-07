@@ -20,8 +20,7 @@
 #include <klee/Expr.h>
 #include <klee/ExprBuilder.h>
 #include <klee/util/ArrayCache.h>
-
-#include "Dependency.h"
+#include "TxDependency.h"
 
 namespace klee {
 
@@ -45,12 +44,12 @@ class WeakestPreCondition {
 
   /// \brief The dependency information for the respective interpolation tree
   /// node
-  Dependency *dependency;
+  TxDependency *dependency;
 
   const Array *array;
 
 public:
-  WeakestPreCondition(TxTreeNode *_node, Dependency *_dependency);
+  WeakestPreCondition(TxTreeNode *_node, TxDependency *_dependency);
 
   ~WeakestPreCondition();
 
