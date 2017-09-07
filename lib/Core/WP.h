@@ -20,8 +20,8 @@
 #include <klee/Expr.h>
 #include <klee/ExprBuilder.h>
 #include <klee/util/ArrayCache.h>
-
-#include "Dependency.h"
+#include "TxDependency.h"
+#include "TxTree.h"
 
 namespace klee {
 
@@ -45,12 +45,14 @@ class WeakestPreCondition {
 
   /// \brief The dependency information for the respective interpolation tree
   /// node
-  Dependency *dependency;
+  TxDependency *dependency;
+
+  std::map<llvm::Value *, std::pair<const Array *, ref<Expr> > > arrayStore;
 
   const Array *array;
 
 public:
-  WeakestPreCondition(TxTreeNode *_node, Dependency *_dependency);
+  WeakestPreCondition(TxTreeNode *_node, TxDependency *_dependency);
 
   ~WeakestPreCondition();
 
@@ -103,6 +105,50 @@ public:
   // \brief Convert newLinearTerm to an expression and store it at WPExpr(in
   // canonical form)
   void convertToExpr(std::map<ref<Expr>, uint64_t> *newLinearTerm);
+
+  // \brief Store a row in arrayStore with llvm::Value and the respective Array
+  // and Expr
+  void storeArrayRef(llvm::Value *value, const Array *array, ref<Expr> expr);
+
+  // \brief Get respective reference to array of an LLVM value
+  const Array *getArrayRef(llvm::Value *value);
+
+  // \brief Get respective value pointer of a read/concat Expr
+  llvm::Value *getValuePointer(ref<Expr> expr);
+
+  // \brief Instantiates the variables in WPExpr by their latest value for the
+  // implication test.
+  ref<Expr>
+  instantiateWPExpression(TxDependency *dependency,
+                          const std::vector<llvm::Instruction *> &callHistory,
+                          ref<Expr> WPExpr);
+
+  // \brief Perform the intersection of two weakest precondition expression
+  ref<Expr> intersectExpr(ref<Expr> expr1,ref<Expr> expr2);
+
+  // \brief Return the minimum of two constant expressions
+  ref<ConstantExpr> getMinOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2);
+
+  // \brief Return the maximum of two constant expressions
+  ref<ConstantExpr> getMaxOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2);
+
+  // \brief Return true if the destination of the LLVM instruction appears in
+  // the WP expression
+  bool isTargetDependent(llvm::Instruction *inst, ref<Expr> wp);
+
+  // \brief Update subsumption table entry based on the WP Expr
+  TxSubsumptionTableEntry *
+  updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry, ref<Expr> wp);
+
+  // \brief Update concretelyAddressedStore based on the WP Expr
+  TxStore::TopInterpolantStore updateConcretelyAddressedStore(
+      TxStore::TopInterpolantStore concretelyAddressedStore, ref<Expr> wp);
+
+  // \brief Get variable stored in the frame
+  ref<Expr> getVarFromExpr(ref<Expr> wp);
+
+  // \brief Update interpolant based on the WP Expr
+  ref<Expr> updateInterpolant(ref<Expr> interpolant, ref<Expr> wp);
 };
 }
 #endif /* WP_H_ */
