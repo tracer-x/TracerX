@@ -36,7 +36,8 @@ using namespace klee;
 
 /**/
 
-WeakestPreCondition::WeakestPreCondition() {
+WeakestPreCondition::WeakestPreCondition(TxTreeNode *_node,
+                                         Dependency *_dependency) {
   WPExpr = eb->False();
 
   // Used to represent constants during the simplification of WPExpr to
@@ -44,6 +45,8 @@ WeakestPreCondition::WeakestPreCondition() {
 
   const Array *array = ac.CreateArray("const", 128);
   constValues = Expr::createTempRead(array, Expr::Int32);
+  node = _node;
+  dependency = _dependency;
 }
 
 WeakestPreCondition::~WeakestPreCondition() {}
@@ -366,28 +369,9 @@ ref<Expr> WeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
       left = ConstantExpr::create(CI->getZExtValue(), Expr::Int64);
   } else if (isa<llvm::LoadInst>(operand1)) {
     llvm::LoadInst *inst = dyn_cast<llvm::LoadInst>(operand1);
-    llvm::AllocaInst *alloca = dyn_cast<llvm::AllocaInst>(inst->getOperand(0));
-    std::string arrayName;
-    if (alloca->hasName())
-      arrayName = alloca->getName();
-    else {
-      arrayName = "tmpAlloca";
-      klee_error("Instruction has no name: tmpAlloca!\n");
-    }
-    unsigned arrayWidth = Expr::Int32;
-    array = ac.CreateArray(arrayName, arrayWidth);
-    left = Expr::createTempRead(array, Expr::Int32);
+    left = dependency->getAddress(inst->getOperand(0), &ac, array);
   } else {
-    std::string arrayName;
-    if (operand1->hasName())
-      arrayName = operand1->getName();
-    else {
-      arrayName = "tmp";
-      klee_error("Instruction has no name: tmp!\n");
-    }
-    unsigned arrayWidth = Expr::Int32;
-    array = ac.CreateArray(arrayName, arrayWidth);
-    left = Expr::createTempRead(array, Expr::Int32);
+    left = dependency->getAddress(operand1, &ac, array);
   }
   return left;
 }
@@ -403,8 +387,7 @@ ref<Expr> WeakestPreCondition::getLHS(llvm::Instruction *i) {
   }
   unsigned arrayWidth = Expr::Int32;
   array = ac.CreateArray(arrayName, arrayWidth);
-  return Expr::createTempRead(array, Expr::Int32);
-  ;
+  return dependency->getAddress(i, &ac, array);
 }
 
 void WeakestPreCondition::updateWPExpr(ref<Expr> result) {
