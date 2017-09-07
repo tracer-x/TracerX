@@ -21,6 +21,8 @@
 #include <klee/ExprBuilder.h>
 #include <klee/util/ArrayCache.h>
 
+#include "Dependency.h"
+
 namespace klee {
 
 /// \brief The class that implements weakest precondition interpolant.
@@ -37,10 +39,18 @@ class WeakestPreCondition {
   ref<Expr> WPExpr;
   ExprBuilder *eb;
   ArrayCache ac;
+
+  // Respective interpolation tree node
+  TxTreeNode *node;
+
+  /// \brief The dependency information for the respective interpolation tree
+  /// node
+  Dependency *dependency;
+
   const Array *array;
 
 public:
-  WeakestPreCondition();
+  WeakestPreCondition(TxTreeNode *_node, Dependency *_dependency);
 
   ~WeakestPreCondition();
 
