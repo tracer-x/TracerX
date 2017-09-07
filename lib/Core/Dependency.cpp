@@ -1115,7 +1115,8 @@ bool Dependency::executeMemoryOperation(
     const std::vector<llvm::Instruction *> &callHistory,
     std::vector<ref<Expr> > &args, bool inBounds, bool symbolicExecutionError) {
   bool ret = false;
-  execute(instr, callHistory, args, symbolicExecutionError);
+  if (inBounds)
+    execute(instr, callHistory, args, symbolicExecutionError);
 #ifdef ENABLE_Z3
   if (boundInterpolation(instr) && inBounds) {
     // The bounds check has been proven valid, we keep the dependency on the
