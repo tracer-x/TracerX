@@ -3303,6 +3303,9 @@ void Executor::terminateStateOnError(ExecutionState &state,
         state.txTreeNode->getInstructionsDepth());
     if (termReason == Executor::Assert) {
       TxTreeGraph::setError(state, TxTreeGraph::ASSERTION);
+    } else if (termReason == Executor::Ptr &&
+               messaget.str() == "memory error: out of bound pointer") {
+      TxTreeGraph::setError(state, TxTreeGraph::MEMORY);
     } else {
       TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
     }
@@ -3753,7 +3756,6 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
             // Memory error according to Tracer-X
             terminateStateOnError(state, "memory error: out of bound pointer",
                                   Ptr, NULL, getAddressInfo(state, address));
-            TxTreeGraph::setError(state, TxTreeGraph::MEMORY);
           }
         }          
       } else {
@@ -3771,7 +3773,6 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
           // Memory error according to Tracer-X
           terminateStateOnError(state, "memory error: out of bound pointer",
                                 Ptr, NULL, getAddressInfo(state, address));
-          TxTreeGraph::setError(state, TxTreeGraph::MEMORY);
         }
       }
 
@@ -3844,8 +3845,6 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
     } else {
       terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
                             NULL, getAddressInfo(*unbound, address));
-
-      TxTreeGraph::setError(*unbound, TxTreeGraph::MEMORY);
     }
   }
 }
