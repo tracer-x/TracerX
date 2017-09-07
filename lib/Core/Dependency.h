@@ -421,6 +421,10 @@ namespace klee {
 
     /// \brief Execute memory operation (load/store). Returns true if memory
     /// bounds violation was detected, false otherwise.
+    ///
+    /// Calling va_start within a variadic function also triggers memory
+    /// operation, but we ignored it here as this method is only called when
+    /// load / store instruction is processed.
     bool
     executeMemoryOperation(llvm::Instruction *instr,
                            const std::vector<llvm::Instruction *> &callHistory,

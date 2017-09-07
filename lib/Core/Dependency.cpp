@@ -1120,9 +1120,7 @@ bool Dependency::executeMemoryOperation(
 #ifdef ENABLE_Z3
   if (boundInterpolation(instr) && inBounds) {
     // The bounds check has been proven valid, we keep the dependency on the
-    // address. Calling va_start within a variadic function also triggers memory
-    // operation, but we ignored it here as this method is only called when load
-    // / store instruction is processed.
+    // address.
     llvm::Value *addressOperand;
     ref<Expr> address(args.at(1));
     switch (instr->getOpcode()) {
