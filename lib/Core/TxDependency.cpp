@@ -16,6 +16,8 @@
 
 #include "TxDependency.h"
 #include "TxShadowArray.h"
+#include "Context.h"
+#include "WP.h"
 #include <klee/util/ArrayCache.h>
 
 #include "Context.h"
@@ -65,9 +67,10 @@ TxDependency::registerNewTxStateValue(llvm::Value *value,
   valuesMap[value].push_back(vvalue);
   return vvalue;
 }
-ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
-                                 const Array *tmpArray) {
 
+ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
+                                 const Array *tmpArray,
+                                 WeakestPreCondition *wp) {
   if (!value->hasName()) {
     klee_error("Dependency::getAddress:Instruction has no name!\n");
   }
@@ -83,12 +86,43 @@ ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
                            ConstantExpr::alloc(idx, symArray->getDomain()));
       Res = i ? ConcatExpr::create(Byte, Res) : Byte;
     }
+    wp->storeArrayRef(value, symArray, Res);
     return Res;
   }
+
+  // Todo: only catching the type of integer and pointers
+  unsigned int size = 0;
+  if (value->getType()->isPointerTy()) {
+    size = value->getType()->getArrayElementType()->getIntegerBitWidth();
+  } else {
+    size = value->getType()->getIntegerBitWidth();
+  }
   // Todo: tmpArray object should be reclaimed sometime later
-  tmpArray =
-      ac->CreateArray(value->getName(), value->getType()->getIntegerBitWidth());
-  return Expr::createTempRead(tmpArray, value->getType()->getIntegerBitWidth());
+  tmpArray = ac->CreateArray(value->getName(), size);
+  ref<Expr> tmpExpr = Expr::createTempRead(tmpArray, size);
+  wp->storeArrayRef(value, tmpArray, tmpExpr);
+  return tmpExpr;
+}
+
+ref<Expr> TxDependency::getLatestValueOfAddress(
+    llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory) {
+    
+  bool allowInconsistency = true;
+  ref<Expr> dummy = ConstantExpr::create(1, Expr::Bool);
+
+  ref<TxStateValue> addressValue =
+      this->getLatestValue(value, callHistory, dummy, allowInconsistency);
+
+  if (addressValue.isNull())
+    return dummy;
+
+  ref<TxStateAddress> address = addressValue->getPointerInfo();
+  if (address.isNull())
+    klee_error("Dependency::getLatestValueOfAddress Address is null");
+  ref<TxStoreEntry> entry = store->find(address);
+  if (entry.isNull())
+    klee_error("Dependency::getLatestValueOfAddress No entry found");
+  return entry->getContent()->getExpression();
 }
 
 ref<TxStateValue> TxDependency::getLatestValue(

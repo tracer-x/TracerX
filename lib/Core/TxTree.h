@@ -323,6 +323,29 @@ public:
 
   ref<Expr> getWPInterpolant() const;
 
+  TxStore::LowerInterpolantStore getConcretelyAddressedHistoricalStore() const;
+
+  TxStore::LowerInterpolantStore
+  getSymbolicallyAddressedHistoricalStore() const;
+
+  TxStore::TopInterpolantStore getConcretelyAddressedStore() const;
+
+  TxStore::TopInterpolantStore getSymbolicallyAddressedStore() const;
+
+  void setInterpolant(ref<Expr> _interpolant);
+
+  void setConcretelyAddressedHistoricalStore(
+      TxStore::LowerInterpolantStore _concretelyAddressedHistoricalStore);
+
+  void setSymbolicallyAddressedHistoricalStore(
+      TxStore::LowerInterpolantStore _symbolicallyAddressedHistoricalStore);
+
+  void setConcretelyAddressedStore(
+      TxStore::TopInterpolantStore _concretelyAddressedStore);
+
+  void setSymbolicallyAddressedStore(
+      TxStore::TopInterpolantStore _symbolicallyAddressedStore);
+
   void dump() const {
     this->print(llvm::errs());
     llvm::errs() << "\n";
@@ -767,7 +790,7 @@ public:
   /// \param dumping Indicates whether we are dumping the states at the point
   /// KLEE itself is about to terminate. Here we should not create subsumption
   /// table entry.
-  void remove(TxTreeNode *node, bool dumping);
+  void remove(ExecutionState *state, TimingSolver *solver, bool dumping);
 
   /// \brief Invokes the subsumption check
   bool subsumptionCheck(TimingSolver *solver, ExecutionState &state,
