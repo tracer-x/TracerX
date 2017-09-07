@@ -629,9 +629,6 @@ private:
   /// this value is dependent upon.
   std::set<std::string> coreReasons;
 
-  /// \brief Direct use count of this value by another value in all interpolants
-  uint64_t directUseCount;
-
   /// \brief Store entries this value is dependent upon
   std::set<ref<TxStoreEntry> > entryList;
 
@@ -640,7 +637,7 @@ private:
                ref<Expr> _valueExpr)
       : refCount(0), value(value), valueExpr(_valueExpr), core(false),
         id(reinterpret_cast<uint64_t>(this)), callHistory(_callHistory),
-        doNotInterpolateBound(false), directUseCount(0) {}
+        doNotInterpolateBound(false) {}
 
 public:
   ~TxStateValue() { locations.clear(); }
@@ -713,10 +710,6 @@ public:
     if (!reason.empty())
       coreReasons.insert(reason);
   }
-
-  void incrementDirectUseCount() { ++directUseCount; }
-
-  uint64_t getDirectUseCount() { return directUseCount; }
 
   bool isCore() const { return core; }
 

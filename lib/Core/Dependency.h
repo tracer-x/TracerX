@@ -303,8 +303,7 @@ namespace klee {
 
     /// \brief Mark as core all the values and locations that flows to the
     /// target
-    void markFlow(ref<TxStateValue> target, const std::string &reason,
-                  bool incrementDirectUseCount = true) const;
+    void markFlow(ref<TxStateValue> target, const std::string &reason) const;
 
     /// \brief Mark as core all the pointer values and that flows to the target;
     /// and adjust its offset bound for memory bounds interpolation (a.k.a.
@@ -323,8 +322,7 @@ namespace klee {
     bool markPointerFlow(ref<TxStateValue> target,
                          ref<TxStateValue> checkedOffset,
                          std::set<ref<Expr> > &bounds,
-                         const std::string &reason,
-                         bool incrementUseCount = true) const;
+                         const std::string &reason) const;
 
     /// \brief Record the expressions of a call's arguments
     void populateArgumentValuesList(

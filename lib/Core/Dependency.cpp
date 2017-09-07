@@ -313,19 +313,14 @@ Dependency::directFlowSources(ref<TxStateValue> target) const {
   return ret;
 }
 
-void Dependency::markFlow(ref<TxStateValue> target, const std::string &reason,
-                          bool incrementDirectUseCount) const {
+void Dependency::markFlow(ref<TxStateValue> target,
+                          const std::string &reason) const {
   if (target.isNull())
     return;
-
-  if (incrementDirectUseCount)
-    target->incrementDirectUseCount();
 
   if (target->isCore()) {
     if (!target->canInterpolateBound())
       return;
-
-    incrementDirectUseCount = false;
   }
 
   target->setAsCore(reason);
@@ -335,26 +330,19 @@ void Dependency::markFlow(ref<TxStateValue> target, const std::string &reason,
   for (std::set<ref<TxStateValue> >::iterator it = stepSources.begin(),
                                               ie = stepSources.end();
        it != ie; ++it) {
-    markFlow(*it, reason, incrementDirectUseCount);
+    markFlow(*it, reason);
   }
 }
 
 bool Dependency::markPointerFlow(ref<TxStateValue> target,
                                  ref<TxStateValue> checkedAddress,
                                  std::set<ref<Expr> > &bounds,
-                                 const std::string &reason,
-                                 bool incrementDirectUseCount) const {
+                                 const std::string &reason) const {
   bool memoryError = false;
   bool boundUpdated = false;
 
   if (target.isNull())
     return memoryError;
-
-  if (incrementDirectUseCount)
-    target->incrementDirectUseCount();
-
-  if (target->isCore())
-    incrementDirectUseCount = false;
 
   if (target->canInterpolateBound()) {
     //  checkedAddress->dump();
@@ -387,7 +375,7 @@ bool Dependency::markPointerFlow(ref<TxStateValue> target,
              it = sources.begin(),
              ie = sources.end();
          it != ie; ++it) {
-      markFlow(it->first, reason, incrementDirectUseCount);
+      markFlow(it->first, reason);
     }
   } else {
     // Bound was updated, this means we need to update further up
@@ -396,8 +384,7 @@ bool Dependency::markPointerFlow(ref<TxStateValue> target,
                it = sources.begin(),
                ie = sources.end();
            it != ie; ++it) {
-        memoryError = markPointerFlow(it->first, checkedAddress, bounds, reason,
-                                      incrementDirectUseCount)
+        memoryError = markPointerFlow(it->first, checkedAddress, bounds, reason)
                           ? true
                           : memoryError;
       }
@@ -409,13 +396,13 @@ bool Dependency::markPointerFlow(ref<TxStateValue> target,
            it = target->getLoadAddresses().begin(),
            ie = target->getLoadAddresses().end();
        it != ie; ++it) {
-    markFlow(*it, reason, incrementDirectUseCount);
+    markFlow(*it, reason);
   }
   for (std::set<ref<TxStateValue> >::iterator
            it = target->getStoreAddresses().begin(),
            ie = target->getStoreAddresses().end();
        it != ie; ++it) {
-    markFlow(*it, reason, incrementDirectUseCount);
+    markFlow(*it, reason);
   }
 
   return memoryError;
