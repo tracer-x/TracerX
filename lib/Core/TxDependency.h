@@ -431,6 +431,12 @@ public:
         concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);
   }
+  
+  // \brief This function is used in WP analysis, in case the variable
+  // has no address in the memory (is a register) a temporary array is
+  // created for it in the memory
+  ref<Expr> getAddress(llvm::Value *value, ArrayCache *ac,
+                         const Array *array);
 
   ref<TxStateValue>
   getLatestValue(llvm::Value *value,
