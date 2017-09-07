@@ -767,7 +767,7 @@ public:
   /// \param dumping Indicates whether we are dumping the states at the point
   /// KLEE itself is about to terminate. Here we should not create subsumption
   /// table entry.
-  void remove(TxTreeNode *node, bool dumping);
+  void remove(ExecutionState *state, TimingSolver *solver, bool dumping);
 
   /// \brief Invokes the subsumption check
   bool subsumptionCheck(TimingSolver *solver, ExecutionState &state,
