@@ -3304,7 +3304,7 @@ void Executor::terminateStateOnError(ExecutionState &state,
                messaget.str() == "memory error: out of bound pointer") {
       TxTreeGraph::setError(state, TxTreeGraph::MEMORY);
     } else {
-      state.txTreeNode->setGenericError();
+      state.txTreeNode->setGenericEarlyTermination();
       TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
     }
   }

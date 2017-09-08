@@ -400,7 +400,7 @@ class TxTreeNode {
   std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
 
   /// \brief Indicates that a generic error was encountered in this node
-  bool genericError;
+  bool genericEarlyTermination;
 
   void setProgramPoint(llvm::Instruction *instr) {
     if (!programPoint)
@@ -548,7 +548,7 @@ public:
     dependency->markAllValues(value, address, reason);
   }
 
-  void setGenericError() { genericError = true; }
+  void setGenericEarlyTermination() { genericEarlyTermination = true; }
 
   /// \brief Print the content of the tree node object to the LLVM error stream.
   void dump() const;

@@ -2062,7 +2062,7 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
     // This is because a generic error returns no information (true), which
     // should not be used for subsuming.
     if (!dumping && !node->isSubsumed && node->storable &&
-        !node->genericError) {
+        !node->genericEarlyTermination) {
       int debugSubsumptionLevel = node->dependency->debugSubsumptionLevel;
 
       if (debugSubsumptionLevel >= 2) {
@@ -2090,8 +2090,8 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
     }
 
     if (p) {
-      if (!p->genericError)
-        p->genericError = node->genericError;
+      if (!p->genericEarlyTermination)
+        p->genericEarlyTermination = node->genericEarlyTermination;
       if (node == p->left) {
         p->left = 0;
       } else {
@@ -2251,7 +2251,7 @@ TxTreeNode::TxTreeNode(
       graph(_parent ? _parent->graph : 0),
       instructionsDepth(_parent ? _parent->instructionsDepth : 0),
       targetData(_targetData), globalAddresses(_globalAddresses),
-      genericError(false), isSubsumed(false) {
+      genericEarlyTermination(false), isSubsumed(false) {
   if (_parent) {
     entryCallHistory = _parent->callHistory;
     callHistory = _parent->callHistory;
