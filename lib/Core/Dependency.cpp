@@ -1263,6 +1263,47 @@ bool Dependency::boundInterpolation(llvm::Value *val) {
 #endif // ENABLE_Z3
 }
 
+void Dependency::memoryBoundViolationInterpolation(llvm::Instruction *inst,
+                                                   ref<Expr> address) {
+  // Memory bounds violation with constant address.
+  llvm::Value *addressOperand;
+
+  if (!llvm::isa<ConstantExpr>(address))
+    return;
+
+  switch (inst->getOpcode()) {
+  case llvm::Instruction::Load: {
+    addressOperand = inst->getOperand(0);
+    break;
+  }
+  case llvm::Instruction::Store: {
+    addressOperand = inst->getOperand(1);
+    break;
+  }
+  default: {
+    assert(!"unknown memory operation");
+    break;
+  }
+  }
+
+  ref<TxStateValue> val(getLatestValueForMarking(addressOperand, address));
+  if (!val->getLocations().empty()) {
+    std::string reason = "";
+    if (debugSubsumptionLevel > 1) {
+      llvm::raw_string_ostream stream(reason);
+      stream << "memory bound violation [";
+      stream << inst->getParent()->getParent()->getName().str() << ": ";
+      if (llvm::MDNode *n = inst->getMetadata("dbg")) {
+        llvm::DILocation loc(n);
+        stream << "Line " << loc.getLineNumber();
+      }
+      stream << "]";
+      stream.flush();
+    }
+    markAllValues(addressOperand, address, reason);
+  }
+}
+
 inline ref<TxStateValue> Dependency::createConstantValue(
     llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,
     ref<Expr> expr) {

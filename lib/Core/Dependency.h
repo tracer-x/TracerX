@@ -495,6 +495,10 @@ namespace klee {
       pathCondition->unsatCoreInterpolation(unsatCore);
     }
 
+    /// \brief Interpolation for memory bound violation
+    void memoryBoundViolationInterpolation(llvm::Instruction *inst,
+                                           ref<Expr> address);
+
     /// \brief Print the content of the object to the LLVM error stream
     void dump() const {
       this->print(llvm::errs());

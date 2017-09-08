@@ -536,6 +536,12 @@ public:
     return dependency->markAllPointerValues(value, address, bounds, reason);
   }
 
+  /// \brief Interpolation for memory bound violation
+  void memoryBoundViolationInterpolation(llvm::Instruction *inst,
+                                         ref<Expr> address) {
+    dependency->memoryBoundViolationInterpolation(inst, address);
+  }
+
   /// \brief Exact pointer value interpolation from a target address
   void exactPointerValuesInterpolation(llvm::Value *value, ref<Expr> address,
                                        const std::string &reason) {
