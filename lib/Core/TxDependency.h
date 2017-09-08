@@ -43,6 +43,8 @@
 
 namespace klee {
 
+class WeakestPreCondition;
+
 /// \brief Computation of memory regions the unsatisfiability core depends
 /// upon, which is used to compute the interpolant stored in the table.
 ///
@@ -436,7 +438,14 @@ public:
   // has no address in the memory (is a register) a temporary array is
   // created for it in the memory
   ref<Expr> getAddress(llvm::Value *value, ArrayCache *ac,
-                         const Array *array);
+                         const Array *array,
+                         WeakestPreCondition *wp);
+
+  // \brief This function is used in WP analysis, it returns the value of an
+  // address
+  ref<Expr>
+  getLatestValueOfAddress(llvm::Value *value,
+                          const std::vector<llvm::Instruction *> &callHistory);
 
   ref<TxStateValue>
   getLatestValue(llvm::Value *value,

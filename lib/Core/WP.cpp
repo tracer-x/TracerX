@@ -369,9 +369,9 @@ ref<Expr> WeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
       left = ConstantExpr::create(CI->getZExtValue(), Expr::Int64);
   } else if (isa<llvm::LoadInst>(operand1)) {
     llvm::LoadInst *inst = dyn_cast<llvm::LoadInst>(operand1);
-    left = dependency->getAddress(inst->getOperand(0), &ac, array);
+    left = dependency->getAddress(inst->getOperand(0), &ac, array, this);
   } else {
-    left = dependency->getAddress(operand1, &ac, array);
+    left = dependency->getAddress(operand1, &ac, array, this);
   }
   return left;
 }
@@ -387,7 +387,7 @@ ref<Expr> WeakestPreCondition::getLHS(llvm::Instruction *i) {
   }
   unsigned arrayWidth = Expr::Int32;
   array = ac.CreateArray(arrayName, arrayWidth);
-  return dependency->getAddress(i, &ac, array);
+  return dependency->getAddress(i, &ac, array, this);
 }
 
 void WeakestPreCondition::updateWPExpr(ref<Expr> result) {
@@ -409,6 +409,7 @@ void WeakestPreCondition::substituteExpr(ref<Expr> result) {
     break;
   }
   default: {
+    result->dump();
     klee_error("Substitution for this expressions is not defined yet!");
   }
   }
@@ -606,4 +607,127 @@ void WeakestPreCondition::convertToExpr(
   }
   kids[0] = temp;
   WPExpr = WPExpr->rebuild(kids);
+}
+
+void WeakestPreCondition::storeArrayRef(llvm::Value *value, const Array *array,
+                                        ref<Expr> expr) {
+  std::map<llvm::Value *, std::pair<const Array *, ref<Expr> > >::iterator it =
+      arrayStore.find(value);
+  if (it == arrayStore.end()) {
+    // value not found in map
+    arrayStore.insert(std::make_pair(value, std::make_pair(array, expr)));
+  } else {
+    // value found in map so it's a memory location
+    // sanity check
+    if (it->second.first != array)
+      klee_error("WeakestPreCondition::storeArrayRef updating Expr value of "
+                 "wrong array.");
+    it->second = std::make_pair(array, expr);
+  }
+}
+
+const Array *WeakestPreCondition::getArrayRef(llvm::Value *value) {
+  std::map<llvm::Value *, std::pair<const Array *, ref<Expr> > >::iterator it =
+      arrayStore.find(value);
+  if (it != arrayStore.end()) {
+    return it->second.first;
+  } else {
+    klee_error("WeakestPreCondition::getArrayRef trying to get Array ref for "
+               "wrong value*.");
+  }
+}
+
+llvm::Value *WeakestPreCondition::getValuePointer(ref<Expr> expr) {
+  for (std::map<llvm::Value *,
+                std::pair<const Array *, ref<Expr> > >::const_iterator
+           it = arrayStore.begin(),
+           ie = arrayStore.end();
+       it != ie; ++it) {
+    if (it->second.second == expr) {
+      return it->first;
+    }
+  }
+  klee_error("WeakestPreCondition::getValuePointer trying to get Value ref for "
+             "wrong expr*.");
+}
+
+ref<Expr> WeakestPreCondition::instantiateWPExpression(
+    TxDependency *dependency, const std::vector<llvm::Instruction *> &callHistory,
+    ref<Expr> WPExpr) {
+  switch (WPExpr->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return WPExpr;
+  }
+
+  case Expr::Read: {
+    ref<Expr> storeValue = dependency->getLatestValueOfAddress(
+        getValuePointer(WPExpr), callHistory);
+    return storeValue;
+  }
+
+  case Expr::Concat: {
+    ref<Expr> storeValue = dependency->getLatestValueOfAddress(
+        getValuePointer(WPExpr), callHistory);
+    return storeValue;
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    ref<Expr> kids[1];
+    kids[0] =
+        instantiateWPExpression(dependency, callHistory, WPExpr->getKid(0));
+    return WPExpr->rebuild(kids);
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    ref<Expr> kids[2];
+    kids[0] =
+        instantiateWPExpression(dependency, callHistory, WPExpr->getKid(0));
+    kids[1] =
+        instantiateWPExpression(dependency, callHistory, WPExpr->getKid(1));
+    return WPExpr->rebuild(kids);
+  }
+
+  case Expr::Select: {
+    ref<Expr> kids[3];
+    kids[0] =
+        instantiateWPExpression(dependency, callHistory, WPExpr->getKid(0));
+    kids[1] =
+        instantiateWPExpression(dependency, callHistory, WPExpr->getKid(1));
+    kids[2] =
+        instantiateWPExpression(dependency, callHistory, WPExpr->getKid(2));
+    return WPExpr->rebuild(kids);
+  }
+  }
+  // Sanity check
+  klee_error("Control should not reach here in "
+             "WeakestPreCondition::instantiateWPExpression!");
+  return WPExpr;
 }

@@ -2069,15 +2069,18 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       ref<Expr> WPExpr = entry->getWPInterpolant();
       Solver::Validity result;
       std::vector<ref<Expr> > unsatCore;
-      // Todo: The variables in WPExpr should be instantiated by their
-      // latest value for the implication test.
-      Query *q = new Query(state->constraints, WPExpr);
-      bool success = solver->evaluate(*state, WPExpr, result, unsatCore);
+      ref<Expr> WPExprInstantiated = node->wp->instantiateWPExpression(
+          node->parent->dependency, node->parent->callHistory, WPExpr);
+      bool success =
+          solver->evaluate(*state, WPExprInstantiated, result, unsatCore);
       if (success != true)
         klee_error("TxTree::remove: Implication test failed");
       if (result == Solver::True) {
         // Todo: Update the interpolant from the deletion algorithm
         // w.r.t. the weakest precondition
+      } else {
+        klee_error("TxTree::remove Trying to find a true case where the WP "
+                   "implication fails.");
       }
 
       // If the result of implication is Solver::False and/or
