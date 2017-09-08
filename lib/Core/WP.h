@@ -46,6 +46,8 @@ class WeakestPreCondition {
   /// node
   TxDependency *dependency;
 
+  std::map<llvm::Value *, std::pair<const Array *, ref<Expr> > > arrayStore;
+
   const Array *array;
 
 public:
@@ -102,6 +104,23 @@ public:
   // \brief Convert newLinearTerm to an expression and store it at WPExpr(in
   // canonical form)
   void convertToExpr(std::map<ref<Expr>, uint64_t> *newLinearTerm);
+
+  // \brief Store a row in arrayStore with llvm::Value and the respective Array
+  // and Expr
+  void storeArrayRef(llvm::Value *value, const Array *array, ref<Expr> expr);
+
+  // \brief Get respective reference to array of an LLVM value
+  const Array *getArrayRef(llvm::Value *value);
+
+  // \brief Get respective value pointer of a read/concat Expr
+  llvm::Value *getValuePointer(ref<Expr> expr);
+
+  // \brief Instantiates the variables in WPExpr by their latest value for the
+  // implication test.
+  ref<Expr>
+  instantiateWPExpression(TxDependency *dependency,
+                          const std::vector<llvm::Instruction *> &callHistory,
+                          ref<Expr> WPExpr);
 };
 }
 #endif /* WP_H_ */
