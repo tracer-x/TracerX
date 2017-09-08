@@ -313,19 +313,14 @@ Dependency::directFlowSources(ref<TxStateValue> target) const {
   return ret;
 }
 
-void Dependency::markFlow(ref<TxStateValue> target, const std::string &reason,
-                          bool incrementDirectUseCount) const {
+void Dependency::markFlow(ref<TxStateValue> target,
+                          const std::string &reason) const {
   if (target.isNull())
     return;
-
-  if (incrementDirectUseCount)
-    target->incrementDirectUseCount();
 
   if (target->isCore()) {
     if (!target->canInterpolateBound())
       return;
-
-    incrementDirectUseCount = false;
   }
 
   target->setAsCore(reason);
@@ -335,26 +330,19 @@ void Dependency::markFlow(ref<TxStateValue> target, const std::string &reason,
   for (std::set<ref<TxStateValue> >::iterator it = stepSources.begin(),
                                               ie = stepSources.end();
        it != ie; ++it) {
-    markFlow(*it, reason, incrementDirectUseCount);
+    markFlow(*it, reason);
   }
 }
 
 bool Dependency::markPointerFlow(ref<TxStateValue> target,
                                  ref<TxStateValue> checkedAddress,
                                  std::set<ref<Expr> > &bounds,
-                                 const std::string &reason,
-                                 bool incrementDirectUseCount) const {
+                                 const std::string &reason) const {
   bool memoryError = false;
   bool boundUpdated = false;
 
   if (target.isNull())
     return memoryError;
-
-  if (incrementDirectUseCount)
-    target->incrementDirectUseCount();
-
-  if (target->isCore())
-    incrementDirectUseCount = false;
 
   if (target->canInterpolateBound()) {
     //  checkedAddress->dump();
@@ -387,7 +375,7 @@ bool Dependency::markPointerFlow(ref<TxStateValue> target,
              it = sources.begin(),
              ie = sources.end();
          it != ie; ++it) {
-      markFlow(it->first, reason, incrementDirectUseCount);
+      markFlow(it->first, reason);
     }
   } else {
     // Bound was updated, this means we need to update further up
@@ -396,8 +384,7 @@ bool Dependency::markPointerFlow(ref<TxStateValue> target,
                it = sources.begin(),
                ie = sources.end();
            it != ie; ++it) {
-        memoryError = markPointerFlow(it->first, checkedAddress, bounds, reason,
-                                      incrementDirectUseCount)
+        memoryError = markPointerFlow(it->first, checkedAddress, bounds, reason)
                           ? true
                           : memoryError;
       }
@@ -409,13 +396,13 @@ bool Dependency::markPointerFlow(ref<TxStateValue> target,
            it = target->getLoadAddresses().begin(),
            ie = target->getLoadAddresses().end();
        it != ie; ++it) {
-    markFlow(*it, reason, incrementDirectUseCount);
+    markFlow(*it, reason);
   }
   for (std::set<ref<TxStateValue> >::iterator
            it = target->getStoreAddresses().begin(),
            ie = target->getStoreAddresses().end();
        it != ie; ++it) {
-    markFlow(*it, reason, incrementDirectUseCount);
+    markFlow(*it, reason);
   }
 
   return memoryError;
@@ -1128,13 +1115,12 @@ bool Dependency::executeMemoryOperation(
     const std::vector<llvm::Instruction *> &callHistory,
     std::vector<ref<Expr> > &args, bool inBounds, bool symbolicExecutionError) {
   bool ret = false;
-  execute(instr, callHistory, args, symbolicExecutionError);
+  if (inBounds)
+    execute(instr, callHistory, args, symbolicExecutionError);
 #ifdef ENABLE_Z3
   if (boundInterpolation(instr) && inBounds) {
     // The bounds check has been proven valid, we keep the dependency on the
-    // address. Calling va_start within a variadic function also triggers memory
-    // operation, but we ignored it here as this method is only called when load
-    // / store instruction is processed.
+    // address.
     llvm::Value *addressOperand;
     ref<Expr> address(args.at(1));
     switch (instr->getOpcode()) {
@@ -1273,6 +1259,47 @@ bool Dependency::boundInterpolation(llvm::Value *val) {
 #else
   return false;
 #endif // ENABLE_Z3
+}
+
+void Dependency::memoryBoundViolationInterpolation(llvm::Instruction *inst,
+                                                   ref<Expr> address) {
+  // Memory bounds violation with constant address.
+  llvm::Value *addressOperand;
+
+  if (!llvm::isa<ConstantExpr>(address))
+    return;
+
+  switch (inst->getOpcode()) {
+  case llvm::Instruction::Load: {
+    addressOperand = inst->getOperand(0);
+    break;
+  }
+  case llvm::Instruction::Store: {
+    addressOperand = inst->getOperand(1);
+    break;
+  }
+  default: {
+    assert(!"unknown memory operation");
+    break;
+  }
+  }
+
+  ref<TxStateValue> val(getLatestValueForMarking(addressOperand, address));
+  if (!val->getLocations().empty()) {
+    std::string reason = "";
+    if (debugSubsumptionLevel > 1) {
+      llvm::raw_string_ostream stream(reason);
+      stream << "memory bound violation [";
+      stream << inst->getParent()->getParent()->getName().str() << ": ";
+      if (llvm::MDNode *n = inst->getMetadata("dbg")) {
+        llvm::DILocation loc(n);
+        stream << "Line " << loc.getLineNumber();
+      }
+      stream << "]";
+      stream.flush();
+    }
+    markAllValues(addressOperand, address, reason);
+  }
 }
 
 inline ref<TxStateValue> Dependency::createConstantValue(

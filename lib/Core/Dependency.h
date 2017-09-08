@@ -303,8 +303,7 @@ namespace klee {
 
     /// \brief Mark as core all the values and locations that flows to the
     /// target
-    void markFlow(ref<TxStateValue> target, const std::string &reason,
-                  bool incrementDirectUseCount = true) const;
+    void markFlow(ref<TxStateValue> target, const std::string &reason) const;
 
     /// \brief Mark as core all the pointer values and that flows to the target;
     /// and adjust its offset bound for memory bounds interpolation (a.k.a.
@@ -323,8 +322,7 @@ namespace klee {
     bool markPointerFlow(ref<TxStateValue> target,
                          ref<TxStateValue> checkedOffset,
                          std::set<ref<Expr> > &bounds,
-                         const std::string &reason,
-                         bool incrementUseCount = true) const;
+                         const std::string &reason) const;
 
     /// \brief Record the expressions of a call's arguments
     void populateArgumentValuesList(
@@ -423,6 +421,10 @@ namespace klee {
 
     /// \brief Execute memory operation (load/store). Returns true if memory
     /// bounds violation was detected, false otherwise.
+    ///
+    /// Calling va_start within a variadic function also triggers memory
+    /// operation, but we ignored it here as this method is only called when
+    /// load / store instruction is processed.
     bool
     executeMemoryOperation(llvm::Instruction *instr,
                            const std::vector<llvm::Instruction *> &callHistory,
@@ -496,6 +498,10 @@ namespace klee {
     void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore) {
       pathCondition->unsatCoreInterpolation(unsatCore);
     }
+
+    /// \brief Interpolation for memory bound violation
+    void memoryBoundViolationInterpolation(llvm::Instruction *inst,
+                                           ref<Expr> address);
 
     /// \brief Print the content of the object to the LLVM error stream
     void dump() const {

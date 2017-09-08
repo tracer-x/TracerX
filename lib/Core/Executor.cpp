@@ -1230,12 +1230,8 @@ void Executor::executeGetValue(ExecutionState &state,
       ExecutionState *es = *bit;
       if (es)
         bindLocal(target, *es, *vit);
-      if (INTERPOLATION_ENABLED) {
-        std::vector<ref<Expr> > args;
-        args.push_back(e);
-        args.push_back(*vit);
-        TxTree::executeOnNode(es->txTreeNode, target->inst, args);
-      }
+      if (INTERPOLATION_ENABLED)
+        TxTree::executeOnNode(es->txTreeNode, target->inst, e, *vit);
       ++bit;
     }
   }
@@ -3210,6 +3206,7 @@ void Executor::terminateStateEarly(ExecutionState &state,
     interpreterHandler->incBranchingDepthOnEarlyTermination(state.depth);
     interpreterHandler->incInstructionsDepthOnEarlyTermination(
         state.txTreeNode->getInstructionsDepth());
+    state.txTreeNode->setGenericEarlyTermination();
   }
 
   if (!OnlyOutputStatesCoveringNew || state.coveredNew ||
@@ -3301,9 +3298,14 @@ void Executor::terminateStateOnError(ExecutionState &state,
     interpreterHandler->incBranchingDepthOnErrorTermination(state.depth);
     interpreterHandler->incInstructionsDepthOnErrorTermination(
         state.txTreeNode->getInstructionsDepth());
+
     if (termReason == Executor::Assert) {
       TxTreeGraph::setError(state, TxTreeGraph::ASSERTION);
+    } else if (termReason == Executor::Ptr &&
+               messaget.str() == "memory error: out of bound pointer") {
+      TxTreeGraph::setError(state, TxTreeGraph::MEMORY);
     } else {
+      state.txTreeNode->setGenericEarlyTermination();
       TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
     }
   }
@@ -3753,7 +3755,6 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
             // Memory error according to Tracer-X
             terminateStateOnError(state, "memory error: out of bound pointer",
                                   Ptr, NULL, getAddressInfo(state, address));
-            TxTreeGraph::setError(state, TxTreeGraph::MEMORY);
           }
         }          
       } else {
@@ -3771,7 +3772,6 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
           // Memory error according to Tracer-X
           terminateStateOnError(state, "memory error: out of bound pointer",
                                 Ptr, NULL, getAddressInfo(state, address));
-          TxTreeGraph::setError(state, TxTreeGraph::MEMORY);
         }
       }
 
@@ -3810,20 +3810,18 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
           wos->write(mo->getOffsetExpr(address), value);
 
           // Update dependency
-          if (INTERPOLATION_ENABLED && target &&
-              TxTree::executeMemoryOperationOnNode(
-                  bound->txTreeNode, target->inst, value, address, false))
-            incomplete = false;
+          if (INTERPOLATION_ENABLED && target)
+            TxTree::executeOnNode(bound->txTreeNode, target->inst, value,
+                                  address);
         }
       } else {
         ref<Expr> result = os->read(mo->getOffsetExpr(address), type);
         bindLocal(target, *bound, result);
 
         // Update dependency
-        if (INTERPOLATION_ENABLED && target &&
-            TxTree::executeMemoryOperationOnNode(
-                bound->txTreeNode, target->inst, result, address, false))
-          incomplete = false;
+        if (INTERPOLATION_ENABLED && target)
+          TxTree::executeOnNode(bound->txTreeNode, target->inst, result,
+                                address);
       }
     }
 
@@ -3842,10 +3840,11 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
     if (incomplete) {
       terminateStateEarly(*unbound, "Query timed out (resolve).");
     } else {
+      if (INTERPOLATION_ENABLED && target) {
+    	  state.txTreeNode->memoryBoundViolationInterpolation(target->inst, address);
+      }
       terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
                             NULL, getAddressInfo(*unbound, address));
-
-      TxTreeGraph::setError(*unbound, TxTreeGraph::MEMORY);
     }
   }
 }

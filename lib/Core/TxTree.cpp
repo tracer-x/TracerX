@@ -2057,7 +2057,12 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
 
     // As the node is about to be deleted, it must have been completely
     // traversed, hence the correct time to table the interpolant.
-    if (!dumping && !node->isSubsumed && node->storable) {
+    //
+    // We don't create an interpolant for an error node of generic error type:
+    // This is because a generic error returns no information (true), which
+    // should not be used for subsuming.
+    if (!dumping && !node->isSubsumed && node->storable &&
+        !node->genericEarlyTermination) {
       int debugSubsumptionLevel = node->dependency->debugSubsumptionLevel;
 
       if (debugSubsumptionLevel >= 2) {
@@ -2084,8 +2089,9 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
       }
     }
 
-    delete node;
     if (p) {
+      if (!p->genericEarlyTermination)
+        p->genericEarlyTermination = node->genericEarlyTermination;
       if (node == p->left) {
         p->left = 0;
       } else {
@@ -2093,6 +2099,7 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
         p->right = 0;
       }
     }
+    delete node;
     node = p;
   } while (node && !node->left && !node->right);
 #endif
@@ -2139,37 +2146,6 @@ void TxTree::markPathCondition(ExecutionState &state, TimingSolver *solver,
 
   // We create path condition marking structure and mark core constraints
   currentTxTreeNode->unsatCoreInterpolation(unsatCore);
-}
-
-void TxTree::execute(llvm::Instruction *instr) {
-  std::vector<ref<Expr> > dummyArgs;
-  executeOnNode(currentTxTreeNode, instr, dummyArgs);
-}
-
-void TxTree::execute(llvm::Instruction *instr, ref<Expr> arg1) {
-  std::vector<ref<Expr> > args;
-  args.push_back(arg1);
-  executeOnNode(currentTxTreeNode, instr, args);
-}
-
-void TxTree::execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2) {
-  std::vector<ref<Expr> > args;
-  args.push_back(arg1);
-  args.push_back(arg2);
-  executeOnNode(currentTxTreeNode, instr, args);
-}
-
-void TxTree::execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2,
-                     ref<Expr> arg3) {
-  std::vector<ref<Expr> > args;
-  args.push_back(arg1);
-  args.push_back(arg2);
-  args.push_back(arg3);
-  executeOnNode(currentTxTreeNode, instr, args);
-}
-
-void TxTree::execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args) {
-  executeOnNode(currentTxTreeNode, instr, args);
 }
 
 void TxTree::executePHI(llvm::Instruction *instr, unsigned incomingBlock,
@@ -2275,7 +2251,7 @@ TxTreeNode::TxTreeNode(
       graph(_parent ? _parent->graph : 0),
       instructionsDepth(_parent ? _parent->instructionsDepth : 0),
       targetData(_targetData), globalAddresses(_globalAddresses),
-      isSubsumed(false) {
+      genericEarlyTermination(false), isSubsumed(false) {
   if (_parent) {
     entryCallHistory = _parent->callHistory;
     callHistory = _parent->callHistory;
