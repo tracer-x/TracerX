@@ -2141,37 +2141,6 @@ void TxTree::markPathCondition(ExecutionState &state, TimingSolver *solver,
   currentTxTreeNode->unsatCoreInterpolation(unsatCore);
 }
 
-void TxTree::execute(llvm::Instruction *instr) {
-  std::vector<ref<Expr> > dummyArgs;
-  executeOnNode(currentTxTreeNode, instr, dummyArgs);
-}
-
-void TxTree::execute(llvm::Instruction *instr, ref<Expr> arg1) {
-  std::vector<ref<Expr> > args;
-  args.push_back(arg1);
-  executeOnNode(currentTxTreeNode, instr, args);
-}
-
-void TxTree::execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2) {
-  std::vector<ref<Expr> > args;
-  args.push_back(arg1);
-  args.push_back(arg2);
-  executeOnNode(currentTxTreeNode, instr, args);
-}
-
-void TxTree::execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2,
-                     ref<Expr> arg3) {
-  std::vector<ref<Expr> > args;
-  args.push_back(arg1);
-  args.push_back(arg2);
-  args.push_back(arg3);
-  executeOnNode(currentTxTreeNode, instr, args);
-}
-
-void TxTree::execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args) {
-  executeOnNode(currentTxTreeNode, instr, args);
-}
-
 void TxTree::executePHI(llvm::Instruction *instr, unsigned incomingBlock,
                         ref<Expr> valueExpr) {
   currentTxTreeNode->dependency->executePHI(instr, incomingBlock,

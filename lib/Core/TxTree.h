@@ -754,26 +754,36 @@ public:
   std::pair<TxTreeNode *, TxTreeNode *>
   split(TxTreeNode *parent, ExecutionState *left, ExecutionState *right);
 
-  /// \brief Abstractly execute an instruction of no argument for building
-  /// dependency information.
-  void execute(llvm::Instruction *instr);
+  /// \brief Execute an instruction of no argument for building dependency
+  /// information.
+  void execute(llvm::Instruction *instr) {
+    executeOnNode(currentTxTreeNode, instr);
+  }
 
-  /// \brief Abstractly execute an instruction of one argument for building
-  /// dependency information.
-  void execute(llvm::Instruction *instr, ref<Expr> arg1);
+  /// \brief Execute an instruction of one argument for building dependency
+  /// information.
+  void execute(llvm::Instruction *instr, ref<Expr> arg1) {
+    executeOnNode(currentTxTreeNode, instr, arg1);
+  }
 
-  /// \brief Abstractly execute an instruction of two arguments for building
-  /// dependency information.
-  void execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2);
+  /// \brief Execute an instruction of two arguments for building dependency
+  /// information.
+  void execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2) {
+    executeOnNode(currentTxTreeNode, instr, arg1, arg2);
+  }
 
-  /// \brief Abstractly execute an instruction of three arguments for building
-  /// dependency information.
+  /// \brief Execute an instruction of three arguments for building dependency
+  /// information.
   void execute(llvm::Instruction *instr, ref<Expr> arg1, ref<Expr> arg2,
-               ref<Expr> arg3);
+               ref<Expr> arg3) {
+    executeOnNode(currentTxTreeNode, instr, arg1, arg2, arg3);
+  }
 
-  /// \brief Abstractly execute an instruction of a number of arguments for
-  /// building dependency information.
-  void execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args);
+  /// \brief Execute an instruction of a number of arguments for building
+  /// dependency information.
+  void execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args) {
+    executeOnNode(currentTxTreeNode, instr, args);
+  }
 
   /// \brief Execution of klee_make_symbolic
   void executeMakeSymbolic(llvm::Instruction *instr, ref<Expr> address,
@@ -812,9 +822,45 @@ public:
     return ret;
   }
 
+  /// \brief Execute an instruction of no argument for building dependency
+  /// information, given a particular interpolation tree node.
+  static void executeOnNode(TxTreeNode *node, llvm::Instruction *instr) {
+    std::vector<ref<Expr> > dummyArgs;
+    executeOnNode(node, instr, dummyArgs);
+  }
+
+  /// \brief Execute an instruction of one argument for building dependency
+  /// information, given a particular interpolation tree node.
+  static void executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
+                            ref<Expr> arg1) {
+    std::vector<ref<Expr> > args;
+    args.push_back(arg1);
+    executeOnNode(node, instr, args);
+  }
+
+  /// \brief Execute an instruction of two arguments for building dependency
+  /// information, given a particular interpolation tree node.
+  static void executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
+                            ref<Expr> arg1, ref<Expr> arg2) {
+    std::vector<ref<Expr> > args;
+    args.push_back(arg1);
+    args.push_back(arg2);
+    executeOnNode(node, instr, args);
+  }
+
+  /// \brief Execute an instruction of three arguments for building dependency
+  /// information, given a particular interpolation tree node.
+  static void executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
+                            ref<Expr> arg1, ref<Expr> arg2, ref<Expr> arg3) {
+    std::vector<ref<Expr> > args;
+    args.push_back(arg1);
+    args.push_back(arg2);
+    args.push_back(arg3);
+    executeOnNode(node, instr, args);
+  }
+
   /// \brief General member function for executing an instruction for building
-  /// dependency
-  /// information, given a particular Tracer-X tree node.
+  /// dependency information, given a particular interpolation tree node.
   static void executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
                             std::vector<ref<Expr> > &args);
 
