@@ -1230,12 +1230,8 @@ void Executor::executeGetValue(ExecutionState &state,
       ExecutionState *es = *bit;
       if (es)
         bindLocal(target, *es, *vit);
-      if (INTERPOLATION_ENABLED) {
-        std::vector<ref<Expr> > args;
-        args.push_back(e);
-        args.push_back(*vit);
-        TxTree::executeOnNode(es->txTreeNode, target->inst, args);
-      }
+      if (INTERPOLATION_ENABLED)
+        TxTree::executeOnNode(es->txTreeNode, target->inst, e, *vit);
       ++bit;
     }
   }
