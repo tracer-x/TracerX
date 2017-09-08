@@ -3206,6 +3206,7 @@ void Executor::terminateStateEarly(ExecutionState &state,
     interpreterHandler->incBranchingDepthOnEarlyTermination(state.depth);
     interpreterHandler->incInstructionsDepthOnEarlyTermination(
         state.txTreeNode->getInstructionsDepth());
+    state.txTreeNode->setGenericEarlyTermination();
   }
 
   if (!OnlyOutputStatesCoveringNew || state.coveredNew ||
