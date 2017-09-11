@@ -1308,6 +1308,10 @@ bool SubsumptionTableEntry::subsumed(
       expr = simplifyExistsExpr(existsExpr, exprHasNoFreeVariables);
     }
 
+    // We finally simplify the conjunction using create()
+    if (llvm::isa<AndExpr>(expr))
+      expr = AndExpr::create(expr->getKid(0), expr->getKid(1));
+
     // If query expression simplification result was false, we quickly fail
     // without calling the solver
     if (expr->isFalse()) {
