@@ -2329,7 +2329,7 @@ ref<Expr> TxTreeNode::getWPInterpolant() {
   } else {
     // TODO: Perform the intersection of the child interpolants
     // The following is a temporary intersection.
-    expr = AndExpr::create(childWPInterpolant[0], childWPInterpolant[1]);
+    expr = wp->intersectExpr(childWPInterpolant[0], childWPInterpolant[1]);
 
     // Setting the intersection of child nodes as the target in the of the nodes
     wp->setWPExpr(expr);

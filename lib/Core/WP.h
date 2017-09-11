@@ -121,6 +121,16 @@ public:
   instantiateWPExpression(TxDependency *dependency,
                           const std::vector<llvm::Instruction *> &callHistory,
                           ref<Expr> WPExpr);
+
+  // \brief Perform the intersection of two weakest precondition expression
+  ref<Expr> intersectExpr(ref<Expr> expr1,ref<Expr> expr2);
+
+  // \brief Return the minimum of two constant expressions
+  ref<ConstantExpr> getMinOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2);
+
+  // \brief Return the maximum of two constant expressions
+  ref<ConstantExpr> getMaxOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2);
+
 };
 }
 #endif /* WP_H_ */
