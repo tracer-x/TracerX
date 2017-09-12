@@ -193,9 +193,8 @@ class SubsumptionTableEntry {
   ref<Expr> makeConstraint(
       ExecutionState &state, ref<TxInterpolantValue> tabledValue,
       ref<TxInterpolantValue> stateValue, ref<Expr> tabledOffset,
-      ref<Expr> stateOffset, std::set<ref<TxInterpolantValue> > &coreValues,
-      std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > > &
-          corePointerValues,
+      ref<Expr> stateOffset, std::set<ref<TxStateValue> > &coreValues,
+      std::map<ref<TxStateValue>, std::set<ref<Expr> > > &corePointerValues,
       std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
       int debugSubsumptionLevel) const;
 
@@ -288,12 +287,10 @@ class SubsumptionTableEntry {
   static ref<Expr> removeUnsubstituted(std::set<const Array *> &variables,
                                        ref<Expr> equalities);
 
-  static void
-  interpolateValues(ExecutionState &state,
-                    std::set<ref<TxInterpolantValue> > &coreValues,
-                    std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > > &
-                        corePointerValues,
-                    int debugSubsumptionLevel);
+  static void interpolateValues(
+      ExecutionState &state, std::set<ref<TxStateValue> > &coreValues,
+      std::map<ref<TxStateValue>, std::set<ref<Expr> > > &corePointerValues,
+      int debugSubsumptionLevel);
 
   bool empty() {
     return interpolant.isNull() && concretelyAddressedStore.empty() &&
@@ -537,10 +534,10 @@ public:
 
   /// \brief Memory bounds interpolation from a target address. Returns true if
   /// memory bounds check fails somehow.
-  bool pointerValuesInterpolation(llvm::Value *value, ref<Expr> address,
+  bool pointerValuesInterpolation(ref<TxStateValue> value,
                                   std::set<ref<Expr> > &bounds,
                                   const std::string &reason) {
-    return dependency->markAllPointerValues(value, address, bounds, reason);
+    return dependency->markAllPointerValues(value, bounds, reason);
   }
 
   /// \brief Interpolation for memory bound violation
@@ -550,9 +547,8 @@ public:
   }
 
   /// \brief Exact / non-pointer value interpolation
-  void valuesInterpolation(llvm::Value *value, ref<Expr> expr,
-                           const std::string &reason) {
-    dependency->markAllValues(value, expr, reason);
+  void valuesInterpolation(ref<TxStateValue> value, const std::string &reason) {
+    dependency->markAllValues(value, reason);
   }
 
   void setGenericEarlyTermination() { genericEarlyTermination = true; }

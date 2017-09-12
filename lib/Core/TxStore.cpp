@@ -145,7 +145,11 @@ inline void TxStore::concreteToInterpolant(
     std::set<const Array *> &replacements, bool coreOnly,
     LowerInterpolantStore &map, bool leftRetrieval) const {
   if (!coreOnly) {
-    map[variable] = entry->getContent()->getInterpolantStyleValue();
+    ref<TxStateValue> stateValue = entry->getContent();
+    ref<TxInterpolantValue> interpolantValue =
+        stateValue->getInterpolantStyleValue();
+    interpolantValue->setOriginalValue(stateValue);
+    map[variable] = interpolantValue;
   } else if (entry->getContent()->isCore()) {
     // Do not add to the map if entry is not used
     if (leftRetrieval) {
@@ -174,7 +178,11 @@ inline void TxStore::symbolicToInterpolant(
     std::set<const Array *> &replacements, bool coreOnly,
     LowerInterpolantStore &map, bool leftRetrieval) const {
   if (!coreOnly) {
-    map[variable] = entry->getContent()->getInterpolantStyleValue();
+    ref<TxStateValue> stateValue = entry->getContent();
+    ref<TxInterpolantValue> interpolantValue =
+        stateValue->getInterpolantStyleValue();
+    interpolantValue->setOriginalValue(stateValue);
+    map[variable] = interpolantValue;
   } else if (entry->getContent()->isCore()) {
     // Do not add to the map if entry is not used
     if (leftRetrieval) {
