@@ -1290,8 +1290,8 @@ bool SubsumptionTableEntry::subsumed(
                it = coreExactPointerValues.begin(),
                ie = coreExactPointerValues.end();
            it != ie; ++it) {
-        state.txTreeNode->exactPointerValuesInterpolation(
-            (*it)->getValue(), (*it)->getExpression(), reason);
+        state.txTreeNode->valuesInterpolation((*it)->getValue(),
+                                              (*it)->getExpression(), reason);
       }
       return true;
     }

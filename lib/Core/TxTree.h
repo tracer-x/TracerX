@@ -542,10 +542,10 @@ public:
     dependency->memoryBoundViolationInterpolation(inst, address);
   }
 
-  /// \brief Exact pointer value interpolation from a target address
-  void exactPointerValuesInterpolation(llvm::Value *value, ref<Expr> address,
-                                       const std::string &reason) {
-    dependency->markAllValues(value, address, reason);
+  /// \brief Exact / non-pointer value interpolation
+  void valuesInterpolation(llvm::Value *value, ref<Expr> expr,
+                           const std::string &reason) {
+    dependency->markAllValues(value, expr, reason);
   }
 
   void setGenericEarlyTermination() { genericEarlyTermination = true; }
