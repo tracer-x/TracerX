@@ -137,8 +137,7 @@ llvm::cl::opt<bool> ExactAddressInterpolant(
     "exact-address-interpolant",
     llvm::cl::desc("This option uses exact address for interpolating "
                    "successful out-of-bound memory access instead of the "
-                   "default memory offset bound. It has no effect when "
-                   "-no-bound-interpolation is specified."));
+                   "default memory offset bound."));
 
 llvm::cl::opt<bool> SpecialFunctionBoundInterpolation(
     "special-function-bound-interpolation",
