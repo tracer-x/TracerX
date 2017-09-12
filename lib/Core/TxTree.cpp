@@ -64,9 +64,8 @@ SubsumptionTableEntry::~SubsumptionTableEntry() {}
 ref<Expr> SubsumptionTableEntry::makeConstraint(
     ExecutionState &state, ref<TxInterpolantValue> tabledValue,
     ref<TxInterpolantValue> stateValue, ref<Expr> tabledOffset,
-    ref<Expr> stateOffset,
+    ref<Expr> stateOffset, std::set<ref<TxInterpolantValue> > &coreValues,
     std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > > &corePointerValues,
-    std::set<ref<TxInterpolantValue> > &coreExactPointerValues,
     std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
     int debugSubsumptionLevel) const {
   ref<Expr> constraint;
@@ -124,7 +123,7 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
         constraint = offsetsCheck;
 
       // We record the value of the pointer for interpolation marking
-      coreExactPointerValues.insert(stateValue);
+      coreValues.insert(stateValue);
     }
   } else {
     // Implication: if tabledConcreteAddress == stateSymbolicAddress,
@@ -135,6 +134,8 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
                        EqExpr::create(tabledOffset, stateOffset)),
         EqExpr::create(tabledValue->getExpression(),
                        stateValue->getExpression()));
+
+    coreValues.insert(stateValue);
   }
   return constraint;
 }
@@ -757,6 +758,52 @@ ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
   return ret;
 }
 
+void SubsumptionTableEntry::interpolateValues(
+    ExecutionState &state, std::set<ref<TxInterpolantValue> > &coreValues,
+    std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > > &corePointerValues,
+    int debugSubsumptionLevel) {
+  std::string reason = "";
+  if (debugSubsumptionLevel >= 1) {
+    llvm::raw_string_ostream stream(reason);
+    llvm::Instruction *instr = state.pc->inst;
+    stream << "subsumption at ";
+    if (instr->getParent()->getParent()) {
+      std::string functionName(
+          instr->getParent()->getParent()->getName().str());
+      stream << functionName << ": ";
+      if (llvm::MDNode *n = instr->getMetadata("dbg")) {
+        llvm::DILocation loc(n);
+        stream << "Line " << loc.getLineNumber();
+      } else {
+        instr->print(stream);
+      }
+    } else {
+      instr->print(stream);
+    }
+  }
+
+  for (std::set<ref<TxInterpolantValue> >::iterator it = coreValues.begin(),
+                                                    ie = coreValues.end();
+       it != ie; ++it) {
+    state.txTreeNode->valuesInterpolation((*it)->getValue(),
+                                          (*it)->getExpression(), reason);
+  }
+
+  if (Dependency::boundInterpolation() && !ExactAddressInterpolant) {
+    reason = "interpolating memory bound for " + reason;
+
+    for (std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > >::iterator
+             it = corePointerValues.begin(),
+             ie = corePointerValues.end();
+         it != ie; ++it) {
+      bool memoryError = state.txTreeNode->pointerValuesInterpolation(
+          it->first->getValue(), it->first->getExpression(), it->second,
+          reason);
+      assert(!memoryError && "interpolation should not result in memory error");
+    }
+  }
+}
+
 bool SubsumptionTableEntry::subsumed(
     TimingSolver *solver, ExecutionState &state, double timeout,
     TxStore::TopInterpolantStore &_concretelyAddressedStore,
@@ -786,11 +833,11 @@ bool SubsumptionTableEntry::subsumed(
   // values for allocations of matching sizes.
   std::map<ref<AllocationInfo>, ref<AllocationInfo> > unifiedBases;
 
+  // Non-pointer / exact pointer values to be marked as in the interpolant
+  std::set<ref<TxInterpolantValue> > coreValues;
+
   // Pointer values in the core for memory bounds interpolation.
   std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > > corePointerValues;
-
-  // Pointer values in the core for exact equality
-  std::set<ref<TxInterpolantValue> > coreExactPointerValues;
 
   {
     TimerStatIncrementer t(concretelyAddressedStoreExpressionBuildTime);
@@ -916,7 +963,7 @@ bool SubsumptionTableEntry::subsumed(
                 res = offsetsCheck;
 
               // We record the value of the pointer for interpolation marking
-              coreExactPointerValues.insert(stateValue);
+              coreValues.insert(stateValue);
             }
           } else {
             res = EqExpr::create(tabledValue->getExpression(),
@@ -954,30 +1001,34 @@ bool SubsumptionTableEntry::subsumed(
                 }
               }
               return false;
-            } else if (debugSubsumptionLevel >= 1 && res->isTrue()) {
-              if (debugSubsumptionLevel >= 2) {
-                std::string msg;
-                llvm::raw_string_ostream stream(msg);
-                tabledValue->getExpression()->print(stream);
-                stream.flush();
-                klee_message("#%lu=>#%lu: Equal contents: %s",
-                             state.txTreeNode->getNodeSequenceNumber(),
-                             nodeSequenceNumber, msg.c_str());
-              } else {
-                klee_message("#%lu=>#%lu: Equal contents",
-                             state.txTreeNode->getNodeSequenceNumber(),
-                             nodeSequenceNumber);
+            } else if (res->isTrue()) {
+              if (debugSubsumptionLevel >= 1) {
+                if (debugSubsumptionLevel >= 2) {
+                  std::string msg;
+                  llvm::raw_string_ostream stream(msg);
+                  tabledValue->getExpression()->print(stream);
+                  stream.flush();
+                  klee_message("#%lu=>#%lu: Equal contents: %s",
+                               state.txTreeNode->getNodeSequenceNumber(),
+                               nodeSequenceNumber, msg.c_str());
+                } else {
+                  klee_message("#%lu=>#%lu: Equal contents",
+                               state.txTreeNode->getNodeSequenceNumber(),
+                               nodeSequenceNumber);
+                }
+
+                if (debugSubsumptionLevel >= 3) {
+                  std::string msg3;
+                  llvm::raw_string_ostream stream1(msg3);
+
+                  it2->first->print(stream1, makeTabs(1));
+                  stream1.flush();
+
+                  klee_message("with value stored in address:\n%s",
+                               msg3.c_str());
+                }
               }
-
-              if (debugSubsumptionLevel >= 3) {
-                std::string msg3;
-                llvm::raw_string_ostream stream1(msg3);
-
-                it2->first->print(stream1, makeTabs(1));
-                stream1.flush();
-
-                klee_message("with value stored in address:\n%s", msg3.c_str());
-              }
+              coreValues.insert(stateValue);
             }
           }
         }
@@ -998,8 +1049,8 @@ bool SubsumptionTableEntry::subsumed(
 
             ref<Expr> constraint = makeConstraint(
                 state, it2->second, it3->second, it2->first->getOffset(),
-                it3->first->getOffset(), corePointerValues,
-                coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
+                it3->first->getOffset(), coreValues, corePointerValues,
+                unifiedBases, debugSubsumptionLevel);
 
             if (constraint.isNull())
               return false;
@@ -1051,8 +1102,8 @@ bool SubsumptionTableEntry::subsumed(
             matchFound = true;
             constraint = makeConstraint(
                 state, it1->second, it2->second, it1->first->getOffset(),
-                it2->first->getOffset(), corePointerValues,
-                coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
+                it2->first->getOffset(), coreValues, corePointerValues,
+                unifiedBases, debugSubsumptionLevel);
             if (constraint.isNull())
               return false;
             if (stateEqualityConstraints.isNull()) {
@@ -1113,8 +1164,8 @@ bool SubsumptionTableEntry::subsumed(
 
           ref<Expr> constraint = makeConstraint(
               state, it2->second, it3->second, it2->first->getOffset(),
-              it3->first->getOffset(), corePointerValues,
-              coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
+              it3->first->getOffset(), coreValues, corePointerValues,
+              unifiedBases, debugSubsumptionLevel);
 
           if (constraint.isNull())
             return false;
@@ -1140,8 +1191,8 @@ bool SubsumptionTableEntry::subsumed(
 
           ref<Expr> constraint = makeConstraint(
               state, it2->second, it3->second, it2->first->getOffset(),
-              it3->first->getOffset(), corePointerValues,
-              coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
+              it3->first->getOffset(), coreValues, corePointerValues,
+              unifiedBases, debugSubsumptionLevel);
 
           if (constraint.isNull())
             return false;
@@ -1180,8 +1231,8 @@ bool SubsumptionTableEntry::subsumed(
             it2->first->getAllocationInfo()) {
           ref<Expr> constraint = makeConstraint(
               state, it1->second, it2->second, it1->first->getOffset(),
-              it2->first->getOffset(), corePointerValues,
-              coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
+              it2->first->getOffset(), coreValues, corePointerValues,
+              unifiedBases, debugSubsumptionLevel);
           if (constraint.isNull())
             return false;
           if (stateEqualityConstraints.isNull()) {
@@ -1204,8 +1255,8 @@ bool SubsumptionTableEntry::subsumed(
             it2->first->getAllocationInfo()) {
           ref<Expr> constraint = makeConstraint(
               state, it1->second, it2->second, it1->first->getOffset(),
-              it2->first->getOffset(), corePointerValues,
-              coreExactPointerValues, unifiedBases, debugSubsumptionLevel);
+              it2->first->getOffset(), coreValues, corePointerValues,
+              unifiedBases, debugSubsumptionLevel);
           if (constraint.isNull())
             return false;
           if (stateEqualityConstraints.isNull()) {
@@ -1255,44 +1306,8 @@ bool SubsumptionTableEntry::subsumed(
                      nodeSequenceNumber, msg.c_str());
       }
 
-      // We build memory bounds interpolants from pointer values
-      std::string reason = "";
-      if (debugSubsumptionLevel >= 1) {
-        llvm::raw_string_ostream stream(reason);
-        llvm::Instruction *instr = state.pc->inst;
-        stream << "interpolating memory bound for subsumption at ";
-        if (instr->getParent()->getParent()) {
-          std::string functionName(
-              instr->getParent()->getParent()->getName().str());
-          stream << functionName << ": ";
-          if (llvm::MDNode *n = instr->getMetadata("dbg")) {
-            llvm::DILocation loc(n);
-            stream << "Line " << loc.getLineNumber();
-          } else {
-            instr->print(stream);
-          }
-        } else {
-          instr->print(stream);
-        }
-      }
-      for (std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > >::iterator
-               it = corePointerValues.begin(),
-               ie = corePointerValues.end();
-           it != ie; ++it) {
-        bool memoryError = state.txTreeNode->pointerValuesInterpolation(
-            it->first->getValue(), it->first->getExpression(), it->second,
-            reason);
-        assert(!memoryError &&
-               "interpolation should not result in memory error");
-      }
-
-      for (std::set<ref<TxInterpolantValue> >::iterator
-               it = coreExactPointerValues.begin(),
-               ie = coreExactPointerValues.end();
-           it != ie; ++it) {
-        state.txTreeNode->exactPointerValuesInterpolation(
-            (*it)->getValue(), (*it)->getExpression(), reason);
-      }
+      interpolateValues(state, coreValues, corePointerValues,
+                        debugSubsumptionLevel);
       return true;
     }
 
@@ -1445,39 +1460,8 @@ bool SubsumptionTableEntry::subsumed(
               msg.c_str());
         }
 
-        if (Dependency::boundInterpolation() && !ExactAddressInterpolant) {
-          // We build memory bounds interpolants from pointer values
-          std::string reason = "";
-          if (debugSubsumptionLevel >= 1) {
-            llvm::raw_string_ostream stream(reason);
-            llvm::Instruction *instr = state.pc->inst;
-            stream << "interpolating memory bound for subsumption at ";
-            if (instr->getParent()->getParent()) {
-              std::string functionName(
-                  instr->getParent()->getParent()->getName().str());
-              stream << functionName << ": ";
-              if (llvm::MDNode *n = instr->getMetadata("dbg")) {
-                llvm::DILocation loc(n);
-                stream << "Line " << loc.getLineNumber();
-              } else {
-                instr->print(stream);
-              }
-            } else {
-              instr->print(stream);
-            }
-          }
-          for (std::map<ref<TxInterpolantValue>,
-                        std::set<ref<Expr> > >::iterator
-                   it = corePointerValues.begin(),
-                   ie = corePointerValues.end();
-               it != ie; ++it) {
-            bool memoryError = state.txTreeNode->pointerValuesInterpolation(
-                it->first->getValue(), it->first->getExpression(), it->second,
-                reason);
-            assert(!memoryError &&
-                   "interpolation should not result in memory error");
-          }
-        }
+        interpolateValues(state, coreValues, corePointerValues,
+                          debugSubsumptionLevel);
         return true;
       }
       if (debugSubsumptionLevel >= 1) {
@@ -1503,39 +1487,8 @@ bool SubsumptionTableEntry::subsumed(
     // We create path condition marking structure and mark core constraints
     state.txTreeNode->unsatCoreInterpolation(unsatCore);
 
-    if (Dependency::boundInterpolation() && !ExactAddressInterpolant) {
-      // We build memory bounds interpolants from pointer values
-      std::string reason = "";
-      if (debugSubsumptionLevel >= 1) {
-        llvm::raw_string_ostream stream(reason);
-        llvm::Instruction *instr = state.pc->inst;
-        stream << "interpolating memory bound for subsumption at ";
-        if (instr->getParent()->getParent()) {
-          std::string functionName(
-              instr->getParent()->getParent()->getName().str());
-          stream << functionName << ": ";
-          if (llvm::MDNode *n = instr->getMetadata("dbg")) {
-            llvm::DILocation loc(n);
-            stream << "Line " << loc.getLineNumber();
-          } else {
-            instr->print(stream);
-          }
-        } else {
-          instr->print(stream);
-        }
-      }
-      for (std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > >::iterator
-               it = corePointerValues.begin(),
-               ie = corePointerValues.end();
-           it != ie; ++it) {
-        bool memoryError = state.txTreeNode->pointerValuesInterpolation(
-            it->first->getValue(), it->first->getExpression(), it->second,
-            reason);
-        assert(!memoryError &&
-               "interpolation should not result in memory error");
-      }
-    }
-
+    interpolateValues(state, coreValues, corePointerValues,
+                      debugSubsumptionLevel);
     return true;
   }
 #endif /* ENABLE_Z3 */

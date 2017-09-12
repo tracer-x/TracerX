@@ -137,13 +137,13 @@ llvm::cl::opt<bool> ExactAddressInterpolant(
     "exact-address-interpolant",
     llvm::cl::desc("This option uses exact address for interpolating "
                    "successful out-of-bound memory access instead of the "
-                   "default memory offset bound. It has no effect when "
-                   "-no-bound-interpolation is specified."));
+                   "default memory offset bound."));
 
 llvm::cl::opt<bool> SpecialFunctionBoundInterpolation(
     "special-function-bound-interpolation",
-    llvm::cl::desc("Perform memory bound interpolation only within function "
-                   "named tracerx_check."),
+    llvm::cl::desc("Perform memory access interpolation only within function "
+                   "named tracerx_check, either memory offset bound or exact "
+                   "address (enabled with -exact-address-interpolant)."),
     llvm::cl::init(false));
 #endif // ENABLE_Z3
 

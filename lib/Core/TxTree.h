@@ -193,9 +193,9 @@ class SubsumptionTableEntry {
   ref<Expr> makeConstraint(
       ExecutionState &state, ref<TxInterpolantValue> tabledValue,
       ref<TxInterpolantValue> stateValue, ref<Expr> tabledOffset,
-      ref<Expr> stateOffset, std::map<ref<TxInterpolantValue>,
-                                      std::set<ref<Expr> > > &corePointerValues,
-      std::set<ref<TxInterpolantValue> > &coreExactPointerValues,
+      ref<Expr> stateOffset, std::set<ref<TxInterpolantValue> > &coreValues,
+      std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > > &
+          corePointerValues,
       std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
       int debugSubsumptionLevel) const;
 
@@ -287,6 +287,13 @@ class SubsumptionTableEntry {
   /// \brief Function to remove equalities whose lhs is a variable in the set.
   static ref<Expr> removeUnsubstituted(std::set<const Array *> &variables,
                                        ref<Expr> equalities);
+
+  static void
+  interpolateValues(ExecutionState &state,
+                    std::set<ref<TxInterpolantValue> > &coreValues,
+                    std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > > &
+                        corePointerValues,
+                    int debugSubsumptionLevel);
 
   bool empty() {
     return interpolant.isNull() && concretelyAddressedStore.empty() &&
@@ -542,10 +549,10 @@ public:
     dependency->memoryBoundViolationInterpolation(inst, address);
   }
 
-  /// \brief Exact pointer value interpolation from a target address
-  void exactPointerValuesInterpolation(llvm::Value *value, ref<Expr> address,
-                                       const std::string &reason) {
-    dependency->markAllValues(value, address, reason);
+  /// \brief Exact / non-pointer value interpolation
+  void valuesInterpolation(llvm::Value *value, ref<Expr> expr,
+                           const std::string &reason) {
+    dependency->markAllValues(value, expr, reason);
   }
 
   void setGenericEarlyTermination() { genericEarlyTermination = true; }
