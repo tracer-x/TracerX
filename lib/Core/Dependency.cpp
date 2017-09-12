@@ -1153,9 +1153,9 @@ bool Dependency::executeMemoryOperation(
         stream.flush();
       }
       if (ExactAddressInterpolant) {
-        markAllValues(addressOperand, address, reason);
+        markAllValues(val, reason);
       } else {
-        ret = markAllPointerValues(addressOperand, address, reason);
+        ret = markAllPointerValues(val, reason);
       }
     }
   }
@@ -1217,10 +1217,8 @@ void Dependency::bindReturnValue(llvm::CallInst *site,
   }
 }
 
-void Dependency::markAllValues(llvm::Value *val, ref<Expr> expr,
+void Dependency::markAllValues(ref<TxStateValue> value,
                                const std::string &reason) {
-  ref<TxStateValue> value = getLatestValueForMarking(val, expr);
-
   if (value.isNull())
     return;
 
@@ -1228,11 +1226,9 @@ void Dependency::markAllValues(llvm::Value *val, ref<Expr> expr,
   store->markUsed(value->getEntryList());
 }
 
-bool Dependency::markAllPointerValues(llvm::Value *val, ref<Expr> address,
+bool Dependency::markAllPointerValues(ref<TxStateValue> value,
                                       std::set<ref<Expr> > &bounds,
                                       const std::string &reason) {
-  ref<TxStateValue> value = getLatestValueForMarking(val, address);
-
   if (value.isNull())
     return false;
 
@@ -1298,7 +1294,7 @@ void Dependency::memoryBoundViolationInterpolation(llvm::Instruction *inst,
       stream << "]";
       stream.flush();
     }
-    markAllValues(addressOperand, address, reason);
+    markAllValues(val, reason);
   }
 }
 

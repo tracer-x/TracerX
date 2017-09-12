@@ -325,6 +325,10 @@ private:
   /// \brief Reason this was stored as needed value
   std::set<std::string> coreReasons;
 
+  /// \brief The original state value, which is used in subsumption check
+  /// interpolation to propagate this value to interpolation marking
+  ref<TxStateValue> originalValue;
+
   void init(llvm::Value *_value, ref<Expr> _expr, bool canInterpolateBound,
             const std::set<std::string> &_coreReasons,
             const std::set<ref<TxStateAddress> > _locations,
@@ -396,6 +400,10 @@ public:
   ref<Expr> getExpression() const { return expr; }
 
   llvm::Value *getValue() const { return value; }
+
+  void setOriginalValue(ref<TxStateValue> value) { originalValue = value; }
+
+  ref<TxStateValue> getOriginalValue() const { return originalValue; }
 
   void print(llvm::raw_ostream &stream) const;
 

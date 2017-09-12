@@ -442,24 +442,31 @@ namespace klee {
                          std::vector<llvm::Instruction *> &callHistory,
                          llvm::Instruction *inst, ref<Expr> returnValue);
 
-    /// \brief Given an LLVM value, retrieve all its sources and mark them as in
-    /// the core.
+    /// \brief Given an LLVM value and the expression it is associated with,
+    /// retrieve all the sources and mark them as in the core
     void markAllValues(llvm::Value *value, ref<Expr> expr,
-                       const std::string &reason);
+                       const std::string &reason) {
+      ref<TxStateValue> stateValue = getLatestValueForMarking(value, expr);
+      markAllValues(stateValue, reason);
+    }
+
+    /// \brief Given a state value, retrieve all its sources and mark them as in
+    /// the core
+    void markAllValues(ref<TxStateValue> value, const std::string &reason);
 
     /// \brief Given an LLVM value which is used as an address, retrieve all its
     /// sources and mark them as in the core. Returns true if bounds error was
     /// detected; false otherwise.
-    bool markAllPointerValues(llvm::Value *val, ref<Expr> address,
+    bool markAllPointerValues(ref<TxStateValue> value,
                               const std::string &reason) {
       std::set<ref<Expr> > bounds;
-      return markAllPointerValues(val, address, bounds, reason);
+      return markAllPointerValues(value, bounds, reason);
     }
 
     /// \brief Given an LLVM value which is used as an address, retrieve all its
     /// sources and mark them as in the core. Returns true if bounds error was
     /// detected; false otherwise.
-    bool markAllPointerValues(llvm::Value *val, ref<Expr> address,
+    bool markAllPointerValues(ref<TxStateValue> value,
                               std::set<ref<Expr> > &bounds,
                               const std::string &reason);
 

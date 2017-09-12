@@ -64,8 +64,8 @@ SubsumptionTableEntry::~SubsumptionTableEntry() {}
 ref<Expr> SubsumptionTableEntry::makeConstraint(
     ExecutionState &state, ref<TxInterpolantValue> tabledValue,
     ref<TxInterpolantValue> stateValue, ref<Expr> tabledOffset,
-    ref<Expr> stateOffset, std::set<ref<TxInterpolantValue> > &coreValues,
-    std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > > &corePointerValues,
+    ref<Expr> stateOffset, std::set<ref<TxStateValue> > &coreValues,
+    std::map<ref<TxStateValue>, std::set<ref<Expr> > > &corePointerValues,
     std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
     int debugSubsumptionLevel) const {
   ref<Expr> constraint;
@@ -106,7 +106,7 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
       }
 
       // We record the LLVM value of the pointer
-      corePointerValues[stateValue] = bounds;
+      corePointerValues[stateValue->getOriginalValue()] = bounds;
     } else {
       ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
           stateValue, unifiedBases, debugSubsumptionLevel);
@@ -123,7 +123,7 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
         constraint = offsetsCheck;
 
       // We record the value of the pointer for interpolation marking
-      coreValues.insert(stateValue);
+      coreValues.insert(stateValue->getOriginalValue());
     }
   } else {
     // Implication: if tabledConcreteAddress == stateSymbolicAddress,
@@ -135,7 +135,7 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
         EqExpr::create(tabledValue->getExpression(),
                        stateValue->getExpression()));
 
-    coreValues.insert(stateValue);
+    coreValues.insert(stateValue->getOriginalValue());
   }
   return constraint;
 }
@@ -759,8 +759,8 @@ ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
 }
 
 void SubsumptionTableEntry::interpolateValues(
-    ExecutionState &state, std::set<ref<TxInterpolantValue> > &coreValues,
-    std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > > &corePointerValues,
+    ExecutionState &state, std::set<ref<TxStateValue> > &coreValues,
+    std::map<ref<TxStateValue>, std::set<ref<Expr> > > &corePointerValues,
     int debugSubsumptionLevel) {
   std::string reason = "";
   if (debugSubsumptionLevel >= 1) {
@@ -782,23 +782,21 @@ void SubsumptionTableEntry::interpolateValues(
     }
   }
 
-  for (std::set<ref<TxInterpolantValue> >::iterator it = coreValues.begin(),
-                                                    ie = coreValues.end();
+  for (std::set<ref<TxStateValue> >::iterator it = coreValues.begin(),
+                                              ie = coreValues.end();
        it != ie; ++it) {
-    state.txTreeNode->valuesInterpolation((*it)->getValue(),
-                                          (*it)->getExpression(), reason);
+    state.txTreeNode->valuesInterpolation(*it, reason);
   }
 
   if (Dependency::boundInterpolation() && !ExactAddressInterpolant) {
     reason = "interpolating memory bound for " + reason;
 
-    for (std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > >::iterator
+    for (std::map<ref<TxStateValue>, std::set<ref<Expr> > >::iterator
              it = corePointerValues.begin(),
              ie = corePointerValues.end();
          it != ie; ++it) {
       bool memoryError = state.txTreeNode->pointerValuesInterpolation(
-          it->first->getValue(), it->first->getExpression(), it->second,
-          reason);
+          it->first, it->second, reason);
       assert(!memoryError && "interpolation should not result in memory error");
     }
   }
@@ -834,10 +832,10 @@ bool SubsumptionTableEntry::subsumed(
   std::map<ref<AllocationInfo>, ref<AllocationInfo> > unifiedBases;
 
   // Non-pointer / exact pointer values to be marked as in the interpolant
-  std::set<ref<TxInterpolantValue> > coreValues;
+  std::set<ref<TxStateValue> > coreValues;
 
   // Pointer values in the core for memory bounds interpolation.
-  std::map<ref<TxInterpolantValue>, std::set<ref<Expr> > > corePointerValues;
+  std::map<ref<TxStateValue>, std::set<ref<Expr> > > corePointerValues;
 
   {
     TimerStatIncrementer t(concretelyAddressedStoreExpressionBuildTime);
@@ -944,7 +942,7 @@ bool SubsumptionTableEntry::subsumed(
                 res = boundsCheck;
 
               // We record the LLVM value of the pointer
-              corePointerValues[stateValue] = bounds;
+              corePointerValues[stateValue->getOriginalValue()] = bounds;
             } else {
               ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
                   stateValue, unifiedBases, debugSubsumptionLevel);
@@ -963,7 +961,7 @@ bool SubsumptionTableEntry::subsumed(
                 res = offsetsCheck;
 
               // We record the value of the pointer for interpolation marking
-              coreValues.insert(stateValue);
+              coreValues.insert(stateValue->getOriginalValue());
             }
           } else {
             res = EqExpr::create(tabledValue->getExpression(),
@@ -1028,7 +1026,7 @@ bool SubsumptionTableEntry::subsumed(
                                msg3.c_str());
                 }
               }
-              coreValues.insert(stateValue);
+              coreValues.insert(stateValue->getOriginalValue());
             }
           }
         }
