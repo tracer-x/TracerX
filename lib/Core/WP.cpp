@@ -131,9 +131,9 @@ ref<Expr> WeakestPreCondition::GenerateWP(
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
        it != ie; ++it) {
+    llvm::Instruction *i = (*it).first->inst;
     if ((*it).second == true || markAllFlag == true) {
       // Retrieve the instruction
-      llvm::Instruction *i = (*it).first->inst;
       // This log will be omitted in the final commit
       klee_message("Printing LLVM Instruction: ");
       i->dump();
@@ -158,6 +158,10 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         // Getting the expressions from the left and right operand
         ref<Expr> left = this->generateExprFromOperand(i, 0);
         ref<Expr> right = this->generateExprFromOperand(i, 1);
+
+        if (markAllFlag == true && !isTargetDependent(i, this->WPExpr)) {
+          break;
+        }
 
         ref<Expr> result;
         // second step is to Storing the updated WP expression
@@ -271,6 +275,10 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         ref<Expr> left = this->generateExprFromOperand(i, 0);
         ref<Expr> right = this->generateExprFromOperand(i, 1);
 
+        if (markAllFlag == true && !isTargetDependent(i, this->WPExpr)) {
+          break;
+        }
+
         ref<Expr> rhs;
         switch (i->getOpcode()) {
         case llvm::Instruction::Add:
@@ -331,6 +339,11 @@ ref<Expr> WeakestPreCondition::GenerateWP(
 
         ref<Expr> left = this->generateExprFromOperand(i, 0);
         ref<Expr> right = this->generateExprFromOperand(i, 1);
+        if (markAllFlag == true &&
+            !isTargetDependent(dyn_cast<llvm::Instruction>(i->getOperand(1)),
+                               this->WPExpr)) {
+          break;
+        }
         ref<Expr> result = EqExpr::create(right, left);
         this->updateWPExpr(result);
         break;
@@ -401,17 +414,14 @@ void WeakestPreCondition::updateWPExpr(ref<Expr> result) {
 
 void WeakestPreCondition::substituteExpr(ref<Expr> result) {
   switch (result->getKind()) {
-  case Expr::Ult:
-  case Expr::Ule:
-  case Expr::Ugt:
-  case Expr::Uge:
-  case Expr::Slt:
-  case Expr::Sle:
-  case Expr::Sgt:
-  case Expr::Sge:
   case Expr::Eq: {
-    const ref<Expr> lhs = result->getKid(0);
-    const ref<Expr> rhs = result->getKid(1);
+    ref<Expr> lhs = result->getKid(0);
+    ref<Expr> rhs = result->getKid(1);
+    if (isa<ConstantExpr>(rhs)) {
+      ref<Expr> temp = lhs;
+      lhs = rhs;
+      rhs = temp;
+    }
 
     WPExpr = this->substituteExpr(WPExpr, lhs, rhs);
     break;
@@ -426,9 +436,10 @@ void WeakestPreCondition::substituteExpr(ref<Expr> result) {
 ref<Expr> WeakestPreCondition::substituteExpr(ref<Expr> base,
                                               const ref<Expr> lhs,
                                               const ref<Expr> rhs) {
-
   if (base.compare(lhs) == 0)
     return rhs;
+  else if (base.compare(rhs) == 0)
+    return lhs;
   else {
     switch (base->getKind()) {
     case Expr::InvalidKind:
@@ -522,6 +533,11 @@ void WeakestPreCondition::simplifyWPExpr() {
     delete newLinearTerm;
     break;
   }
+  case Expr::Constant: {
+    // Do nothing. The expression is in the form of True or False
+    break;
+  }
+
   default: {
     klee_message("Error while parsing WP Expression:");
     WPExpr->dump();
@@ -655,8 +671,7 @@ llvm::Value *WeakestPreCondition::getValuePointer(ref<Expr> expr) {
       return it->first;
     }
   }
-  klee_error("WeakestPreCondition::getValuePointer trying to get Value ref for "
-             "wrong expr*.");
+  return NULL;
 }
 
 ref<Expr> WeakestPreCondition::instantiateWPExpression(
@@ -669,14 +684,22 @@ ref<Expr> WeakestPreCondition::instantiateWPExpression(
   }
 
   case Expr::Read: {
-    ref<Expr> storeValue = dependency->getLatestValueOfAddress(
-        getValuePointer(WPExpr), callHistory);
+    llvm::Value *tempInstr = getValuePointer(WPExpr);
+    if (tempInstr == NULL)
+      klee_error(
+          "WeakestPreCondition::instantiateWPExpression Value ref is null");
+    ref<Expr> storeValue =
+        dependency->getLatestValueOfAddress(tempInstr, callHistory);
     return storeValue;
   }
 
   case Expr::Concat: {
-    ref<Expr> storeValue = dependency->getLatestValueOfAddress(
-        getValuePointer(WPExpr), callHistory);
+    llvm::Value *tempInstr = getValuePointer(WPExpr);
+    if (tempInstr == NULL)
+      klee_error(
+          "WeakestPreCondition::instantiateWPExpression Value ref is null");
+    ref<Expr> storeValue =
+        dependency->getLatestValueOfAddress(tempInstr, callHistory);
     return storeValue;
   }
 
@@ -777,4 +800,83 @@ ref<ConstantExpr> WeakestPreCondition::getMaxOfConstExpr(ref<ConstantExpr> expr1
 		return expr1;
 	else
 		return expr2;
+}
+
+bool WeakestPreCondition::isTargetDependent(llvm::Instruction *inst,
+                                            ref<Expr> wp) {
+  switch (wp->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return false;
+  }
+
+  case Expr::Read: {
+    if (inst == getValuePointer(wp)) {
+      return true;
+    }
+    return false;
+  }
+
+  case Expr::Concat: {
+    if (inst == getValuePointer(wp)) {
+      return true;
+    }
+    return false;
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    ref<Expr> kids[1];
+    kids[0] = WPExpr->getKid(0);
+    return isTargetDependent(inst, kids[0]);
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    ref<Expr> kids[2];
+    kids[0] = WPExpr->getKid(0);
+    kids[1] = WPExpr->getKid(1);
+    return (isTargetDependent(inst, kids[0]) ||
+            isTargetDependent(inst, kids[1]));
+  }
+
+  case Expr::Select: {
+    ref<Expr> kids[3];
+    kids[0] = WPExpr->getKid(0);
+    kids[1] = WPExpr->getKid(1);
+    kids[2] = WPExpr->getKid(2);
+    return (isTargetDependent(inst, kids[0]) ||
+            isTargetDependent(inst, kids[1]) ||
+            isTargetDependent(inst, kids[2]));
+  }
+  }
+  // Sanity check
+  klee_error("Control should not reach here in "
+             "WeakestPreCondition::isTargetDependent!");
+  return false;
 }

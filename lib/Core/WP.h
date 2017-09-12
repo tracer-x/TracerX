@@ -131,6 +131,9 @@ public:
   // \brief Return the maximum of two constant expressions
   ref<ConstantExpr> getMaxOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2);
 
+  // \brief Return true if the destination of the LLVM instruction appears in
+  // the WP expression
+  bool isTargetDependent(llvm::Instruction *inst, ref<Expr> wp);
 };
 }
 #endif /* WP_H_ */
