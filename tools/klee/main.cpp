@@ -338,6 +338,14 @@ public:
   }
   unsigned getSubsumptionTermination() { return m_subsumptionTermination; }
   void incSubsumptionTermination() { m_subsumptionTermination++; }
+  unsigned getSubsumptionTerminationTest() {
+    return m_subsumptionTerminationTest;
+  }
+  void incSubsumptionTerminationTest() {
+    if (!NoOutput) {
+      m_subsumptionTerminationTest++;
+    }
+  }
   unsigned getEarlyTermination() { return m_earlyTermination; }
   void incEarlyTermination() { m_earlyTermination++; }
   unsigned getEarlyTerminationTest() { return m_earlyTerminationTest; }
@@ -401,7 +409,8 @@ KleeHandler::KleeHandler(int argc, char **argv)
       m_totalInstructionsDepthOnErrorTermination(0),
       m_totalBranchingDepthOnSubsumption(0),
       m_totalInstructionsDepthOnSubsumption(0), m_subsumptionTermination(0),
-      m_earlyTermination(0), m_earlyTerminationTest(0), m_errorTermination(0),
+      m_subsumptionTerminationTest(0), m_earlyTermination(0),
+      m_earlyTerminationTest(0), m_errorTermination(0),
       m_errorTerminationTest(0), m_exitTermination(0), m_exitTerminationTest(0),
       m_otherTermination(0), m_argc(argc), m_argv(argv) {
 
@@ -1741,6 +1750,11 @@ int main(int argc, char **argv, char **envp) {
         << handler->getNumTestCases() << ", among which\n";
   stats << "KLEE: done:     early-terminating tests (instruction time limit, solver timeout, max-depth reached) = "
         << handler->getEarlyTerminationTest() << "\n";
+#ifdef ENABLE_Z3
+  if (SubsumedTest)
+    stats << "KLEE: done:     subsumed tests = "
+          << handler->getSubsumptionTerminationTest() << "\n";
+#endif
   stats << "KLEE: done:     error tests = "
         << handler->getErrorTerminationTest() << "\n";
   stats << "KLEE: done:     program exit tests = "
