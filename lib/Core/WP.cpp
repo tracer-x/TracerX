@@ -34,6 +34,11 @@
 
 using namespace klee;
 
+typedef std::map<ref<TxVariable>, ref<TxInterpolantValue> >
+    LowerInterpolantStore;
+typedef std::map<ref<TxAllocationContext>, LowerInterpolantStore>
+    TopInterpolantStore;
+       
 /**/
 
 WeakestPreCondition::WeakestPreCondition(TxTreeNode *_node,
@@ -879,4 +884,179 @@ bool WeakestPreCondition::isTargetDependent(llvm::Instruction *inst,
   klee_error("Control should not reach here in "
              "WeakestPreCondition::isTargetDependent!");
   return false;
+}
+
+TxSubsumptionTableEntry *
+WeakestPreCondition::updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry,
+                                                 ref<Expr> wp) {
+  ref<Expr> interpolant = entry->getInterpolant();
+  TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore =
+      entry->getConcretelyAddressedHistoricalStore();
+  TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore =
+      entry->getSymbolicallyAddressedHistoricalStore();
+  TxStore::TopInterpolantStore concretelyAddressedStore =
+      entry->getConcretelyAddressedStore();
+  TxStore::TopInterpolantStore symbolicallyAddressedStore =
+      entry->getSymbolicallyAddressedStore();
+
+  if (concretelyAddressedStore.size() == 0)
+    klee_error("WeakestPreCondition::updateSubsumptionTableEntry for this case "
+               "is not implemented yet.");
+  else {
+    // TODO: Assuming WP is one frame, fix this
+    TxStore::TopInterpolantStore newConcretelyAddressedStore =
+        updateConcretelyAddressedStore(concretelyAddressedStore, wp);
+    ref<Expr> newInterpolant = updateInterpolant(interpolant, wp);
+    entry->setConcretelyAddressedStore(newConcretelyAddressedStore);
+    entry->setInterpolant(newInterpolant);
+  }
+  // For future reference
+  if (!interpolant.isNull())
+    interpolant->dump();
+
+  concretelyAddressedStore = entry->getConcretelyAddressedStore();
+  for (TopInterpolantStore::const_iterator
+           it = concretelyAddressedStore.begin(),
+           ie = concretelyAddressedStore.end();
+       it != ie; ++it) {
+    (*it).first->dump();
+    LowerInterpolantStore temp = (*it).second;
+    for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
+                                               ie2 = temp.end();
+         it2 != ie2; ++it2) {
+      (*it2).first->dump();
+      (*it2).second->dump();
+    }
+  }
+  for (TopInterpolantStore::const_iterator
+           it = symbolicallyAddressedStore.begin(),
+           ie = symbolicallyAddressedStore.end();
+       it != ie; ++it) {
+    (*it).first->dump();
+    LowerInterpolantStore temp = (*it).second;
+    for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
+                                               ie2 = temp.end();
+         it2 != ie2; ++it2) {
+      (*it2).first->dump();
+      (*it2).second->dump();
+    }
+  }
+
+  for (LowerInterpolantStore::const_iterator
+           it = concretelyAddressedHistoricalStore.begin(),
+           ie = concretelyAddressedHistoricalStore.end();
+       it != ie; ++it) {
+    (*it).first->dump();
+    (*it).second->dump();
+  }
+
+  for (LowerInterpolantStore::const_iterator
+           it = symbolicallyAddressedHistoricalStore.begin(),
+           ie = symbolicallyAddressedHistoricalStore.end();
+       it != ie; ++it) {
+    (*it).first->dump();
+    (*it).second->dump();
+  }
+  return entry;
+}
+
+TxStore::TopInterpolantStore
+WeakestPreCondition::updateConcretelyAddressedStore(
+    TxStore::TopInterpolantStore concretelyAddressedStore, ref<Expr> wp) {
+
+  ref<Expr> var = getVarFromExpr(wp);
+  llvm::Value *allocaVar = getValuePointer(var);
+  TopInterpolantStore::iterator candidateForRemove =
+      concretelyAddressedStore.end();
+  for (TopInterpolantStore::iterator it = concretelyAddressedStore.begin(),
+                                     ie = concretelyAddressedStore.end();
+       it != ie; ++it) {
+
+    if ((*it).first->getValue() == allocaVar)
+      candidateForRemove = it;
+  }
+  if (candidateForRemove != concretelyAddressedStore.end()) {
+    concretelyAddressedStore.erase(candidateForRemove);
+  }
+  return concretelyAddressedStore;
+}
+
+ref<Expr> WeakestPreCondition::getVarFromExpr(ref<Expr> wp) {
+  // TODO: Assuming frame has only one variable. Fix it.
+  switch (wp->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Read:
+  case Expr::Concat:
+  case Expr::Constant: {
+    return wp;
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    ref<Expr> kids[1];
+    kids[0] = getVarFromExpr(wp->getKid(0));
+    return kids[0];
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    ref<Expr> kids[2];
+    kids[0] = getVarFromExpr(wp->getKid(0));
+    kids[1] = getVarFromExpr(wp->getKid(1));
+    if (isa<ReadExpr>(kids[0]) || isa<ConcatExpr>(kids[0]))
+      return kids[0];
+    else
+      return kids[1];
+  }
+
+  case Expr::Select: {
+    ref<Expr> kids[3];
+    kids[0] = getVarFromExpr(wp->getKid(0));
+    kids[1] = getVarFromExpr(wp->getKid(1));
+    kids[2] = getVarFromExpr(wp->getKid(2));
+    if (isa<ReadExpr>(kids[0]) || isa<ConcatExpr>(kids[0]))
+      return kids[0];
+    else if (isa<ReadExpr>(kids[1]) || isa<ConcatExpr>(kids[1]))
+      return kids[1];
+    else
+      return kids[1];
+  }
+  }
+  // Sanity check
+  klee_error(
+      "Control should not reach here in WeakestPreCondition::getVarFromExpr");
+  return wp;
+}
+
+ref<Expr> WeakestPreCondition::updateInterpolant(ref<Expr> interpolant,
+                                                 ref<Expr> wp) {
+  if (interpolant.isNull())
+    return wp;
+  else
+    return AndExpr::create(interpolant, wp);
 }
