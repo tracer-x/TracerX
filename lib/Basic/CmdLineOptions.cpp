@@ -100,6 +100,15 @@ llvm::cl::opt<bool> OutputTree(
                    "format. At present, this feature is only available when "
                    "Z3 is compiled in and interpolation is enabled."));
 
+llvm::cl::opt<bool>
+SubsumedTest("subsumed-test",
+             llvm::cl::desc("Enables generation of test cases for subsumed "
+                            "paths. This is needed for the computation of "
+                            "coverage using gcov or llvm-cov, as otherwise the "
+                            "part of code visited by the subsumed paths are "
+                            "not considered in the coverage computation."),
+             llvm::cl::init(false));
+
 llvm::cl::opt<bool> NoExistential(
     "no-existential",
     llvm::cl::desc(
