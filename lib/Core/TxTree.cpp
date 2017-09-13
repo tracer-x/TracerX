@@ -2113,8 +2113,10 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       ref<Expr> WPExpr = entry->getWPInterpolant();
       Solver::Validity result;
       std::vector<ref<Expr> > unsatCore;
-      ref<Expr> WPExprInstantiated = node->wp->instantiateWPExpression(
-          node->parent->dependency, node->parent->callHistory, WPExpr);
+      ref<Expr> WPExprInstantiated = ConstantExpr::create(0, 32);
+      if (node->parent)
+        WPExprInstantiated = node->wp->instantiateWPExpression(
+            node->parent->dependency, node->parent->callHistory, WPExpr);
       bool success =
           solver->evaluate(*state, WPExprInstantiated, result, unsatCore);
       if (success != true)
@@ -2127,8 +2129,6 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         // improves the interpolant from the deletion algorithm
         // is slim. As a result, in such cases the interpolant
         // from deletion is not changed.
-        klee_error("TxTree::remove Trying to find a true case where the WP "
-                   "implication fails.");
       }
 
       TxSubsumptionTable::insert(node->getProgramPoint(), node->entryCallHistory,
@@ -2371,7 +2371,9 @@ ref<Expr> TxTreeNode::getWPInterpolant() {
     // Generate weakest precondition from pathCondition and/or BB instructions
     markAllFlag = 0;
     expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
-    this->parent->setChildWPInterpolant(expr);
+    expr->dump();
+    if (parent)
+      this->parent->setChildWPInterpolant(expr);
   } else {
     expr = wp->intersectExpr(childWPInterpolant[0], childWPInterpolant[1]);
 
@@ -2382,7 +2384,8 @@ ref<Expr> TxTreeNode::getWPInterpolant() {
     // All instructions are marked
     markAllFlag = 1;
     expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
-    this->parent->setChildWPInterpolant(expr);
+    if (parent)
+      this->parent->setChildWPInterpolant(expr);
   }
   return expr;
 }

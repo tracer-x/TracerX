@@ -341,7 +341,6 @@ ref<Expr> WeakestPreCondition::GenerateWP(
       }
 
       case llvm::Instruction::Store: {
-
         ref<Expr> left = this->generateExprFromOperand(i, 0);
         ref<Expr> right = this->generateExprFromOperand(i, 1);
         if (markAllFlag == true &&
@@ -354,6 +353,39 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         break;
       }
 
+      case llvm::Instruction::Call: {
+        llvm::CallInst *call = dyn_cast<llvm::CallInst>(i);
+
+        if (call->getCalledFunction()->getName() == "klee_assume") {
+          // TODO: Nothing specific is needed to be done for now.
+        } else if (call->getCalledFunction()->getName() ==
+                   "klee_make_symbolic") {
+          // TODO: Nothing specific is needed to be done for now.
+        } else {
+          if (call->doesNotReturn())
+            klee_error("Call Instructions are not yet implemented.");
+          else
+            klee_error("Call Instructions are not yet implemented.");
+        }
+        break;
+      }
+
+      case llvm::Instruction::BitCast: {
+        // Getting the expressions from the operand
+        ref<Expr> operand = this->generateExprFromOperand(i, 0);
+        if (markAllFlag == true && !isTargetDependent(i, this->WPExpr)) {
+          break;
+        }
+        ref<Expr> lhs = this->getLHS(i);
+        ref<Expr> result = EqExpr::create(lhs, operand);
+        this->updateWPExpr(result);
+        break;
+      }
+
+      case llvm::Instruction::Alloca: {
+        // TODO: Nothing specific is needed to be done for now.
+        break;
+      }
       default: {
         klee_message("+++++++++++++++++++++++++++++++++++++++++++++");
         klee_message("LLVM Instruction Not Implemeneted Yet: ");
@@ -682,6 +714,7 @@ llvm::Value *WeakestPreCondition::getValuePointer(ref<Expr> expr) {
 ref<Expr> WeakestPreCondition::instantiateWPExpression(
     TxDependency *dependency, const std::vector<llvm::Instruction *> &callHistory,
     ref<Expr> WPExpr) {
+  WPExpr->dump();
   switch (WPExpr->getKind()) {
   case Expr::InvalidKind:
   case Expr::Constant: {
