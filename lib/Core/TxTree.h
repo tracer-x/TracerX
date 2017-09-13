@@ -323,6 +323,29 @@ public:
 
   ref<Expr> getWPInterpolant() const;
 
+  TxStore::LowerInterpolantStore getConcretelyAddressedHistoricalStore() const;
+
+  TxStore::LowerInterpolantStore
+  getSymbolicallyAddressedHistoricalStore() const;
+
+  TxStore::TopInterpolantStore getConcretelyAddressedStore() const;
+
+  TxStore::TopInterpolantStore getSymbolicallyAddressedStore() const;
+
+  void setInterpolant(ref<Expr> _interpolant);
+
+  void setConcretelyAddressedHistoricalStore(
+      TxStore::LowerInterpolantStore _concretelyAddressedHistoricalStore);
+
+  void setSymbolicallyAddressedHistoricalStore(
+      TxStore::LowerInterpolantStore _symbolicallyAddressedHistoricalStore);
+
+  void setConcretelyAddressedStore(
+      TxStore::TopInterpolantStore _concretelyAddressedStore);
+
+  void setSymbolicallyAddressedStore(
+      TxStore::TopInterpolantStore _symbolicallyAddressedStore);
+
   void dump() const {
     this->print(llvm::errs());
     llvm::errs() << "\n";

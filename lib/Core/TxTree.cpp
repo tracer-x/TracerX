@@ -1501,6 +1501,50 @@ ref<Expr> TxSubsumptionTableEntry::getInterpolant() const {
 
 ref<Expr> TxSubsumptionTableEntry::getWPInterpolant() const { return wpInterpolant; }
 
+TxStore::LowerInterpolantStore
+TxSubsumptionTableEntry::getConcretelyAddressedHistoricalStore() const {
+  return concretelyAddressedHistoricalStore;
+}
+
+TxStore::LowerInterpolantStore
+TxSubsumptionTableEntry::getSymbolicallyAddressedHistoricalStore() const {
+  return symbolicallyAddressedHistoricalStore;
+}
+
+TxStore::TopInterpolantStore
+TxSubsumptionTableEntry::getConcretelyAddressedStore() const {
+  return concretelyAddressedStore;
+}
+
+TxStore::TopInterpolantStore
+TxSubsumptionTableEntry::getSymbolicallyAddressedStore() const {
+  return symbolicallyAddressedStore;
+}
+
+void TxSubsumptionTableEntry::setInterpolant(ref<Expr> _interpolant) {
+  interpolant = _interpolant;
+}
+
+void TxSubsumptionTableEntry::setConcretelyAddressedHistoricalStore(
+    TxStore::LowerInterpolantStore _concretelyAddressedHistoricalStore) {
+  concretelyAddressedHistoricalStore = _concretelyAddressedHistoricalStore;
+}
+
+void TxSubsumptionTableEntry::setSymbolicallyAddressedHistoricalStore(
+    TxStore::LowerInterpolantStore _symbolicallyAddressedHistoricalStore) {
+  symbolicallyAddressedHistoricalStore = _symbolicallyAddressedHistoricalStore;
+}
+
+void TxSubsumptionTableEntry::setConcretelyAddressedStore(
+    TxStore::TopInterpolantStore _concretelyAddressedStore) {
+  concretelyAddressedStore = _concretelyAddressedStore;
+}
+
+void TxSubsumptionTableEntry::setSymbolicallyAddressedStore(
+    TxStore::TopInterpolantStore _symbolicallyAddressedStore) {
+  symbolicallyAddressedStore = _symbolicallyAddressedStore;
+}
+
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
   print(stream, 0);
 }
@@ -2076,18 +2120,20 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       if (success != true)
         klee_error("TxTree::remove: Implication test failed");
       if (result == Solver::True) {
-        // Todo: Update the interpolant from the deletion algorithm
-        // w.r.t. the weakest precondition
+        entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
       } else {
+        // If the result of implication is Solver::False and/or
+        // Solver::Unknown the chance that the WP interpolant
+        // improves the interpolant from the deletion algorithm
+        // is slim. As a result, in such cases the interpolant
+        // from deletion is not changed.
         klee_error("TxTree::remove Trying to find a true case where the WP "
                    "implication fails.");
       }
 
-      // If the result of implication is Solver::False and/or
-      // Solver::Unknown the chance that the WP interpolant
-      // improves the interpolant from the deletion algorithm
-      // is slim. As a result, in such cases the interpolant
-      // from deletion is not changed.
+      TxSubsumptionTable::insert(node->getProgramPoint(), node->entryCallHistory,
+                               entry);
+
       TxTreeGraph::addTableEntryMapping(node, entry);
 
       if (debugSubsumptionLevel >= 2) {
@@ -2327,8 +2373,6 @@ ref<Expr> TxTreeNode::getWPInterpolant() {
     expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
     this->parent->setChildWPInterpolant(expr);
   } else {
-    // TODO: Perform the intersection of the child interpolants
-    // The following is a temporary intersection.
     expr = wp->intersectExpr(childWPInterpolant[0], childWPInterpolant[1]);
 
     // Setting the intersection of child nodes as the target in the of the nodes

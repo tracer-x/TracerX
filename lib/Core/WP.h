@@ -21,6 +21,7 @@
 #include <klee/ExprBuilder.h>
 #include <klee/util/ArrayCache.h>
 #include "TxDependency.h"
+#include "TxTree.h"
 
 namespace klee {
 
@@ -134,6 +135,20 @@ public:
   // \brief Return true if the destination of the LLVM instruction appears in
   // the WP expression
   bool isTargetDependent(llvm::Instruction *inst, ref<Expr> wp);
+
+  // \brief Update subsumption table entry based on the WP Expr
+  TxSubsumptionTableEntry *
+  updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry, ref<Expr> wp);
+
+  // \brief Update concretelyAddressedStore based on the WP Expr
+  TxStore::TopInterpolantStore updateConcretelyAddressedStore(
+      TxStore::TopInterpolantStore concretelyAddressedStore, ref<Expr> wp);
+
+  // \brief Get variable stored in the frame
+  ref<Expr> getVarFromExpr(ref<Expr> wp);
+
+  // \brief Update interpolant based on the WP Expr
+  ref<Expr> updateInterpolant(ref<Expr> interpolant, ref<Expr> wp);
 };
 }
 #endif /* WP_H_ */
