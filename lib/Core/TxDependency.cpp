@@ -89,11 +89,17 @@ ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
     wp->storeArrayRef(value, symArray, Res);
     return Res;
   }
+
+  // Todo: only catching the type of integer and pointers
+  unsigned int size = 0;
+  if (value->getType()->isPointerTy()) {
+    size = value->getType()->getArrayElementType()->getIntegerBitWidth();
+  } else {
+    size = value->getType()->getIntegerBitWidth();
+  }
   // Todo: tmpArray object should be reclaimed sometime later
-  tmpArray =
-      ac->CreateArray(value->getName(), value->getType()->getIntegerBitWidth());
-  ref<Expr> tmpExpr =
-      Expr::createTempRead(tmpArray, value->getType()->getIntegerBitWidth());
+  tmpArray = ac->CreateArray(value->getName(), size);
+  ref<Expr> tmpExpr = Expr::createTempRead(tmpArray, size);
   wp->storeArrayRef(value, tmpArray, tmpExpr);
   return tmpExpr;
 }
