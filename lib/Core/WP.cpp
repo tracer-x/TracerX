@@ -14,7 +14,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "WP.h"
-
+#include "Context.h"
 #include "TxTree.h"
 
 #include <klee/Expr.h>
@@ -38,7 +38,107 @@ typedef std::map<ref<TxVariable>, ref<TxInterpolantValue> >
     LowerInterpolantStore;
 typedef std::map<ref<TxAllocationContext>, LowerInterpolantStore>
     TopInterpolantStore;
-       
+
+std::map<llvm::Value *, std::pair<const Array *, ref<Expr> > >
+    WPArrayStore::arrayStore;
+ArrayCache WPArrayStore::ac;
+const Array *WPArrayStore::array;
+ref<Expr> WPArrayStore::constValues;
+
+void WPArrayStore::insert(llvm::Value *value, const Array *array,
+                          ref<Expr> expr) {
+  static std::map<llvm::Value *,
+                  std::pair<const Array *, ref<Expr> > >::iterator it =
+      arrayStore.find(value);
+  if (it == arrayStore.end()) {
+    // value not found in map
+    arrayStore.insert(std::make_pair(value, std::make_pair(array, expr)));
+  } else {
+    klee_error("WPArrayStore::insert not checked yet");
+
+    // value found in map so it's a memory location
+    // sanity check
+    if (it->second.first != array) {
+      klee_error("WPArrayStore::insert updating Expr value of wrong array.");
+    }
+    it->second = std::make_pair(array, expr);
+  }
+}
+
+ref<Expr> WPArrayStore::createAndInsert(std::string arrayName,
+                                        llvm::Value *value) {
+  static std::map<llvm::Value *,
+                  std::pair<const Array *, ref<Expr> > >::iterator it =
+      arrayStore.find(value);
+
+  // Todo: only catching the type of integer and pointers
+  unsigned int size = 0;
+  if (value->getType()->isIntegerTy()) {
+    size = value->getType()->getIntegerBitWidth();
+  } else if (value->getType()->isPointerTy() &&
+             value->getType()->getArrayElementType()->isIntegerTy()) {
+    size = value->getType()->getArrayElementType()->getIntegerBitWidth();
+  } else if (value->getType()->isPointerTy() &&
+             value->getType()->getArrayElementType()->isArrayTy() &&
+             value->getType()
+                 ->getArrayElementType()
+                 ->getArrayElementType()
+                 ->isIntegerTy()) {
+    size = value->getType()
+               ->getArrayElementType()
+               ->getArrayElementType()
+               ->getIntegerBitWidth();
+  } else {
+    value->getType()->dump();
+    klee_error("Dependency::getAddress getting size is not defined for this "
+               "type yet3");
+  }
+
+  // Todo: tmpArray object should be reclaimed sometime later
+  array = ac.CreateArray(arrayName, size);
+  ref<Expr> expr = Expr::createTempRead(array, size);
+  WPArrayStore::insert(value, array, expr);
+
+  if (it == arrayStore.end()) {
+    // value not found in map
+    arrayStore.insert(std::make_pair(value, std::make_pair(array, expr)));
+
+  } else {
+    // value found in map so it's a memory location
+    // sanity check
+    if (it->second.first != array) {
+      klee_error("WPArrayStore::insert updating Expr value of wrong array.");
+    }
+    it->second = std::make_pair(array, expr);
+  }
+  return expr;
+}
+
+const Array *WPArrayStore::getArrayRef(llvm::Value *value) {
+  std::map<llvm::Value *, std::pair<const Array *, ref<Expr> > >::iterator it =
+      arrayStore.find(value);
+  if (it != arrayStore.end()) {
+    return it->second.first;
+  } else {
+    klee_error("WeakestPreCondition::getArrayRef trying to get Array ref for "
+               "wrong value*.");
+    return it->second.first;
+  }
+}
+
+llvm::Value *WPArrayStore::getValuePointer(ref<Expr> expr) {
+  for (std::map<llvm::Value *,
+                std::pair<const Array *, ref<Expr> > >::const_iterator
+           it = arrayStore.begin(),
+           ie = arrayStore.end();
+       it != ie; ++it) {
+    if (it->second.second == expr) {
+      return it->first;
+    }
+  }
+  return NULL;
+}
+
 /**/
 
 WeakestPreCondition::WeakestPreCondition(TxTreeNode *_node,
@@ -48,18 +148,17 @@ WeakestPreCondition::WeakestPreCondition(TxTreeNode *_node,
   // Used to represent constants during the simplification of WPExpr to
   // canonical form
 
-  const Array *array = ac.CreateArray("const", 128);
-  constValues = Expr::createTempRead(array, Expr::Int32);
   node = _node;
   dependency = _dependency;
+  debugSubsumptionLevel = dependency->debugSubsumptionLevel;
 }
 
 WeakestPreCondition::~WeakestPreCondition() {}
 
-std::map<KInstruction *, bool> WeakestPreCondition::markVariables(
-    std::map<KInstruction *, bool> reverseInstructionList) {
+std::vector<std::pair<KInstruction *, int> > WeakestPreCondition::markVariables(
+    std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
 
-  for (std::map<KInstruction *, bool>::const_reverse_iterator
+  for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
        it != ie; ++it) {
@@ -67,27 +166,33 @@ std::map<KInstruction *, bool> WeakestPreCondition::markVariables(
     // Retrieve the instruction
     KInstruction *i = (*it).first;
 
+    std::vector<std::pair<KInstruction *, int> >::iterator iter =
+        std::find(reverseInstructionList.begin(), reverseInstructionList.end(),
+                  std::pair<KInstruction *, int>(i, 0));
+
     // Mark the instructions
     if (markedVariables.find(i->inst) != markedVariables.end()) {
-      reverseInstructionList[i] = true;
+      iter->second = 1;
     } else if (dyn_cast<llvm::StoreInst>(i->inst) &&
                markedVariables.find(i->inst->getOperand(1)) !=
                    markedVariables.end()) {
-      reverseInstructionList[i] = true;
+      iter->second = 1;
     }
 
     // Add the variables in the RHS of marked instructions to markedVariables
     // set
-    if ((*it).second == true) {
+    if ((*it).second == 1) {
       if (dyn_cast<llvm::BinaryOperator>(i->inst) ||
+          dyn_cast<llvm::LoadInst>(i->inst) ||
           dyn_cast<llvm::UnaryInstruction>(i->inst) ||
           dyn_cast<llvm::StoreInst>(i->inst) ||
           dyn_cast<llvm::CmpInst>(i->inst)) {
         unsigned int j = 0;
         while (j < i->inst->getNumOperands()) {
           llvm::Value *operand = i->inst->getOperand(j);
-          if (markedVariables.find(operand) == markedVariables.end() &&
-              !dyn_cast<llvm::Constant>(operand)) {
+          if ((!isa<llvm::Constant>(operand) ||
+               isa<llvm::GlobalValue>(operand)) &&
+              markedVariables.find(operand) == markedVariables.end()) {
             markedVariables.insert(operand);
           }
           j++;
@@ -104,7 +209,8 @@ std::map<KInstruction *, bool> WeakestPreCondition::markVariables(
           break;
         }
         case llvm::Instruction::Call: {
-          // TODO: Add interprocedural marking
+          // TODO: Interprocedural Marking not implemented yet!
+          // At the current moment it is not needed.
           break;
         }
         default: {
@@ -113,43 +219,51 @@ std::map<KInstruction *, bool> WeakestPreCondition::markVariables(
         }
         }
       }
+    } else if ((*it).second == 2) {
+      // TODO: Marking not implemented for false dependency in instruction yet!
+      // At the current moment it is not needed.
     }
   }
 
   // Printing reverseInstructionList will be omitted in the final commit
-  /*for (std::map<KInstruction *, bool>::const_reverse_iterator
+  /*for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
        it != ie; ++it) {
-          (*it).first->inst->dump();
-          llvm::errs() <<  " " << (*it).second << "\n";
+    (*it).first->inst->dump();
+    llvm::errs() << " " << (*it).second << "\n";
   }*/
   return reverseInstructionList;
 }
 
 ref<Expr> WeakestPreCondition::GenerateWP(
-    std::map<KInstruction *, bool> reverseInstructionList, bool markAllFlag) {
+    std::vector<std::pair<KInstruction *, int> > reverseInstructionList,
+    bool markAllFlag) {
 
-  // This log will be omitted in the final commit
-  klee_message("**********WP Interpolant Start************");
-  for (std::map<KInstruction *, bool>::const_reverse_iterator
+  if (debugSubsumptionLevel >= 4)
+    klee_message("**********WP Interpolant Start************");
+  for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
        it != ie; ++it) {
     llvm::Instruction *i = (*it).first->inst;
-    if ((*it).second == true || markAllFlag == true) {
+    if ((*it).second == 1 || markAllFlag == true) {
       // Retrieve the instruction
-      // This log will be omitted in the final commit
-      klee_message("Printing LLVM Instruction: ");
-      i->dump();
-      klee_message("---------------------------------------------");
+      if (debugSubsumptionLevel >= 4) {
+        klee_message("Printing LLVM Instruction: ");
+        i->dump();
+        klee_message("---------------------------------------------");
+      }
 
       switch (i->getOpcode()) {
 
       case llvm::Instruction::Br: {
         llvm::BranchInst *bi = cast<llvm::BranchInst>(i);
         if (bi->isUnconditional()) {
-          klee_error("Unconditional BR is not marked in WP!");
+          if (markAllFlag != true)
+            klee_error("Unconditional BR is not marked in WP!");
+          // else
+          // Nothing is needed to be done	.
         } else {
           // llvm::Value* cond = bi->getCondition();
           // TODO: Nothing specific is needed to be done for now.
@@ -159,15 +273,13 @@ ref<Expr> WeakestPreCondition::GenerateWP(
 
       case llvm::Instruction::FCmp:
       case llvm::Instruction::ICmp: {
-
-        // Getting the expressions from the left and right operand
-        ref<Expr> left = this->generateExprFromOperand(i, 0);
-        ref<Expr> right = this->generateExprFromOperand(i, 1);
-
         if (markAllFlag == true && !isTargetDependent(i, this->WPExpr)) {
           break;
         }
 
+        // Getting the expressions from the left and right operand
+        ref<Expr> left = this->generateExprFromOperand(i, 0);
+        ref<Expr> right = this->generateExprFromOperand(i, 1);
         ref<Expr> result;
         // second step is to Storing the updated WP expression
         llvm::CmpInst *ICC = dyn_cast<llvm::CmpInst>(i);
@@ -276,13 +388,12 @@ ref<Expr> WeakestPreCondition::GenerateWP(
       case llvm::Instruction::Shl:
       case llvm::Instruction::LShr:
       case llvm::Instruction::AShr: {
-        // Getting the expressions from the left and right operand
-        ref<Expr> left = this->generateExprFromOperand(i, 0);
-        ref<Expr> right = this->generateExprFromOperand(i, 1);
-
         if (markAllFlag == true && !isTargetDependent(i, this->WPExpr)) {
           break;
         }
+        // Getting the expressions from the left and right operand
+        ref<Expr> left = this->generateExprFromOperand(i, 0);
+        ref<Expr> right = this->generateExprFromOperand(i, 1);
 
         ref<Expr> rhs;
         switch (i->getOpcode()) {
@@ -341,19 +452,22 @@ ref<Expr> WeakestPreCondition::GenerateWP(
       }
 
       case llvm::Instruction::Store: {
-        ref<Expr> left = this->generateExprFromOperand(i, 0);
-        ref<Expr> right = this->generateExprFromOperand(i, 1);
         if (markAllFlag == true &&
-            !isTargetDependent(dyn_cast<llvm::Instruction>(i->getOperand(1)),
-                               this->WPExpr)) {
+            !isTargetDependent(i->getOperand(1), this->WPExpr)) {
           break;
         }
+        ref<Expr> left = this->generateExprFromOperand(i, 0);
+        ref<Expr> right = this->generateExprFromOperand(i, 1);
         ref<Expr> result = EqExpr::create(right, left);
         this->updateWPExpr(result);
         break;
       }
 
       case llvm::Instruction::Call: {
+        if (markAllFlag == true && !isTargetDependent(i, this->WPExpr)) {
+          break;
+        }
+
         llvm::CallInst *call = dyn_cast<llvm::CallInst>(i);
 
         if (call->getCalledFunction()->getName() == "klee_assume") {
@@ -362,14 +476,31 @@ ref<Expr> WeakestPreCondition::GenerateWP(
                    "klee_make_symbolic") {
           // TODO: Nothing specific is needed to be done for now.
         } else {
-          if (call->doesNotReturn())
-            klee_error("Call Instructions are not yet implemented.");
-          else
-            klee_error("Call Instructions are not yet implemented.");
+          if (call->doesNotReturn()) {
+            klee_error("Call Instructions without return value are not yet "
+                       "implemented.");
+          } else {
+            llvm::Function *CalledFunc = call->getCalledFunction();
+            llvm::Function::ArgumentListType &args =
+                CalledFunc->getArgumentList();
+            llvm::Function::ArgumentListType::iterator firstArg = args.begin();
+            llvm::Function::ArgumentListType::iterator lastArg = args.end();
+            uint64_t i = 0;
+            for (; firstArg != lastArg && i < call->getNumOperands();
+                 ++firstArg, i++) {
+              llvm::Value *funcArg = dyn_cast<llvm::Value>(firstArg);
+              this->WPExpr = replaceCallArguments(this->WPExpr, funcArg,
+                                                  call->getOperand(i));
+            }
+            klee_error(
+                "Call Instructions with return value are not yet implemented.");
+          }
         }
         break;
       }
 
+      case llvm::Instruction::ZExt:
+      case llvm::Instruction::SExt:
       case llvm::Instruction::BitCast: {
         // Getting the expressions from the operand
         ref<Expr> operand = this->generateExprFromOperand(i, 0);
@@ -386,6 +517,21 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         // TODO: Nothing specific is needed to be done for now.
         break;
       }
+
+      case llvm::Instruction::GetElementPtr: {
+        if (markAllFlag == true && !isTargetDependent(i, this->WPExpr)) {
+          break;
+        }
+        klee_error("GetElementPtr Instruction is not yet implemented.");
+      }
+
+      case llvm::Instruction::Ret: {
+        if (markAllFlag == true && !isTargetDependent(i, this->WPExpr)) {
+          break;
+        }
+        klee_error("Ret Instruction is not yet implemented.");
+      }
+
       default: {
         klee_message("+++++++++++++++++++++++++++++++++++++++++++++");
         klee_message("LLVM Instruction Not Implemeneted Yet: ");
@@ -393,14 +539,26 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         klee_error("+++++++++++++++++++++++++++++++++++++++++++++");
       }
       }
-      // This log will be omitted in the final commit
-      klee_message("**** Weakest PreCondition ****");
-      WPExpr->dump();
-      klee_message("***************************************");
+      if (debugSubsumptionLevel >= 4) {
+        klee_message("**** Weakest PreCondition At Each Instruction ****");
+        WPExpr->dump();
+        klee_message("***************************************");
+      }
+    } else if ((*it).second == 2) {
+      klee_message("False case of LLVM Instruction Not Implemeneted Yet");
+      i->dump();
     }
   }
-  // This log will be omitted in the final commit
-  klee_message("**********Generating WP finished**********");
+
+  if (debugSubsumptionLevel >= 3) {
+    klee_message("***************************************");
+    klee_message("******** Weakest PreCondition *********");
+    WPExpr->dump();
+    klee_message("***************************************");
+  }
+
+  if (debugSubsumptionLevel >= 4)
+    klee_message("**********Generating WP finished**********");
 
   return WPExpr;
 }
@@ -419,25 +577,19 @@ ref<Expr> WeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
       left = ConstantExpr::create(CI->getZExtValue(), Expr::Int64);
   } else if (isa<llvm::LoadInst>(operand1)) {
     llvm::LoadInst *inst = dyn_cast<llvm::LoadInst>(operand1);
-    left = dependency->getAddress(inst->getOperand(0), &ac, array, this);
+    left = dependency->getAddress(inst->getOperand(0), &WPArrayStore::ac,
+                                  WPArrayStore::array, this);
   } else {
-    left = dependency->getAddress(operand1, &ac, array, this);
+    left = dependency->getAddress(operand1, &WPArrayStore::ac,
+                                  WPArrayStore::array, this);
   }
   return left;
 }
 
 ref<Expr> WeakestPreCondition::getLHS(llvm::Instruction *i) {
-
-  std::string arrayName;
-  if (i->hasName())
-    arrayName = i->getName();
-  else {
-    arrayName = "tmpLHS";
-    klee_error("Instruction has no name: tmpLHS!\n");
-  }
-  unsigned arrayWidth = Expr::Int32;
-  array = ac.CreateArray(arrayName, arrayWidth);
-  return dependency->getAddress(i, &ac, array, this);
+  ref<Expr> lhs =
+      dependency->getAddress(i, &WPArrayStore::ac, WPArrayStore::array, this);
+  return lhs;
 }
 
 void WeakestPreCondition::updateWPExpr(ref<Expr> result) {
@@ -451,6 +603,10 @@ void WeakestPreCondition::updateWPExpr(ref<Expr> result) {
 
 void WeakestPreCondition::substituteExpr(ref<Expr> result) {
   switch (result->getKind()) {
+  case Expr::Constant: {
+    // Nothing is needed to be done, it's either true or false
+    break;
+  }
   case Expr::Eq: {
     ref<Expr> lhs = result->getKid(0);
     ref<Expr> rhs = result->getKid(1);
@@ -561,12 +717,14 @@ void WeakestPreCondition::simplifyWPExpr() {
         new std::map<ref<Expr>, uint64_t>;
     if (isa<ConstantExpr>(kids[1])) {
       ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[1]);
-      insertTerm(newLinearTerm, constant->getZExtValue(), constValues);
+      insertTerm(newLinearTerm, constant->getZExtValue(),
+                 WPArrayStore::constValues);
     } else {
       newLinearTerm = this->simplifyWPTerm(newLinearTerm, kids[1]);
     }
     newLinearTerm = this->simplifyWPTerm(newLinearTerm, kids[0]);
     convertToExpr(newLinearTerm);
+
     delete newLinearTerm;
     break;
   }
@@ -588,7 +746,8 @@ std::map<ref<Expr>, uint64_t> *WeakestPreCondition::simplifyWPTerm(
     std::map<ref<Expr>, uint64_t> *newLinearTerm, ref<Expr> linearTerm) {
   if (isa<ConstantExpr>(linearTerm)) {
     ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(linearTerm);
-    insertTerm(newLinearTerm, (-1) * constant->getZExtValue(), constValues);
+    insertTerm(newLinearTerm, (-1) * constant->getZExtValue(),
+               WPArrayStore::constValues);
   } else {
     switch (linearTerm->getKind()) {
     case Expr::Concat:
@@ -649,7 +808,7 @@ void WeakestPreCondition::convertToExpr(
            it = newLinearTerm->begin(),
            ie = newLinearTerm->end();
        it != ie; ++it) {
-    if (it->first == constValues) {
+    if (it->first == WPArrayStore::constValues) {
       kids[1] = ConstantExpr::create(it->second, Expr::Int32);
     } else {
       ref<Expr> lhs;
@@ -670,51 +829,11 @@ void WeakestPreCondition::convertToExpr(
   WPExpr = WPExpr->rebuild(kids);
 }
 
-void WeakestPreCondition::storeArrayRef(llvm::Value *value, const Array *array,
-                                        ref<Expr> expr) {
-  std::map<llvm::Value *, std::pair<const Array *, ref<Expr> > >::iterator it =
-      arrayStore.find(value);
-  if (it == arrayStore.end()) {
-    // value not found in map
-    arrayStore.insert(std::make_pair(value, std::make_pair(array, expr)));
-  } else {
-    // value found in map so it's a memory location
-    // sanity check
-    if (it->second.first != array)
-      klee_error("WeakestPreCondition::storeArrayRef updating Expr value of "
-                 "wrong array.");
-    it->second = std::make_pair(array, expr);
-  }
-}
-
-const Array *WeakestPreCondition::getArrayRef(llvm::Value *value) {
-  std::map<llvm::Value *, std::pair<const Array *, ref<Expr> > >::iterator it =
-      arrayStore.find(value);
-  if (it != arrayStore.end()) {
-    return it->second.first;
-  } else {
-    klee_error("WeakestPreCondition::getArrayRef trying to get Array ref for "
-               "wrong value*.");
-  }
-}
-
-llvm::Value *WeakestPreCondition::getValuePointer(ref<Expr> expr) {
-  for (std::map<llvm::Value *,
-                std::pair<const Array *, ref<Expr> > >::const_iterator
-           it = arrayStore.begin(),
-           ie = arrayStore.end();
-       it != ie; ++it) {
-    if (it->second.second == expr) {
-      return it->first;
-    }
-  }
-  return NULL;
-}
-
 ref<Expr> WeakestPreCondition::instantiateWPExpression(
     TxDependency *dependency, const std::vector<llvm::Instruction *> &callHistory,
     ref<Expr> WPExpr) {
-  WPExpr->dump();
+
+  ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
   switch (WPExpr->getKind()) {
   case Expr::InvalidKind:
   case Expr::Constant: {
@@ -722,22 +841,26 @@ ref<Expr> WeakestPreCondition::instantiateWPExpression(
   }
 
   case Expr::Read: {
-    llvm::Value *tempInstr = getValuePointer(WPExpr);
+    llvm::Value *tempInstr = WPArrayStore::getValuePointer(WPExpr);
     if (tempInstr == NULL)
       klee_error(
           "WeakestPreCondition::instantiateWPExpression Value ref is null");
     ref<Expr> storeValue =
         dependency->getLatestValueOfAddress(tempInstr, callHistory);
+    if (storeValue == dummy)
+      return WPExpr;
     return storeValue;
   }
 
   case Expr::Concat: {
-    llvm::Value *tempInstr = getValuePointer(WPExpr);
+    llvm::Value *tempInstr = WPArrayStore::getValuePointer(WPExpr);
     if (tempInstr == NULL)
       klee_error(
           "WeakestPreCondition::instantiateWPExpression Value ref is null");
     ref<Expr> storeValue =
         dependency->getLatestValueOfAddress(tempInstr, callHistory);
+    if (storeValue == dummy)
+      return WPExpr;
     return storeValue;
   }
 
@@ -818,6 +941,26 @@ ref<Expr> WeakestPreCondition::intersectExpr(ref<Expr> expr1,ref<Expr> expr2){
 		  klee_error("WeakestPreCondition::intersectExpr left operands are not the same.");
 		  return AndExpr::create(expr1,expr2);
 	  }
+  } else if (expr1->getKind() == Expr::Slt && expr2->getKind() == Expr::Slt) {
+    if (expr1->getKid(0) == expr2->getKid(0)) {
+      ref<Expr> kids[2];
+      kids[0] = expr1->getKid(0);
+      // sanity check
+      assert(isa<ConstantExpr>(expr1->getKid(1)) &&
+             "expr1->getKid(1) should be constant expression");
+      assert(isa<ConstantExpr>(expr2->getKid(1)) &&
+             "expr2->getKid(1) should be constant expression");
+      kids[1] =
+          this->getMinOfConstExpr(dyn_cast<ConstantExpr>(expr1->getKid(1)),
+                                  dyn_cast<ConstantExpr>(expr2->getKid(1)));
+      return expr1->rebuild(kids);
+    } else {
+      expr1->dump();
+      expr2->dump();
+      klee_error(
+          "WeakestPreCondition::intersectExpr left operands are not the same.");
+      return AndExpr::create(expr1, expr2);
+    }
   }else{
 	  expr1->dump();
 	  expr2->dump();
@@ -827,7 +970,7 @@ ref<Expr> WeakestPreCondition::intersectExpr(ref<Expr> expr1,ref<Expr> expr2){
 }
 
 ref<ConstantExpr> WeakestPreCondition::getMinOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2){
-	if(expr1.compare(expr2) >= 0)
+	if((expr1->getAPValue().getSExtValue() < expr2->getAPValue().getSExtValue()))
 		return expr1;
 	else
 		return expr2;
@@ -840,8 +983,7 @@ ref<ConstantExpr> WeakestPreCondition::getMaxOfConstExpr(ref<ConstantExpr> expr1
 		return expr2;
 }
 
-bool WeakestPreCondition::isTargetDependent(llvm::Instruction *inst,
-                                            ref<Expr> wp) {
+bool WeakestPreCondition::isTargetDependent(llvm::Value *inst, ref<Expr> wp) {
   switch (wp->getKind()) {
   case Expr::InvalidKind:
   case Expr::Constant: {
@@ -849,14 +991,14 @@ bool WeakestPreCondition::isTargetDependent(llvm::Instruction *inst,
   }
 
   case Expr::Read: {
-    if (inst == getValuePointer(wp)) {
+    if (inst == WPArrayStore::getValuePointer(wp)) {
       return true;
     }
     return false;
   }
 
   case Expr::Concat: {
-    if (inst == getValuePointer(wp)) {
+    if (inst == WPArrayStore::getValuePointer(wp)) {
       return true;
     }
     return false;
@@ -931,6 +1073,7 @@ WeakestPreCondition::updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry,
       entry->getConcretelyAddressedStore();
   TxStore::TopInterpolantStore symbolicallyAddressedStore =
       entry->getSymbolicallyAddressedStore();
+  std::set<const Array *> existentials = entry->getExistentials();
 
   if (concretelyAddressedStore.size() == 0)
     klee_error("WeakestPreCondition::updateSubsumptionTableEntry for this case "
@@ -939,56 +1082,62 @@ WeakestPreCondition::updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry,
     // TODO: Assuming WP is one frame, fix this
     TxStore::TopInterpolantStore newConcretelyAddressedStore =
         updateConcretelyAddressedStore(concretelyAddressedStore, wp);
-    ref<Expr> newInterpolant = updateInterpolant(interpolant, wp);
+    ref<Expr> newInterpolant =
+        updateInterpolant(interpolant, replaceArrayWithShadow(wp));
+    std::set<const Array *> newExistentials =
+        updateExistentials(existentials, wp);
     entry->setConcretelyAddressedStore(newConcretelyAddressedStore);
     entry->setInterpolant(newInterpolant);
+    entry->setExistentials(newExistentials);
   }
-  // For future reference
-  if (!interpolant.isNull())
-    interpolant->dump();
+  if (debugSubsumptionLevel >= 4) {
+    // For future reference
+    if (!interpolant.isNull())
+      interpolant->dump();
 
-  concretelyAddressedStore = entry->getConcretelyAddressedStore();
-  for (TopInterpolantStore::const_iterator
-           it = concretelyAddressedStore.begin(),
-           ie = concretelyAddressedStore.end();
-       it != ie; ++it) {
-    (*it).first->dump();
-    LowerInterpolantStore temp = (*it).second;
-    for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
-                                               ie2 = temp.end();
-         it2 != ie2; ++it2) {
-      (*it2).first->dump();
-      (*it2).second->dump();
+    concretelyAddressedStore = entry->getConcretelyAddressedStore();
+    for (TopInterpolantStore::const_iterator
+             it = concretelyAddressedStore.begin(),
+             ie = concretelyAddressedStore.end();
+         it != ie; ++it) {
+      (*it).first->dump();
+      LowerInterpolantStore temp = (*it).second;
+      for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
+                                                 ie2 = temp.end();
+           it2 != ie2; ++it2) {
+        (*it2).first->dump();
+        (*it2).second->dump();
+      }
     }
-  }
-  for (TopInterpolantStore::const_iterator
-           it = symbolicallyAddressedStore.begin(),
-           ie = symbolicallyAddressedStore.end();
-       it != ie; ++it) {
-    (*it).first->dump();
-    LowerInterpolantStore temp = (*it).second;
-    for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
-                                               ie2 = temp.end();
-         it2 != ie2; ++it2) {
-      (*it2).first->dump();
-      (*it2).second->dump();
+    for (TopInterpolantStore::const_iterator
+             it = symbolicallyAddressedStore.begin(),
+             ie = symbolicallyAddressedStore.end();
+         it != ie; ++it) {
+      (*it).first->dump();
+      LowerInterpolantStore temp = (*it).second;
+      for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
+                                                 ie2 = temp.end();
+           it2 != ie2; ++it2) {
+        (*it2).first->dump();
+        (*it2).second->dump();
+      }
     }
-  }
 
-  for (LowerInterpolantStore::const_iterator
-           it = concretelyAddressedHistoricalStore.begin(),
-           ie = concretelyAddressedHistoricalStore.end();
-       it != ie; ++it) {
-    (*it).first->dump();
-    (*it).second->dump();
-  }
+    for (LowerInterpolantStore::const_iterator
+             it = concretelyAddressedHistoricalStore.begin(),
+             ie = concretelyAddressedHistoricalStore.end();
+         it != ie; ++it) {
+      (*it).first->dump();
+      (*it).second->dump();
+    }
 
-  for (LowerInterpolantStore::const_iterator
-           it = symbolicallyAddressedHistoricalStore.begin(),
-           ie = symbolicallyAddressedHistoricalStore.end();
-       it != ie; ++it) {
-    (*it).first->dump();
-    (*it).second->dump();
+    for (LowerInterpolantStore::const_iterator
+             it = symbolicallyAddressedHistoricalStore.begin(),
+             ie = symbolicallyAddressedHistoricalStore.end();
+         it != ie; ++it) {
+      (*it).first->dump();
+      (*it).second->dump();
+    }
   }
   return entry;
 }
@@ -998,7 +1147,7 @@ WeakestPreCondition::updateConcretelyAddressedStore(
     TxStore::TopInterpolantStore concretelyAddressedStore, ref<Expr> wp) {
 
   ref<Expr> var = getVarFromExpr(wp);
-  llvm::Value *allocaVar = getValuePointer(var);
+  llvm::Value *allocaVar = WPArrayStore::getValuePointer(var);
   TopInterpolantStore::iterator candidateForRemove =
       concretelyAddressedStore.end();
   for (TopInterpolantStore::iterator it = concretelyAddressedStore.begin(),
@@ -1008,8 +1157,18 @@ WeakestPreCondition::updateConcretelyAddressedStore(
     if ((*it).first->getValue() == allocaVar)
       candidateForRemove = it;
   }
+
   if (candidateForRemove != concretelyAddressedStore.end()) {
-    concretelyAddressedStore.erase(candidateForRemove);
+    // TODO: Should be handled, not working
+    LowerInterpolantStore temp = candidateForRemove->second;
+
+    for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
+                                               ie2 = temp.end();
+         it2 != ie2; ++it2) {
+      ref<TxVariable> tempValue = (*it2).first;
+      ref<TxInterpolantValue> tempInterpolantValue = (*it2).second;
+      tempInterpolantValue->updateExpression(replaceArrayWithShadow(var));
+    }
   }
   return concretelyAddressedStore;
 }
@@ -1091,5 +1250,278 @@ ref<Expr> WeakestPreCondition::updateInterpolant(ref<Expr> interpolant,
   if (interpolant.isNull())
     return wp;
   else
-    return AndExpr::create(interpolant, wp);
+    // TODO: Assuming frame has only one variable. Fix it.
+    return wp;
+}
+
+ref<Expr> WeakestPreCondition::replaceArrayWithShadow(ref<Expr> interpolant) {
+  switch (interpolant->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return interpolant;
+  }
+
+  case Expr::Read:
+  case Expr::Concat: {
+    llvm::Value *array = WPArrayStore::getValuePointer(interpolant);
+    std::string arrayName = array->getName();
+    const std::string ext(".addr");
+    if (arrayName.find(ext))
+      arrayName = arrayName.substr(0, arrayName.size() - ext.size());
+    const Array *symArray =
+        TxShadowArray::getSymbolicShadowArray(array->getName());
+    if (symArray != NULL) {
+      ref<Expr> Res(0);
+      unsigned NumBytes = symArray->getDomain() / 8;
+      assert(symArray->getDomain() == NumBytes * 8 && "Invalid read size!");
+      for (unsigned i = 0; i != NumBytes; ++i) {
+        unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
+        ref<Expr> Byte =
+            ReadExpr::create(UpdateList(symArray, 0),
+                             ConstantExpr::alloc(idx, symArray->getDomain()));
+        Res = i ? ConcatExpr::create(Byte, Res) : Byte;
+      }
+      return Res;
+    } else {
+      interpolant->dump();
+      klee_error("WeakestPreCondition::replaceArrayWithShadow Shadow array "
+                 "doesn't exist!");
+    }
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    ref<Expr> kids[1];
+    kids[0] = replaceArrayWithShadow(interpolant->getKid(0));
+    return interpolant->rebuild(kids);
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    ref<Expr> kids[2];
+    kids[0] = replaceArrayWithShadow(interpolant->getKid(0));
+    kids[1] = replaceArrayWithShadow(interpolant->getKid(1));
+    return interpolant->rebuild(kids);
+  }
+
+  case Expr::Select: {
+    ref<Expr> kids[3];
+    kids[0] = replaceArrayWithShadow(interpolant->getKid(0));
+    kids[1] = replaceArrayWithShadow(interpolant->getKid(1));
+    kids[2] = replaceArrayWithShadow(interpolant->getKid(2));
+    return interpolant->rebuild(kids);
+  }
+  }
+  // Sanity check
+  klee_error(
+      "Control should not reach here in WeakestPreCondition::getVarFromExpr");
+  return interpolant;
+}
+
+std::set<const Array *>
+WeakestPreCondition::updateExistentials(std::set<const Array *> existentials,
+                                        ref<Expr> wp) {
+  switch (wp->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return existentials;
+  }
+
+  case Expr::Read:
+  case Expr::Concat: {
+    llvm::Value *array = WPArrayStore::getValuePointer(wp);
+    std::string arrayName = array->getName();
+    const std::string ext(".addr");
+    if (arrayName.find(ext))
+      arrayName = arrayName.substr(0, arrayName.size() - ext.size());
+    const Array *symArray =
+        TxShadowArray::getSymbolicShadowArray(array->getName());
+    if (!symArray) {
+      wp->dump();
+      klee_error("WeakestPreCondition::updateExistentials Shadow array doesn't "
+                 "exist!");
+    }
+    if (existentials.find(symArray) == existentials.end()) {
+      existentials.insert(symArray);
+    }
+    return existentials;
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    std::set<const Array *> newExistentials =
+        updateExistentials(existentials, wp->getKid(0));
+    return newExistentials;
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    std::set<const Array *> newExistentials =
+        updateExistentials(existentials, wp->getKid(0));
+    std::set<const Array *> newExistentials2 =
+        updateExistentials(newExistentials, wp->getKid(1));
+    return newExistentials2;
+  }
+
+  case Expr::Select: {
+    std::set<const Array *> newExistentials =
+        updateExistentials(existentials, wp->getKid(0));
+    std::set<const Array *> newExistentials2 =
+        updateExistentials(newExistentials, wp->getKid(1));
+    std::set<const Array *> newExistentials3 =
+        updateExistentials(newExistentials2, wp->getKid(2));
+    return newExistentials3;
+  }
+  }
+  // Sanity check
+  klee_error(
+      "Control should not reach here in WeakestPreCondition::getVarFromExpr");
+  return existentials;
+}
+
+ref<Expr> WeakestPreCondition::replaceCallArguments(ref<Expr> interpolant,
+                                                    llvm::Value *funcArg,
+                                                    llvm::Value *callArg) {
+  switch (interpolant->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return interpolant;
+  }
+
+  case Expr::Read:
+  case Expr::Concat: {
+    llvm::Value *array = WPArrayStore::getValuePointer(interpolant);
+    if (array == funcArg) {
+      std::string arrayName = callArg->getName();
+      const std::string ext(".addr");
+      if (arrayName.find(ext))
+        arrayName = arrayName.substr(0, arrayName.size() - ext.size());
+      const Array *symArray = TxShadowArray::getSymbolicShadowArray(arrayName);
+      llvm::errs() << symArray->getName();
+
+      if (symArray != NULL) {
+        ref<Expr> Res(0);
+        unsigned NumBytes = symArray->getDomain() / 8;
+        assert(symArray->getDomain() == NumBytes * 8 && "Invalid read size!");
+        for (unsigned i = 0; i != NumBytes; ++i) {
+          unsigned idx =
+              Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
+          ref<Expr> Byte =
+              ReadExpr::create(UpdateList(symArray, 0),
+                               ConstantExpr::alloc(idx, symArray->getDomain()));
+          Res = i ? ConcatExpr::create(Byte, Res) : Byte;
+        }
+        klee_error("WeakestPreCondition::replaceCallArguments Not tested yet");
+        return Res;
+      } else {
+        interpolant->dump();
+        klee_error("WeakestPreCondition::replaceCallArguments Shadow array "
+                   "doesn't exist!");
+      }
+    }
+    return interpolant;
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    ref<Expr> kids[1];
+    kids[0] = replaceCallArguments(interpolant->getKid(0), funcArg, callArg);
+    return interpolant->rebuild(kids);
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    ref<Expr> kids[2];
+    kids[0] = replaceCallArguments(interpolant->getKid(0), funcArg, callArg);
+    kids[1] = replaceCallArguments(interpolant->getKid(1), funcArg, callArg);
+    return interpolant->rebuild(kids);
+  }
+
+  case Expr::Select: {
+    ref<Expr> kids[3];
+    kids[0] = replaceCallArguments(interpolant->getKid(0), funcArg, callArg);
+    kids[1] = replaceCallArguments(interpolant->getKid(1), funcArg, callArg);
+    kids[2] = replaceCallArguments(interpolant->getKid(2), funcArg, callArg);
+    return interpolant->rebuild(kids);
+  }
+  }
+  // Sanity check
+  klee_error("Control should not reach here in "
+             "WeakestPreCondition::replaceCallArguments");
+  return interpolant;
 }

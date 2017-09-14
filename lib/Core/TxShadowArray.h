@@ -43,6 +43,8 @@ namespace klee {
     }
 
     static const Array *getSymbolicArray(std::string name);
+
+    static const Array *getSymbolicShadowArray(std::string name);
   };
 
 }
