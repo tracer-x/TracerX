@@ -2110,25 +2110,27 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       TxSubsumptionTable::insert(node->getProgramPoint(),
                                  node->entryCallHistory, entry);
 
-      ref<Expr> WPExpr = entry->getWPInterpolant();
-      Solver::Validity result;
-      std::vector<ref<Expr> > unsatCore;
-      ref<Expr> WPExprInstantiated = ConstantExpr::create(0, 32);
-      if (node->parent)
-        WPExprInstantiated = node->wp->instantiateWPExpression(
-            node->parent->dependency, node->parent->callHistory, WPExpr);
-      bool success =
-          solver->evaluate(*state, WPExprInstantiated, result, unsatCore);
-      if (success != true)
-        klee_error("TxTree::remove: Implication test failed");
-      if (result == Solver::True) {
-        entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
-      } else {
-        // If the result of implication is Solver::False and/or
-        // Solver::Unknown the chance that the WP interpolant
-        // improves the interpolant from the deletion algorithm
-        // is slim. As a result, in such cases the interpolant
-        // from deletion is not changed.
+      if (WPInterpolant) {
+        ref<Expr> WPExpr = entry->getWPInterpolant();
+        Solver::Validity result;
+        std::vector<ref<Expr> > unsatCore;
+        ref<Expr> WPExprInstantiated = ConstantExpr::create(0, 32);
+        if (node->parent)
+          WPExprInstantiated = node->wp->instantiateWPExpression(
+              node->parent->dependency, node->parent->callHistory, WPExpr);
+        bool success =
+            solver->evaluate(*state, WPExprInstantiated, result, unsatCore);
+        if (success != true)
+          klee_error("TxTree::remove: Implication test failed");
+        if (result == Solver::True) {
+          entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
+        } else {
+          // If the result of implication is Solver::False and/or
+          // Solver::Unknown the chance that the WP interpolant
+          // improves the interpolant from the deletion algorithm
+          // is slim. As a result, in such cases the interpolant
+          // from deletion is not changed.
+        }
       }
 
       TxSubsumptionTable::insert(node->getProgramPoint(), node->entryCallHistory,
