@@ -56,10 +56,10 @@ WeakestPreCondition::WeakestPreCondition(TxTreeNode *_node,
 
 WeakestPreCondition::~WeakestPreCondition() {}
 
-std::map<KInstruction *, bool> WeakestPreCondition::markVariables(
-    std::map<KInstruction *, bool> reverseInstructionList) {
+std::map<KInstruction *, int> WeakestPreCondition::markVariables(
+    std::map<KInstruction *, int> reverseInstructionList) {
 
-  for (std::map<KInstruction *, bool>::const_reverse_iterator
+  for (std::map<KInstruction *, int>::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
        it != ie; ++it) {
@@ -69,16 +69,16 @@ std::map<KInstruction *, bool> WeakestPreCondition::markVariables(
 
     // Mark the instructions
     if (markedVariables.find(i->inst) != markedVariables.end()) {
-      reverseInstructionList[i] = true;
+      reverseInstructionList[i] = 1;
     } else if (dyn_cast<llvm::StoreInst>(i->inst) &&
                markedVariables.find(i->inst->getOperand(1)) !=
                    markedVariables.end()) {
-      reverseInstructionList[i] = true;
+      reverseInstructionList[i] = 1;
     }
 
     // Add the variables in the RHS of marked instructions to markedVariables
     // set
-    if ((*it).second == true) {
+    if ((*it).second == 1) {
       if (dyn_cast<llvm::BinaryOperator>(i->inst) ||
           dyn_cast<llvm::UnaryInstruction>(i->inst) ||
           dyn_cast<llvm::StoreInst>(i->inst) ||
@@ -105,6 +105,7 @@ std::map<KInstruction *, bool> WeakestPreCondition::markVariables(
         }
         case llvm::Instruction::Call: {
           // TODO: Add interprocedural marking
+          klee_error("Marking not implemented for call instruction yet!");
           break;
         }
         default: {
@@ -113,11 +114,14 @@ std::map<KInstruction *, bool> WeakestPreCondition::markVariables(
         }
         }
       }
+    } else if ((*it).second == 2) {
+      klee_error(
+          "Marking not implemented for false dependency in instruction yet!");
     }
   }
 
   // Printing reverseInstructionList will be omitted in the final commit
-  /*for (std::map<KInstruction *, bool>::const_reverse_iterator
+  /*for (std::map<KInstruction *, int>::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
        it != ie; ++it) {
@@ -128,16 +132,16 @@ std::map<KInstruction *, bool> WeakestPreCondition::markVariables(
 }
 
 ref<Expr> WeakestPreCondition::GenerateWP(
-    std::map<KInstruction *, bool> reverseInstructionList, bool markAllFlag) {
+    std::map<KInstruction *, int> reverseInstructionList, bool markAllFlag) {
 
   // This log will be omitted in the final commit
   klee_message("**********WP Interpolant Start************");
-  for (std::map<KInstruction *, bool>::const_reverse_iterator
+  for (std::map<KInstruction *, int>::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
        it != ie; ++it) {
     llvm::Instruction *i = (*it).first->inst;
-    if ((*it).second == true || markAllFlag == true) {
+    if ((*it).second == 1 || markAllFlag == true) {
       // Retrieve the instruction
       // This log will be omitted in the final commit
       klee_message("Printing LLVM Instruction: ");
@@ -397,8 +401,12 @@ ref<Expr> WeakestPreCondition::GenerateWP(
       klee_message("**** Weakest PreCondition ****");
       WPExpr->dump();
       klee_message("***************************************");
+    } else if ((*it).second == 2) {
+      klee_message("False case of LLVM Instruction Not Implemeneted Yet");
+      i->dump();
     }
   }
+
   // This log will be omitted in the final commit
   klee_message("**********Generating WP finished**********");
 

@@ -909,6 +909,8 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       // We then extract the unsatisfiability core of antecedent and not
       // consequent as the Craig interpolant.
       txTree->markPathCondition(current, unsatCore);
+      if (WPInterpolant)
+        txTree->markInstruction(current.prevPC, true);
     }
 
     return StatePair(&current, 0);
@@ -924,6 +926,8 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       // which means that antecedent -> not(consequent) is valid. In this
       // case also we extract the unsat core of the proof
       txTree->markPathCondition(current, unsatCore);
+      if (WPInterpolant)
+        txTree->markInstruction(current.prevPC, false);
     }
 
     return StatePair(0, &current);
