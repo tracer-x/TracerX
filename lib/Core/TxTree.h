@@ -418,7 +418,11 @@ class TxTreeNode {
 
   /// \brief List of the instructions in the node in a reverse order (used only
   /// in WP interpolation)
-  std::map<KInstruction *, bool> reverseInstructionList;
+  /// Second argument is 0 means instruction is not dependent to any target
+  /// Second argument is 1 means instruction is dependent to a target
+  /// Second argument is 2 means negation of the instruction is dependent to a
+  /// target
+  std::map<KInstruction *, int> reverseInstructionList;
 
   uint64_t nodeSequenceNumber;
 
@@ -924,9 +928,8 @@ public:
   void storeInstruction(KInstruction *instr);
 
   /// \brief Mark an instruction in a node which contributes to computing
-  /// weakest precondition
-  /// interpolant
-  void markInstruction(KInstruction *instr);
+  /// weakest precondition interpolant
+  void markInstruction(KInstruction *instr, bool branchFlag);
 
   /// \brief Print the content of the tree node object into a stream.
   ///

@@ -2177,9 +2177,6 @@ void TxTree::markPathCondition(ExecutionState &state,
   int debugSubsumptionLevel =
       currentTxTreeNode->dependency->debugSubsumptionLevel;
 
-  if (WPInterpolant)
-    this->markInstruction(state.prevPC);
-
   llvm::BranchInst *binst =
       llvm::dyn_cast<llvm::BranchInst>(state.prevPC->inst);
 
@@ -2226,12 +2223,14 @@ void TxTree::executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
 
 void TxTree::storeInstruction(KInstruction *instr) {
   currentTxTreeNode->reverseInstructionList.insert(
-      std::pair<KInstruction *, bool>(instr, false));
+      std::pair<KInstruction *, bool>(instr, 0));
 }
 
-void TxTree::markInstruction(KInstruction *instr) {
-  currentTxTreeNode->reverseInstructionList[instr] = true;
-  // TODO: Add support for the case where false path is feasible
+void TxTree::markInstruction(KInstruction *instr, bool branchFlag) {
+  if (branchFlag == true)
+    currentTxTreeNode->reverseInstructionList[instr] = 1;
+  else
+    currentTxTreeNode->reverseInstructionList[instr] = 2;
 }
 
 void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
