@@ -332,6 +332,8 @@ public:
 
   TxStore::TopInterpolantStore getSymbolicallyAddressedStore() const;
 
+  std::set<const Array *> getExistentials() const;
+
   void setInterpolant(ref<Expr> _interpolant);
 
   void setConcretelyAddressedHistoricalStore(
@@ -345,6 +347,8 @@ public:
 
   void setSymbolicallyAddressedStore(
       TxStore::TopInterpolantStore _symbolicallyAddressedStore);
+
+  void setExistentials(std::set<const Array *> _existentials);
 
   void dump() const {
     this->print(llvm::errs());
@@ -418,7 +422,11 @@ class TxTreeNode {
 
   /// \brief List of the instructions in the node in a reverse order (used only
   /// in WP interpolation)
-  std::map<KInstruction *, bool> reverseInstructionList;
+  /// Second argument is 0 means instruction is not dependent to any target
+  /// Second argument is 1 means instruction is dependent to a target
+  /// Second argument is 2 means negation of the instruction is dependent to a
+  /// target
+  std::vector<std::pair<KInstruction *, int> > reverseInstructionList;
 
   uint64_t nodeSequenceNumber;
 
@@ -506,14 +514,21 @@ public:
 
   /// \brief Retrieve the weakest precondition interpolant for this node as KLEE expression object
   ///
-  /// \return The weakest precondition interpolant expression.
+  /// \return Generate and return the weakest precondition interpolant
+  /// expression.
   ref<Expr> getWPInterpolant();
+
+  /// \return Return the weakest precondition object
+  WeakestPreCondition *getWP() { return wp; }
 
   /// \brief Store the child WP interpolants in the parent node
   void setChildWPInterpolant(ref<Expr> interpolant);
 
   /// \brief Get the stored child WP interpolants in the parent node
   ref<Expr> getChildWPInterpolant(int flag);
+
+  /// \brief Copy WP to the parent node at subsumption point
+  void setWPAtSubsumption(ref<Expr> _wpInterpolant);
 
   /// \brief Extend the path condition with another constraint
   ///
@@ -924,9 +939,8 @@ public:
   void storeInstruction(KInstruction *instr);
 
   /// \brief Mark an instruction in a node which contributes to computing
-  /// weakest precondition
-  /// interpolant
-  void markInstruction(KInstruction *instr);
+  /// weakest precondition interpolant
+  void markInstruction(KInstruction *instr, bool branchFlag);
 
   /// \brief Print the content of the tree node object into a stream.
   ///

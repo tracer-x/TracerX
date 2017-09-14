@@ -805,6 +805,8 @@ bool TxSubsumptionTableEntry::subsumed(
                    state.txTreeNode->getNodeSequenceNumber(),
                    nodeSequenceNumber);
     }
+    if (WPInterpolant)
+      state.txTreeNode->setWPAtSubsumption(wpInterpolant);
     return true;
   }
 
@@ -1309,6 +1311,8 @@ bool TxSubsumptionTableEntry::subsumed(
 
       interpolateValues(state, coreValues, corePointerValues,
                         debugSubsumptionLevel);
+      if (WPInterpolant)
+        state.txTreeNode->setWPAtSubsumption(wpInterpolant);
       return true;
     }
 
@@ -1377,7 +1381,8 @@ bool TxSubsumptionTableEntry::subsumed(
                          state.txTreeNode->getNodeSequenceNumber(),
                          nodeSequenceNumber, msg.c_str());
           }
-
+          if (WPInterpolant)
+            state.txTreeNode->setWPAtSubsumption(wpInterpolant);
           return true;
         } else {
           // Here we try to get bound-variables-free conjunction, if there is
@@ -1463,6 +1468,8 @@ bool TxSubsumptionTableEntry::subsumed(
 
         interpolateValues(state, coreValues, corePointerValues,
                           debugSubsumptionLevel);
+        if (WPInterpolant)
+          state.txTreeNode->setWPAtSubsumption(wpInterpolant);
         return true;
       }
       if (debugSubsumptionLevel >= 1) {
@@ -1487,9 +1494,10 @@ bool TxSubsumptionTableEntry::subsumed(
 
     // We create path condition marking structure and mark core constraints
     state.txTreeNode->unsatCoreInterpolation(unsatCore);
-
     interpolateValues(state, coreValues, corePointerValues,
                       debugSubsumptionLevel);
+    if (WPInterpolant)
+      state.txTreeNode->setWPAtSubsumption(wpInterpolant);
     return true;
   }
 #endif /* ENABLE_Z3 */
@@ -1522,6 +1530,10 @@ TxSubsumptionTableEntry::getSymbolicallyAddressedStore() const {
   return symbolicallyAddressedStore;
 }
 
+std::set<const Array *> TxSubsumptionTableEntry::getExistentials() const {
+  return existentials;
+}
+
 void TxSubsumptionTableEntry::setInterpolant(ref<Expr> _interpolant) {
   interpolant = _interpolant;
 }
@@ -1544,6 +1556,11 @@ void TxSubsumptionTableEntry::setConcretelyAddressedStore(
 void TxSubsumptionTableEntry::setSymbolicallyAddressedStore(
     TxStore::TopInterpolantStore _symbolicallyAddressedStore) {
   symbolicallyAddressedStore = _symbolicallyAddressedStore;
+}
+
+void TxSubsumptionTableEntry::setExistentials(
+    std::set<const Array *> _existentials) {
+  existentials = _existentials;
 }
 
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
@@ -2032,6 +2049,10 @@ TxTree::TxTree(
     currentTxTreeNode = TxTreeNode::createRoot(_targetData, _globalAddresses);
   }
   root = currentTxTreeNode;
+
+  // Used by WP expression
+  WPArrayStore::array = WPArrayStore::ac.CreateArray("const", 128);
+  WPArrayStore::constValues = ConstantExpr::create(0, 32);
 }
 
 bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
@@ -2111,25 +2132,27 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       TxSubsumptionTable::insert(node->getProgramPoint(),
                                  node->entryCallHistory, entry);
 
-      ref<Expr> WPExpr = entry->getWPInterpolant();
-      Solver::Validity result;
-      std::vector<ref<Expr> > unsatCore;
-      ref<Expr> WPExprInstantiated = ConstantExpr::create(0, 32);
-      if (node->parent)
-        WPExprInstantiated = node->wp->instantiateWPExpression(
-            node->parent->dependency, node->parent->callHistory, WPExpr);
-      bool success =
-          solver->evaluate(*state, WPExprInstantiated, result, unsatCore);
-      if (success != true)
-        klee_error("TxTree::remove: Implication test failed");
-      if (result == Solver::True) {
-        entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
-      } else {
-        // If the result of implication is Solver::False and/or
-        // Solver::Unknown the chance that the WP interpolant
-        // improves the interpolant from the deletion algorithm
-        // is slim. As a result, in such cases the interpolant
-        // from deletion is not changed.
+      if (WPInterpolant) {
+        ref<Expr> WPExpr = entry->getWPInterpolant();
+        Solver::Validity result;
+        std::vector<ref<Expr> > unsatCore;
+        ref<Expr> WPExprInstantiated = ConstantExpr::create(0, 32);
+        if (node->parent)
+          WPExprInstantiated = node->wp->instantiateWPExpression(
+              node->parent->dependency, node->parent->callHistory, WPExpr);
+        bool success =
+            solver->evaluate(*state, WPExprInstantiated, result, unsatCore);
+        if (success != true)
+          klee_error("TxTree::remove: Implication test failed");
+        if (result == Solver::True) {
+          entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
+        } else {
+          // If the result of implication is Solver::False and/or
+          // Solver::Unknown the chance that the WP interpolant
+          // improves the interpolant from the deletion algorithm
+          // is slim. As a result, in such cases the interpolant
+          // from deletion is not changed.
+        }
       }
 
       TxSubsumptionTable::insert(node->getProgramPoint(), node->entryCallHistory,
@@ -2178,12 +2201,8 @@ void TxTree::markPathCondition(ExecutionState &state,
   int debugSubsumptionLevel =
       currentTxTreeNode->dependency->debugSubsumptionLevel;
 
-  if (WPInterpolant)
-    this->markInstruction(state.prevPC);
-
   llvm::BranchInst *binst =
       llvm::dyn_cast<llvm::BranchInst>(state.prevPC->inst);
-
   if (binst) {
     ref<Expr> unknownExpression;
     std::string reason = "";
@@ -2226,13 +2245,28 @@ void TxTree::executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
 }
 
 void TxTree::storeInstruction(KInstruction *instr) {
-  currentTxTreeNode->reverseInstructionList.insert(
-      std::pair<KInstruction *, bool>(instr, false));
+  currentTxTreeNode->reverseInstructionList.push_back(
+      std::pair<KInstruction *, bool>(instr, 0));
 }
 
-void TxTree::markInstruction(KInstruction *instr) {
-  currentTxTreeNode->reverseInstructionList[instr] = true;
-  // TODO: Add support for the case where false path is feasible
+void TxTree::markInstruction(KInstruction *instr, bool branchFlag) {
+  std::vector<std::pair<KInstruction *, int> >::iterator iter =
+      std::find(currentTxTreeNode->reverseInstructionList.begin(),
+                currentTxTreeNode->reverseInstructionList.end(),
+                std::pair<KInstruction *, int>(instr, 0));
+  // Only mark the br instruction that jumps to cond.false condition for now.
+  // TODO: remove this condition so all branch instructions are marked.
+
+  if (isa<llvm::BranchInst>(iter->first->inst)) {
+    llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(iter->first->inst);
+    if (br->getSuccessor(1)->getName() == "cond.false" ||
+        br->getSuccessor(1)->getName() == "cond.false") {
+      if (branchFlag == true)
+        iter->second = 1;
+      else
+        iter->second = 2;
+    }
+  }
 }
 
 void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
@@ -2347,6 +2381,9 @@ TxTreeNode::TxTreeNode(
 TxTreeNode::~TxTreeNode() {
   if (dependency)
     delete dependency;
+  if (wp) {
+    delete wp;
+  }
 }
 
 ref<Expr> TxTreeNode::getInterpolant(
@@ -2372,16 +2409,15 @@ ref<Expr> TxTreeNode::getWPInterpolant() {
     // Generate weakest precondition from pathCondition and/or BB instructions
     markAllFlag = 0;
     expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
-    expr->dump();
     if (parent)
       this->parent->setChildWPInterpolant(expr);
   } else {
     expr = wp->intersectExpr(childWPInterpolant[0], childWPInterpolant[1]);
 
-    // Setting the intersection of child nodes as the target in the of the nodes
+    // Setting the intersection of child nodes as the target in the current node
     wp->setWPExpr(expr);
 
-    // Generate weakest precondition from pathCondition and/or BB instructions
+    // Generate weakest precondition fot the current node
     // All instructions are marked
     markAllFlag = 1;
     expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
@@ -2403,6 +2439,11 @@ ref<Expr> TxTreeNode::getChildWPInterpolant(int flag) {
     return childWPInterpolant[0];
   else
     return childWPInterpolant[1];
+}
+
+void TxTreeNode::setWPAtSubsumption(ref<Expr> _wpInterpolant) {
+  if (parent)
+    parent->setChildWPInterpolant(_wpInterpolant);
 }
 
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
