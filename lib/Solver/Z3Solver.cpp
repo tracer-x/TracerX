@@ -208,6 +208,14 @@ bool Z3SolverImpl::internalRunSolver(
   // TODO: is the "simple_solver" the right solver to use for
   // best performance?
   Z3_solver theSolver = Z3_mk_simple_solver(builder->ctx);
+  if (INTERPOLATION_ENABLED) {
+    if (llvm::isa<ExistsExpr>(query.expr) ||
+        (llvm::isa<EqExpr>(query.expr) &&
+         llvm::isa<ExistsExpr>(query.expr->getKid(1)))) {
+      Z3_symbol abv = Z3_mk_string_symbol(builder->ctx, "ABV");
+      theSolver = Z3_mk_solver_for_logic(builder->ctx, abv);
+    }
+  }
   Z3_solver_inc_ref(builder->ctx, theSolver);
   Z3_solver_set_params(builder->ctx, theSolver, solverParameters);
 
