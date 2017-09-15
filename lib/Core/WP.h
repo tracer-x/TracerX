@@ -47,6 +47,8 @@ class WeakestPreCondition {
   /// node
   TxDependency *dependency;
 
+  int debugSubsumptionLevel;
+
   std::map<llvm::Value *, std::pair<const Array *, ref<Expr> > > arrayStore;
 
   const Array *array;
@@ -62,6 +64,8 @@ public:
   void resetWPExpr() { WPExpr = eb->False(); }
 
   void setWPExpr(ref<Expr> expr) { WPExpr = expr; }
+
+  ref<Expr> getWPExpr() { return WPExpr; }
 
   // \brief Preprocessing phase: marking the instructions that contribute
   // to the target or an infeasible path.
@@ -149,6 +153,9 @@ public:
 
   // \brief Update interpolant based on the WP Expr
   ref<Expr> updateInterpolant(ref<Expr> interpolant, ref<Expr> wp);
+
+  // \brief Replace array with shadow array in an expression
+  ref<Expr> replaceArrayWithShadow(ref<Expr> interpolant);
 };
 }
 #endif /* WP_H_ */

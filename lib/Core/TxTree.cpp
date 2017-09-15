@@ -804,6 +804,9 @@ bool TxSubsumptionTableEntry::subsumed(
                    state.txTreeNode->getNodeSequenceNumber(),
                    nodeSequenceNumber);
     }
+    if (WPInterpolant)
+      state.txTreeNode->setWPAtSubsumption(wpInterpolant);
+    klee_error("Sanity check for copying WP Expr to subsumed node");
     return true;
   }
 
@@ -1308,6 +1311,9 @@ bool TxSubsumptionTableEntry::subsumed(
 
       interpolateValues(state, coreValues, corePointerValues,
                         debugSubsumptionLevel);
+      if (WPInterpolant)
+        state.txTreeNode->setWPAtSubsumption(wpInterpolant);
+      klee_error("Sanity check for copying WP Expr to subsumed node");
       return true;
     }
 
@@ -1376,7 +1382,9 @@ bool TxSubsumptionTableEntry::subsumed(
                          state.txTreeNode->getNodeSequenceNumber(),
                          nodeSequenceNumber, msg.c_str());
           }
-
+          if (WPInterpolant)
+            state.txTreeNode->setWPAtSubsumption(wpInterpolant);
+          klee_error("Sanity check for copying WP Expr to subsumed node");
           return true;
         } else {
           // Here we try to get bound-variables-free conjunction, if there is
@@ -1462,6 +1470,8 @@ bool TxSubsumptionTableEntry::subsumed(
 
         interpolateValues(state, coreValues, corePointerValues,
                           debugSubsumptionLevel);
+        if (WPInterpolant)
+          state.txTreeNode->setWPAtSubsumption(wpInterpolant);
         return true;
       }
       if (debugSubsumptionLevel >= 1) {
@@ -1489,6 +1499,9 @@ bool TxSubsumptionTableEntry::subsumed(
 
     interpolateValues(state, coreValues, corePointerValues,
                       debugSubsumptionLevel);
+    if (WPInterpolant)
+      state.txTreeNode->setWPAtSubsumption(wpInterpolant);
+    klee_error("Sanity check for copying WP Expr to subsumed node");
     return true;
   }
 #endif /* ENABLE_Z3 */
@@ -2372,7 +2385,6 @@ ref<Expr> TxTreeNode::getWPInterpolant() {
     // Generate weakest precondition from pathCondition and/or BB instructions
     markAllFlag = 0;
     expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
-    expr->dump();
     if (parent)
       this->parent->setChildWPInterpolant(expr);
   } else {
@@ -2403,6 +2415,11 @@ ref<Expr> TxTreeNode::getChildWPInterpolant(int flag) {
     return childWPInterpolant[0];
   else
     return childWPInterpolant[1];
+}
+
+void TxTreeNode::setWPAtSubsumption(ref<Expr> _wpInterpolant) {
+  if (parent)
+    parent->setChildWPInterpolant(_wpInterpolant);
 }
 
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
