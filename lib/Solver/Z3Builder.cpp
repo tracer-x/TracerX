@@ -334,9 +334,8 @@ Z3ASTHandle Z3Builder::sbvLeExpr(Z3ASTHandle lhs, Z3ASTHandle rhs) {
 }
 
 Z3ASTHandle Z3Builder::existsExpr(Z3ASTHandle body) {
-  return Z3ASTHandle(Z3_mk_exists(ctx, 0, 0, 0, getQuantificationSize(),
-                                  getQuantificationSorts(),
-                                  getQuantificationSymbols(), body),
+  return Z3ASTHandle(Z3_mk_exists_const(ctx, 0, getQuantificationSize(),
+                                        getBoundVariables(), 0, 0, body),
                      ctx);
 }
 
@@ -858,8 +857,15 @@ Z3Builder::QuantificationContext::QuantificationContext(
                                          itEnd = _existentials.end();
        it != itEnd; ++it) {
     --index;
-    existentials[(*it)->name] =
-        builder->buildArray((*it)->name.c_str(), (*it)->domain, (*it)->range);
+
+    Z3SortHandle domainSort = builder->getBvSort((*it)->domain);
+    Z3SortHandle rangeSort = builder->getBvSort((*it)->range);
+    Z3SortHandle t = builder->getArraySort(domainSort, rangeSort);
+    Z3_symbol s =
+        Z3_mk_string_symbol(ctx, const_cast<char *>((*it)->name.c_str()));
+    Z3_ast bound = Z3_mk_const(ctx, s, t);
+    existentials[(*it)->name] = Z3ASTHandle(bound, ctx);
+    boundVariables.push_back((Z3_app)bound);
     sorts.push_back(Z3_mk_array_sort(_ctx, Z3_mk_bv_sort(_ctx, (*it)->domain),
                                      Z3_mk_bv_sort(_ctx, (*it)->range)));
     symbols.push_back(Z3_mk_string_symbol(_ctx, (*it)->name.c_str()));
