@@ -43,6 +43,9 @@ void custom_z3_error_handler(Z3_context ctx, Z3_error_code ec) {
     // Solver timeout is not a fatal error
     return;
   }
+  if (INTERPOLATION_ENABLED && strcmp(errorMsg, "incomplete (theory array)")) {
+    return;
+  }
   llvm::errs() << "Error: Incorrect use of Z3. [" << ec << "] " << errorMsg
                << "\n";
   abort();

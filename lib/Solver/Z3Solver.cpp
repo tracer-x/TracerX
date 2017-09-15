@@ -348,6 +348,9 @@ SolverImpl::SolverRunStatus Z3SolverImpl::handleSolverResponse(
     if (strcmp(reason, "unknown") == 0) {
       return SolverImpl::SOLVER_RUN_STATUS_FAILURE;
     }
+    if (INTERPOLATION_ENABLED && strcmp(reason, "incomplete (theory array)")) {
+      return SolverImpl::SOLVER_RUN_STATUS_FAILURE;
+    }
     klee_warning("Unexpected solver failure. Reason is \"%s,\"\n", reason);
     abort();
   }
