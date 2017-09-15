@@ -123,7 +123,7 @@ class Z3Builder {
                           std::set<const Array *> _existentials,
                           QuantificationContext *_parent);
 
-    ~QuantificationContext();
+    ~QuantificationContext() {}
 
     unsigned size() { return boundVariables.size(); }
 

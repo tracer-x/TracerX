@@ -869,10 +869,6 @@ Z3Builder::QuantificationContext::QuantificationContext(
   }
 }
 
-Z3Builder::QuantificationContext::~QuantificationContext() {
-  existentials.clear();
-}
-
 void
 Z3Builder::pushQuantificationContext(std::set<const Array *> existentials) {
   quantificationContext =
