@@ -117,8 +117,6 @@ class Z3Builder {
 
     QuantificationContext *parent;
 
-    Z3ASTHandle getBoundVarQuick(std::string name);
-
     QuantificationContext(Z3Builder *builder, Z3_context _ctx,
                           std::set<const Array *> _existentials,
                           QuantificationContext *_parent);
@@ -128,8 +126,6 @@ class Z3Builder {
     unsigned size() { return boundVariables.size(); }
 
     Z3_app *getBoundVariables() { return &boundVariables[0]; }
-
-    Z3ASTHandle getBoundVar(std::string name);
 
     QuantificationContext *getParent() { return parent; }
   };
