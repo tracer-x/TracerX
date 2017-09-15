@@ -866,16 +866,11 @@ Z3Builder::QuantificationContext::QuantificationContext(
     Z3_ast bound = Z3_mk_const(ctx, s, t);
     existentials[(*it)->name] = Z3ASTHandle(bound, ctx);
     boundVariables.push_back((Z3_app)bound);
-    sorts.push_back(Z3_mk_array_sort(_ctx, Z3_mk_bv_sort(_ctx, (*it)->domain),
-                                     Z3_mk_bv_sort(_ctx, (*it)->range)));
-    symbols.push_back(Z3_mk_string_symbol(_ctx, (*it)->name.c_str()));
   }
 }
 
 Z3Builder::QuantificationContext::~QuantificationContext() {
   existentials.clear();
-  sorts.clear();
-  symbols.clear();
 }
 
 void

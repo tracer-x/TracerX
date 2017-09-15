@@ -112,8 +112,6 @@ class Z3Builder {
   struct QuantificationContext {
 
     std::map<std::string, Z3ASTHandle> existentials;
-    std::vector<Z3_sort> sorts;
-    std::vector<Z3_symbol> symbols;
     std::vector<Z3_app> boundVariables;
     Z3_context ctx;
 
@@ -127,13 +125,9 @@ class Z3Builder {
 
     ~QuantificationContext();
 
-    unsigned size() { return symbols.size(); }
+    unsigned size() { return boundVariables.size(); }
 
     Z3_app *getBoundVariables() { return &boundVariables[0]; }
-
-    Z3_symbol *getSymbols() { return &symbols[0]; }
-
-    Z3_sort *getSorts() { return &sorts[0]; }
 
     Z3ASTHandle getBoundVar(std::string name);
 
@@ -216,14 +210,6 @@ private:
   void popQuantificationContext();
 
   unsigned getQuantificationSize() { return quantificationContext->size(); }
-
-  Z3_symbol *getQuantificationSymbols() {
-    return quantificationContext->getSymbols();
-  }
-
-  Z3_sort *getQuantificationSorts() {
-    return quantificationContext->getSorts();
-  }
 
   Z3_app *getBoundVariables() {
     return quantificationContext->getBoundVariables();
