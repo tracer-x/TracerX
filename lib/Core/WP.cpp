@@ -14,7 +14,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "WP.h"
-
+#include "Context.h"
 #include "TxTree.h"
 
 #include <klee/Expr.h>
@@ -52,6 +52,7 @@ WeakestPreCondition::WeakestPreCondition(TxTreeNode *_node,
   constValues = Expr::createTempRead(array, Expr::Int32);
   node = _node;
   dependency = _dependency;
+  debugSubsumptionLevel = dependency->debugSubsumptionLevel;
 }
 
 WeakestPreCondition::~WeakestPreCondition() {}
@@ -134,8 +135,8 @@ std::map<KInstruction *, int> WeakestPreCondition::markVariables(
 ref<Expr> WeakestPreCondition::GenerateWP(
     std::map<KInstruction *, int> reverseInstructionList, bool markAllFlag) {
 
-  // This log will be omitted in the final commit
-  klee_message("**********WP Interpolant Start************");
+  if (debugSubsumptionLevel >= 2)
+    klee_message("**********WP Interpolant Start************");
   for (std::map<KInstruction *, int>::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
@@ -143,17 +144,21 @@ ref<Expr> WeakestPreCondition::GenerateWP(
     llvm::Instruction *i = (*it).first->inst;
     if ((*it).second == 1 || markAllFlag == true) {
       // Retrieve the instruction
-      // This log will be omitted in the final commit
-      klee_message("Printing LLVM Instruction: ");
-      i->dump();
-      klee_message("---------------------------------------------");
+      if (debugSubsumptionLevel >= 3) {
+        klee_message("Printing LLVM Instruction: ");
+        i->dump();
+        klee_message("---------------------------------------------");
+      }
 
       switch (i->getOpcode()) {
 
       case llvm::Instruction::Br: {
         llvm::BranchInst *bi = cast<llvm::BranchInst>(i);
         if (bi->isUnconditional()) {
-          klee_error("Unconditional BR is not marked in WP!");
+          if (markAllFlag != true)
+            klee_error("Unconditional BR is not marked in WP!");
+          // else
+          // Nothing is needed to be done	.
         } else {
           // llvm::Value* cond = bi->getCondition();
           // TODO: Nothing specific is needed to be done for now.
@@ -397,18 +402,19 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         klee_error("+++++++++++++++++++++++++++++++++++++++++++++");
       }
       }
-      // This log will be omitted in the final commit
-      klee_message("**** Weakest PreCondition ****");
-      WPExpr->dump();
-      klee_message("***************************************");
+      if (debugSubsumptionLevel >= 2) {
+        klee_message("**** Weakest PreCondition ****");
+        WPExpr->dump();
+        klee_message("***************************************");
+      }
     } else if ((*it).second == 2) {
       klee_message("False case of LLVM Instruction Not Implemeneted Yet");
       i->dump();
     }
   }
 
-  // This log will be omitted in the final commit
-  klee_message("**********Generating WP finished**********");
+  if (debugSubsumptionLevel >= 2)
+    klee_message("**********Generating WP finished**********");
 
   return WPExpr;
 }
@@ -722,7 +728,6 @@ llvm::Value *WeakestPreCondition::getValuePointer(ref<Expr> expr) {
 ref<Expr> WeakestPreCondition::instantiateWPExpression(
     TxDependency *dependency, const std::vector<llvm::Instruction *> &callHistory,
     ref<Expr> WPExpr) {
-  WPExpr->dump();
   switch (WPExpr->getKind()) {
   case Expr::InvalidKind:
   case Expr::Constant: {
@@ -947,56 +952,60 @@ WeakestPreCondition::updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry,
     // TODO: Assuming WP is one frame, fix this
     TxStore::TopInterpolantStore newConcretelyAddressedStore =
         updateConcretelyAddressedStore(concretelyAddressedStore, wp);
-    ref<Expr> newInterpolant = updateInterpolant(interpolant, wp);
+    ref<Expr> newInterpolant =
+        replaceArrayWithShadow(updateInterpolant(interpolant, wp));
     entry->setConcretelyAddressedStore(newConcretelyAddressedStore);
-    entry->setInterpolant(newInterpolant);
+    // TODO: Should be handled, not working
+    // entry->setInterpolant(newInterpolant);
   }
-  // For future reference
-  if (!interpolant.isNull())
-    interpolant->dump();
+  if (debugSubsumptionLevel >= 3) {
+    // For future reference
+    if (!interpolant.isNull())
+      interpolant->dump();
 
-  concretelyAddressedStore = entry->getConcretelyAddressedStore();
-  for (TopInterpolantStore::const_iterator
-           it = concretelyAddressedStore.begin(),
-           ie = concretelyAddressedStore.end();
-       it != ie; ++it) {
-    (*it).first->dump();
-    LowerInterpolantStore temp = (*it).second;
-    for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
-                                               ie2 = temp.end();
-         it2 != ie2; ++it2) {
-      (*it2).first->dump();
-      (*it2).second->dump();
+    concretelyAddressedStore = entry->getConcretelyAddressedStore();
+    for (TopInterpolantStore::const_iterator
+             it = concretelyAddressedStore.begin(),
+             ie = concretelyAddressedStore.end();
+         it != ie; ++it) {
+      (*it).first->dump();
+      LowerInterpolantStore temp = (*it).second;
+      for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
+                                                 ie2 = temp.end();
+           it2 != ie2; ++it2) {
+        (*it2).first->dump();
+        (*it2).second->dump();
+      }
     }
-  }
-  for (TopInterpolantStore::const_iterator
-           it = symbolicallyAddressedStore.begin(),
-           ie = symbolicallyAddressedStore.end();
-       it != ie; ++it) {
-    (*it).first->dump();
-    LowerInterpolantStore temp = (*it).second;
-    for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
-                                               ie2 = temp.end();
-         it2 != ie2; ++it2) {
-      (*it2).first->dump();
-      (*it2).second->dump();
+    for (TopInterpolantStore::const_iterator
+             it = symbolicallyAddressedStore.begin(),
+             ie = symbolicallyAddressedStore.end();
+         it != ie; ++it) {
+      (*it).first->dump();
+      LowerInterpolantStore temp = (*it).second;
+      for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
+                                                 ie2 = temp.end();
+           it2 != ie2; ++it2) {
+        (*it2).first->dump();
+        (*it2).second->dump();
+      }
     }
-  }
 
-  for (LowerInterpolantStore::const_iterator
-           it = concretelyAddressedHistoricalStore.begin(),
-           ie = concretelyAddressedHistoricalStore.end();
-       it != ie; ++it) {
-    (*it).first->dump();
-    (*it).second->dump();
-  }
+    for (LowerInterpolantStore::const_iterator
+             it = concretelyAddressedHistoricalStore.begin(),
+             ie = concretelyAddressedHistoricalStore.end();
+         it != ie; ++it) {
+      (*it).first->dump();
+      (*it).second->dump();
+    }
 
-  for (LowerInterpolantStore::const_iterator
-           it = symbolicallyAddressedHistoricalStore.begin(),
-           ie = symbolicallyAddressedHistoricalStore.end();
-       it != ie; ++it) {
-    (*it).first->dump();
-    (*it).second->dump();
+    for (LowerInterpolantStore::const_iterator
+             it = symbolicallyAddressedHistoricalStore.begin(),
+             ie = symbolicallyAddressedHistoricalStore.end();
+         it != ie; ++it) {
+      (*it).first->dump();
+      (*it).second->dump();
+    }
   }
   return entry;
 }
@@ -1017,7 +1026,8 @@ WeakestPreCondition::updateConcretelyAddressedStore(
       candidateForRemove = it;
   }
   if (candidateForRemove != concretelyAddressedStore.end()) {
-    concretelyAddressedStore.erase(candidateForRemove);
+    // TODO: Should be handled, not working
+    // concretelyAddressedStore.erase(candidateForRemove);
   }
   return concretelyAddressedStore;
 }
@@ -1100,4 +1110,89 @@ ref<Expr> WeakestPreCondition::updateInterpolant(ref<Expr> interpolant,
     return wp;
   else
     return AndExpr::create(interpolant, wp);
+}
+
+ref<Expr> WeakestPreCondition::replaceArrayWithShadow(ref<Expr> interpolant) {
+  switch (interpolant->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return interpolant;
+  }
+
+  case Expr::Read:
+  case Expr::Concat: {
+    llvm::Value *array = getValuePointer(interpolant);
+    array->dump();
+    const Array *symArray =
+        ShadowArray::getSymbolicShadowArray(array->getName());
+    if (symArray != NULL) {
+      ref<Expr> Res(0);
+      unsigned NumBytes = symArray->getDomain() / 8;
+      assert(symArray->getDomain() == NumBytes * 8 && "Invalid read size!");
+      for (unsigned i = 0; i != NumBytes; ++i) {
+        unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
+        ref<Expr> Byte =
+            ReadExpr::create(UpdateList(symArray, 0),
+                             ConstantExpr::alloc(idx, symArray->getDomain()));
+        Res = i ? ConcatExpr::create(Byte, Res) : Byte;
+      }
+      return Res;
+    } else {
+      klee_error("WeakestPreCondition::replaceArrayWithShadow Shadow array "
+                 "doesn't exist!");
+    }
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    ref<Expr> kids[1];
+    kids[0] = replaceArrayWithShadow(interpolant->getKid(0));
+    return interpolant->rebuild(kids);
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    ref<Expr> kids[2];
+    kids[0] = replaceArrayWithShadow(interpolant->getKid(0));
+    kids[1] = replaceArrayWithShadow(interpolant->getKid(1));
+    return interpolant->rebuild(kids);
+  }
+
+  case Expr::Select: {
+    ref<Expr> kids[3];
+    kids[0] = replaceArrayWithShadow(interpolant->getKid(0));
+    kids[1] = replaceArrayWithShadow(interpolant->getKid(1));
+    kids[2] = replaceArrayWithShadow(interpolant->getKid(2));
+    return interpolant->rebuild(kids);
+  }
+  }
+  // Sanity check
+  klee_error(
+      "Control should not reach here in WeakestPreCondition::getVarFromExpr");
+  return interpolant;
 }

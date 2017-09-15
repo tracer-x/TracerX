@@ -510,14 +510,21 @@ public:
 
   /// \brief Retrieve the weakest precondition interpolant for this node as KLEE expression object
   ///
-  /// \return The weakest precondition interpolant expression.
+  /// \return Generate and return the weakest precondition interpolant
+  /// expression.
   ref<Expr> getWPInterpolant();
+
+  /// \return Return the weakest precondition object
+  WeakestPreCondition *getWP() { return wp; }
 
   /// \brief Store the child WP interpolants in the parent node
   void setChildWPInterpolant(ref<Expr> interpolant);
 
   /// \brief Get the stored child WP interpolants in the parent node
   ref<Expr> getChildWPInterpolant(int flag);
+
+  /// \brief Copy WP to the parent node at subsumption point
+  void setWPAtSubsumption(ref<Expr> _wpInterpolant);
 
   /// \brief Extend the path condition with another constraint
   ///
