@@ -927,26 +927,31 @@ bool SubsumptionTableEntry::subsumed(
             return false;
           } else if (Dependency::boundInterpolation() &&
                      tabledValue->isPointer() && stateValue->isPointer()) {
+            ref<Expr> boundsCheck;
             if (!ExactAddressInterpolant && tabledValue->useBound()) {
               std::set<ref<Expr> > bounds;
-              ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
+              boundsCheck = tabledValue->getBoundsCheck(
                   stateValue, bounds, unifiedBases, debugSubsumptionLevel);
-              if (boundsCheck->isFalse()) {
-                if (debugSubsumptionLevel >= 1) {
-                  std::string msg;
-                  klee_message("#%lu=>#%lu: Check failure due to failure in "
-                               "memory bounds check%s",
-                               state.txTreeNode->getNodeSequenceNumber(),
-                               nodeSequenceNumber, msg.c_str());
+              if (!boundsCheck.isNull()) {
+                if (boundsCheck->isFalse()) {
+                  if (debugSubsumptionLevel >= 1) {
+                    std::string msg;
+                    klee_message("#%lu=>#%lu: Check failure due to failure in "
+                                 "memory bounds check%s",
+                                 state.txTreeNode->getNodeSequenceNumber(),
+                                 nodeSequenceNumber, msg.c_str());
+                  }
+                  return false;
                 }
-                return false;
-              }
-              if (!boundsCheck->isTrue())
-                res = boundsCheck;
+                if (!boundsCheck->isTrue())
+                  res = boundsCheck;
 
-              // We record the LLVM value of the pointer
-              corePointerValues[stateValue->getOriginalValue()] = bounds;
-            } else {
+                // We record the LLVM value of the pointer
+                corePointerValues[stateValue->getOriginalValue()] = bounds;
+              }
+            }
+
+            if (boundsCheck.isNull()) {
               ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
                   stateValue, unifiedBases, debugSubsumptionLevel);
 
