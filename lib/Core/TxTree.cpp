@@ -1501,7 +1501,6 @@ bool TxSubsumptionTableEntry::subsumed(
                       debugSubsumptionLevel);
     if (WPInterpolant)
       state.txTreeNode->setWPAtSubsumption(wpInterpolant);
-    klee_error("Sanity check for copying WP Expr to subsumed node");
     return true;
   }
 #endif /* ENABLE_Z3 */

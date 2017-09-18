@@ -379,6 +379,8 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         break;
       }
 
+      case llvm::Instruction::ZExt:
+      case llvm::Instruction::SExt:
       case llvm::Instruction::BitCast: {
         // Getting the expressions from the operand
         ref<Expr> operand = this->generateExprFromOperand(i, 0);
@@ -953,7 +955,7 @@ WeakestPreCondition::updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry,
     TxStore::TopInterpolantStore newConcretelyAddressedStore =
         updateConcretelyAddressedStore(concretelyAddressedStore, wp);
     ref<Expr> newInterpolant =
-        replaceArrayWithShadow(updateInterpolant(interpolant, wp));
+        updateInterpolant(interpolant, replaceArrayWithShadow(wp));
     entry->setConcretelyAddressedStore(newConcretelyAddressedStore);
     // TODO: Should be handled, not working
     // entry->setInterpolant(newInterpolant);
@@ -1122,7 +1124,6 @@ ref<Expr> WeakestPreCondition::replaceArrayWithShadow(ref<Expr> interpolant) {
   case Expr::Read:
   case Expr::Concat: {
     llvm::Value *array = getValuePointer(interpolant);
-    array->dump();
     const Array *symArray =
         ShadowArray::getSymbolicShadowArray(array->getName());
     if (symArray != NULL) {
