@@ -367,14 +367,12 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
           }
           continue;
         }
-        // Create constraints for symbolic bounds
-        if (res.isNull()) {
-          res = UltExpr::create(*otherOffsetsIt, *selfBoundsIt);
-        } else {
-          res = AndExpr::create(UltExpr::create(*otherOffsetsIt, *selfBoundsIt),
-                                res);
-        }
-        bounds.insert(*selfBoundsIt);
+
+        // We return a null expression signaling that we have encountered a
+        // symbolic bound. In this case, the caller should switch to checking
+        // the exact offset.
+        ref<Expr> nullExpression;
+        return nullExpression;
       }
     }
   }

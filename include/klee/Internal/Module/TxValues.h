@@ -387,6 +387,18 @@ public:
 
   bool isPointer() const { return !allocationOffsets.empty(); }
 
+  /// \brief Get bounds check expression.
+  ///
+  /// \param svalue The value that comes from the program state to be checked
+  /// for subsumption.
+  /// \param [out] bounds The checked bounds to be used in bounds interpolation.
+  /// \param [out] unifiedBases The mapping between base addresses to be
+  /// considered the same in subsumption check.
+  /// \param debugSubsumptionLevel The verbosity level of debug information
+  /// display.
+  ///
+  /// \return Null expression when a symbolic bound exists in the interpolant,
+  /// the bound checking constraint otherwise.
   ref<Expr> getBoundsCheck(
       ref<TxInterpolantValue> svalue, std::set<ref<Expr> > &bounds,
       std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,

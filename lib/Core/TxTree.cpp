@@ -83,60 +83,63 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
       ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
           stateValue, bounds, unifiedBases, debugSubsumptionLevel);
 
-      if (!boundsCheck->isTrue()) {
-        if (!boundsCheck->isFalse()) {
-          // Implication: if tabled (interpolant)'s address == state address
-          // then bounds check must hold
-          constraint =
-              EqExpr::create(ConstantExpr::create(0, Expr::Bool),
-                             EqExpr::create(tabledOffset, stateOffset));
-          constraint = OrExpr::create(constraint, boundsCheck);
-        } else {
-          if (debugSubsumptionLevel >= 1) {
-            std::string msg;
-            klee_message("#%lu=>#%lu: Check failure due to failure in "
-                         "memory bounds check%s",
-                         state.txTreeNode->getNodeSequenceNumber(),
-                         nodeSequenceNumber, msg.c_str());
+      if (!boundsCheck.isNull()) {
+        if (!boundsCheck->isTrue()) {
+          if (!boundsCheck->isFalse()) {
+            // Implication: if tabled (interpolant)'s address == state address
+            // then bounds check must hold
+            constraint =
+                EqExpr::create(ConstantExpr::create(0, Expr::Bool),
+                               EqExpr::create(tabledOffset, stateOffset));
+            constraint = OrExpr::create(constraint, boundsCheck);
+          } else {
+            if (debugSubsumptionLevel >= 1) {
+              std::string msg;
+              klee_message("#%lu=>#%lu: Check failure due to failure in "
+                           "memory bounds check%s",
+                           state.txTreeNode->getNodeSequenceNumber(),
+                           nodeSequenceNumber, msg.c_str());
+            }
+
+            assert(constraint.isNull() && "must return a null constraint");
+            return constraint;
           }
-
-          assert(constraint.isNull() && "must return a null constraint");
-          return constraint;
         }
-      }
 
-      // We record the LLVM value of the pointer
-      corePointerValues[stateValue->getOriginalValue()] = bounds;
-    } else {
-      ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
-          stateValue, unifiedBases, debugSubsumptionLevel);
-      if (offsetsCheck->isFalse()) {
-        if (debugSubsumptionLevel >= 1) {
-          klee_message("#%lu=>#%lu: Check failure due to failure in "
-                       "offset equality check",
-                       state.txTreeNode->getNodeSequenceNumber(),
-                       nodeSequenceNumber);
-        }
+        // We record the LLVM value of the pointer
+        corePointerValues[stateValue->getOriginalValue()] = bounds;
         return constraint;
       }
-      if (!offsetsCheck->isTrue())
-        constraint = offsetsCheck;
-
-      // We record the value of the pointer for interpolation marking
-      coreValues.insert(stateValue->getOriginalValue());
     }
-  } else {
-    // Implication: if tabledConcreteAddress == stateSymbolicAddress,
-    // then tabledValue->getExpression() ==
-    // stateValue->getExpression()
-    constraint = OrExpr::create(
-        EqExpr::create(ConstantExpr::create(0, Expr::Bool),
-                       EqExpr::create(tabledOffset, stateOffset)),
-        EqExpr::create(tabledValue->getExpression(),
-                       stateValue->getExpression()));
 
+    ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
+        stateValue, unifiedBases, debugSubsumptionLevel);
+    if (offsetsCheck->isFalse()) {
+      if (debugSubsumptionLevel >= 1) {
+        klee_message("#%lu=>#%lu: Check failure due to failure in "
+                     "offset equality check",
+                     state.txTreeNode->getNodeSequenceNumber(),
+                     nodeSequenceNumber);
+      }
+      return constraint;
+    }
+    if (!offsetsCheck->isTrue())
+      constraint = offsetsCheck;
+
+    // We record the value of the pointer for interpolation marking
     coreValues.insert(stateValue->getOriginalValue());
+    return constraint;
   }
+
+  // Implication: if tabledConcreteAddress == stateSymbolicAddress, then
+  // tabledValue->getExpression() == stateValue->getExpression()
+  constraint =
+      OrExpr::create(EqExpr::create(ConstantExpr::create(0, Expr::Bool),
+                                    EqExpr::create(tabledOffset, stateOffset)),
+                     EqExpr::create(tabledValue->getExpression(),
+                                    stateValue->getExpression()));
+
+  coreValues.insert(stateValue->getOriginalValue());
   return constraint;
 }
 
@@ -924,26 +927,31 @@ bool SubsumptionTableEntry::subsumed(
             return false;
           } else if (Dependency::boundInterpolation() &&
                      tabledValue->isPointer() && stateValue->isPointer()) {
+            ref<Expr> boundsCheck;
             if (!ExactAddressInterpolant && tabledValue->useBound()) {
               std::set<ref<Expr> > bounds;
-              ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
+              boundsCheck = tabledValue->getBoundsCheck(
                   stateValue, bounds, unifiedBases, debugSubsumptionLevel);
-              if (boundsCheck->isFalse()) {
-                if (debugSubsumptionLevel >= 1) {
-                  std::string msg;
-                  klee_message("#%lu=>#%lu: Check failure due to failure in "
-                               "memory bounds check%s",
-                               state.txTreeNode->getNodeSequenceNumber(),
-                               nodeSequenceNumber, msg.c_str());
+              if (!boundsCheck.isNull()) {
+                if (boundsCheck->isFalse()) {
+                  if (debugSubsumptionLevel >= 1) {
+                    std::string msg;
+                    klee_message("#%lu=>#%lu: Check failure due to failure in "
+                                 "memory bounds check%s",
+                                 state.txTreeNode->getNodeSequenceNumber(),
+                                 nodeSequenceNumber, msg.c_str());
+                  }
+                  return false;
                 }
-                return false;
-              }
-              if (!boundsCheck->isTrue())
-                res = boundsCheck;
+                if (!boundsCheck->isTrue())
+                  res = boundsCheck;
 
-              // We record the LLVM value of the pointer
-              corePointerValues[stateValue->getOriginalValue()] = bounds;
-            } else {
+                // We record the LLVM value of the pointer
+                corePointerValues[stateValue->getOriginalValue()] = bounds;
+              }
+            }
+
+            if (boundsCheck.isNull()) {
               ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
                   stateValue, unifiedBases, debugSubsumptionLevel);
 
