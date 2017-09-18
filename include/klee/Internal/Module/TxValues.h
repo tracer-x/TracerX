@@ -421,6 +421,8 @@ public:
 
   ref<Expr> getExpression() const { return expr; }
 
+  void updateExpression(ref<Expr> _expr) { expr = _expr; }
+
   llvm::Value *getValue() const { return value; }
 
   void setOriginalValue(ref<TxStateValue> value) { originalValue = value; }

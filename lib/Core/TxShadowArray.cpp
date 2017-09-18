@@ -155,7 +155,7 @@ const Array *TxShadowArray::getSymbolicArray(std::string name) {
   return NULL;
 }
 
-const Array *ShadowArray::getSymbolicShadowArray(std::string name) {
+const Array *TxShadowArray::getSymbolicShadowArray(std::string name) {
   for (std::map<const Array *, const Array *>::iterator
            it = shadowArray.begin(),
            ie = shadowArray.end();

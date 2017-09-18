@@ -946,6 +946,7 @@ WeakestPreCondition::updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry,
       entry->getConcretelyAddressedStore();
   TxStore::TopInterpolantStore symbolicallyAddressedStore =
       entry->getSymbolicallyAddressedStore();
+  std::set<const Array *> existentials = entry->getExistentials();
 
   if (concretelyAddressedStore.size() == 0)
     klee_error("WeakestPreCondition::updateSubsumptionTableEntry for this case "
@@ -956,9 +957,11 @@ WeakestPreCondition::updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry,
         updateConcretelyAddressedStore(concretelyAddressedStore, wp);
     ref<Expr> newInterpolant =
         updateInterpolant(interpolant, replaceArrayWithShadow(wp));
+    std::set<const Array *> newExistentials =
+        updateExistentials(existentials, wp);
     entry->setConcretelyAddressedStore(newConcretelyAddressedStore);
-    // TODO: Should be handled, not working
-    // entry->setInterpolant(newInterpolant);
+    entry->setInterpolant(newInterpolant);
+    entry->setExistentials(newExistentials);
   }
   if (debugSubsumptionLevel >= 3) {
     // For future reference
@@ -1029,7 +1032,14 @@ WeakestPreCondition::updateConcretelyAddressedStore(
   }
   if (candidateForRemove != concretelyAddressedStore.end()) {
     // TODO: Should be handled, not working
-    // concretelyAddressedStore.erase(candidateForRemove);
+    LowerInterpolantStore temp = candidateForRemove->second;
+    for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
+                                               ie2 = temp.end();
+         it2 != ie2; ++it2) {
+      ref<TxVariable> tempValue = (*it2).first;
+      ref<TxInterpolantValue> tempInterpolantValue = (*it2).second;
+      tempInterpolantValue->updateExpression(replaceArrayWithShadow(var));
+    }
   }
   return concretelyAddressedStore;
 }
@@ -1111,7 +1121,8 @@ ref<Expr> WeakestPreCondition::updateInterpolant(ref<Expr> interpolant,
   if (interpolant.isNull())
     return wp;
   else
-    return AndExpr::create(interpolant, wp);
+    // TODO: Assuming frame has only one variable. Fix it.
+    return wp;
 }
 
 ref<Expr> WeakestPreCondition::replaceArrayWithShadow(ref<Expr> interpolant) {
@@ -1125,7 +1136,7 @@ ref<Expr> WeakestPreCondition::replaceArrayWithShadow(ref<Expr> interpolant) {
   case Expr::Concat: {
     llvm::Value *array = getValuePointer(interpolant);
     const Array *symArray =
-        ShadowArray::getSymbolicShadowArray(array->getName());
+        TxShadowArray::getSymbolicShadowArray(array->getName());
     if (symArray != NULL) {
       ref<Expr> Res(0);
       unsigned NumBytes = symArray->getDomain() / 8;
@@ -1196,4 +1207,86 @@ ref<Expr> WeakestPreCondition::replaceArrayWithShadow(ref<Expr> interpolant) {
   klee_error(
       "Control should not reach here in WeakestPreCondition::getVarFromExpr");
   return interpolant;
+}
+
+std::set<const Array *>
+WeakestPreCondition::updateExistentials(std::set<const Array *> existentials,
+                                        ref<Expr> wp) {
+  switch (wp->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return existentials;
+  }
+
+  case Expr::Read:
+  case Expr::Concat: {
+    llvm::Value *array = getValuePointer(wp);
+    const Array *symArray =
+        TxShadowArray::getSymbolicShadowArray(array->getName());
+    if (!symArray) {
+      wp->dump();
+      klee_error("WeakestPreCondition::updateExistentials Shadow array doesn't "
+                 "exist!");
+    }
+    if (existentials.find(symArray) == existentials.end()) {
+      existentials.insert(symArray);
+    }
+    return existentials;
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    std::set<const Array *> newExistentials =
+        updateExistentials(existentials, wp->getKid(0));
+    return newExistentials;
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    std::set<const Array *> newExistentials =
+        updateExistentials(existentials, wp->getKid(0));
+    std::set<const Array *> newExistentials2 =
+        updateExistentials(newExistentials, wp->getKid(1));
+    return newExistentials2;
+  }
+
+  case Expr::Select: {
+    std::set<const Array *> newExistentials =
+        updateExistentials(existentials, wp->getKid(0));
+    std::set<const Array *> newExistentials2 =
+        updateExistentials(newExistentials, wp->getKid(1));
+    std::set<const Array *> newExistentials3 =
+        updateExistentials(newExistentials2, wp->getKid(2));
+    return newExistentials3;
+  }
+  }
+  // Sanity check
+  klee_error(
+      "Control should not reach here in WeakestPreCondition::getVarFromExpr");
+  return existentials;
 }
