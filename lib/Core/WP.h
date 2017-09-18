@@ -156,6 +156,10 @@ public:
 
   // \brief Replace array with shadow array in an expression
   ref<Expr> replaceArrayWithShadow(ref<Expr> interpolant);
+
+  // \brief Add new existential variables to the list
+  std::set<const Array *>
+  updateExistentials(std::set<const Array *> existentials, ref<Expr> wp);
 };
 }
 #endif /* WP_H_ */

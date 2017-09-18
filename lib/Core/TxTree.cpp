@@ -1384,7 +1384,6 @@ bool TxSubsumptionTableEntry::subsumed(
           }
           if (WPInterpolant)
             state.txTreeNode->setWPAtSubsumption(wpInterpolant);
-          klee_error("Sanity check for copying WP Expr to subsumed node");
           return true;
         } else {
           // Here we try to get bound-variables-free conjunction, if there is
@@ -1533,6 +1532,10 @@ TxSubsumptionTableEntry::getSymbolicallyAddressedStore() const {
   return symbolicallyAddressedStore;
 }
 
+std::set<const Array *> TxSubsumptionTableEntry::getExistentials() const {
+  return existentials;
+}
+
 void TxSubsumptionTableEntry::setInterpolant(ref<Expr> _interpolant) {
   interpolant = _interpolant;
 }
@@ -1555,6 +1558,11 @@ void TxSubsumptionTableEntry::setConcretelyAddressedStore(
 void TxSubsumptionTableEntry::setSymbolicallyAddressedStore(
     TxStore::TopInterpolantStore _symbolicallyAddressedStore) {
   symbolicallyAddressedStore = _symbolicallyAddressedStore;
+}
+
+void TxSubsumptionTableEntry::setExistentials(
+    std::set<const Array *> _existentials) {
+  existentials = _existentials;
 }
 
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream) const {

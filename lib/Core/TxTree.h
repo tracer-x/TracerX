@@ -332,6 +332,8 @@ public:
 
   TxStore::TopInterpolantStore getSymbolicallyAddressedStore() const;
 
+  std::set<const Array *> getExistentials() const;
+
   void setInterpolant(ref<Expr> _interpolant);
 
   void setConcretelyAddressedHistoricalStore(
@@ -345,6 +347,8 @@ public:
 
   void setSymbolicallyAddressedStore(
       TxStore::TopInterpolantStore _symbolicallyAddressedStore);
+
+  void setExistentials(std::set<const Array *> _existentials);
 
   void dump() const {
     this->print(llvm::errs());
