@@ -69,12 +69,13 @@ public:
 
   // \brief Preprocessing phase: marking the instructions that contribute
   // to the target or an infeasible path.
-  std::map<KInstruction *, int>
-  markVariables(std::map<KInstruction *, int> reverseInstructionList);
+  std::vector<std::pair<KInstruction *, int> > markVariables(
+      std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
 
   // \brief Generate and return the weakest precondition expression.
-  ref<Expr> GenerateWP(std::map<KInstruction *, int> reverseInstructionList,
-                       bool markAllFlag);
+  ref<Expr> GenerateWP(
+      std::vector<std::pair<KInstruction *, int> > reverseInstructionList,
+      bool markAllFlag);
 
   // \brief Generate expression from operand of an instruction
   ref<Expr> generateExprFromOperand(llvm::Instruction *i, int operand);

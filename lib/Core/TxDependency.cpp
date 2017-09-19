@@ -74,6 +74,10 @@ ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
   if (!value->hasName()) {
     klee_error("Dependency::getAddress:Instruction has no name!\n");
   }
+  std::string arrayName = value->getName();
+  const std::string ext(".addr");
+  if (arrayName.find(ext))
+    arrayName = arrayName.substr(0, arrayName.size() - ext.size());
   const Array *symArray = TxShadowArray::getSymbolicArray(value->getName());
   if (symArray != NULL) {
     ref<Expr> Res(0);
@@ -98,7 +102,7 @@ ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
     size = value->getType()->getIntegerBitWidth();
   }
   // Todo: tmpArray object should be reclaimed sometime later
-  tmpArray = ac->CreateArray(value->getName(), size);
+  tmpArray = ac->CreateArray(arrayName, size);
   ref<Expr> tmpExpr = Expr::createTempRead(tmpArray, size);
   wp->storeArrayRef(value, tmpArray, tmpExpr);
   return tmpExpr;
@@ -108,14 +112,13 @@ ref<Expr> TxDependency::getLatestValueOfAddress(
     llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory) {
     
   bool allowInconsistency = true;
-  ref<Expr> dummy = ConstantExpr::create(1, Expr::Bool);
+  ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
 
   ref<TxStateValue> addressValue =
       this->getLatestValue(value, callHistory, dummy, allowInconsistency);
 
   if (addressValue.isNull())
     return dummy;
-
   ref<TxStateAddress> address = addressValue->getPointerInfo();
   if (address.isNull())
     klee_error("Dependency::getLatestValueOfAddress Address is null");

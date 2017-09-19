@@ -2244,15 +2244,19 @@ void TxTree::executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
 }
 
 void TxTree::storeInstruction(KInstruction *instr) {
-  currentTxTreeNode->reverseInstructionList.insert(
+  currentTxTreeNode->reverseInstructionList.push_back(
       std::pair<KInstruction *, bool>(instr, 0));
 }
 
 void TxTree::markInstruction(KInstruction *instr, bool branchFlag) {
+  std::vector<std::pair<KInstruction *, int> >::iterator iter =
+      std::find(currentTxTreeNode->reverseInstructionList.begin(),
+                currentTxTreeNode->reverseInstructionList.end(),
+                std::pair<KInstruction *, int>(instr, 0));
   if (branchFlag == true)
-    currentTxTreeNode->reverseInstructionList[instr] = 1;
+    iter->second = 1;
   else
-    currentTxTreeNode->reverseInstructionList[instr] = 2;
+    iter->second = 2;
 }
 
 void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,

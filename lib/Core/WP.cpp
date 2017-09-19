@@ -57,10 +57,10 @@ WeakestPreCondition::WeakestPreCondition(TxTreeNode *_node,
 
 WeakestPreCondition::~WeakestPreCondition() {}
 
-std::map<KInstruction *, int> WeakestPreCondition::markVariables(
-    std::map<KInstruction *, int> reverseInstructionList) {
+std::vector<std::pair<KInstruction *, int> > WeakestPreCondition::markVariables(
+    std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
 
-  for (std::map<KInstruction *, int>::const_reverse_iterator
+  for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
        it != ie; ++it) {
@@ -68,13 +68,17 @@ std::map<KInstruction *, int> WeakestPreCondition::markVariables(
     // Retrieve the instruction
     KInstruction *i = (*it).first;
 
+    std::vector<std::pair<KInstruction *, int> >::iterator iter =
+        std::find(reverseInstructionList.begin(), reverseInstructionList.end(),
+                  std::pair<KInstruction *, int>(i, 0));
+
     // Mark the instructions
     if (markedVariables.find(i->inst) != markedVariables.end()) {
-      reverseInstructionList[i] = 1;
+      iter->second = 1;
     } else if (dyn_cast<llvm::StoreInst>(i->inst) &&
                markedVariables.find(i->inst->getOperand(1)) !=
                    markedVariables.end()) {
-      reverseInstructionList[i] = 1;
+      iter->second = 1;
     }
 
     // Add the variables in the RHS of marked instructions to markedVariables
@@ -122,7 +126,7 @@ std::map<KInstruction *, int> WeakestPreCondition::markVariables(
   }
 
   // Printing reverseInstructionList will be omitted in the final commit
-  /*for (std::map<KInstruction *, int>::const_reverse_iterator
+  /*for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
        it != ie; ++it) {
@@ -133,11 +137,12 @@ std::map<KInstruction *, int> WeakestPreCondition::markVariables(
 }
 
 ref<Expr> WeakestPreCondition::GenerateWP(
-    std::map<KInstruction *, int> reverseInstructionList, bool markAllFlag) {
+    std::vector<std::pair<KInstruction *, int> > reverseInstructionList,
+    bool markAllFlag) {
 
   if (debugSubsumptionLevel >= 2)
     klee_message("**********WP Interpolant Start************");
-  for (std::map<KInstruction *, int>::const_reverse_iterator
+  for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
        it != ie; ++it) {
@@ -445,9 +450,12 @@ ref<Expr> WeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
 ref<Expr> WeakestPreCondition::getLHS(llvm::Instruction *i) {
 
   std::string arrayName;
-  if (i->hasName())
+  if (i->hasName()) {
     arrayName = i->getName();
-  else {
+    const std::string ext(".addr");
+    if (arrayName.find(ext))
+      arrayName = arrayName.substr(0, arrayName.size() - ext.size());
+  } else {
     arrayName = "tmpLHS";
     klee_error("Instruction has no name: tmpLHS!\n");
   }
@@ -467,6 +475,10 @@ void WeakestPreCondition::updateWPExpr(ref<Expr> result) {
 
 void WeakestPreCondition::substituteExpr(ref<Expr> result) {
   switch (result->getKind()) {
+  case Expr::Constant: {
+    // Nothing is needed to be done, it's either true or false
+    break;
+  }
   case Expr::Eq: {
     ref<Expr> lhs = result->getKid(0);
     ref<Expr> rhs = result->getKid(1);
@@ -730,6 +742,8 @@ llvm::Value *WeakestPreCondition::getValuePointer(ref<Expr> expr) {
 ref<Expr> WeakestPreCondition::instantiateWPExpression(
     TxDependency *dependency, const std::vector<llvm::Instruction *> &callHistory,
     ref<Expr> WPExpr) {
+
+  ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
   switch (WPExpr->getKind()) {
   case Expr::InvalidKind:
   case Expr::Constant: {
@@ -743,6 +757,8 @@ ref<Expr> WeakestPreCondition::instantiateWPExpression(
           "WeakestPreCondition::instantiateWPExpression Value ref is null");
     ref<Expr> storeValue =
         dependency->getLatestValueOfAddress(tempInstr, callHistory);
+    if (storeValue == dummy)
+      return WPExpr;
     return storeValue;
   }
 
@@ -753,6 +769,8 @@ ref<Expr> WeakestPreCondition::instantiateWPExpression(
           "WeakestPreCondition::instantiateWPExpression Value ref is null");
     ref<Expr> storeValue =
         dependency->getLatestValueOfAddress(tempInstr, callHistory);
+    if (storeValue == dummy)
+      return WPExpr;
     return storeValue;
   }
 
@@ -1135,6 +1153,10 @@ ref<Expr> WeakestPreCondition::replaceArrayWithShadow(ref<Expr> interpolant) {
   case Expr::Read:
   case Expr::Concat: {
     llvm::Value *array = getValuePointer(interpolant);
+    std::string arrayName = array->getName();
+    const std::string ext(".addr");
+    if (arrayName.find(ext))
+      arrayName = arrayName.substr(0, arrayName.size() - ext.size());
     const Array *symArray =
         TxShadowArray::getSymbolicShadowArray(array->getName());
     if (symArray != NULL) {
@@ -1150,6 +1172,7 @@ ref<Expr> WeakestPreCondition::replaceArrayWithShadow(ref<Expr> interpolant) {
       }
       return Res;
     } else {
+      interpolant->dump();
       klee_error("WeakestPreCondition::replaceArrayWithShadow Shadow array "
                  "doesn't exist!");
     }
@@ -1221,6 +1244,10 @@ WeakestPreCondition::updateExistentials(std::set<const Array *> existentials,
   case Expr::Read:
   case Expr::Concat: {
     llvm::Value *array = getValuePointer(wp);
+    std::string arrayName = array->getName();
+    const std::string ext(".addr");
+    if (arrayName.find(ext))
+      arrayName = arrayName.substr(0, arrayName.size() - ext.size());
     const Array *symArray =
         TxShadowArray::getSymbolicShadowArray(array->getName());
     if (!symArray) {
