@@ -35,6 +35,12 @@ using namespace klee;
 
 namespace klee {
 
+const uint64_t symbolicBoundId = ULONG_MAX;
+
+bool concreteBound(uint64_t bound) { return bound < ULONG_MAX; }
+
+/**/
+
 void TxStoreEntry::print(llvm::raw_ostream &stream,
                          const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
@@ -249,32 +255,18 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
       std::set<ref<Expr> > newBounds;
 
       if (concreteBound > 0)
-        allocationBounds[allocInfo].insert(Expr::createPointer(concreteBound));
+        allocationBounds[allocInfo].insert(concreteBound);
 
       // Symbolic bounds
-      const std::set<ref<Expr> > &bounds = (*it)->getSymbolicOffsetBounds();
-
-      if (shadowing) {
-        std::set<ref<Expr> > shadowBounds;
-        for (std::set<ref<Expr> >::const_iterator it1 = bounds.begin(),
-                                                  ie1 = bounds.end();
-             it1 != ie1; ++it1) {
-          shadowBounds.insert(
-              ShadowArray::getShadowExpression(*it1, replacements));
-        }
-        if (!shadowBounds.empty()) {
-          allocationBounds[allocInfo]
-              .insert(shadowBounds.begin(), shadowBounds.end());
-        }
-      } else if (!bounds.empty()) {
-        allocationBounds[allocInfo].insert(bounds.begin(), bounds.end());
+      if ((*it)->hasSymbolicOffsetBounds()) {
+        allocationBounds[allocInfo].insert(symbolicBoundId);
       }
     }
   }
 }
 
 ref<Expr> TxInterpolantValue::getBoundsCheck(
-    ref<TxInterpolantValue> other, std::set<ref<Expr> > &bounds,
+    ref<TxInterpolantValue> other, std::set<uint64_t> &bounds,
     std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
     int debugSubsumptionLevel) const {
   ref<Expr> res;
@@ -297,11 +289,11 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
   // information from the argument object; in this way resulting in
   // less iterations compared to doing it the other way around.
   bool matchFound = false;
-  for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
+  for (std::map<ref<AllocationInfo>, std::set<uint64_t> >::const_iterator
            selfBoundsListIt = allocationBounds.begin(),
            selfBoundsListIe = allocationBounds.end();
        selfBoundsListIt != selfBoundsListIe; ++selfBoundsListIt) {
-    std::set<ref<Expr> > selfBounds = selfBoundsListIt->second;
+    std::set<uint64_t> selfBounds = selfBoundsListIt->second;
     std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::iterator
     otherOffsetsListIt = other->allocationOffsets.find(selfBoundsListIt->first);
     if (otherOffsetsListIt == other->allocationOffsets.end()) {
@@ -328,13 +320,11 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
              otherOffsetsIt = otherOffsets.begin(),
              otherOffsetsIe = otherOffsets.end();
          otherOffsetsIt != otherOffsetsIe; ++otherOffsetsIt) {
-      for (std::set<ref<Expr> >::const_iterator
-               selfBoundsIt = selfBounds.begin(),
-               selfBoundsIe = selfBounds.end();
+      for (std::set<uint64_t>::const_iterator selfBoundsIt = selfBounds.begin(),
+                                              selfBoundsIe = selfBounds.end();
            selfBoundsIt != selfBoundsIe; ++selfBoundsIt) {
-        if (ConstantExpr *selfBoundObj =
-                llvm::dyn_cast<ConstantExpr>(*selfBoundsIt)) {
-          uint64_t selfBound = selfBoundObj->getZExtValue();
+        uint64_t selfBound = *selfBoundsIt;
+        if (concreteBound(selfBound)) {
           if (ConstantExpr *otherOffsetObj =
                   llvm::dyn_cast<ConstantExpr>(*otherOffsetsIt)) {
             if (selfBound > 0) {
@@ -358,12 +348,15 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
             // Symbolic state offset, but concrete tabled bound. Here the bound
             // is known (non-zero), so we create constraints
             if (res.isNull()) {
-              res = UltExpr::create(*otherOffsetsIt, *selfBoundsIt);
+              res = UltExpr::create(*otherOffsetsIt,
+                                    Expr::createPointer(selfBound));
             } else {
               res = AndExpr::create(
-                  UltExpr::create(*otherOffsetsIt, *selfBoundsIt), res);
+                  UltExpr::create(*otherOffsetsIt,
+                                  Expr::createPointer(selfBound)),
+                  res);
             }
-            bounds.insert(*selfBoundsIt);
+            bounds.insert(selfBound);
           }
           continue;
         }
@@ -383,7 +376,7 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
       return ConstantExpr::create(1, Expr::Bool);
     else {
       // Match not found; we force match via address translation
-      for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
+      for (std::map<ref<AllocationInfo>, std::set<uint64_t> >::const_iterator
                selfBoundsListIt = allocationBounds.begin(),
                selfBoundsListIe = allocationBounds.end();
            selfBoundsListIt != selfBoundsListIe && !matchFound;
@@ -398,24 +391,30 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
                    otherSize = otherOffsetsListIt->first->getSize();
           if (selfSize == otherSize) {
             // Allocation sizes match
-            const std::set<ref<Expr> > &selfBounds = selfBoundsListIt->second;
+            const std::set<uint64_t> &selfBounds = selfBoundsListIt->second;
             const std::set<ref<Expr> > &otherOffsets =
                 otherOffsetsListIt->second;
             ref<Expr> expr;
-            for (std::set<ref<Expr> >::const_iterator
+            for (std::set<uint64_t>::const_iterator
                      selfBoundsIt = selfBounds.begin(),
                      selfBoundsIe = selfBounds.end();
                  selfBoundsIt != selfBoundsIe; ++selfBoundsIt) {
+              uint64_t selfBound = *selfBoundsIt;
               for (std::set<ref<Expr> >::const_iterator
                        otherOffsetsIt = otherOffsets.begin(),
                        otherOffsetsIe = otherOffsets.end();
                    otherOffsetsIt != otherOffsetsIe; ++otherOffsetsIt) {
-                // Create constraints for offset equalities
+                // Create constraints for offset inequalities
+                ref<Expr> conjunct;
+                if (concreteBound(selfBound))
+                  conjunct = UltExpr::create(*otherOffsetsIt,
+                                             Expr::createPointer(selfBound));
+                else
+                  conjunct = ConstantExpr::create(0, Expr::Bool);
                 if (expr.isNull()) {
-                  expr = UltExpr::create(*otherOffsetsIt, *selfBoundsIt);
+                  expr = conjunct;
                 } else {
-                  expr = AndExpr::create(
-                      UltExpr::create(*otherOffsetsIt, *selfBoundsIt), expr);
+                  expr = AndExpr::create(conjunct, expr);
                 }
               }
             }
@@ -602,7 +601,7 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
 
   if (!doNotUseBound && !allocationBounds.empty()) {
     stream << prefix << "BOUNDS:";
-    for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
+    for (std::map<ref<AllocationInfo>, std::set<uint64_t> >::const_iterator
              it = allocationBounds.begin(),
              ie = allocationBounds.end();
          it != ie; ++it) {
@@ -610,13 +609,15 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
       stream << prefix << "[";
       it->first->print(stream);
       stream << "<{";
-      for (std::set<ref<Expr> >::const_iterator it1 = it->second.begin(),
-                                                is1 = it1,
-                                                ie1 = it->second.end();
+      for (std::set<uint64_t>::const_iterator it1 = it->second.begin(),
+                                              is1 = it1, ie1 = it->second.end();
            it1 != ie1; ++it1) {
         if (it1 != is1)
           stream << ",";
-        (*it1)->print(stream);
+        if (concreteBound(*it1))
+          stream << (*it1);
+        else
+          stream << "(symbolic)";
       }
       stream << "}]";
     }
@@ -669,17 +670,17 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
 /**/
 
 bool TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
-                                       std::set<ref<Expr> > &_bounds,
+                                       std::set<uint64_t> &_bounds,
                                        bool &boundUpdated) {
   const std::set<ref<TxStateAddress> > &locations =
       checkedAddress->getLocations();
-  std::set<ref<Expr> > bounds(_bounds);
+  std::set<uint64_t> bounds(_bounds);
 
   if (bounds.empty()) {
-    bounds.insert(Expr::createPointer(size));
+    bounds.insert(size);
   }
 
-  for (std::set<ref<Expr> >::iterator it1 = bounds.begin(), ie1 = bounds.end();
+  for (std::set<uint64_t>::iterator it1 = bounds.begin(), ie1 = bounds.end();
        it1 != ie1; ++it1) {
 
     for (std::set<ref<TxStateAddress> >::iterator it2 = locations.begin(),
@@ -688,57 +689,57 @@ bool TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
       ref<Expr> checkedOffset = (*it2)->getOffset();
       if (ConstantExpr *c = llvm::dyn_cast<ConstantExpr>(checkedOffset)) {
         if (ConstantExpr *o = llvm::dyn_cast<ConstantExpr>(getOffset())) {
-          if (ConstantExpr *b = llvm::dyn_cast<ConstantExpr>(*it1)) {
-            uint64_t offsetInt = o->getZExtValue();
-            uint64_t newBound =
-                b->getZExtValue() - (c->getZExtValue() - offsetInt);
+          uint64_t offsetInt = o->getZExtValue();
+          uint64_t newBound = (*it1) - (c->getZExtValue() - offsetInt);
 
-            if (concreteOffsetBound > newBound) {
+          if (concreteOffsetBound > newBound) {
 
-              // FIXME: A quick hack to avoid assertion check to make DirSeek.c
-              // regression test pass.
-              llvm::Value *v = (*it2)->getContext()->getValue();
-              if (v->getType()->isPointerTy()) {
-                llvm::Type *elementType = v->getType()->getPointerElementType();
-                if (llvm::StructType *elementStructType =
-                        llvm::dyn_cast<llvm::StructType>(elementType)) {
-                  if (!elementStructType->isLiteral() &&
-                      elementType->getStructName() == "struct.dirent") {
-                    concreteOffsetBound = newBound;
-                    boundUpdated = true;
-                    continue;
-                  }
+            // FIXME: A quick hack to avoid assertion check to make DirSeek.c
+            // regression test pass.
+            llvm::Value *v = (*it2)->getContext()->getValue();
+            if (v->getType()->isPointerTy()) {
+              llvm::Type *elementType = v->getType()->getPointerElementType();
+              if (llvm::StructType *elementStructType =
+                      llvm::dyn_cast<llvm::StructType>(elementType)) {
+                if (!elementStructType->isLiteral() &&
+                    elementType->getStructName() == "struct.dirent") {
+                  concreteOffsetBound = newBound;
+                  boundUpdated = true;
+                  continue;
                 }
               }
-
-              if (newBound > offsetInt) {
-                concreteOffsetBound = newBound;
-                boundUpdated = true;
-              } else {
-                // Incorrect bounds would pass this assertion, as long as the
-                // value of the checked offset is reasonable (non-negative). We
-                // need to pass some wrong bounds since Tracer-X is more
-                // conservative than KLEE: KLEE can still determine that memory
-                // access is valid as it happens to be in a valid region.
-                // Tracer-X, on the other hand, associates every pointer with a
-                // set of allocations, and the memory bound is violated whenever
-                // there is an access to a memory outside of the region
-                // associated with any of the allocations.
-                assert(c->getZExtValue() <= LLONG_MAX && "incorrect bound");
-                return true;
-              }
             }
-            continue;
+
+            if (newBound > offsetInt) {
+              concreteOffsetBound = newBound;
+              boundUpdated = true;
+            } else {
+              // Incorrect bounds would pass this assertion, as long as the
+              // value of the checked offset is reasonable (non-negative). We
+              // need to pass some wrong bounds since Tracer-X is more
+              // conservative than KLEE: KLEE can still determine that memory
+              // access is valid as it happens to be in a valid region.
+              // Tracer-X, on the other hand, associates every pointer with a
+              // set of allocations, and the memory bound is violated whenever
+              // there is an access to a memory outside of the region associated
+              // with any of the allocations.
+              assert(c->getZExtValue() <= LLONG_MAX && "incorrect bound");
+              return true;
+            }
           }
+          continue;
         }
       }
 
-      symbolicOffsetBounds.insert(
-          SubExpr::create(*it1, SubExpr::create(checkedOffset, getOffset())));
+      concreteOffsetBound = symbolicBoundId;
       boundUpdated = true;
     }
   }
   return false;
+}
+
+inline bool TxStateAddress::hasSymbolicOffsetBounds() const {
+  return !concreteBound(concreteOffsetBound);
 }
 
 ref<TxStateAddress>

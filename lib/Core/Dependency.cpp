@@ -336,7 +336,7 @@ void Dependency::markFlow(ref<TxStateValue> target,
 
 bool Dependency::markPointerFlow(ref<TxStateValue> target,
                                  ref<TxStateValue> checkedAddress,
-                                 std::set<ref<Expr> > &bounds,
+                                 std::set<uint64_t> &bounds,
                                  const std::string &reason) const {
   bool memoryError = false;
   bool boundUpdated = false;
@@ -1227,7 +1227,7 @@ void Dependency::markAllValues(ref<TxStateValue> value,
 }
 
 bool Dependency::markAllPointerValues(ref<TxStateValue> value,
-                                      std::set<ref<Expr> > &bounds,
+                                      std::set<uint64_t> &bounds,
                                       const std::string &reason) {
   if (value.isNull())
     return false;

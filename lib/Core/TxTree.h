@@ -194,7 +194,7 @@ class SubsumptionTableEntry {
       ExecutionState &state, ref<TxInterpolantValue> tabledValue,
       ref<TxInterpolantValue> stateValue, ref<Expr> tabledOffset,
       ref<Expr> stateOffset, std::set<ref<TxStateValue> > &coreValues,
-      std::map<ref<TxStateValue>, std::set<ref<Expr> > > &corePointerValues,
+      std::map<ref<TxStateValue>, std::set<uint64_t> > &corePointerValues,
       std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
       int debugSubsumptionLevel) const;
 
@@ -289,7 +289,7 @@ class SubsumptionTableEntry {
 
   static void interpolateValues(
       ExecutionState &state, std::set<ref<TxStateValue> > &coreValues,
-      std::map<ref<TxStateValue>, std::set<ref<Expr> > > &corePointerValues,
+      std::map<ref<TxStateValue>, std::set<uint64_t> > &corePointerValues,
       int debugSubsumptionLevel);
 
   bool empty() {
@@ -535,7 +535,7 @@ public:
   /// \brief Memory bounds interpolation from a target address. Returns true if
   /// memory bounds check fails somehow.
   bool pointerValuesInterpolation(ref<TxStateValue> value,
-                                  std::set<ref<Expr> > &bounds,
+                                  std::set<uint64_t> &bounds,
                                   const std::string &reason) {
     return dependency->markAllPointerValues(value, bounds, reason);
   }

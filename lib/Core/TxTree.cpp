@@ -65,7 +65,7 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
     ExecutionState &state, ref<TxInterpolantValue> tabledValue,
     ref<TxInterpolantValue> stateValue, ref<Expr> tabledOffset,
     ref<Expr> stateOffset, std::set<ref<TxStateValue> > &coreValues,
-    std::map<ref<TxStateValue>, std::set<ref<Expr> > > &corePointerValues,
+    std::map<ref<TxStateValue>, std::set<uint64_t> > &corePointerValues,
     std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
     int debugSubsumptionLevel) const {
   ref<Expr> constraint;
@@ -79,7 +79,7 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
   } else if (Dependency::boundInterpolation() && tabledValue->isPointer() &&
              stateValue->isPointer()) {
     if (!ExactAddressInterpolant && tabledValue->useBound()) {
-      std::set<ref<Expr> > bounds;
+      std::set<uint64_t> bounds;
       ref<Expr> boundsCheck = tabledValue->getBoundsCheck(
           stateValue, bounds, unifiedBases, debugSubsumptionLevel);
 
@@ -763,7 +763,7 @@ ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
 
 void SubsumptionTableEntry::interpolateValues(
     ExecutionState &state, std::set<ref<TxStateValue> > &coreValues,
-    std::map<ref<TxStateValue>, std::set<ref<Expr> > > &corePointerValues,
+    std::map<ref<TxStateValue>, std::set<uint64_t> > &corePointerValues,
     int debugSubsumptionLevel) {
   std::string reason = "";
   if (debugSubsumptionLevel >= 1) {
@@ -794,7 +794,7 @@ void SubsumptionTableEntry::interpolateValues(
   if (Dependency::boundInterpolation() && !ExactAddressInterpolant) {
     reason = "interpolating memory bound for " + reason;
 
-    for (std::map<ref<TxStateValue>, std::set<ref<Expr> > >::iterator
+    for (std::map<ref<TxStateValue>, std::set<uint64_t> >::iterator
              it = corePointerValues.begin(),
              ie = corePointerValues.end();
          it != ie; ++it) {
@@ -838,7 +838,7 @@ bool SubsumptionTableEntry::subsumed(
   std::set<ref<TxStateValue> > coreValues;
 
   // Pointer values in the core for memory bounds interpolation.
-  std::map<ref<TxStateValue>, std::set<ref<Expr> > > corePointerValues;
+  std::map<ref<TxStateValue>, std::set<uint64_t> > corePointerValues;
 
   {
     TimerStatIncrementer t(concretelyAddressedStoreExpressionBuildTime);
@@ -929,7 +929,7 @@ bool SubsumptionTableEntry::subsumed(
                      tabledValue->isPointer() && stateValue->isPointer()) {
             ref<Expr> boundsCheck;
             if (!ExactAddressInterpolant && tabledValue->useBound()) {
-              std::set<ref<Expr> > bounds;
+              std::set<uint64_t> bounds;
               boundsCheck = tabledValue->getBoundsCheck(
                   stateValue, bounds, unifiedBases, debugSubsumptionLevel);
               if (!boundsCheck.isNull()) {

@@ -312,7 +312,7 @@ namespace klee {
     void markPointerFlow(ref<TxStateValue> target,
                          ref<TxStateValue> checkedOffset,
                          const std::string &reason) const {
-      std::set<ref<Expr> > bounds;
+      std::set<uint64_t> bounds;
       markPointerFlow(target, checkedOffset, bounds, reason);
     }
 
@@ -321,7 +321,7 @@ namespace klee {
     /// slackening)
     bool markPointerFlow(ref<TxStateValue> target,
                          ref<TxStateValue> checkedOffset,
-                         std::set<ref<Expr> > &bounds,
+                         std::set<uint64_t> &bounds,
                          const std::string &reason) const;
 
     /// \brief Record the expressions of a call's arguments
@@ -459,7 +459,7 @@ namespace klee {
     /// detected; false otherwise.
     bool markAllPointerValues(ref<TxStateValue> value,
                               const std::string &reason) {
-      std::set<ref<Expr> > bounds;
+      std::set<uint64_t> bounds;
       return markAllPointerValues(value, bounds, reason);
     }
 
@@ -467,7 +467,7 @@ namespace klee {
     /// sources and mark them as in the core. Returns true if bounds error was
     /// detected; false otherwise.
     bool markAllPointerValues(ref<TxStateValue> value,
-                              std::set<ref<Expr> > &bounds,
+                              std::set<uint64_t> &bounds,
                               const std::string &reason);
 
     /// \brief Tests if bound interpolation shold be enabled

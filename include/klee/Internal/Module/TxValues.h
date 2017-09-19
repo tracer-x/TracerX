@@ -305,7 +305,7 @@ private:
   /// This constitutes the weakest liberal precondition of the memory checks
   /// against which the offsets of the pointer values of the current state are
   /// to be checked.
-  std::map<ref<AllocationInfo>, std::set<ref<Expr> > > allocationBounds;
+  std::map<ref<AllocationInfo>, std::set<uint64_t> > allocationBounds;
 
   /// \brief In case the stored value was a pointer, then this should be a
   /// non-empty map mapping of allocation sites to the set of offsets. This is
@@ -400,7 +400,7 @@ public:
   /// \return Null expression when a symbolic bound exists in the interpolant,
   /// the bound checking constraint otherwise.
   ref<Expr> getBoundsCheck(
-      ref<TxInterpolantValue> svalue, std::set<ref<Expr> > &bounds,
+      ref<TxInterpolantValue> svalue, std::set<uint64_t> &bounds,
       std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
       int debugSubsumptionLevel) const;
 
@@ -440,11 +440,8 @@ private:
   /// \brief The absolute address
   ref<Expr> address;
 
-  /// \brief The expressions representing the bound on the offset, i.e., the
-  /// interpolant, in case it is symbolic.
-  std::set<ref<Expr> > symbolicOffsetBounds;
-
-  /// \brief This is the concrete offset bound
+  /// \brief This is the concrete offset bound. Its value is
+  /// klee::symbolicBoundId in case the bound should be symbolic
   uint64_t concreteOffsetBound;
 
   /// \brief The size of this allocation (0 means unknown)
@@ -556,7 +553,7 @@ public:
   /// \brief Adjust the offset bound for interpolation (a.k.a. slackening).
   /// Returns true if a memory bound violation is detected, and false if not.
   bool adjustOffsetBound(ref<TxStateValue> checkedAddress,
-                         std::set<ref<Expr> > &bounds, bool &boundUpdated);
+                         std::set<uint64_t> &bounds, bool &boundUpdated);
 
   bool hasConstantAddress() const { return llvm::isa<ConstantExpr>(address); }
 
@@ -568,9 +565,7 @@ public:
 
   ref<Expr> getBase() const { return variable->getBase(); }
 
-  const std::set<ref<Expr> > &getSymbolicOffsetBounds() const {
-    return symbolicOffsetBounds;
-  }
+  inline bool hasSymbolicOffsetBounds() const;
 
   ref<AllocationContext> getContext() const { return variable->getContext(); }
 
