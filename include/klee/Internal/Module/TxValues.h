@@ -440,11 +440,8 @@ private:
   /// \brief The absolute address
   ref<Expr> address;
 
-  /// \brief The expressions representing the bound on the offset, i.e., the
-  /// interpolant, in case it is symbolic.
-  std::set<ref<Expr> > symbolicOffsetBounds;
-
-  /// \brief This is the concrete offset bound
+  /// \brief This is the concrete offset bound. Its value is
+  /// klee::symbolicBoundId in case the bound should be symbolic
   uint64_t concreteOffsetBound;
 
   /// \brief The size of this allocation (0 means unknown)
@@ -568,9 +565,7 @@ public:
 
   ref<Expr> getBase() const { return variable->getBase(); }
 
-  const std::set<ref<Expr> > &getSymbolicOffsetBounds() const {
-    return symbolicOffsetBounds;
-  }
+  inline bool hasSymbolicOffsetBounds() const;
 
   ref<AllocationContext> getContext() const { return variable->getContext(); }
 

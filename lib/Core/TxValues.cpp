@@ -258,9 +258,7 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
         allocationBounds[allocInfo].insert(concreteBound);
 
       // Symbolic bounds
-      const std::set<ref<Expr> > &bounds = (*it)->getSymbolicOffsetBounds();
-
-      if (!bounds.empty()) {
+      if ((*it)->hasSymbolicOffsetBounds()) {
         allocationBounds[allocInfo].insert(symbolicBoundId);
       }
     }
@@ -733,13 +731,15 @@ bool TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
         }
       }
 
-      symbolicOffsetBounds.insert(
-          SubExpr::create(Expr::createPointer(*it1),
-                          SubExpr::create(checkedOffset, getOffset())));
+      concreteOffsetBound = symbolicBoundId;
       boundUpdated = true;
     }
   }
   return false;
+}
+
+inline bool TxStateAddress::hasSymbolicOffsetBounds() const {
+  return !concreteBound(concreteOffsetBound);
 }
 
 ref<TxStateAddress>
