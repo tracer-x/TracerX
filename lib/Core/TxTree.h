@@ -426,7 +426,7 @@ class TxTreeNode {
   /// Second argument is 1 means instruction is dependent to a target
   /// Second argument is 2 means negation of the instruction is dependent to a
   /// target
-  std::map<KInstruction *, int> reverseInstructionList;
+  std::vector<std::pair<KInstruction *, int> > reverseInstructionList;
 
   uint64_t nodeSequenceNumber;
 
