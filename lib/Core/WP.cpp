@@ -120,8 +120,8 @@ std::vector<std::pair<KInstruction *, int> > WeakestPreCondition::markVariables(
         }
       }
     } else if ((*it).second == 2) {
-      klee_error(
-          "Marking not implemented for false dependency in instruction yet!");
+      //TODO: Marking not implemented for false dependency in instruction yet!
+      // At the current moment it is not needed.
     }
   }
 
@@ -368,6 +368,10 @@ ref<Expr> WeakestPreCondition::GenerateWP(
       }
 
       case llvm::Instruction::Call: {
+        if (markAllFlag == true && !isTargetDependent(i, this->WPExpr)) {
+           break;
+        }
+
         llvm::CallInst *call = dyn_cast<llvm::CallInst>(i);
 
         if (call->getCalledFunction()->getName() == "klee_assume") {
@@ -376,10 +380,21 @@ ref<Expr> WeakestPreCondition::GenerateWP(
                    "klee_make_symbolic") {
           // TODO: Nothing specific is needed to be done for now.
         } else {
-          if (call->doesNotReturn())
-            klee_error("Call Instructions are not yet implemented.");
-          else
-            klee_error("Call Instructions are not yet implemented.");
+          if (call->doesNotReturn()){
+            klee_error("Call Instructions without return value are not yet implemented.");
+          }else{
+            llvm::Function *CalledFunc = call->getCalledFunction();
+            llvm::Function::ArgumentListType &args = CalledFunc->getArgumentList();
+            llvm::Function::ArgumentListType::iterator firstArg = args.begin();
+            llvm::Function::ArgumentListType::iterator lastArg = args.end();
+            uint64_t i = 0;
+            for ( ;firstArg != lastArg && i < call->getNumOperands(); ++firstArg,i++)
+            {
+            	llvm::Value* funcArg = dyn_cast<llvm::Value>(firstArg);
+            	this->WPExpr = replaceCallArguments(this->WPExpr,funcArg,call->getOperand(i));
+            }
+            klee_error("Call Instructions with return value are not yet implemented.");
+          }
         }
         break;
       }
@@ -1316,4 +1331,98 @@ WeakestPreCondition::updateExistentials(std::set<const Array *> existentials,
   klee_error(
       "Control should not reach here in WeakestPreCondition::getVarFromExpr");
   return existentials;
+}
+
+ref<Expr> WeakestPreCondition::replaceCallArguments(ref<Expr> interpolant,llvm::Value* funcArg,llvm::Value* callArg){
+	  switch (interpolant->getKind()) {
+	  case Expr::InvalidKind:
+	  case Expr::Constant: {
+	    return interpolant;
+	  }
+
+	  case Expr::Read:
+	  case Expr::Concat: {
+		  llvm::Value *array = getValuePointer(interpolant);
+		  if (array == funcArg){
+			  std::string arrayName = callArg->getName();
+			  	    const std::string ext(".addr");
+			  	    if (arrayName.find(ext))
+			  	      arrayName = arrayName.substr(0, arrayName.size() - ext.size());
+			  	    const Array *symArray = ShadowArray::getSymbolicShadowArray(arrayName);
+			  	    llvm::errs() << symArray->getName();
+
+			  	    if (symArray != NULL) {
+			  	      ref<Expr> Res(0);
+			  	      unsigned NumBytes = symArray->getDomain() / 8;
+			  	      assert(symArray->getDomain() == NumBytes * 8 && "Invalid read size!");
+			  	      for (unsigned i = 0; i != NumBytes; ++i) {
+			  	        unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
+			  	        ref<Expr> Byte =
+			  	            ReadExpr::create(UpdateList(symArray, 0),
+			  	                             ConstantExpr::alloc(idx, symArray->getDomain()));
+			  	        Res = i ? ConcatExpr::create(Byte, Res) : Byte;
+			  	      }
+			  	      klee_error("WeakestPreCondition::replaceCallArguments Not tested yet");
+			  	      return Res;
+			  	    } else {
+			  	      interpolant->dump();
+			  	      klee_error("WeakestPreCondition::replaceCallArguments Shadow array "
+			  	                 "doesn't exist!");
+			  	    }
+		  }
+		  return interpolant;
+	  }
+
+	  case Expr::NotOptimized:
+	  case Expr::Not:
+	  case Expr::Extract:
+	  case Expr::ZExt:
+	  case Expr::SExt: {
+	    ref<Expr> kids[1];
+	    kids[0] = replaceCallArguments(interpolant->getKid(0),funcArg,callArg);
+	    return interpolant->rebuild(kids);
+	  }
+
+	  case Expr::Eq:
+	  case Expr::Ne:
+	  case Expr::Ult:
+	  case Expr::Ule:
+	  case Expr::Ugt:
+	  case Expr::Uge:
+	  case Expr::Slt:
+	  case Expr::Sle:
+	  case Expr::Sgt:
+	  case Expr::Sge:
+	  case Expr::LastKind:
+	  case Expr::Add:
+	  case Expr::Sub:
+	  case Expr::Mul:
+	  case Expr::UDiv:
+	  case Expr::SDiv:
+	  case Expr::URem:
+	  case Expr::SRem:
+	  case Expr::And:
+	  case Expr::Or:
+	  case Expr::Xor:
+	  case Expr::Shl:
+	  case Expr::LShr:
+	  case Expr::AShr: {
+	    ref<Expr> kids[2];
+	    kids[0] = replaceCallArguments(interpolant->getKid(0),funcArg,callArg);
+	    kids[1] = replaceCallArguments(interpolant->getKid(1),funcArg,callArg);
+	    return interpolant->rebuild(kids);
+	  }
+
+	  case Expr::Select: {
+	    ref<Expr> kids[3];
+	    kids[0] = replaceCallArguments(interpolant->getKid(0),funcArg,callArg);
+	    kids[1] = replaceCallArguments(interpolant->getKid(1),funcArg,callArg);
+	    kids[2] = replaceCallArguments(interpolant->getKid(2),funcArg,callArg);
+	    return interpolant->rebuild(kids);
+	  }
+	  }
+	  // Sanity check
+	  klee_error(
+	      "Control should not reach here in WeakestPreCondition::replaceCallArguments");
+	  return interpolant;
 }
