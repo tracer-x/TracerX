@@ -125,20 +125,17 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
     }
     if (!offsetsCheck->isTrue())
       constraint = offsetsCheck;
-
-    // We record the value of the pointer for interpolation marking
-    coreValues.insert(stateValue->getOriginalValue());
-    return constraint;
+  } else {
+    // Implication: if tabledConcreteAddress == stateSymbolicAddress, then
+    // tabledValue->getExpression() == stateValue->getExpression()
+    constraint = OrExpr::create(
+        EqExpr::create(ConstantExpr::create(0, Expr::Bool),
+                       EqExpr::create(tabledOffset, stateOffset)),
+        EqExpr::create(tabledValue->getExpression(),
+                       stateValue->getExpression()));
   }
 
-  // Implication: if tabledConcreteAddress == stateSymbolicAddress, then
-  // tabledValue->getExpression() == stateValue->getExpression()
-  constraint =
-      OrExpr::create(EqExpr::create(ConstantExpr::create(0, Expr::Bool),
-                                    EqExpr::create(tabledOffset, stateOffset)),
-                     EqExpr::create(tabledValue->getExpression(),
-                                    stateValue->getExpression()));
-
+  // We record the value of the pointer for interpolation marking
   coreValues.insert(stateValue->getOriginalValue());
   return constraint;
 }
