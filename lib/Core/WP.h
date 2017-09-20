@@ -161,6 +161,9 @@ public:
   // \brief Add new existential variables to the list
   std::set<const Array *>
   updateExistentials(std::set<const Array *> existentials, ref<Expr> wp);
+
+  // \brief Replace arguments passed to a call with the function arguments in the WPExpr
+  ref<Expr> replaceCallArguments(ref<Expr> wp, llvm::Value* funcArg,llvm::Value* callArg);
 };
 }
 #endif /* WP_H_ */
