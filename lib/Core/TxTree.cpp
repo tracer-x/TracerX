@@ -320,7 +320,8 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
         ref<Expr> newIntpRight;
 
         // When the if condition holds, we perform substitution
-        if (hasSubExpression(equalityConstraintLeft,
+        if (interpolantAtom->getNumKids() > 0 &&
+            hasSubExpression(equalityConstraintLeft,
                              interpolantAtom->getKid(0))) {
           // Here we perform substitution, where given
           // an interpolant atom and an equality constraint,
