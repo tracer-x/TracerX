@@ -19,11 +19,34 @@
 #include "klee/ExecutionState.h"
 #include <klee/Expr.h>
 #include <klee/ExprBuilder.h>
+#include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ArrayCache.h>
 #include "TxDependency.h"
 #include "TxTree.h"
 
 namespace klee {
+
+/// \brief Implements the replacement mechanism for replacing variables in WP
+/// Expr, used in
+/// replacing free with bound variables.
+class WPArrayStore {
+
+  static std::map<llvm::Value *, std::pair<const Array *, ref<Expr> > >
+      arrayStore;
+
+public:
+  static ArrayCache ac;
+  static const Array *array;
+  static ref<Expr> constValues;
+
+  static void insert(llvm::Value *value, const Array *array, ref<Expr> expr);
+
+  static ref<Expr> createAndInsert(std::string arrayName, llvm::Value *value);
+
+  static const Array *getArrayRef(llvm::Value *value);
+
+  static llvm::Value *getValuePointer(ref<Expr> expr);
+};
 
 /// \brief The class that implements weakest precondition interpolant.
 class WeakestPreCondition {
@@ -33,12 +56,9 @@ class WeakestPreCondition {
   friend class ExecutionState;
 
   std::set<llvm::Value *> markedVariables;
-  // Used to represent constants during the simplification of WPExpr to
-  // canonical form
-  ref<Expr> constValues;
+
   ref<Expr> WPExpr;
   ExprBuilder *eb;
-  ArrayCache ac;
 
   // Respective interpolation tree node
   TxTreeNode *node;
@@ -48,10 +68,6 @@ class WeakestPreCondition {
   TxDependency *dependency;
 
   int debugSubsumptionLevel;
-
-  std::map<llvm::Value *, std::pair<const Array *, ref<Expr> > > arrayStore;
-
-  const Array *array;
 
 public:
   WeakestPreCondition(TxTreeNode *_node, TxDependency *_dependency);
@@ -111,16 +127,6 @@ public:
   // canonical form)
   void convertToExpr(std::map<ref<Expr>, uint64_t> *newLinearTerm);
 
-  // \brief Store a row in arrayStore with llvm::Value and the respective Array
-  // and Expr
-  void storeArrayRef(llvm::Value *value, const Array *array, ref<Expr> expr);
-
-  // \brief Get respective reference to array of an LLVM value
-  const Array *getArrayRef(llvm::Value *value);
-
-  // \brief Get respective value pointer of a read/concat Expr
-  llvm::Value *getValuePointer(ref<Expr> expr);
-
   // \brief Instantiates the variables in WPExpr by their latest value for the
   // implication test.
   ref<Expr>
@@ -139,7 +145,7 @@ public:
 
   // \brief Return true if the destination of the LLVM instruction appears in
   // the WP expression
-  bool isTargetDependent(llvm::Instruction *inst, ref<Expr> wp);
+  bool isTargetDependent(llvm::Value *inst, ref<Expr> wp);
 
   // \brief Update subsumption table entry based on the WP Expr
   TxSubsumptionTableEntry *
@@ -162,8 +168,10 @@ public:
   std::set<const Array *>
   updateExistentials(std::set<const Array *> existentials, ref<Expr> wp);
 
-  // \brief Replace arguments passed to a call with the function arguments in the WPExpr
-  ref<Expr> replaceCallArguments(ref<Expr> wp, llvm::Value* funcArg,llvm::Value* callArg);
+  // \brief Replace arguments passed to a call with the function arguments in
+  // the WPExpr
+  ref<Expr> replaceCallArguments(ref<Expr> wp, llvm::Value *funcArg,
+                                 llvm::Value *callArg);
 };
 }
 #endif /* WP_H_ */

@@ -806,7 +806,6 @@ bool TxSubsumptionTableEntry::subsumed(
     }
     if (WPInterpolant)
       state.txTreeNode->setWPAtSubsumption(wpInterpolant);
-    klee_error("Sanity check for copying WP Expr to subsumed node");
     return true;
   }
 
@@ -1313,7 +1312,6 @@ bool TxSubsumptionTableEntry::subsumed(
                         debugSubsumptionLevel);
       if (WPInterpolant)
         state.txTreeNode->setWPAtSubsumption(wpInterpolant);
-      klee_error("Sanity check for copying WP Expr to subsumed node");
       return true;
     }
 
@@ -2051,6 +2049,11 @@ TxTree::TxTree(
     currentTxTreeNode = TxTreeNode::createRoot(_targetData, _globalAddresses);
   }
   root = currentTxTreeNode;
+
+  // Used by WP expression
+  WPArrayStore::array = WPArrayStore::ac.CreateArray("const", 128);
+  WPArrayStore::constValues =
+      Expr::createTempRead(WPArrayStore::array, Expr::Int32);
 }
 
 bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
@@ -2201,7 +2204,6 @@ void TxTree::markPathCondition(ExecutionState &state,
 
   llvm::BranchInst *binst =
       llvm::dyn_cast<llvm::BranchInst>(state.prevPC->inst);
-
   if (binst) {
     ref<Expr> unknownExpression;
     std::string reason = "";
@@ -2253,10 +2255,19 @@ void TxTree::markInstruction(KInstruction *instr, bool branchFlag) {
       std::find(currentTxTreeNode->reverseInstructionList.begin(),
                 currentTxTreeNode->reverseInstructionList.end(),
                 std::pair<KInstruction *, int>(instr, 0));
-  if (branchFlag == true)
-    iter->second = 1;
-  else
-    iter->second = 2;
+  // Only mark the br instruction that jumps to cond.false condition for now.
+  // TODO: remove this condition so all branch instructions are marked.
+
+  if (isa<llvm::BranchInst>(iter->first->inst)) {
+    llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(iter->first->inst);
+    if (br->getSuccessor(1)->getName() == "cond.false" ||
+        br->getSuccessor(1)->getName() == "cond.false") {
+      if (branchFlag == true)
+        iter->second = 1;
+      else
+        iter->second = 2;
+    }
+  }
 }
 
 void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
@@ -2371,6 +2382,9 @@ TxTreeNode::TxTreeNode(
 TxTreeNode::~TxTreeNode() {
   if (dependency)
     delete dependency;
+  if (wp) {
+    delete wp;
+  }
 }
 
 ref<Expr> TxTreeNode::getInterpolant(
@@ -2401,10 +2415,10 @@ ref<Expr> TxTreeNode::getWPInterpolant() {
   } else {
     expr = wp->intersectExpr(childWPInterpolant[0], childWPInterpolant[1]);
 
-    // Setting the intersection of child nodes as the target in the of the nodes
+    // Setting the intersection of child nodes as the target in the current node
     wp->setWPExpr(expr);
 
-    // Generate weakest precondition from pathCondition and/or BB instructions
+    // Generate weakest precondition fot the current node
     // All instructions are marked
     markAllFlag = 1;
     expr = wp->GenerateWP(reverseInstructionList, markAllFlag);

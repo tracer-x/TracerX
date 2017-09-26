@@ -74,15 +74,21 @@ ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
   if (!value->hasName()) {
     klee_error("Dependency::getAddress:Instruction has no name!\n");
   }
+
   std::string arrayName = value->getName();
+
+  if (arrayName == "")
+    klee_error("Dependency::getAddress Arrayname is empty !\n");
   const std::string ext(".addr");
-  if (arrayName.find(ext))
+  if (arrayName.find(ext) != std::string::npos)
     arrayName = arrayName.substr(0, arrayName.size() - ext.size());
   const Array *symArray = TxShadowArray::getSymbolicArray(value->getName());
   if (symArray != NULL) {
+    // Symbolic array exists. Generating shadow Expr.
     ref<Expr> Res(0);
     unsigned NumBytes = symArray->getDomain() / 8;
     assert(symArray->getDomain() == NumBytes * 8 && "Invalid read size!");
+
     for (unsigned i = 0; i != NumBytes; ++i) {
       unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
       ref<Expr> Byte =
@@ -90,21 +96,13 @@ ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
                            ConstantExpr::alloc(idx, symArray->getDomain()));
       Res = i ? ConcatExpr::create(Byte, Res) : Byte;
     }
-    wp->storeArrayRef(value, symArray, Res);
+    // Storing entry
+    WPArrayStore::insert(value, symArray, Res);
     return Res;
   }
 
-  // Todo: only catching the type of integer and pointers
-  unsigned int size = 0;
-  if (value->getType()->isPointerTy()) {
-    size = value->getType()->getArrayElementType()->getIntegerBitWidth();
-  } else {
-    size = value->getType()->getIntegerBitWidth();
-  }
-  // Todo: tmpArray object should be reclaimed sometime later
-  tmpArray = ac->CreateArray(arrayName, size);
-  ref<Expr> tmpExpr = Expr::createTempRead(tmpArray, size);
-  wp->storeArrayRef(value, tmpArray, tmpExpr);
+  // Symbolic array doesn't exist create one
+  ref<Expr> tmpExpr = WPArrayStore::createAndInsert(arrayName, value);
   return tmpExpr;
 }
 
