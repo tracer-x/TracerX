@@ -275,7 +275,8 @@ class SubsumptionTableEntry {
                                           bool &hasExistentialsOnly);
 
   /// \brief Function to collect substitution from a conjunction of equalities.
-  static void getSubstitution1(ref<Expr> equalities,
+  static void getSubstitution1(std::set<const Array *> &existentials,
+                               ref<Expr> equalities,
                                std::map<ref<Expr>, ref<Expr> > &map);
 
   /// \brief Function to collect substitution from a conjunction of formulas.
