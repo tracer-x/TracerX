@@ -546,20 +546,20 @@ ref<Expr> SubsumptionTableEntry::simplifyEqualityExpr(
 }
 
 void
-SubsumptionTableEntry::getSubstitution1(ref<Expr> equalities,
+SubsumptionTableEntry::getSubstitution1(std::set<const Array *> &existentials,
+                                        ref<Expr> equalities,
                                         std::map<ref<Expr>, ref<Expr> > &map) {
-  // It is assumed the lhs is an expression on the existentially-quantified
-  // variable whereas the rhs is an expression on the free variables.
+  // It is assumed the rhs is an expression on the free variables.
   if (llvm::isa<EqExpr>(equalities)) {
     ref<Expr> lhs = equalities->getKid(0);
-    if (isVariable(lhs)) {
+    if (isVariable(lhs) && hasVariableInSet(existentials, lhs)) {
       map[lhs] = equalities->getKid(1);
     } else if (SExtExpr *lhsSExt = llvm::dyn_cast<SExtExpr>(lhs)) {
       // Here we skin a sign-extend expression to retrieve the variable within
       if (SExtExpr *rhsSExt = llvm::dyn_cast<SExtExpr>(equalities->getKid(1))) {
         if (lhsSExt->getWidth() == rhsSExt->getWidth()) {
           lhs = lhsSExt->getKid(0);
-          if (isVariable(lhs)) {
+          if (isVariable(lhs) && hasVariableInSet(existentials, lhs)) {
             map[lhs] = rhsSExt->getKid(0);
           }
         }
@@ -569,15 +569,15 @@ SubsumptionTableEntry::getSubstitution1(ref<Expr> equalities,
       if (ZExtExpr *rhsZExt = llvm::dyn_cast<ZExtExpr>(equalities->getKid(1))) {
         if (lhsZExt->getWidth() == rhsZExt->getWidth()) {
           lhs = lhsZExt->getKid(0);
-          if (isVariable(lhs)) {
+          if (isVariable(lhs) && hasVariableInSet(existentials, lhs)) {
             map[lhs] = rhsZExt->getKid(0);
           }
         }
       }
     }
   } else if (llvm::isa<AndExpr>(equalities)) {
-    getSubstitution1(equalities->getKid(0), map);
-    getSubstitution1(equalities->getKid(1), map);
+    getSubstitution1(existentials, equalities->getKid(0), map);
+    getSubstitution1(existentials, equalities->getKid(1), map);
   }
 }
 
@@ -730,7 +730,7 @@ ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
 
   std::map<ref<Expr>, ref<Expr> > substitution1;
   ref<Expr> equalities = body->getKid(1);
-  getSubstitution1(equalities, substitution1);
+  getSubstitution1(expr->variables, equalities, substitution1);
 
   ref<Expr> interpolant =
       ApplySubstitutionVisitor(substitution1).visit(body->getKid(0));
