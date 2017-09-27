@@ -294,25 +294,6 @@ void Dependency::addDependencyToNonPointer(ref<TxStateValue> source,
   target->addDependency(source, nullLocation);
 }
 
-std::set<ref<TxStateValue> >
-Dependency::directFlowSources(ref<TxStateValue> target) const {
-  std::set<ref<TxStateValue> > ret;
-  std::map<ref<TxStateValue>, ref<TxStateAddress> > sources =
-      target->getSources();
-  std::set<ref<TxStateValue> > &loadAddresses = target->getLoadAddresses();
-  std::set<ref<TxStateValue> > &storeAddresses = target->getStoreAddresses();
-
-  for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::iterator it =
-           sources.begin();
-       it != sources.end(); ++it) {
-    ret.insert(it->first);
-  }
-
-  ret.insert(loadAddresses.begin(), loadAddresses.end());
-  ret.insert(storeAddresses.begin(), storeAddresses.end());
-  return ret;
-}
-
 void Dependency::markFlow(ref<TxStateValue> target,
                           const std::string &reason) const {
   if (target.isNull())
@@ -326,9 +307,25 @@ void Dependency::markFlow(ref<TxStateValue> target,
   target->setAsCore(reason);
   target->disableBoundInterpolation();
 
-  std::set<ref<TxStateValue> > stepSources = directFlowSources(target);
-  for (std::set<ref<TxStateValue> >::iterator it = stepSources.begin(),
-                                              ie = stepSources.end();
+  std::map<ref<TxStateValue>, ref<TxStateAddress> > sources =
+      target->getSources();
+  std::set<ref<TxStateValue> > &loadAddresses = target->getLoadAddresses();
+  std::set<ref<TxStateValue> > &storeAddresses = target->getStoreAddresses();
+
+  for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::iterator it =
+           sources.begin();
+       it != sources.end(); ++it) {
+    markFlow(it->first, reason);
+  }
+
+  for (std::set<ref<TxStateValue> >::iterator it = loadAddresses.begin(),
+                                              ie = loadAddresses.end();
+       it != ie; ++it) {
+    markFlow(*it, reason);
+  }
+
+  for (std::set<ref<TxStateValue> >::iterator it = storeAddresses.begin(),
+                                              ie = storeAddresses.end();
        it != ie; ++it) {
     markFlow(*it, reason);
   }
