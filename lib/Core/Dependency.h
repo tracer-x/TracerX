@@ -297,10 +297,6 @@ namespace klee {
     void addDependencyToNonPointer(ref<TxStateValue> source,
                                    ref<TxStateValue> target);
 
-    /// \brief All values that flows to the target in one step
-    std::set<ref<TxStateValue> >
-    directFlowSources(ref<TxStateValue> target) const;
-
     /// \brief Mark as core all the values and locations that flows to the
     /// target
     void markFlow(ref<TxStateValue> target, const std::string &reason) const;
