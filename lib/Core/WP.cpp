@@ -240,7 +240,7 @@ ref<Expr> WeakestPreCondition::GenerateWP(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList,
     bool markAllFlag) {
 
-  if (debugSubsumptionLevel >= 3)
+  if (debugSubsumptionLevel >= 4)
     klee_message("**********WP Interpolant Start************");
   for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
@@ -249,7 +249,7 @@ ref<Expr> WeakestPreCondition::GenerateWP(
     llvm::Instruction *i = (*it).first->inst;
     if ((*it).second == 1 || markAllFlag == true) {
       // Retrieve the instruction
-      if (debugSubsumptionLevel >= 3) {
+      if (debugSubsumptionLevel >= 4) {
         klee_message("Printing LLVM Instruction: ");
         i->dump();
         klee_message("---------------------------------------------");
@@ -539,8 +539,8 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         klee_error("+++++++++++++++++++++++++++++++++++++++++++++");
       }
       }
-      if (debugSubsumptionLevel >= 3) {
-        klee_message("**** Weakest PreCondition ****");
+      if (debugSubsumptionLevel >= 4) {
+        klee_message("**** Weakest PreCondition At Each Instruction ****");
         WPExpr->dump();
         klee_message("***************************************");
       }
@@ -550,7 +550,14 @@ ref<Expr> WeakestPreCondition::GenerateWP(
     }
   }
 
-  if (debugSubsumptionLevel >= 3)
+  if (debugSubsumptionLevel >= 3) {
+    klee_message("***************************************");
+    klee_message("******** Weakest PreCondition *********");
+    WPExpr->dump();
+    klee_message("***************************************");
+  }
+
+  if (debugSubsumptionLevel >= 4)
     klee_message("**********Generating WP finished**********");
 
   return WPExpr;
@@ -1083,7 +1090,7 @@ WeakestPreCondition::updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry,
     entry->setInterpolant(newInterpolant);
     entry->setExistentials(newExistentials);
   }
-  if (debugSubsumptionLevel >= 3) {
+  if (debugSubsumptionLevel >= 4) {
     // For future reference
     if (!interpolant.isNull())
       interpolant->dump();
@@ -1150,9 +1157,11 @@ WeakestPreCondition::updateConcretelyAddressedStore(
     if ((*it).first->getValue() == allocaVar)
       candidateForRemove = it;
   }
+
   if (candidateForRemove != concretelyAddressedStore.end()) {
     // TODO: Should be handled, not working
     LowerInterpolantStore temp = candidateForRemove->second;
+
     for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
                                                ie2 = temp.end();
          it2 != ie2; ++it2) {

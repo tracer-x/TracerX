@@ -1493,7 +1493,6 @@ bool TxSubsumptionTableEntry::subsumed(
 
     // We create path condition marking structure and mark core constraints
     state.txTreeNode->unsatCoreInterpolation(unsatCore);
-
     interpolateValues(state, coreValues, corePointerValues,
                       debugSubsumptionLevel);
     if (WPInterpolant)
@@ -2052,8 +2051,7 @@ TxTree::TxTree(
 
   // Used by WP expression
   WPArrayStore::array = WPArrayStore::ac.CreateArray("const", 128);
-  WPArrayStore::constValues =
-      Expr::createTempRead(WPArrayStore::array, Expr::Int32);
+  WPArrayStore::constValues = ConstantExpr::create(0, 32);
 }
 
 bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
