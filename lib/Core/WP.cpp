@@ -970,7 +970,7 @@ ref<Expr> WeakestPreCondition::intersectExpr(ref<Expr> expr1,ref<Expr> expr2){
 }
 
 ref<ConstantExpr> WeakestPreCondition::getMinOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2){
-	if(expr1.compare(expr2) >= 0)
+	if((expr1->getAPValue().getSExtValue() < expr2->getAPValue().getSExtValue()))
 		return expr1;
 	else
 		return expr2;
