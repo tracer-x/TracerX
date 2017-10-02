@@ -734,8 +734,6 @@ public:
     return callHistory;
   }
 
-  const std::set<std::string> &getReasons() const { return coreReasons; }
-
   ref<TxInterpolantValue> getInterpolantStyleValue() {
     return TxInterpolantValue::create(value, valueExpr, canInterpolateBound(),
                                       coreReasons, locations);
