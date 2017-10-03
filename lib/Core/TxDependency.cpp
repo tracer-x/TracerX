@@ -106,6 +106,87 @@ ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
   return tmpExpr;
 }
 
+ref<Expr> TxDependency::getPointerAddress(llvm::ConstantExpr *gep, ArrayCache *ac,
+                                        const Array *tmpArray,
+                                        WeakestPreCondition *wp) {
+  std::string arrayName;
+  const std::string ext(".addr");
+  const Array *symArray;
+  ref<Expr> Res;
+  long int offset = 0;
+  ref<Expr> tmpExpr;
+
+  // Todo: only catching the type of integer and pointers
+  unsigned int size = 0;
+  if (gep->getType()->isIntegerTy()) {
+    size = gep->getType()->getIntegerBitWidth();
+  } else if (gep->getType()->isPointerTy() &&
+             gep->getType()->getArrayElementType()->isIntegerTy()) {
+    size = gep->getType()->getArrayElementType()->getIntegerBitWidth();
+  } else if (gep->getType()->isPointerTy() &&
+             gep->getType()->getArrayElementType()->isArrayTy() &&
+             gep->getType()
+                 ->getArrayElementType()
+                 ->getArrayElementType()
+                 ->isIntegerTy()) {
+    size = gep->getType()
+               ->getArrayElementType()
+               ->getArrayElementType()
+               ->getIntegerBitWidth();
+  } else {
+    gep->getType()->dump();
+    klee_error(
+        "Dependency::getPointerAddress getting size is not defined for this "
+        "type yet");
+  }
+
+  if (gep->getNumOperands() == 3) {
+    if (llvm::ConstantInt *CI =
+            dyn_cast<llvm::ConstantInt>(gep->getOperand(2))) {
+      if (CI->getBitWidth() <= 64) {
+        offset = CI->getSExtValue();
+      } else {
+        klee_error("Dependency::getPointerAddress bit size is incorrect.");
+      }
+    } else {
+      klee_error("Dependency::getPointerAddress not integer.");
+    }
+
+    if (!gep->getOperand(0)->hasName()) {
+      klee_error("Dependency::getPointerAddress Instruction has no name!\n");
+    }
+    arrayName = gep->getOperand(0)->getName();
+    if (arrayName == "")
+      klee_error("Dependency::getPointerAddress Arrayname is empty !\n");
+
+    if (arrayName.find(ext) != std::string::npos)
+      arrayName = arrayName.substr(0, arrayName.size() - ext.size());
+    symArray = TxShadowArray::getSymbolicArray(arrayName);
+
+    if (symArray != NULL) {
+      // Symbolic array exists. Generating shadow Expr.
+      unsigned NumBytes = size / 8;
+      if (NumBytes > 1)
+        klee_error("Dependency::getPointerAddress Expression generation not "
+                   "implemented yet");
+      Res =
+          ReadExpr::create(UpdateList(symArray, 0),
+                           ConstantExpr::alloc(offset, symArray->getDomain()));
+
+      // Storing entry
+      WPArrayStore::insert(gep, symArray, Res);
+      return Res;
+    } else {
+      klee_error("Dependency::getPointerAddress Symbolic array not exists.");
+      return tmpExpr;
+    }
+  } else {
+    klee_error("Dependency::getPointerAddress for more or less than 3 "
+               "arguments to getElementPtrConstantExpr not implemented yet.");
+    return tmpExpr;
+  }
+}
+
 ref<Expr> TxDependency::getLatestValueOfAddress(
     llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory) {
     
