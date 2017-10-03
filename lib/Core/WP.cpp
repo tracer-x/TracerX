@@ -90,8 +90,9 @@ ref<Expr> WPArrayStore::createAndInsert(std::string arrayName,
                ->getIntegerBitWidth();
   } else {
     value->getType()->dump();
-    klee_error("Dependency::getAddress getting size is not defined for this "
-               "type yet3");
+    klee_error(
+        "WPArrayStore::createAndInsert getting size is not defined for this "
+        "type yet");
   }
 
   // Todo: tmpArray object should be reclaimed sometime later
@@ -532,6 +533,15 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         klee_error("Ret Instruction is not yet implemented.");
       }
 
+      case llvm::Instruction::Switch: {
+        llvm::SwitchInst *si = cast<llvm::SwitchInst>(i);
+        if (markAllFlag == true &&
+            !isTargetDependent(si->getCondition(), this->WPExpr)) {
+          break;
+        }
+        klee_error("Switch Instruction is not yet implemented.");
+      }
+
       default: {
         klee_message("+++++++++++++++++++++++++++++++++++++++++++++");
         klee_message("LLVM Instruction Not Implemeneted Yet: ");
@@ -577,8 +587,18 @@ ref<Expr> WeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
       left = ConstantExpr::create(CI->getZExtValue(), Expr::Int64);
   } else if (isa<llvm::LoadInst>(operand1)) {
     llvm::LoadInst *inst = dyn_cast<llvm::LoadInst>(operand1);
-    left = dependency->getAddress(inst->getOperand(0), &WPArrayStore::ac,
-                                  WPArrayStore::array, this);
+    if (isa<llvm::GlobalValue>(inst->getOperand(0))) {
+      left = dependency->getAddress(inst->getOperand(0), &WPArrayStore::ac,
+                                    WPArrayStore::array, this);
+    } else if (isa<llvm::ConstantExpr>(inst->getOperand(0))) {
+      llvm::ConstantExpr *gep =
+          dyn_cast<llvm::ConstantExpr>(inst->getOperand(0));
+      left = dependency->getPointerAddress(gep, &WPArrayStore::ac,
+                                           WPArrayStore::array, this);
+    } else {
+      left = dependency->getAddress(inst->getOperand(0), &WPArrayStore::ac,
+                                    WPArrayStore::array, this);
+    }
   } else {
     left = dependency->getAddress(operand1, &WPArrayStore::ac,
                                   WPArrayStore::array, this);
