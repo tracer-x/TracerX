@@ -655,7 +655,7 @@ private:
         doNotInterpolateBound(false) {}
 
 public:
-  ~TxStateValue() { locations.clear(); }
+  ~TxStateValue() {}
 
   static ref<TxStateValue>
   create(llvm::Value *value,
