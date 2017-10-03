@@ -452,6 +452,15 @@ private:
   /// \brief The size of this allocation (0 means unknown)
   uint64_t size;
 
+  TxStateAddress(ref<TxVariable> _variable, ref<Expr> _address,
+                 uint64_t _concreteOffsetBound, uint64_t _size)
+      : refCount(0), variable(_variable), address(_address),
+        concreteOffsetBound(_concreteOffsetBound), size(_size) {}
+
+  TxStateAddress(ref<TxVariable> _variable, ref<Expr> _address, uint64_t _size)
+      : refCount(0), variable(_variable), address(_address),
+        concreteOffsetBound(_size), size(_size) {}
+
   TxStateAddress(ref<AllocationContext> _context, ref<Expr> &_address,
                  ref<Expr> &_base, ref<Expr> &_offset, uint64_t _size)
       : refCount(0), concreteOffsetBound(_size), size(_size) {
@@ -587,6 +596,12 @@ public:
   ref<Expr> getOffset() const { return variable->getOffset(); }
 
   uint64_t getSize() const { return size; }
+
+  /// \brief Copying function
+  ref<TxStateAddress> copy() const {
+    ref<TxStateAddress> ret(new TxStateAddress(variable, address, size));
+    return ret;
+  }
 
   /// \brief Print the content of the object to the LLVM error stream
   void dump() const {
