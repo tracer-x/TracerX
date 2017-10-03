@@ -44,6 +44,8 @@ class TxStateValue;
 
 class TxStoreEntry;
 
+const uint64_t symbolicBoundId = ULONG_MAX;
+
 class AllocationContext {
 
 public:
@@ -474,6 +476,10 @@ private:
       address = ZExtExpr::create(_address, pointerWidth);
     } else {
       address = _address;
+    }
+
+    if (!llvm::isa<ConstantExpr>(address)) {
+      concreteOffsetBound = symbolicBoundId;
     }
 
     ref<AllocationInfo> allocInfo;
