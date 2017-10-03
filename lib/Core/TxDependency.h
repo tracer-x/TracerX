@@ -441,11 +441,17 @@ public:
                          const Array *array,
                          WeakestPreCondition *wp);
 
+  // \brief This function is used in WP analysis, where the value is pointing
+  // to a pointer type. in case the variable has no address in the memory (is
+  // a register) a temporary array is created for it in the memory
+  ref<Expr> getPointerAddress(llvm::ConstantExpr *gep, ArrayCache *ac,
+                         const Array *tmpArray, WeakestPreCondition *wp);
+
   // \brief This function is used in WP analysis, it returns the value of an
   // address
   ref<Expr>
   getLatestValueOfAddress(llvm::Value *value,
-                          const std::vector<llvm::Instruction *> &callHistory);
+                         const std::vector<llvm::Instruction *> &callHistory);
 
   ref<TxStateValue>
   getLatestValue(llvm::Value *value,
