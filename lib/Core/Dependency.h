@@ -166,8 +166,6 @@ namespace klee {
   /// \see TxStateValue
   /// \see TxStateAddress
   class Dependency {
-
-  private:
     /// \brief The path condition manager
     TxPathCondition *pathCondition;
 

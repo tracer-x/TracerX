@@ -655,7 +655,7 @@ private:
         doNotInterpolateBound(false) {}
 
 public:
-  ~TxStateValue() { locations.clear(); }
+  ~TxStateValue() {}
 
   static ref<TxStateValue>
   create(llvm::Value *value,
@@ -733,8 +733,6 @@ public:
   const std::vector<llvm::Instruction *> &getCallHistory() const {
     return callHistory;
   }
-
-  const std::set<std::string> &getReasons() const { return coreReasons; }
 
   ref<TxInterpolantValue> getInterpolantStyleValue() {
     return TxInterpolantValue::create(value, valueExpr, canInterpolateBound(),
