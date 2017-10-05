@@ -70,6 +70,7 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
     int debugSubsumptionLevel) const {
   ref<Expr> constraint;
 
+#ifdef ENABLE_Z3
   if (tabledValue->getExpression()->getWidth() !=
       stateValue->getExpression()->getWidth()) {
     // We conservatively require that the addresses should not be
@@ -137,6 +138,7 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
 
   // We record the value of the pointer for interpolation marking
   coreValues.insert(stateValue->getOriginalValue());
+#endif
   return constraint;
 }
 
@@ -789,6 +791,7 @@ void SubsumptionTableEntry::interpolateValues(
     state.txTreeNode->valuesInterpolation(*it, reason);
   }
 
+#ifdef ENABLE_Z3
   if (Dependency::boundInterpolation() && !ExactAddressInterpolant) {
     reason = "interpolating memory bound for " + reason;
 
@@ -801,6 +804,7 @@ void SubsumptionTableEntry::interpolateValues(
       assert(!memoryError && "interpolation should not result in memory error");
     }
   }
+#endif
 }
 
 bool SubsumptionTableEntry::subsumed(

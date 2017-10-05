@@ -35,9 +35,7 @@ using namespace klee;
 
 namespace klee {
 
-const uint64_t symbolicBoundId = ULONG_MAX;
-
-bool concreteBound(uint64_t bound) { return bound < ULONG_MAX; }
+bool concreteBound(uint64_t bound) { return bound < symbolicBoundId; }
 
 /**/
 
