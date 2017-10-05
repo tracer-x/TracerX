@@ -769,6 +769,9 @@ public:
                                       replacements);
   }
 
+  /// \brief Copy this value
+  ref<TxStateValue> copy();
+
   /// \brief Print minimal information about this object.
   ///
   /// \param stream The stream to print the data to.

@@ -847,6 +847,21 @@ void TxStateValue::print(llvm::raw_ostream &stream,
   }
 }
 
+ref<TxStateValue> TxStateValue::copy() {
+  ref<TxStateValue> ret(new TxStateValue(value, callHistory, valueExpr));
+  ret->location = location->copy();
+  for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::iterator
+           it = sources.begin(),
+           ie = sources.end();
+       it != ie; ++it) {
+    ret->sources[it->first] = (it->second)->copy();
+  }
+  ret->loadAddresses = loadAddresses;
+  ret->storeAddresses = storeAddresses;
+  ret->entryList = entryList;
+  return ret;
+}
+
 void TxStateValue::printMinimal(llvm::raw_ostream &stream,
                                 const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
