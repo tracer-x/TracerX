@@ -89,6 +89,8 @@ extern llvm::cl::opt<bool> ExactAddressInterpolant;
 
 extern llvm::cl::opt<bool> SpecialFunctionBoundInterpolation;
 
+extern llvm::cl::opt<bool> TracerXPointerError;
+
 #endif
 
 #ifdef ENABLE_METASMT

@@ -154,6 +154,12 @@ llvm::cl::opt<bool> SpecialFunctionBoundInterpolation(
                    "named tracerx_check, either memory offset bound or exact "
                    "address (enabled with -exact-address-interpolant)."),
     llvm::cl::init(false));
+
+llvm::cl::opt<bool> TracerXPointerError(
+    "tracerx-pointer-error",
+    llvm::cl::desc("Enables detection of more memory errors by interpolation "
+                   "shadow memory (may be false positives)."),
+    llvm::cl::init(false));
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT

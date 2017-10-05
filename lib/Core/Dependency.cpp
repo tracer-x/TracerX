@@ -1153,6 +1153,10 @@ bool Dependency::executeMemoryOperation(
         markAllValues(val, reason);
       } else {
         ret = markAllPointerValues(val, reason);
+        if (ret && !TracerXPointerError) {
+          markAllValues(val, reason);
+          ret = false;
+        }
       }
     }
   }
