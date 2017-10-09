@@ -862,6 +862,7 @@ void TxStateValue::printMinimal(llvm::raw_ostream &stream,
       stream << prefix << "an interpolant value\n";
     }
     if (!coreReasons.empty()) {
+      stream << prefix << "reason(s) for storage:\n";
       for (std::set<std::string>::const_iterator it = coreReasons.begin(),
                                                  ie = coreReasons.end();
            it != ie; ++it) {
