@@ -71,7 +71,7 @@ ref<Expr> WPArrayStore::createAndInsert(std::string arrayName,
                   std::pair<const Array *, ref<Expr> > >::iterator it =
       arrayStore.find(value);
 
-  // Todo: only catching the type of integer and pointers
+  // Only catching the type of integer and pointers now
   unsigned int size = 0;
   if (value->getType()->isIntegerTy()) {
     size = value->getType()->getIntegerBitWidth();
@@ -210,7 +210,7 @@ std::vector<std::pair<KInstruction *, int> > WeakestPreCondition::markVariables(
           break;
         }
         case llvm::Instruction::Call: {
-          // TODO: Interprocedural Marking not implemented yet!
+          // Interprocedural Marking not implemented yet!
           // At the current moment it is not needed.
           break;
         }
@@ -221,7 +221,7 @@ std::vector<std::pair<KInstruction *, int> > WeakestPreCondition::markVariables(
         }
       }
     } else if ((*it).second == 2) {
-      // TODO: Marking not implemented for false dependency in instruction yet!
+      // Marking not implemented for false dependency in instruction yet!
       // At the current moment it is not needed.
     }
   }
@@ -267,7 +267,7 @@ ref<Expr> WeakestPreCondition::GenerateWP(
           // Nothing is needed to be done	.
         } else {
           // llvm::Value* cond = bi->getCondition();
-          // TODO: Nothing specific is needed to be done for now.
+          // Nothing specific is needed to be done for now.
         }
         break;
       }
@@ -472,10 +472,10 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         llvm::CallInst *call = dyn_cast<llvm::CallInst>(i);
 
         if (call->getCalledFunction()->getName() == "klee_assume") {
-          // TODO: Nothing specific is needed to be done for now.
+          // Nothing specific is needed to be done for now.
         } else if (call->getCalledFunction()->getName() ==
                    "klee_make_symbolic") {
-          // TODO: Nothing specific is needed to be done for now.
+          // Nothing specific is needed to be done for now.
         } else {
           if (call->doesNotReturn()) {
             klee_error("Call Instructions without return value are not yet "
@@ -502,6 +502,7 @@ ref<Expr> WeakestPreCondition::GenerateWP(
 
       case llvm::Instruction::ZExt:
       case llvm::Instruction::SExt:
+      case llvm::Instruction::Trunc:
       case llvm::Instruction::BitCast: {
         // Getting the expressions from the operand
         ref<Expr> operand = this->generateExprFromOperand(i, 0);
@@ -515,7 +516,7 @@ ref<Expr> WeakestPreCondition::GenerateWP(
       }
 
       case llvm::Instruction::Alloca: {
-        // TODO: Nothing specific is needed to be done for now.
+        // Nothing specific is needed to be done for now.
         break;
       }
 
@@ -1099,7 +1100,7 @@ WeakestPreCondition::updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry,
     klee_error("WeakestPreCondition::updateSubsumptionTableEntry for this case "
                "is not implemented yet.");
   else {
-    // TODO: Assuming WP is one frame, fix this
+    // TODO: Assuming WP is one frame
     TxStore::TopInterpolantStore newConcretelyAddressedStore =
         updateConcretelyAddressedStore(concretelyAddressedStore, wp);
     ref<Expr> newInterpolant =
@@ -1179,7 +1180,6 @@ WeakestPreCondition::updateConcretelyAddressedStore(
   }
 
   if (candidateForRemove != concretelyAddressedStore.end()) {
-    // TODO: Should be handled, not working
     LowerInterpolantStore temp = candidateForRemove->second;
 
     for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
@@ -1194,7 +1194,7 @@ WeakestPreCondition::updateConcretelyAddressedStore(
 }
 
 ref<Expr> WeakestPreCondition::getVarFromExpr(ref<Expr> wp) {
-  // TODO: Assuming frame has only one variable. Fix it.
+  // TODO: Assuming frame has only one variable.
   switch (wp->getKind()) {
   case Expr::InvalidKind:
   case Expr::Read:
@@ -1269,9 +1269,120 @@ ref<Expr> WeakestPreCondition::updateInterpolant(ref<Expr> interpolant,
                                                  ref<Expr> wp) {
   if (interpolant.isNull())
     return wp;
-  else
-    // TODO: Assuming frame has only one variable. Fix it.
+
+  // At this point the WP has more than one frame. The algorithm to update is as
+  // follow:
+  // 1- Partition the interpolant to frames related and unrelated to WCET
+  // 2- Replace the frame related to WCET with the WP formula
+
+  ref<Expr> var = getVarFromExpr(wp);
+  ref<Expr> unrelatedFrame = extractUnrelatedFrame(interpolant, var);
+  if (unrelatedFrame == WPArrayStore::constValues)
     return wp;
+  else
+    return AndExpr::create(unrelatedFrame, wp);
+}
+
+ref<Expr> WeakestPreCondition::extractUnrelatedFrame(ref<Expr> interpolant,
+                                                     ref<Expr> var) {
+  switch (interpolant->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return interpolant;
+  }
+
+  case Expr::Read:
+  case Expr::Concat: {
+    if (interpolant == var)
+      return WPArrayStore::constValues;
+    else
+      return interpolant;
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    ref<Expr> kids[1];
+    kids[0] = extractUnrelatedFrame(interpolant->getKid(0), var);
+    if (kids[0] == WPArrayStore::constValues)
+      return WPArrayStore::constValues;
+    else
+      return interpolant->rebuild(kids);
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    ref<Expr> kids[2];
+    kids[0] = extractUnrelatedFrame(interpolant->getKid(0), var);
+    kids[1] = extractUnrelatedFrame(interpolant->getKid(1), var);
+    if (kids[0] == WPArrayStore::constValues ||
+        kids[1] == WPArrayStore::constValues) {
+      return WPArrayStore::constValues;
+    } else {
+      return interpolant->rebuild(kids);
+    }
+  }
+
+  // pass the other one as frame
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::And: {
+    ref<Expr> kids[2];
+    kids[0] = extractUnrelatedFrame(interpolant->getKid(0), var);
+    kids[1] = extractUnrelatedFrame(interpolant->getKid(1), var);
+    if (kids[0] == WPArrayStore::constValues &&
+        kids[1] == WPArrayStore::constValues)
+      klee_error("WeakestPreCondition::extractUnrelatedFrame This AND case is "
+                 "not implemented yet!");
+    if (kids[0] == WPArrayStore::constValues &&
+        !(kids[1] == WPArrayStore::constValues)) {
+      return kids[1];
+    } else if (!(kids[0] == WPArrayStore::constValues) &&
+               kids[1] == WPArrayStore::constValues) {
+      return kids[0];
+    } else {
+      return interpolant->rebuild(kids);
+    }
+  }
+
+  case Expr::Select: {
+    ref<Expr> kids[3];
+    kids[0] = extractUnrelatedFrame(interpolant->getKid(0), var);
+    kids[1] = extractUnrelatedFrame(interpolant->getKid(1), var);
+    kids[2] = extractUnrelatedFrame(interpolant->getKid(2), var);
+    if (kids[0] == WPArrayStore::constValues ||
+        kids[1] == WPArrayStore::constValues ||
+        kids[2] == WPArrayStore::constValues)
+      return WPArrayStore::constValues;
+    else
+      return interpolant->rebuild(kids);
+  }
+  }
+  // Sanity check
+  klee_error("Control should not reach here in "
+             "WeakestPreCondition::extractUnrelatedFrame");
+  return interpolant;
 }
 
 ref<Expr> WeakestPreCondition::replaceArrayWithShadow(ref<Expr> interpolant) {
