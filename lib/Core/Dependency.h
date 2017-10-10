@@ -261,8 +261,11 @@ namespace klee {
                                                ref<Expr> expr);
 
     /// \brief Add flow dependency between source and target value
-    void addDependency(ref<TxStateValue> source, ref<TxStateValue> target,
-                       bool multiLocationsCheck = true);
+    void addDependency(ref<TxStateValue> source, ref<TxStateValue> target);
+
+    void addTwoDependencies(ref<TxStateValue> source1,
+                            ref<TxStateValue> source2,
+                            ref<TxStateValue> target);
 
     /// \brief Add flow dependency between source and target value
     void addDependencyIntToPtr(ref<TxStateValue> source,

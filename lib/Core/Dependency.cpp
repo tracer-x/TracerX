@@ -150,15 +150,35 @@ ref<TxStateValue> Dependency::getLatestValueForMarking(llvm::Value *val,
 }
 
 void Dependency::addDependency(ref<TxStateValue> source,
-                               ref<TxStateValue> target,
-                               bool multiLocationsCheck) {
+                               ref<TxStateValue> target) {
   if (source.isNull() || target.isNull())
     return;
 
-  assert((!multiLocationsCheck || target->getLocations().empty()) &&
-         "should not add new location");
+  assert(target->getLocations().empty() && "should not add new location");
 
   addDependencyIntToPtr(source, target);
+}
+
+void Dependency::addTwoDependencies(ref<TxStateValue> source1,
+                                    ref<TxStateValue> source2,
+                                    ref<TxStateValue> target) {
+  if (source1.isNull() || source2.isNull() || target.isNull())
+    return;
+
+  unsigned locCount1 = (source1->getLocations().empty());
+  unsigned locCount2 = (source2->getLocations().empty());
+
+  if (locCount1 + locCount2 == 0 || locCount1 + locCount2 == 2) {
+    // Both sources are pointers, the result is non-pointer
+    addDependencyToNonPointer(source1, target);
+    addDependencyToNonPointer(source2, target);
+  } else if (locCount1 == 1) {
+    addDependencyToNonPointer(source1, target);
+    addDependencyIntToPtr(source2, target);
+  } else {
+    addDependencyIntToPtr(source1, target);
+    addDependencyToNonPointer(source2, target);
+  }
 }
 
 void Dependency::addDependencyIntToPtr(ref<TxStateValue> source,
@@ -914,7 +934,8 @@ void Dependency::execute(llvm::Instruction *instr,
                 val, getNewTxStateValue(instr, callHistory, result));
           }
         } else {
-          addDependency(val, getNewTxStateValue(instr, callHistory, result));
+          addDependencyToNonPointer(
+              val, getNewTxStateValue(instr, callHistory, result));
         }
       } else if (!llvm::isa<llvm::Constant>(instr->getOperand(0)))
           // Constants would kill dependencies, the remaining is for
@@ -971,9 +992,7 @@ void Dependency::execute(llvm::Instruction *instr,
       } else if (result == op2Expr) {
         addDependency(op2, newValue);
       } else {
-        addDependency(op1, newValue);
-        // We do not require that the locations set is empty
-        addDependency(op2, newValue, false);
+        addTwoDependencies(op1, op2, newValue);
       }
       break;
     }
@@ -1018,15 +1037,7 @@ void Dependency::execute(llvm::Instruction *instr,
 
       if (!op1.isNull() || !op2.isNull()) {
         newValue = getNewTxStateValue(instr, callHistory, result);
-        if (instr->getOpcode() == llvm::Instruction::ICmp ||
-            instr->getOpcode() == llvm::Instruction::FCmp) {
-          addDependencyToNonPointer(op1, newValue);
-          addDependencyToNonPointer(op2, newValue);
-        } else {
-          addDependency(op1, newValue);
-          // We do not require that the locations set is empty
-          addDependency(op2, newValue, false);
-        }
+        addTwoDependencies(op1, op2, newValue);
       }
       break;
     }
