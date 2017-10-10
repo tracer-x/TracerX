@@ -205,8 +205,8 @@ public:
                                   ref<TxStateValue> value);
 
   /// \brief Newly relate an location with its stored value
-  void updateStore(const std::set<ref<TxStateAddress> > &locations,
-                   ref<TxStateValue> address, ref<TxStateValue> value);
+  void updateStore(ref<TxStateAddress> location, ref<TxStateValue> address,
+                   ref<TxStateValue> value);
 
   /// \brief Register the entries in the entry list as used
   void markUsed(const std::set<ref<TxStoreEntry> > &entryList);

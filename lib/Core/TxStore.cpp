@@ -159,7 +159,7 @@ inline void TxStore::concreteToInterpolant(
       return;
     }
 
-    // An address is in the core if it stores a value that is in the core
+// An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
     if (!NoExistential) {
       map[variable] =
@@ -192,7 +192,7 @@ inline void TxStore::symbolicToInterpolant(
       return;
     }
 
-    // An address is in the core if it stores a value that is in the core
+// An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
     if (!NoExistential) {
       ref<TxVariable> address = TxStateAddress::create(
@@ -307,15 +307,13 @@ void TxStore::getSymbolicStore(
 void TxStore::updateStoreWithLoadedValue(ref<TxStateAddress> loc,
                                          ref<TxStateValue> address,
                                          ref<TxStateValue> value) {
-  std::set<ref<TxStateAddress> > locations;
-  locations.insert(loc);
-  updateStore(locations, address, value);
+  updateStore(loc, address, value);
   value->addLoadAddress(address);
 }
 
-void TxStore::updateStore(const std::set<ref<TxStateAddress> > &locations,
+void TxStore::updateStore(ref<TxStateAddress> location,
                           ref<TxStateValue> address, ref<TxStateValue> value) {
-  if (locations.empty())
+  if (location.isNull())
     return;
 
   // Here we also mark the entries used to build the value as used. Only used
@@ -325,44 +323,40 @@ void TxStore::updateStore(const std::set<ref<TxStateAddress> > &locations,
   // We want to renew the table entry list, so we first remove the old ones
   value->resetStoreEntryList();
 
-  for (std::set<ref<TxStateAddress> >::const_iterator it = locations.begin(),
-                                                      ie = locations.end();
-       it != ie; ++it) {
-    TopStateStore::iterator middleStoreIter =
-        internalStore.find((*it)->getContext());
+  TopStateStore::iterator middleStoreIter =
+      internalStore.find(location->getContext());
 
-    if (middleStoreIter != internalStore.end()) {
-      MiddleStateStore &middleStore = middleStoreIter->second;
-      if (middleStore.hasAllocationInfo((*it)->getAllocationInfo())) {
-        ref<TxStoreEntry> entry =
-            middleStore.updateStore((*it), address, value, depth);
-        if (!entry.isNull()) {
-          // We associate this value with the store entry, signifying that the
-          // entry is important whenever the value is used. This is used for
-          // computing the interpolant.
-          value->addStoreEntry(entry);
-        }
-        return;
+  if (middleStoreIter != internalStore.end()) {
+    MiddleStateStore &middleStore = middleStoreIter->second;
+    if (middleStore.hasAllocationInfo(location->getAllocationInfo())) {
+      ref<TxStoreEntry> entry =
+          middleStore.updateStore(location, address, value, depth);
+      if (!entry.isNull()) {
+        // We associate this value with the store entry, signifying that the
+        // entry is important whenever the value is used. This is used for
+        // computing the interpolant.
+        value->addStoreEntry(entry);
       }
-
-      // Here we save the old store
-      concretelyAddressedHistoricalStore.insert(middleStore.concreteBegin(),
-                                                middleStore.concreteEnd());
-      symbolicallyAddressedHistoricalStore.insert(middleStore.symbolicBegin(),
-                                                  middleStore.symbolicEnd());
+      return;
     }
 
-    MiddleStateStore newMiddleStateStore((*it)->getAllocationInfo());
-    internalStore[(*it)->getContext()] = newMiddleStateStore;
-    MiddleStateStore &middleStateStore = internalStore[(*it)->getContext()];
-    ref<TxStoreEntry> entry =
-        middleStateStore.updateStore((*it), address, value, depth);
-    if (!entry.isNull()) {
-      // We associate this value with the store entry, signifying that the entry
-      // is important whenever the value is used. This is used for computing the
-      // interpolant.
-      value->addStoreEntry(entry);
-    }
+    // Here we save the old store
+    concretelyAddressedHistoricalStore.insert(middleStore.concreteBegin(),
+                                              middleStore.concreteEnd());
+    symbolicallyAddressedHistoricalStore.insert(middleStore.symbolicBegin(),
+                                                middleStore.symbolicEnd());
+  }
+
+  MiddleStateStore newMiddleStateStore(location->getAllocationInfo());
+  internalStore[location->getContext()] = newMiddleStateStore;
+  MiddleStateStore &middleStateStore = internalStore[location->getContext()];
+  ref<TxStoreEntry> entry =
+      middleStateStore.updateStore(location, address, value, depth);
+  if (!entry.isNull()) {
+    // We associate this value with the store entry, signifying that the entry
+    // is important whenever the value is used. This is used for computing the
+    // interpolant.
+    value->addStoreEntry(entry);
   }
 }
 
