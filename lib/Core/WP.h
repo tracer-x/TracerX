@@ -161,6 +161,10 @@ public:
   // \brief Update interpolant based on the WP Expr
   ref<Expr> updateInterpolant(ref<Expr> interpolant, ref<Expr> wp);
 
+  // \brief Extracts unrelated frames from interpolant to be passed in
+  // conjunction with the WP Expr
+  ref<Expr> extractUnrelatedFrame(ref<Expr> interpolant, ref<Expr> var);
+
   // \brief Replace array with shadow array in an expression
   ref<Expr> replaceArrayWithShadow(ref<Expr> interpolant);
 
