@@ -72,6 +72,7 @@ ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
                                  const Array *tmpArray,
                                  WeakestPreCondition *wp) {
   if (!value->hasName()) {
+    value->dump();
     klee_error("Dependency::getAddress:Instruction has no name!\n");
   }
 
