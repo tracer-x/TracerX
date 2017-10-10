@@ -268,8 +268,8 @@ namespace klee {
                             ref<TxStateValue> target);
 
     /// \brief Add flow dependency between source and target value
-    void addDependencyIntToPtr(ref<TxStateValue> source,
-                               ref<TxStateValue> target);
+    void addDependencyOfPossiblePointer(ref<TxStateValue> source,
+                                        ref<TxStateValue> target);
 
     /// \brief Add flow dependency between source and target pointers, offset by
     /// some amount

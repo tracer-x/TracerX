@@ -156,7 +156,7 @@ void Dependency::addDependency(ref<TxStateValue> source,
 
   assert(target->getLocations().empty() && "should not add new location");
 
-  addDependencyIntToPtr(source, target);
+  addDependencyOfPossiblePointer(source, target);
 }
 
 void Dependency::addTwoDependencies(ref<TxStateValue> source1,
@@ -174,15 +174,15 @@ void Dependency::addTwoDependencies(ref<TxStateValue> source1,
     addDependencyToNonPointer(source2, target);
   } else if (locCount1 == 1) {
     addDependencyToNonPointer(source1, target);
-    addDependencyIntToPtr(source2, target);
+    addDependencyOfPossiblePointer(source2, target);
   } else {
-    addDependencyIntToPtr(source1, target);
+    addDependencyOfPossiblePointer(source1, target);
     addDependencyToNonPointer(source2, target);
   }
 }
 
-void Dependency::addDependencyIntToPtr(ref<TxStateValue> source,
-                                       ref<TxStateValue> target) {
+void Dependency::addDependencyOfPossiblePointer(ref<TxStateValue> source,
+                                                ref<TxStateValue> target) {
   ref<TxStateAddress> nullLocation;
 
   if (source.isNull() || target.isNull())
@@ -930,7 +930,7 @@ void Dependency::execute(llvm::Instruction *instr,
             addDependencyToNonPointer(
                 val, getNewPointerValue(instr, callHistory, result, 0));
           } else {
-            addDependencyIntToPtr(
+            addDependencyOfPossiblePointer(
                 val, getNewTxStateValue(instr, callHistory, result));
           }
         } else {
