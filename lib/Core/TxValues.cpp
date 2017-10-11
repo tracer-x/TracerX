@@ -183,7 +183,7 @@ void TxVariable::print(llvm::raw_ostream &stream,
 void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
                               bool canInterpolateBound,
                               const std::set<std::string> &_coreReasons,
-                              const std::set<ref<TxStateAddress> > _locations,
+                              ref<TxStateAddress> _location,
                               std::set<const Array *> &replacements,
                               bool shadowing) {
   refCount = 0;
@@ -196,16 +196,13 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
 
   coreReasons = _coreReasons;
 
-  for (std::set<ref<TxStateAddress> >::const_iterator it = _locations.begin(),
-                                                      ie = _locations.end();
-       it != ie; ++it) {
+  if (!_location.isNull()) {
     ref<AllocationInfo> allocInfo =
-        (*it)->getAllocationInfo(); // The allocation context
+        _location->getAllocationInfo(); // The allocation context
 
-    ref<Expr> offset =
-        shadowing
-            ? ShadowArray::getShadowExpression((*it)->getOffset(), replacements)
-            : (*it)->getOffset();
+    ref<Expr> offset = shadowing ? ShadowArray::getShadowExpression(
+                                       _location->getOffset(), replacements)
+                                 : _location->getOffset();
 
     // We next build the offsets to be compared against stored allocation
     // offset bounds
@@ -238,27 +235,23 @@ void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
   if (doNotUseBound)
     return;
 
-  if (!_locations.empty()) {
+  if (!_location.isNull()) {
     // Here we compute memory bounds for checking pointer values. The memory
     // bound is the size of the allocation minus the offset; this is the weakest
     // precondition (interpolant) of memory bound checks done by KLEE.
-    for (std::set<ref<TxStateAddress> >::const_iterator it = _locations.begin(),
-                                                        ie = _locations.end();
-         it != ie; ++it) {
-      ref<AllocationInfo> allocInfo =
-          (*it)->getAllocationInfo(); // The allocation info
+    ref<AllocationInfo> allocInfo =
+        _location->getAllocationInfo(); // The allocation info
 
-      // Concrete bound
-      uint64_t concreteBound = (*it)->getConcreteOffsetBound();
-      std::set<ref<Expr> > newBounds;
+    // Concrete bound
+    uint64_t concreteBound = _location->getConcreteOffsetBound();
+    std::set<ref<Expr> > newBounds;
 
-      if (concreteBound > 0)
-        allocationBounds[allocInfo].insert(concreteBound);
+    if (concreteBound > 0)
+      allocationBounds[allocInfo].insert(concreteBound);
 
-      // Symbolic bounds
-      if ((*it)->hasSymbolicOffsetBounds()) {
-        allocationBounds[allocInfo].insert(symbolicBoundId);
-      }
+    // Symbolic bounds
+    if (_location->hasSymbolicOffsetBounds()) {
+      allocationBounds[allocInfo].insert(symbolicBoundId);
     }
   }
 }
@@ -670,8 +663,7 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
 bool TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
                                        std::set<uint64_t> &_bounds,
                                        bool &boundUpdated) {
-  const std::set<ref<TxStateAddress> > &locations =
-      checkedAddress->getLocations();
+  const ref<TxStateAddress> location = checkedAddress->getLocation();
   std::set<uint64_t> bounds(_bounds);
 
   if (bounds.empty()) {
@@ -681,57 +673,53 @@ bool TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
   for (std::set<uint64_t>::iterator it1 = bounds.begin(), ie1 = bounds.end();
        it1 != ie1; ++it1) {
 
-    for (std::set<ref<TxStateAddress> >::iterator it2 = locations.begin(),
-                                                  ie2 = locations.end();
-         it2 != ie2; ++it2) {
-      ref<Expr> checkedOffset = (*it2)->getOffset();
-      if (ConstantExpr *c = llvm::dyn_cast<ConstantExpr>(checkedOffset)) {
-        if (ConstantExpr *o = llvm::dyn_cast<ConstantExpr>(getOffset())) {
-          uint64_t offsetInt = o->getZExtValue();
-          uint64_t newBound = (*it1) - (c->getZExtValue() - offsetInt);
+    ref<Expr> checkedOffset = location->getOffset();
+    if (ConstantExpr *c = llvm::dyn_cast<ConstantExpr>(checkedOffset)) {
+      if (ConstantExpr *o = llvm::dyn_cast<ConstantExpr>(getOffset())) {
+        uint64_t offsetInt = o->getZExtValue();
+        uint64_t newBound = (*it1) - (c->getZExtValue() - offsetInt);
 
-          if (concreteOffsetBound > newBound) {
+        if (concreteOffsetBound > newBound) {
 
-            // FIXME: A quick hack to avoid assertion check to make DirSeek.c
-            // regression test pass.
-            llvm::Value *v = (*it2)->getContext()->getValue();
-            if (v->getType()->isPointerTy()) {
-              llvm::Type *elementType = v->getType()->getPointerElementType();
-              if (llvm::StructType *elementStructType =
-                      llvm::dyn_cast<llvm::StructType>(elementType)) {
-                if (!elementStructType->isLiteral() &&
-                    elementType->getStructName() == "struct.dirent") {
-                  concreteOffsetBound = newBound;
-                  boundUpdated = true;
-                  continue;
-                }
+          // FIXME: A quick hack to avoid assertion check to make DirSeek.c
+          // regression test pass.
+          llvm::Value *v = location->getContext()->getValue();
+          if (v->getType()->isPointerTy()) {
+            llvm::Type *elementType = v->getType()->getPointerElementType();
+            if (llvm::StructType *elementStructType =
+                    llvm::dyn_cast<llvm::StructType>(elementType)) {
+              if (!elementStructType->isLiteral() &&
+                  elementType->getStructName() == "struct.dirent") {
+                concreteOffsetBound = newBound;
+                boundUpdated = true;
+                continue;
               }
             }
-
-            if (newBound > offsetInt) {
-              concreteOffsetBound = newBound;
-              boundUpdated = true;
-            } else {
-              // Incorrect bounds would pass this assertion, as long as the
-              // value of the checked offset is reasonable (non-negative). We
-              // need to pass some wrong bounds since Tracer-X is more
-              // conservative than KLEE: KLEE can still determine that memory
-              // access is valid as it happens to be in a valid region.
-              // Tracer-X, on the other hand, associates every pointer with a
-              // set of allocations, and the memory bound is violated whenever
-              // there is an access to a memory outside of the region associated
-              // with any of the allocations.
-              assert(c->getZExtValue() <= LLONG_MAX && "incorrect bound");
-              return true;
-            }
           }
-          continue;
-        }
-      }
 
-      concreteOffsetBound = symbolicBoundId;
-      boundUpdated = true;
+          if (newBound > offsetInt) {
+            concreteOffsetBound = newBound;
+            boundUpdated = true;
+          } else {
+            // Incorrect bounds would pass this assertion, as long as the value
+            // of the checked offset is reasonable (non-negative). We need to
+            // pass some wrong bounds since Tracer-X is more
+            // conservative than KLEE: KLEE can still determine that memory
+            // access is valid as it happens to be in a valid region.
+            // Tracer-X, on the other hand, associates every pointer with a
+            // set of allocations, and the memory bound is violated whenever
+            // there is an access to a memory outside of the region associated
+            // with any of the allocations.
+            assert(c->getZExtValue() <= LLONG_MAX && "incorrect bound");
+            return true;
+          }
+        }
+        continue;
+      }
     }
+
+    concreteOffsetBound = symbolicBoundId;
+    boundUpdated = true;
   }
   return false;
 }

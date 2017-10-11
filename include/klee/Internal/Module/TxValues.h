@@ -333,13 +333,13 @@ private:
 
   void init(llvm::Value *_value, ref<Expr> _expr, bool canInterpolateBound,
             const std::set<std::string> &_coreReasons,
-            const std::set<ref<TxStateAddress> > _locations,
+            ref<TxStateAddress> _locations,
             std::set<const Array *> &replacements, bool shadowing = false);
 
   TxInterpolantValue(llvm::Value *value, ref<Expr> expr,
                      bool canInterpolateBound,
                      const std::set<std::string> &coreReasons,
-                     const std::set<ref<TxStateAddress> > locations,
+                     ref<TxStateAddress> locations,
                      std::set<const Array *> &replacements) {
     init(value, expr, canInterpolateBound, coreReasons, locations, replacements,
          true);
@@ -348,30 +348,28 @@ private:
   TxInterpolantValue(llvm::Value *value, ref<Expr> expr,
                      bool canInterpolateBound,
                      const std::set<std::string> &coreReasons,
-                     const std::set<ref<TxStateAddress> > locations) {
+                     ref<TxStateAddress> location) {
     std::set<const Array *> dummyReplacements;
-    init(value, expr, canInterpolateBound, coreReasons, locations,
+    init(value, expr, canInterpolateBound, coreReasons, location,
          dummyReplacements);
   }
 
 public:
   static ref<TxInterpolantValue>
   create(llvm::Value *value, ref<Expr> expr, bool canInterpolateBound,
-         const std::set<std::string> &coreReasons,
-         const std::set<ref<TxStateAddress> > locations,
+         const std::set<std::string> &coreReasons, ref<TxStateAddress> location,
          std::set<const Array *> &replacements) {
-    ref<TxInterpolantValue> sv(
-        new TxInterpolantValue(value, expr, canInterpolateBound, coreReasons,
-                               locations, replacements));
+    ref<TxInterpolantValue> sv(new TxInterpolantValue(
+        value, expr, canInterpolateBound, coreReasons, location, replacements));
     return sv;
   }
 
   static ref<TxInterpolantValue>
   create(llvm::Value *value, ref<Expr> expr, bool canInterpolateBound,
          const std::set<std::string> &coreReasons,
-         const std::set<ref<TxStateAddress> > locations) {
+         ref<TxStateAddress> location) {
     ref<TxInterpolantValue> sv(new TxInterpolantValue(
-        value, expr, canInterpolateBound, coreReasons, locations));
+        value, expr, canInterpolateBound, coreReasons, location));
     return sv;
   }
 
@@ -618,7 +616,7 @@ private:
   const ref<Expr> valueExpr;
 
   /// \brief Set of memory locations possibly being pointed to
-  std::set<ref<TxStateAddress> > locations;
+  ref<TxStateAddress> location;
 
   /// \brief Member variable to indicate if any unsatisfiability core depends
   /// on this value.
@@ -714,13 +712,11 @@ public:
   }
 
   void addLocation(ref<TxStateAddress> loc) {
-    if (locations.find(loc) == locations.end())
-      locations.insert(loc);
+    assert(location.isNull() && "location already defined");
+    location = loc;
   }
 
-  const std::set<ref<TxStateAddress> > &getLocations() const {
-    return locations;
-  }
+  const ref<TxStateAddress> getLocation() const { return location; }
 
   bool hasValue(llvm::Value *value) const { return this->value == value; }
 
@@ -742,13 +738,13 @@ public:
 
   ref<TxInterpolantValue> getInterpolantStyleValue() {
     return TxInterpolantValue::create(value, valueExpr, canInterpolateBound(),
-                                      coreReasons, locations);
+                                      coreReasons, location);
   }
 
   ref<TxInterpolantValue>
   getInterpolantStyleValue(std::set<const Array *> &replacements) {
     return TxInterpolantValue::create(value, valueExpr, canInterpolateBound(),
-                                      coreReasons, locations, replacements);
+                                      coreReasons, location, replacements);
   }
 
   /// \brief Print minimal information about this object.
