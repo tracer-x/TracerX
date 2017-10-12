@@ -623,8 +623,8 @@ private:
   /// \brief Set of memory locations possibly being pointed to
   ref<TxStateAddress> location;
 
-  /// \brief Member variable to indicate if any unsatisfiability core depends
-  /// on this value.
+  /// \brief Member variable to indicate if an interpolant depends on this
+  /// value.
   bool core;
 
   /// \brief The id of this object
