@@ -668,8 +668,13 @@ private:
   /// this value is dependent upon.
   std::set<std::string> coreReasons;
 
-  /// \brief Store entries this value is dependent upon
-  std::set<ref<TxStoreEntry> > entryList;
+  /// \brief Store entries this value is dependent upon, on which memory bound
+  /// interpolation may be enabled.
+  std::set<ref<TxStoreEntry> > allowBoundEntryList;
+
+  /// \brief Store entries this value is dependent upon, upon which memory bound
+  /// interpolation may not be enabled.
+  std::set<ref<TxStoreEntry> > disableBoundEntryList;
 
   TxStateValue(llvm::Value *value,
                const std::vector<llvm::Instruction *> &_callHistory,
@@ -715,9 +720,16 @@ public:
 
   /// \brief Clear the contents of the list of entries this value was loaded
   /// from
-  void resetStoreEntryList() { entryList.clear(); }
+  void resetStoreEntryList() {
+    allowBoundEntryList.clear();
+    disableBoundEntryList.clear();
+  }
 
-  const std::set<ref<TxStoreEntry> > &getEntryList() const;
+  const std::set<ref<TxStoreEntry> > getEntryList() const;
+
+  const std::set<ref<TxStoreEntry> > &getAllowBoundEntryList() const;
+
+  const std::set<ref<TxStoreEntry> > &getDisableBoundEntryList() const;
 
   const std::map<ref<TxStateValue>, ref<TxStateAddress> > &getSources() {
     return sources;

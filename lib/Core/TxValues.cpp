@@ -775,14 +775,40 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
 
 void TxStateValue::addLoadAddress(ref<TxStateValue> loadAddress) {
   loadAddresses.insert(loadAddress);
-  entryList.insert(loadAddress->entryList.begin(),
-                   loadAddress->entryList.end());
+  disableBoundEntryList.insert(loadAddress->allowBoundEntryList.begin(),
+                               loadAddress->allowBoundEntryList.end());
+  disableBoundEntryList.insert(loadAddress->disableBoundEntryList.begin(),
+                               loadAddress->disableBoundEntryList.end());
+  std::set<ref<TxStoreEntry> > tmpSet;
+  for (std::set<ref<TxStoreEntry> >::iterator it = allowBoundEntryList.begin(),
+                                              ie = allowBoundEntryList.end();
+       it != ie; ++it) {
+    std::set<ref<TxStoreEntry> >::iterator it1 =
+        disableBoundEntryList.find(*it);
+    if (it1 == disableBoundEntryList.end()) {
+      tmpSet.insert(*it);
+    }
+  }
+  allowBoundEntryList = tmpSet;
 }
 
 void TxStateValue::addStoreAddress(ref<TxStateValue> storeAddress) {
   storeAddresses.insert(storeAddress);
-  entryList.insert(storeAddress->entryList.begin(),
-                   storeAddress->entryList.end());
+  disableBoundEntryList.insert(storeAddress->allowBoundEntryList.begin(),
+                               storeAddress->allowBoundEntryList.end());
+  disableBoundEntryList.insert(storeAddress->disableBoundEntryList.begin(),
+                               storeAddress->disableBoundEntryList.end());
+  std::set<ref<TxStoreEntry> > tmpSet;
+  for (std::set<ref<TxStoreEntry> >::iterator it = allowBoundEntryList.begin(),
+                                              ie = allowBoundEntryList.end();
+       it != ie; ++it) {
+    std::set<ref<TxStoreEntry> >::iterator it1 =
+        disableBoundEntryList.find(*it);
+    if (it1 == disableBoundEntryList.end()) {
+      tmpSet.insert(*it);
+    }
+  }
+  allowBoundEntryList = tmpSet;
 }
 
 void TxStateValue::addDependency(ref<TxStateValue> source,
@@ -796,15 +822,41 @@ void TxStateValue::addDependency(ref<TxStateValue> source,
   } else {
     sources[source] = via;
   }
-  entryList.insert(source->entryList.begin(), source->entryList.end());
+
+  std::set<ref<TxStoreEntry> > tmpSet;
+  for (std::set<ref<TxStoreEntry> >::iterator
+           it = source->allowBoundEntryList.begin(),
+           ie = source->allowBoundEntryList.end();
+       it != ie; ++it) {
+    std::set<ref<TxStoreEntry> >::iterator it1 =
+        disableBoundEntryList.find(*it);
+    if (it1 == disableBoundEntryList.end()) {
+      tmpSet.insert(*it);
+    }
+  }
+  allowBoundEntryList.insert(tmpSet.begin(), tmpSet.end());
+  disableBoundEntryList.insert(source->disableBoundEntryList.begin(),
+                               source->disableBoundEntryList.end());
 }
 
 void TxStateValue::addStoreEntry(ref<TxStoreEntry> entry) {
-  entryList.insert(entry);
+  allowBoundEntryList.insert(entry);
 }
 
-const std::set<ref<TxStoreEntry> > &TxStateValue::getEntryList() const {
-  return entryList;
+const std::set<ref<TxStoreEntry> > TxStateValue::getEntryList() const {
+  std::set<ref<TxStoreEntry> > ret = allowBoundEntryList;
+  ret.insert(disableBoundEntryList.begin(), disableBoundEntryList.end());
+  return ret;
+}
+
+const std::set<ref<TxStoreEntry> > &
+TxStateValue::getAllowBoundEntryList() const {
+  return allowBoundEntryList;
+}
+
+const std::set<ref<TxStoreEntry> > &
+TxStateValue::getDisableBoundEntryList() const {
+  return disableBoundEntryList;
 }
 
 void TxStateValue::print(llvm::raw_ostream &stream,
@@ -814,12 +866,20 @@ void TxStateValue::print(llvm::raw_ostream &stream,
   printMinimal(stream, prefix);
   stream << "\n";
 
-  if (entryList.empty()) {
+  if (allowBoundEntryList.empty() && disableBoundEntryList.empty()) {
     stream << prefix << "not dependent on store\n";
   } else {
     stream << prefix << "loaded from store entries:";
-    for (std::set<ref<TxStoreEntry> >::const_iterator it = entryList.begin(),
-                                                      ie = entryList.end();
+    for (std::set<ref<TxStoreEntry> >::const_iterator
+             it = allowBoundEntryList.begin(),
+             ie = allowBoundEntryList.end();
+         it != ie; ++it) {
+      stream << "\n";
+      (*it)->print(stream, tabsNext);
+    }
+    for (std::set<ref<TxStoreEntry> >::const_iterator
+             it = disableBoundEntryList.begin(),
+             ie = disableBoundEntryList.end();
          it != ie; ++it) {
       stream << "\n";
       (*it)->print(stream, tabsNext);
@@ -858,7 +918,8 @@ ref<TxStateValue> TxStateValue::copy() {
   }
   ret->loadAddresses = loadAddresses;
   ret->storeAddresses = storeAddresses;
-  ret->entryList = entryList;
+  ret->allowBoundEntryList = allowBoundEntryList;
+  ret->disableBoundEntryList = disableBoundEntryList;
   return ret;
 }
 
