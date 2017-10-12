@@ -671,7 +671,7 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
 bool TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
                                        std::set<uint64_t> &_bounds,
                                        bool &boundUpdated) {
-  const ref<TxStateAddress> location = checkedAddress->getLocation();
+  const ref<TxStateAddress> location = checkedAddress->getPointerInfo();
   std::set<uint64_t> bounds(_bounds);
 
   if (bounds.empty()) {
@@ -849,7 +849,7 @@ void TxStateValue::print(llvm::raw_ostream &stream,
 
 ref<TxStateValue> TxStateValue::copy() {
   ref<TxStateValue> ret(new TxStateValue(value, callHistory, valueExpr));
-  ret->location = location->copy();
+  ret->pointerInfo = pointerInfo->copy();
   for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::iterator
            it = sources.begin(),
            ie = sources.end();

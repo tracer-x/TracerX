@@ -636,7 +636,7 @@ private:
   const ref<Expr> valueExpr;
 
   /// \brief Set of memory locations possibly being pointed to
-  ref<TxStateAddress> location;
+  ref<TxStateAddress> pointerInfo;
 
   /// \brief Member variable to indicate if an interpolant depends on this
   /// value.
@@ -731,12 +731,14 @@ public:
     return 1;
   }
 
-  void addLocation(ref<TxStateAddress> loc) {
-    assert(location.isNull() && "location already defined");
-    location = loc;
+  void addPointerInfo(ref<TxStateAddress> loc) {
+    assert(pointerInfo.isNull() && "location already defined");
+    pointerInfo = loc;
   }
 
-  const ref<TxStateAddress> getLocation() const { return location; }
+  const ref<TxStateAddress> getPointerInfo() const { return pointerInfo; }
+
+  bool isPointer() const { return !pointerInfo.isNull(); }
 
   bool hasValue(llvm::Value *value) const { return this->value == value; }
 
@@ -758,14 +760,14 @@ public:
 
   ref<TxInterpolantValue> getInterpolantStyleValue() {
     return TxInterpolantValue::create(value, valueExpr, canInterpolateBound(),
-                                      coreReasons, location);
+                                      coreReasons, pointerInfo);
   }
 
   ref<TxInterpolantValue>
   getInterpolantStyleValue(const std::map<ref<Expr>, ref<Expr> > &substitution,
                            std::set<const Array *> &replacements) {
     return TxInterpolantValue::create(value, valueExpr, canInterpolateBound(),
-                                      coreReasons, location, substitution,
+                                      coreReasons, pointerInfo, substitution,
                                       replacements);
   }
 

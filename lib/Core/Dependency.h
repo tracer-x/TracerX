@@ -215,7 +215,7 @@ namespace klee {
                        ref<Expr> address, uint64_t size) {
       ref<TxStateValue> vvalue =
           TxStateValue::create(loc, callHistory, address);
-      vvalue->addLocation(
+      vvalue->addPointerInfo(
           TxStateAddress::create(loc, callHistory, address, size));
       return registerNewTxStateValue(loc, vvalue);
     }
@@ -227,7 +227,7 @@ namespace klee {
         ref<Expr> address, ref<TxStateAddress> loc, ref<Expr> offset) {
       ref<TxStateValue> vvalue =
           TxStateValue::create(value, callHistory, address);
-      vvalue->addLocation(TxStateAddress::create(loc, address, offset));
+      vvalue->addPointerInfo(TxStateAddress::create(loc, address, offset));
       return registerNewTxStateValue(value, vvalue);
     }
 

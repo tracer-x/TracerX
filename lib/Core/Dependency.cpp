@@ -163,8 +163,8 @@ void Dependency::addTwoDependencies(ref<TxStateValue> source1,
   if (source1.isNull() || source2.isNull() || target.isNull())
     return;
 
-  unsigned locCount1 = (source1->getLocation().isNull());
-  unsigned locCount2 = (source2->getLocation().isNull());
+  unsigned locCount1 = !source1->isPointer();
+  unsigned locCount2 = !source2->isPointer();
 
   if (locCount1 + locCount2 == 0 || locCount1 + locCount2 == 2) {
     // Both sources are pointers, the result is non-pointer
@@ -186,15 +186,15 @@ void Dependency::addDependencyOfPossiblePointer(ref<TxStateValue> source,
   if (source.isNull() || target.isNull())
     return;
 
-  ref<TxStateAddress> location = source->getLocation();
-  if (!location.isNull()) {
+  if (source->isPointer()) {
+    ref<TxStateAddress> pointerInfo = source->getPointerInfo();
     ref<Expr> targetExpr(ZExtExpr::create(target->getExpression(),
                                           Context::get().getPointerWidth()));
-    ref<Expr> sourceBase(location->getBase());
+    ref<Expr> sourceBase(pointerInfo->getBase());
     ref<Expr> offsetDelta(SubExpr::create(
-        SubExpr::create(targetExpr, sourceBase), location->getOffset()));
-    target->addLocation(
-        TxStateAddress::create(location, targetExpr, offsetDelta));
+        SubExpr::create(targetExpr, sourceBase), pointerInfo->getOffset()));
+    target->addPointerInfo(
+        TxStateAddress::create(pointerInfo, targetExpr, offsetDelta));
   }
   target->addDependency(source, nullLocation);
 }
@@ -215,24 +215,24 @@ void Dependency::addDependencyWithOffset(ref<TxStateValue> source,
   if (d > LLONG_MAX)
     return;
 
-  ref<TxStateAddress> location = source->getLocation();
+  ref<TxStateAddress> pointerInfo = source->getPointerInfo();
   ref<Expr> targetExpr(target->getExpression());
 
   ConstantExpr *ce = llvm::dyn_cast<ConstantExpr>(targetExpr);
   uint64_t a = ce ? ce->getZExtValue() : 0;
 
-  ConstantExpr *be = llvm::dyn_cast<ConstantExpr>(location->getBase());
+  ConstantExpr *be = llvm::dyn_cast<ConstantExpr>(pointerInfo->getBase());
     uint64_t b = be ? be->getZExtValue() : 0;
 
-    ConstantExpr *oe = llvm::dyn_cast<ConstantExpr>(location->getOffset());
+    ConstantExpr *oe = llvm::dyn_cast<ConstantExpr>(pointerInfo->getOffset());
     uint64_t o = (oe ? oe->getZExtValue() : 0) + d;
 
     // The following if conditional implements a mechanism to
     // only add memory locations that make sense; that is, when
     // the offset is address minus base
     if (!(ce && de && be && oe && o != (a - b) && (b != 0))) {
-      target->addLocation(
-          TxStateAddress::create(location, targetExpr, offsetDelta));
+      target->addPointerInfo(
+          TxStateAddress::create(pointerInfo, targetExpr, offsetDelta));
     }
 
   target->addDependency(source, nullLocation);
@@ -244,7 +244,7 @@ void Dependency::addDependencyViaLocation(ref<TxStateValue> source,
   if (source.isNull() || target.isNull())
     return;
 
-  target->addLocation(source->getLocation());
+  target->addPointerInfo(source->getPointerInfo());
   target->addDependency(source, via);
 }
 
@@ -254,7 +254,7 @@ void Dependency::addDependencyViaExternalFunction(
   if (source.isNull() || target.isNull())
     return;
 
-  if (!source->getLocation().isNull()) {
+  if (source->isPointer()) {
       std::string reason = "";
       if (debugSubsumptionLevel >= 1) {
         llvm::raw_string_ostream stream(reason);
@@ -270,7 +270,7 @@ void Dependency::addDependencyViaExternalFunction(
 
   // Add new location to the target in case of pointer return value
   llvm::Type *t = target->getValue()->getType();
-  if (t->isPointerTy() && target->getLocation().isNull()) {
+  if (t->isPointerTy() && !target->isPointer()) {
     uint64_t size = 0;
     ref<Expr> address(target->getExpression());
 
@@ -279,7 +279,7 @@ void Dependency::addDependencyViaExternalFunction(
       size = targetData->getTypeStoreSize(elementType);
     }
 
-    target->addLocation(
+    target->addPointerInfo(
         TxStateAddress::create(target->getValue(), callHistory, address, size));
   }
 
@@ -343,9 +343,8 @@ bool Dependency::markPointerFlow(ref<TxStateValue> target,
     return memoryError;
 
   if (target->canInterpolateBound()) {
-    ref<TxStateAddress> location = target->getLocation();
-    memoryError =
-        location->adjustOffsetBound(checkedAddress, bounds, boundUpdated);
+    memoryError = target->getPointerInfo()->adjustOffsetBound(
+        checkedAddress, bounds, boundUpdated);
   }
 
   // If this was the first time this value gets marked, we should propagate the
@@ -375,7 +374,7 @@ bool Dependency::markPointerFlow(ref<TxStateValue> target,
                it = sources.begin(),
                ie = sources.end();
            it != ie; ++it) {
-        if (it->first->getLocation().isNull()) {
+        if (!it->first->isPointer()) {
           markFlow(it->first, reason);
         } else {
           memoryError =
@@ -738,13 +737,12 @@ void Dependency::execute(llvm::Instruction *instr,
           instr->getOperand(0)->getType()->getPointerElementType();
 
       if (!addressValue.isNull()) {
-        ref<TxStateAddress> location = addressValue->getLocation();
-        if (location.isNull()) {
+        if (!addressValue->isPointer()) {
           // The size of the allocation is unknown here as the memory region
           // might have been allocated by the environment
           ref<TxStateAddress> loc = TxStateAddress::create(
               instr->getOperand(0), callHistory, address, 0);
-          addressValue->addLocation(loc);
+          addressValue->addPointerInfo(loc);
 
           // Build the loaded value
           ref<TxStateValue> loadedValue =
@@ -755,8 +753,9 @@ void Dependency::execute(llvm::Instruction *instr,
           store->updateStoreWithLoadedValue(loc, addressValue, loadedValue);
           break;
         } else {
+          ref<TxStateAddress> pointerInfo = addressValue->getPointerInfo();
           // Check the possible mismatch between Tracer-X and KLEE loaded value
-          ref<TxStoreEntry> target = store->find(location);
+          ref<TxStoreEntry> target = store->find(pointerInfo);
 
           if (!target.isNull() &&
               valueExpr != target->getContent()->getExpression()) {
@@ -789,7 +788,7 @@ void Dependency::execute(llvm::Instruction *instr,
             }
           }
 
-          if (isMainArgument(location->getContext()->getValue())) {
+          if (isMainArgument(pointerInfo->getContext()->getValue())) {
             // The load corresponding to a load of the main function's argument
             // that was never allocated within this program.
 
@@ -799,7 +798,7 @@ void Dependency::execute(llvm::Instruction *instr,
                     ? getNewPointerValue(instr, callHistory, valueExpr, 0)
                     : getNewTxStateValue(instr, callHistory, valueExpr);
 
-            store->updateStoreWithLoadedValue(location, addressValue,
+            store->updateStoreWithLoadedValue(pointerInfo, addressValue,
                                               loadedValue);
             break;
           }
@@ -810,42 +809,39 @@ void Dependency::execute(llvm::Instruction *instr,
             getNewPointerValue(instr->getOperand(0), callHistory, address, 0);
 
         if (llvm::isa<llvm::GlobalVariable>(instr->getOperand(0))) {
-          // The value not found was a global variable, record it here.
-          ref<TxStateAddress> location = addressValue->getLocation();
-
           // Build the loaded value
           ref<TxStateValue> loadedValue =
               loadedType->isPointerTy()
                   ? getNewPointerValue(instr, callHistory, valueExpr, 0)
                   : getNewTxStateValue(instr, callHistory, valueExpr);
 
-          store->updateStoreWithLoadedValue(location, addressValue,
-                                            loadedValue);
+          store->updateStoreWithLoadedValue(addressValue->getPointerInfo(),
+                                            addressValue, loadedValue);
           break;
         }
       }
 
-      ref<TxStateAddress> location = addressValue->getLocation();
+      ref<TxStateAddress> pointerInfo = addressValue->getPointerInfo();
 
-      ref<TxStoreEntry> storeEntry = store->find(location);
+      ref<TxStoreEntry> storeEntry = store->find(pointerInfo);
 
       if (storeEntry.isNull() ||
           valueExpr != storeEntry->getContent()->getExpression()) {
         // Build the loaded value
         ref<TxStateValue> loadedValue =
-            (storeEntry.isNull() ||
-             storeEntry->getContent()->getLocation().isNull()) &&
+            (storeEntry.isNull() || !storeEntry->getContent()->isPointer()) &&
                     loadedType->isPointerTy()
                 ? getNewPointerValue(instr, callHistory, valueExpr, 0)
                 : getNewTxStateValue(instr, callHistory, valueExpr);
         // We could not find the stored value, create a new one.
-        store->updateStoreWithLoadedValue(location, addressValue, loadedValue);
+        store->updateStoreWithLoadedValue(pointerInfo, addressValue,
+                                          loadedValue);
       } else {
         // Build the loaded value
         ref<TxStateValue> loadedValue =
             getNewTxStateValue(instr, callHistory, valueExpr);
         addDependencyViaLocation(storeEntry->getContent(), loadedValue,
-                                 location);
+                                 pointerInfo);
         loadedValue->addLoadAddress(addressValue);
         loadedValue->addStoreAddress(storeEntry->getAddressValue());
       }
@@ -867,16 +863,16 @@ void Dependency::execute(llvm::Instruction *instr,
         // assert(!"null address");
         addressValue =
             getNewPointerValue(instr->getOperand(1), callHistory, address, 0);
-      } else if (addressValue->getLocation().isNull()) {
+      } else if (!addressValue->isPointer()) {
         if (instr->getOperand(1)->getType()->isPointerTy()) {
-          addressValue->addLocation(TxStateAddress::create(
+          addressValue->addPointerInfo(TxStateAddress::create(
               instr->getOperand(1), callHistory, address, 0));
         } else {
           assert(!"address is not a pointer");
         }
       }
 
-      store->updateStore(addressValue->getLocation(), addressValue,
+      store->updateStore(addressValue->getPointerInfo(), addressValue,
                          storedValue);
       break;
     }
@@ -900,7 +896,7 @@ void Dependency::execute(llvm::Instruction *instr,
 
       if (!val.isNull()) {
         if (llvm::isa<llvm::IntToPtrInst>(instr)) {
-          if (val->getLocation().isNull()) {
+          if (!val->isPointer()) {
             // 0 signifies unknown allocation size
             addDependencyToNonPointer(
                 val, getNewPointerValue(instr, callHistory, result, 0));
@@ -1027,9 +1023,9 @@ void Dependency::execute(llvm::Instruction *instr,
         // assert(!"null address");
         addressValue = getNewPointerValue(instr->getOperand(0), callHistory,
                                           inputAddress, 0);
-      } else if (addressValue->getLocation().isNull()) {
+      } else if (!addressValue->isPointer()) {
         // Note that the allocation has unknown size here (0).
-        addressValue->addLocation(TxStateAddress::create(
+        addressValue->addPointerInfo(TxStateAddress::create(
             instr->getOperand(0), callHistory, inputAddress, 0));
       }
 
@@ -1063,16 +1059,16 @@ void Dependency::executeMakeSymbolic(
   if (addressValue.isNull()) {
     // assert(!"null address");
     addressValue = getNewPointerValue(pointer, callHistory, address, 0);
-  } else if (addressValue->getLocation().isNull()) {
+  } else if (!addressValue->isPointer()) {
     if (pointer->getType()->isPointerTy()) {
-      addressValue->addLocation(
+      addressValue->addPointerInfo(
           TxStateAddress::create(pointer, callHistory, address, 0));
     } else {
       assert(!"address is not a pointer");
     }
   }
 
-  store->updateStore(addressValue->getLocation(), addressValue, storedValue);
+  store->updateStore(addressValue->getPointerInfo(), addressValue, storedValue);
 }
 
 void Dependency::executePHI(llvm::Instruction *instr,
@@ -1122,7 +1118,7 @@ bool Dependency::executeMemoryOperation(
     }
 
     ref<TxStateValue> val(getLatestValueForMarking(addressOperand, address));
-    if (!val->getLocation().isNull()) {
+    if (val->isPointer()) {
       std::string reason = "";
       if (debugSubsumptionLevel > 1) {
         llvm::raw_string_ostream stream(reason);
@@ -1268,7 +1264,7 @@ void Dependency::memoryBoundViolationInterpolation(llvm::Instruction *inst,
   }
 
   ref<TxStateValue> val(getLatestValueForMarking(addressOperand, address));
-  if (!val->getLocation().isNull()) {
+  if (val->isPointer()) {
     std::string reason = "";
     if (debugSubsumptionLevel > 1) {
       llvm::raw_string_ostream stream(reason);
