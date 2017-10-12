@@ -757,15 +757,14 @@ void Dependency::execute(llvm::Instruction *instr,
           // Check the possible mismatch between Tracer-X and KLEE loaded value
           ref<TxStoreEntry> target = store->find(pointerInfo);
 
-          if (!target.isNull() &&
-              valueExpr != target->getContent()->getExpression()) {
+          if (!target.isNull() && valueExpr != target->getExpression()) {
             // Print a warning when the expressions mismatch, unless when the
             // expression comes from klee_make_symbolic in a loop, as the
             // expected expression recorded in Tracer-X shadow memory may be
             // outdated, and the expression that comes from KLEE is the updated
             // one from klee_make_symbolic.
-            llvm::CallInst *ci = llvm::dyn_cast<llvm::CallInst>(
-                target->getContent()->getValue());
+            llvm::CallInst *ci =
+                llvm::dyn_cast<llvm::CallInst>(target->getValue());
             if (ci) {
               // Here we determine if this was a call to klee_make_symbolic from
               // the LLVM source of the call instruction instead of
@@ -779,7 +778,7 @@ void Dependency::execute(llvm::Instruction *instr,
                 std::string msg;
                 llvm::raw_string_ostream s2(msg);
                 s2 << "Loaded value ";
-                target->getContent()->getExpression()->print(s2);
+                target->getExpression()->print(s2);
                 s2 << " should be ";
                 valueExpr->print(s2);
                 s2.flush();
@@ -825,11 +824,10 @@ void Dependency::execute(llvm::Instruction *instr,
 
       ref<TxStoreEntry> storeEntry = store->find(pointerInfo);
 
-      if (storeEntry.isNull() ||
-          valueExpr != storeEntry->getContent()->getExpression()) {
+      if (storeEntry.isNull() || valueExpr != storeEntry->getExpression()) {
         // Build the loaded value
         ref<TxStateValue> loadedValue =
-            (storeEntry.isNull() || !storeEntry->getContent()->isPointer()) &&
+            (storeEntry.isNull() || !storeEntry->isPointer()) &&
                     loadedType->isPointerTy()
                 ? getNewPointerValue(instr, callHistory, valueExpr, 0)
                 : getNewTxStateValue(instr, callHistory, valueExpr);

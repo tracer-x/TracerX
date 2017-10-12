@@ -808,6 +808,12 @@ public:
   }
 };
 
+/// \brief A class for each entry in the store. This class also stores the
+/// information for memory bound interpolation. Hence, it has a static (e.g.,
+/// TxStateValue#value, TxStateValue#valueExpr, TxStateValue#entryList) as well
+/// as a dynamic part (TxStateValue#pointerInfo,
+/// TxStateValue#doNotInterpolateBound, TxStateValue#core,
+/// TxStateValue#coreReasons).
 class TxStoreEntry {
 public:
   unsigned refCount;
@@ -822,11 +828,32 @@ private:
   /// \brief The creation depth of this entry
   uint64_t depth;
 
+  llvm::Value *value;
+
+  const ref<Expr> valueExpr;
+
+  /// \brief Store entries this value is dependent upon
+  std::set<ref<TxStoreEntry> > entryList;
+
+  /// \brief Set of memory locations possibly being pointed to
+  ref<TxStateAddress> pointerInfo;
+
+  bool doNotInterpolateBound;
+
+  /// \brief Member variable to indicate if an interpolant depends on this
+  /// value.
+  bool core;
+
+  std::set<std::string> coreReasons;
+
 public:
   TxStoreEntry(ref<TxStateAddress> _address, ref<TxStateValue> _addressValue,
                ref<TxStateValue> _content, uint64_t _depth)
       : refCount(0), address(_address), addressValue(_addressValue),
-        content(_content), depth(_depth) {}
+        content(_content), depth(_depth), value(content->getValue()),
+        valueExpr(content->getExpression()), entryList(content->getEntryList()),
+        pointerInfo(content->getPointerInfo()), doNotInterpolateBound(false),
+        core(false) {}
 
   ~TxStoreEntry() {}
 
@@ -838,7 +865,26 @@ public:
 
   ref<TxStateValue> getContent() { return content; }
 
+  llvm::Value *getValue() const { return value; }
+
+  ref<Expr> getExpression() const { return valueExpr; }
+
+  ref<TxStateAddress> getPointerInfo() const { return pointerInfo; }
+
+  bool isPointer() const { return !pointerInfo.isNull(); }
+
   uint64_t getDepth() { return depth; }
+
+  ref<TxInterpolantValue> getInterpolantStyleValue() {
+    return TxInterpolantValue::create(value, valueExpr, !doNotInterpolateBound,
+                                      coreReasons, pointerInfo);
+  }
+
+  ref<TxInterpolantValue>
+  getInterpolantStyleValue(std::set<const Array *> &replacements) {
+    return TxInterpolantValue::create(value, valueExpr, !doNotInterpolateBound,
+                                      coreReasons, pointerInfo, replacements);
+  }
 
   /// \brief A simple pointer comparison
   int compare(const TxStoreEntry &other) const {
