@@ -845,7 +845,9 @@ private:
   const ref<Expr> valueExpr;
 
   /// \brief Store entries this value is dependent upon
-  std::set<ref<TxStoreEntry> > entryList;
+  std::set<ref<TxStoreEntry> > allowBoundEntryList;
+
+  std::set<ref<TxStoreEntry> > disableBoundEntryList;
 
   /// \brief Set of memory locations possibly being pointed to
   ref<TxStateAddress> pointerInfo;
@@ -863,7 +865,9 @@ public:
                ref<TxStateValue> _content, uint64_t _depth)
       : refCount(0), address(_address), addressValue(_addressValue),
         content(_content), depth(_depth), value(content->getValue()),
-        valueExpr(content->getExpression()), entryList(content->getEntryList()),
+        valueExpr(content->getExpression()),
+        allowBoundEntryList(content->getAllowBoundEntryList()),
+        disableBoundEntryList(content->getDisableBoundEntryList()),
         pointerInfo(content->getPointerInfo()), doNotInterpolateBound(false),
         core(false) {}
 

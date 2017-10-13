@@ -1205,11 +1205,8 @@ void Dependency::markAllValues(ref<TxStateValue> value,
 
   markFlow(value, reason);
 
-  std::set<ref<TxStoreEntry> > entryList = value->getAllowBoundEntryList();
-  const std::set<ref<TxStoreEntry> > &disableBoundEntryList =
-      value->getDisableBoundEntryList();
-  entryList.insert(disableBoundEntryList.begin(), disableBoundEntryList.end());
-  store->markUsed(entryList);
+  store->markUsed(value->getAllowBoundEntryList());
+  store->markUsed(value->getDisableBoundEntryList());
 }
 
 bool Dependency::markAllPointerValues(ref<TxStateValue> value,
@@ -1220,11 +1217,8 @@ bool Dependency::markAllPointerValues(ref<TxStateValue> value,
 
   bool ret = markPointerFlow(value, value, bounds, reason);
 
-  std::set<ref<TxStoreEntry> > entryList = value->getAllowBoundEntryList();
-  const std::set<ref<TxStoreEntry> > &disableBoundEntryList =
-      value->getDisableBoundEntryList();
-  entryList.insert(disableBoundEntryList.begin(), disableBoundEntryList.end());
-  store->markUsed(entryList);
+  store->markUsed(value->getAllowBoundEntryList());
+  store->markUsed(value->getDisableBoundEntryList());
   return ret;
 }
 

@@ -329,11 +329,8 @@ void TxStore::updateStore(ref<TxStateAddress> location,
 
   // Here we also mark the entries used to build the value as used. Only used
   // entries will be in the interpolant
-  std::set<ref<TxStoreEntry> > entryList = value->getAllowBoundEntryList();
-  const std::set<ref<TxStoreEntry> > &disableBoundEntryList =
-      value->getDisableBoundEntryList();
-  entryList.insert(disableBoundEntryList.begin(), disableBoundEntryList.end());
-  markUsed(entryList);
+  markUsed(value->getAllowBoundEntryList());
+  markUsed(value->getDisableBoundEntryList());
 
   // We want to renew the table entry list, so we first remove the old ones
   value->resetStoreEntryList();
