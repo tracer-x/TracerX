@@ -843,12 +843,6 @@ void TxStateValue::addStoreEntry(ref<TxStoreEntry> entry) {
   allowBoundEntryList.insert(entry);
 }
 
-const std::set<ref<TxStoreEntry> > TxStateValue::getEntryList() const {
-  std::set<ref<TxStoreEntry> > ret = allowBoundEntryList;
-  ret.insert(disableBoundEntryList.begin(), disableBoundEntryList.end());
-  return ret;
-}
-
 const std::set<ref<TxStoreEntry> > &
 TxStateValue::getAllowBoundEntryList() const {
   return allowBoundEntryList;

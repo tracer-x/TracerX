@@ -725,8 +725,6 @@ public:
     disableBoundEntryList.clear();
   }
 
-  const std::set<ref<TxStoreEntry> > getEntryList() const;
-
   const std::set<ref<TxStoreEntry> > &getAllowBoundEntryList() const;
 
   const std::set<ref<TxStoreEntry> > &getDisableBoundEntryList() const;
