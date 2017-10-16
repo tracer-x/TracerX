@@ -912,9 +912,21 @@ public:
 
   ref<Expr> getExpression() const { return valueExpr; }
 
+  std::set<ref<TxStoreEntry> > &getAllowBoundEntryList() {
+    return allowBoundEntryList;
+  }
+
+  std::set<ref<TxStoreEntry> > &getDisableBoundEntryList() {
+    return disableBoundEntryList;
+  }
+
   ref<TxStateAddress> getLeftPointerInfo() const { return leftPointerInfo; }
 
   ref<TxStateAddress> getRightPointerInfo() const { return rightPointerInfo; }
+
+  bool leftCanInterpolateBound() { return !leftDoNotInterpolateBound; }
+
+  bool rightCanInterpolateBound() { return !rightDoNotInterpolateBound; }
 
   bool isPointer() const { return !leftPointerInfo.isNull(); }
 
