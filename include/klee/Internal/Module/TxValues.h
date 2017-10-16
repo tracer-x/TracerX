@@ -820,10 +820,10 @@ public:
 
 /// \brief A class for each entry in the store. This class also stores the
 /// information for memory bound interpolation. Hence, it has a static (e.g.,
-/// TxStateValue#value, TxStateValue#valueExpr, TxStateValue#entryList) as well
-/// as a dynamic part (TxStateValue#pointerInfo,
-/// TxStateValue#doNotInterpolateBound, TxStateValue#core,
-/// TxStateValue#coreReasons).
+/// TxStoreEntry#value, TxStoreEntry#valueExpr, TxStoreEnty#entryList) as well
+/// as a dynamic part (TxStoreEntry#pointerInfo,
+/// TxStoreEntry#doNotInterpolateBound,
+/// TxStoreEntry#core, TxStoreEntry#coreReasons).
 class TxStoreEntry {
 public:
   unsigned refCount;
