@@ -928,6 +928,22 @@ public:
 
   bool rightCanInterpolateBound() { return !rightDoNotInterpolateBound; }
 
+  void leftDisableBoundInterpolation() { leftDoNotInterpolateBound = true; }
+
+  void rightDisableBoundInterpolation() { rightDoNotInterpolateBound = true; }
+
+  void leftSetAsCore(const std::string reason) {
+    leftCore = true;
+    if (!reason.empty())
+      leftCoreReasons.insert(reason);
+  }
+
+  void rightSetAsCore(const std::string reason) {
+    rightCore = true;
+    if (!reason.empty())
+      rightCoreReasons.insert(reason);
+  }
+
   bool isPointer() const { return !leftPointerInfo.isNull(); }
 
   uint64_t getDepth() { return depth; }
