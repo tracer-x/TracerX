@@ -821,9 +821,12 @@ public:
 /// \brief A class for each entry in the store. This class also stores the
 /// information for memory bound interpolation. Hence, it has a static (e.g.,
 /// TxStoreEntry#value, TxStoreEntry#valueExpr, TxStoreEnty#entryList) as well
-/// as a dynamic part (TxStoreEntry#pointerInfo,
-/// TxStoreEntry#doNotInterpolateBound,
-/// TxStoreEntry#core, TxStoreEntry#coreReasons).
+/// as a dynamic part (TxStoreEntry#leftPointerInfo,
+/// TxStoreEntry#rightPointerInfo,
+/// TxStoreEntry#leftDoNotInterpolateBound,
+/// TxStoreEntry#rightDoNotInterpolateBound, TxStoreEntry#leftCore,
+/// TxStoreEntry#rightCore,
+/// TxStoreEntry#leftCoreReasons, TxStoreEntry#rightCoreReasons).
 class TxStoreEntry {
 public:
   unsigned refCount;
@@ -847,16 +850,37 @@ private:
 
   std::set<ref<TxStoreEntry> > disableBoundEntryList;
 
-  /// \brief Set of memory locations possibly being pointed to
-  ref<TxStateAddress> pointerInfo;
+  /// \brief Set of memory locations possibly being pointed to, which can be
+  /// modified by the subtree of the immediate left child.
+  ref<TxStateAddress> leftPointerInfo;
 
-  bool doNotInterpolateBound;
+  /// \brief Set of memory locations possibly being pointed to, which can be
+  /// modified by the subtree of the immediate right child.
+  ref<TxStateAddress> rightPointerInfo;
+
+  /// \brief Flag to ignore bound interpolation, set from the subtree of the
+  /// immediate left child.
+  bool leftDoNotInterpolateBound;
+
+  /// \brief Flag to ignore bound interpolation, set from the subtree of the
+  /// immediate right child.
+  bool rightDoNotInterpolateBound;
 
   /// \brief Member variable to indicate if an interpolant depends on this
-  /// value.
-  bool core;
+  /// value, set from the subtree of the immediate left child.
+  bool leftCore;
 
-  std::set<std::string> coreReasons;
+  /// \brief Member variable to indicate if an interpolant depends on this
+  /// value, set from the subtree of the immediate right child.
+  bool rightCore;
+
+  /// \brief Reasons for the interpolant marking, from the subtree of the
+  /// immediate left child. This is used for debugging.
+  std::set<std::string> leftCoreReasons;
+
+  /// \brief Reasons for the interpolant marking, from the subtree of the
+  /// immediate right child. This is used for debugging.
+  std::set<std::string> rightCoreReasons;
 
 public:
   TxStoreEntry(ref<TxStateAddress> _address, ref<TxStateValue> _addressValue,
@@ -866,8 +890,13 @@ public:
         valueExpr(content->getExpression()),
         allowBoundEntryList(content->getAllowBoundEntryList()),
         disableBoundEntryList(content->getDisableBoundEntryList()),
-        pointerInfo(content->getPointerInfo()), doNotInterpolateBound(false),
-        core(false) {}
+        leftDoNotInterpolateBound(false), rightDoNotInterpolateBound(false),
+        leftCore(false), rightCore(false) {
+    if (!content->getPointerInfo().isNull()) {
+      leftPointerInfo = content->getPointerInfo();
+      rightPointerInfo = content->getPointerInfo()->copy();
+    }
+  }
 
   ~TxStoreEntry() {}
 
@@ -883,21 +912,40 @@ public:
 
   ref<Expr> getExpression() const { return valueExpr; }
 
-  ref<TxStateAddress> getPointerInfo() const { return pointerInfo; }
+  ref<TxStateAddress> getLeftPointerInfo() const { return leftPointerInfo; }
 
-  bool isPointer() const { return !pointerInfo.isNull(); }
+  ref<TxStateAddress> getRightPointerInfo() const { return rightPointerInfo; }
+
+  bool isPointer() const { return !leftPointerInfo.isNull(); }
 
   uint64_t getDepth() { return depth; }
 
-  ref<TxInterpolantValue> getInterpolantStyleValue() {
-    return TxInterpolantValue::create(value, valueExpr, !doNotInterpolateBound,
-                                      coreReasons, pointerInfo);
+  ref<TxInterpolantValue> getLeftInterpolantStyleValue() {
+    return TxInterpolantValue::create(value, valueExpr,
+                                      !leftDoNotInterpolateBound,
+                                      leftCoreReasons, leftPointerInfo);
   }
 
-  ref<TxInterpolantValue>
-  getInterpolantStyleValue(std::set<const Array *> &replacements) {
-    return TxInterpolantValue::create(value, valueExpr, !doNotInterpolateBound,
-                                      coreReasons, pointerInfo, replacements);
+  ref<TxInterpolantValue> getLeftInterpolantStyleValue(
+      const std::map<ref<Expr>, ref<Expr> > &substitution,
+      std::set<const Array *> &replacements) {
+    return TxInterpolantValue::create(
+        value, valueExpr, !leftDoNotInterpolateBound, leftCoreReasons,
+        leftPointerInfo, substitution, replacements);
+  }
+
+  ref<TxInterpolantValue> getRightInterpolantStyleValue() {
+    return TxInterpolantValue::create(value, valueExpr,
+                                      !rightDoNotInterpolateBound,
+                                      rightCoreReasons, rightPointerInfo);
+  }
+
+  ref<TxInterpolantValue> getRightInterpolantStyleValue(
+      const std::map<ref<Expr>, ref<Expr> > &substitution,
+      std::set<const Array *> &replacements) {
+    return TxInterpolantValue::create(
+        value, valueExpr, !rightDoNotInterpolateBound, rightCoreReasons,
+        rightPointerInfo, substitution, replacements);
   }
 
   /// \brief A simple pointer comparison
