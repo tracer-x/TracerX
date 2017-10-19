@@ -799,9 +799,11 @@ bool TxSubsumptionTableEntry::subsumed(
     // If it fails then false is returned. If it succeeds then the
     // second check is performed.
     bool result = state.txTreeNode->checkWPAtSubsumption(
-        wpInterpolant, state, _concretelyAddressedStore,
-        _symbolicallyAddressedStore, _concretelyAddressedHistoricalStore,
-        _symbolicallyAddressedHistoricalStore, timeout, debugSubsumptionLevel);
+        wpInterpolant, state,
+		__concretelyAddressedHistoricalStore,
+        __symbolicallyAddressedHistoricalStore,
+		timeout, debugSubsumptionLevel);
+
     if (result != Solver::True) {
       if (debugSubsumptionLevel >= 1) {
         klee_message("#%lu=>#%lu: Check failure at WP Expr check ",
@@ -2478,10 +2480,8 @@ ref<Expr> TxTreeNode::getChildWPInterpolant(int flag) {
 
 bool TxTreeNode::checkWPAtSubsumption(
     ref<Expr> wpInterpolant, ExecutionState &state,
-    TxStore::TopInterpolantStore &concretelyAddressedStore,
-    TxStore::TopInterpolantStore &symbolicallyAddressedStore,
-    TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
-    TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore,
+    TxStore::LowerStateStore &concretelyAddressedHistoricalStore,
+    TxStore::LowerStateStore &symbolicallyAddressedHistoricalStore,
     double timeout, int debugSubsumptionLevel) {
   ref<Expr> wpInstantiatedInterpolant =
       wp->instantiateWPExpression(dependency, callHistory, wpInterpolant);
