@@ -793,6 +793,29 @@ bool TxSubsumptionTableEntry::subsumed(
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
+  if (WPInterpolant) {
+    // Checking if weakest pre-condition holds. In case WPInterpolant
+    // flag is set, this serves as the first check when subsuming a node.
+    // If it fails then false is returned. If it succeeds then the
+    // second check is performed.
+    bool result = state.txTreeNode->checkWPAtSubsumption(
+        wpInterpolant, state, _concretelyAddressedStore,
+        _symbolicallyAddressedStore, _concretelyAddressedHistoricalStore,
+        _symbolicallyAddressedHistoricalStore, timeout, debugSubsumptionLevel);
+    if (result != Solver::True) {
+      if (debugSubsumptionLevel >= 1) {
+        klee_message("#%lu=>#%lu: Check failure at WP Expr check ",
+                     state.txTreeNode->getNodeSequenceNumber(),
+                     nodeSequenceNumber);
+      }
+      return false;
+    }
+    if (debugSubsumptionLevel >= 1) {
+      klee_message("#%lu=>#%lu: Weakest precondition check success",
+                   state.txTreeNode->getNodeSequenceNumber(),
+                   nodeSequenceNumber);
+    }
+  }
   // Tell the solver implementation that we are checking for subsumption for
   // collecting statistics of solver calls.
   SubsumptionCheckMarker subsumptionCheckMarker;
@@ -804,7 +827,10 @@ bool TxSubsumptionTableEntry::subsumed(
                    state.txTreeNode->getNodeSequenceNumber(),
                    nodeSequenceNumber);
     }
+
     if (WPInterpolant)
+      // In case a node is subsumed, the WP Expr is stored at the parent node.
+      // This is crucial for generating WP Expr at the parent node.
       state.txTreeNode->setWPAtSubsumption(wpInterpolant);
     return true;
   }
@@ -1311,6 +1337,8 @@ bool TxSubsumptionTableEntry::subsumed(
       interpolateValues(state, coreValues, corePointerValues,
                         debugSubsumptionLevel);
       if (WPInterpolant)
+        // In case a node is subsumed, the WP Expr is stored at the parent node.
+        // This is crucial for generating WP Expr at the parent node.
         state.txTreeNode->setWPAtSubsumption(wpInterpolant);
       return true;
     }
@@ -1381,6 +1409,9 @@ bool TxSubsumptionTableEntry::subsumed(
                          nodeSequenceNumber, msg.c_str());
           }
           if (WPInterpolant)
+            // In case a node is subsumed, the WP Expr is stored at the parent
+            // node.
+            // This is crucial for generating WP Expr at the parent node.
             state.txTreeNode->setWPAtSubsumption(wpInterpolant);
           return true;
         } else {
@@ -1468,6 +1499,9 @@ bool TxSubsumptionTableEntry::subsumed(
         interpolateValues(state, coreValues, corePointerValues,
                           debugSubsumptionLevel);
         if (WPInterpolant)
+          // In case a node is subsumed, the WP Expr is stored at the parent
+          // node.
+          // This is crucial for generating WP Expr at the parent node.
           state.txTreeNode->setWPAtSubsumption(wpInterpolant);
         return true;
       }
@@ -1496,6 +1530,8 @@ bool TxSubsumptionTableEntry::subsumed(
     interpolateValues(state, coreValues, corePointerValues,
                       debugSubsumptionLevel);
     if (WPInterpolant)
+      // In case a node is subsumed, the WP Expr is stored at the parent node.
+      // This is crucial for generating WP Expr at the parent node.
       state.txTreeNode->setWPAtSubsumption(wpInterpolant);
     return true;
   }
@@ -2438,6 +2474,26 @@ ref<Expr> TxTreeNode::getChildWPInterpolant(int flag) {
     return childWPInterpolant[0];
   else
     return childWPInterpolant[1];
+}
+
+bool TxTreeNode::checkWPAtSubsumption(
+    ref<Expr> wpInterpolant, ExecutionState &state,
+    TxStore::TopInterpolantStore &concretelyAddressedStore,
+    TxStore::TopInterpolantStore &symbolicallyAddressedStore,
+    TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
+    TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore,
+    double timeout, int debugSubsumptionLevel) {
+  ref<Expr> wpInstantiatedInterpolant =
+      wp->instantiateWPExpression(dependency, callHistory, wpInterpolant);
+
+  if (wpInstantiatedInterpolant->isTrue())
+    return true;
+  else if (wpInstantiatedInterpolant->isFalse())
+    return false;
+  else
+    klee_error("TxTreeNode::checkWPAtSubsumption non constant WCET is not "
+               "handled yet");
+  return false;
 }
 
 void TxTreeNode::setWPAtSubsumption(ref<Expr> _wpInterpolant) {

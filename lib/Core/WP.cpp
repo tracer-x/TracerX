@@ -1103,13 +1103,15 @@ WeakestPreCondition::updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry,
     // TODO: Assuming WP is one frame
     TxStore::TopInterpolantStore newConcretelyAddressedStore =
         updateConcretelyAddressedStore(concretelyAddressedStore, wp);
-    ref<Expr> newInterpolant =
-        updateInterpolant(interpolant, replaceArrayWithShadow(wp));
-    std::set<const Array *> newExistentials =
-        updateExistentials(existentials, wp);
     entry->setConcretelyAddressedStore(newConcretelyAddressedStore);
-    entry->setInterpolant(newInterpolant);
-    entry->setExistentials(newExistentials);
+    // TODO: Currently we don't need to update the interpolant & the
+    // existentials
+    // ref<Expr> newInterpolant =
+    //    updateInterpolant(interpolant, replaceArrayWithShadow(wp));
+    // std::set<const Array *> newExistentials =
+    //    updateExistentials(existentials, wp);
+    // entry->setInterpolant(newInterpolant);
+    // entry->setExistentials(newExistentials);
   }
   if (debugSubsumptionLevel >= 4) {
     // For future reference
@@ -1180,15 +1182,7 @@ WeakestPreCondition::updateConcretelyAddressedStore(
   }
 
   if (candidateForRemove != concretelyAddressedStore.end()) {
-    LowerInterpolantStore temp = candidateForRemove->second;
-
-    for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
-                                               ie2 = temp.end();
-         it2 != ie2; ++it2) {
-      ref<TxVariable> tempValue = (*it2).first;
-      ref<TxInterpolantValue> tempInterpolantValue = (*it2).second;
-      tempInterpolantValue->updateExpression(replaceArrayWithShadow(var));
-    }
+    concretelyAddressedStore.erase(candidateForRemove);
   }
   return concretelyAddressedStore;
 }
