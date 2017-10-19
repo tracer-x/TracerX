@@ -527,6 +527,15 @@ public:
   /// \brief Get the stored child WP interpolants in the parent node
   ref<Expr> getChildWPInterpolant(int flag);
 
+  /// \brief Check WP Interpolant holds at subsumption point
+  bool checkWPAtSubsumption(
+      ref<Expr> wpInterpolant, ExecutionState &state,
+      TxStore::TopInterpolantStore &concretelyAddressedStore,
+      TxStore::TopInterpolantStore &symbolicallyAddressedStore,
+      TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
+      TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore,
+      double timeout, int debugSubsumptionLevel);
+
   /// \brief Copy WP to the parent node at subsumption point
   void setWPAtSubsumption(ref<Expr> _wpInterpolant);
 
