@@ -31,7 +31,8 @@ namespace klee {
 /// replacing free with bound variables.
 class WPArrayStore {
 
-  static std::map<llvm::Value *, std::pair<const Array *, ref<Expr> > >
+  static std::map<std::pair<std::string, llvm::Value *>,
+                  std::pair<const Array *, ref<Expr> > >
       arrayStore;
 
 public:
@@ -46,6 +47,10 @@ public:
   static const Array *getArrayRef(llvm::Value *value);
 
   static llvm::Value *getValuePointer(ref<Expr> expr);
+
+  static llvm::Value *getValuePointer(std::string func, ref<Expr> expr);
+
+  static std::string getFunctionName(llvm::Value *i);
 };
 
 /// \brief The class that implements weakest precondition interpolant.
