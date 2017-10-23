@@ -123,15 +123,15 @@ void TxPathCondition::unsatCoreInterpolation(
     depthToConstraintSet[*it] = currentSet;
   }
 
-  TxPathCondition *currentPC = this;
   for (std::vector<uint64_t>::reverse_iterator it = sortedKeys.rbegin(),
                                                ie = sortedKeys.rend();
        it != ie; ++it) {
     uint64_t constraintDepth = *it;
     std::set<ref<PCConstraint> > &constraintSet =
         depthToConstraintSet[constraintDepth];
+    TxPathCondition *currentPC = this;
 
-    while (currentPC && currentPC->depth > constraintDepth) {
+    while (currentPC && currentPC->parent && currentPC->depth >= constraintDepth) {
       if (currentPC->parent->left == currentPC) {
         currentPC = currentPC->parent;
         currentPC->usedByLeftPath.insert(constraintSet.begin(),
