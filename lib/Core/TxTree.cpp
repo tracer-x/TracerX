@@ -2490,9 +2490,11 @@ bool TxTreeNode::checkWPAtSubsumption(
     return true;
   else if (wpInstantiatedInterpolant->isFalse())
     return false;
-  else
+  else {
+    wpInstantiatedInterpolant->dump();
     klee_error("TxTreeNode::checkWPAtSubsumption non constant WCET is not "
                "handled yet");
+  }
   return false;
 }
 

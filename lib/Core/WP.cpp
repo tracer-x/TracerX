@@ -39,7 +39,8 @@ typedef std::map<ref<TxVariable>, ref<TxInterpolantValue> >
 typedef std::map<ref<TxAllocationContext>, LowerInterpolantStore>
     TopInterpolantStore;
 
-std::map<llvm::Value *, std::pair<const Array *, ref<Expr> > >
+std::map<std::pair<std::string, llvm::Value *>,
+         std::pair<const Array *, ref<Expr> > >
     WPArrayStore::arrayStore;
 ArrayCache WPArrayStore::ac;
 const Array *WPArrayStore::array;
@@ -47,12 +48,14 @@ ref<Expr> WPArrayStore::constValues;
 
 void WPArrayStore::insert(llvm::Value *value, const Array *array,
                           ref<Expr> expr) {
-  static std::map<llvm::Value *,
+  static std::map<std::pair<std::string, llvm::Value *>,
                   std::pair<const Array *, ref<Expr> > >::iterator it =
-      arrayStore.find(value);
+      arrayStore.find(std::make_pair(getFunctionName(value), value));
   if (it == arrayStore.end()) {
     // value not found in map
-    arrayStore.insert(std::make_pair(value, std::make_pair(array, expr)));
+    arrayStore.insert(
+        std::make_pair(std::make_pair(getFunctionName(value), value),
+                       std::make_pair(array, expr)));
   } else {
     klee_error("WPArrayStore::insert not checked yet");
 
@@ -67,9 +70,9 @@ void WPArrayStore::insert(llvm::Value *value, const Array *array,
 
 ref<Expr> WPArrayStore::createAndInsert(std::string arrayName,
                                         llvm::Value *value) {
-  static std::map<llvm::Value *,
+  static std::map<std::pair<std::string, llvm::Value *>,
                   std::pair<const Array *, ref<Expr> > >::iterator it =
-      arrayStore.find(value);
+      arrayStore.find(std::make_pair(getFunctionName(value), value));
 
   // Only catching the type of integer and pointers now
   unsigned int size = 0;
@@ -102,7 +105,9 @@ ref<Expr> WPArrayStore::createAndInsert(std::string arrayName,
 
   if (it == arrayStore.end()) {
     // value not found in map
-    arrayStore.insert(std::make_pair(value, std::make_pair(array, expr)));
+    arrayStore.insert(
+        std::make_pair(std::make_pair(getFunctionName(value), value),
+                       std::make_pair(array, expr)));
 
   } else {
     // value found in map so it's a memory location
@@ -116,8 +121,9 @@ ref<Expr> WPArrayStore::createAndInsert(std::string arrayName,
 }
 
 const Array *WPArrayStore::getArrayRef(llvm::Value *value) {
-  std::map<llvm::Value *, std::pair<const Array *, ref<Expr> > >::iterator it =
-      arrayStore.find(value);
+  std::map<std::pair<std::string, llvm::Value *>,
+           std::pair<const Array *, ref<Expr> > >::iterator it =
+      arrayStore.find(std::make_pair(getFunctionName(value), value));
   if (it != arrayStore.end()) {
     return it->second.first;
   } else {
@@ -128,16 +134,61 @@ const Array *WPArrayStore::getArrayRef(llvm::Value *value) {
 }
 
 llvm::Value *WPArrayStore::getValuePointer(ref<Expr> expr) {
-  for (std::map<llvm::Value *,
+  for (std::map<std::pair<std::string, llvm::Value *>,
                 std::pair<const Array *, ref<Expr> > >::const_iterator
            it = arrayStore.begin(),
            ie = arrayStore.end();
        it != ie; ++it) {
     if (it->second.second == expr) {
-      return it->first;
+      return it->first.second;
     }
   }
   return NULL;
+}
+
+llvm::Value *WPArrayStore::getValuePointer(std::string func, ref<Expr> expr) {
+  for (std::map<std::pair<std::string, llvm::Value *>,
+                std::pair<const Array *, ref<Expr> > >::const_iterator
+           it = arrayStore.begin(),
+           ie = arrayStore.end();
+       it != ie; ++it) {
+    if (it->second.second == expr && it->first.first == func) {
+      return it->first.second;
+    }
+  }
+  return NULL;
+}
+
+std::string WPArrayStore::getFunctionName(llvm::Value *i) {
+  llvm::Instruction *inst;
+  if (isa<llvm::Instruction>(i)) {
+    inst = dyn_cast<llvm::Instruction>(i);
+  } else if (isa<llvm::GlobalValue>(i)) {
+    return "Global";
+  } else if (isa<llvm::ConstantExpr>(i)) {
+    // llvm::ConstantExpr* ce = dyn_cast<llvm::ConstantExpr>(i);
+    // klee_error("WeakestPreCondition::getFunctionName sajjad");
+    return "Constant";
+  } else {
+    i->dump();
+    klee_error("WeakestPreCondition::getFunctionName LLVM Value is not an "
+               "instruction");
+  }
+  llvm::BasicBlock *BB = inst->getParent();
+  if (!BB) {
+    inst->dump();
+    klee_error("WeakestPreCondition::getFunctionName Basic Block is Null");
+  }
+  llvm::Function *func = BB->getParent();
+  if (!func) {
+    BB->dump();
+    klee_error("WeakestPreCondition::getFunctionName Function is Null");
+  }
+  if (!func->hasName()) {
+    func->dump();
+    klee_error("WeakestPreCondition::getFunctionName Function has no name");
+  }
+  return func->getName();
 }
 
 /**/
@@ -1019,7 +1070,8 @@ bool WeakestPreCondition::isTargetDependent(llvm::Value *inst, ref<Expr> wp) {
   }
 
   case Expr::Concat: {
-    if (inst == WPArrayStore::getValuePointer(wp)) {
+    if (inst == WPArrayStore::getValuePointer(
+                    WPArrayStore::getFunctionName(inst), wp)) {
       return true;
     }
     return false;
