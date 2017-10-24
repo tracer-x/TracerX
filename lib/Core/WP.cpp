@@ -430,6 +430,8 @@ ref<Expr> WeakestPreCondition::GenerateWP(
       case llvm::Instruction::Add:
       case llvm::Instruction::Sub:
       case llvm::Instruction::Mul:
+      case llvm::Instruction::FMul:
+      case llvm::Instruction::FDiv:
       case llvm::Instruction::UDiv:
       case llvm::Instruction::SDiv:
       case llvm::Instruction::URem:
@@ -566,6 +568,8 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         break;
       }
 
+      case llvm::Instruction::FPToSI:
+      case llvm::Instruction::SIToFP:
       case llvm::Instruction::Alloca: {
         // Nothing specific is needed to be done for now.
         break;
