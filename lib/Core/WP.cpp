@@ -79,6 +79,10 @@ ref<Expr> WPArrayStore::createAndInsert(std::string arrayName,
   if (value->getType()->isIntegerTy()) {
     size = value->getType()->getIntegerBitWidth();
   } else if (value->getType()->isPointerTy() &&
+		  value->getType()->getArrayElementType()->isPointerTy()&&
+		  value->getType()->getArrayElementType()->getArrayElementType()->isIntegerTy()) {
+    size = value->getType()->getArrayElementType()->getArrayElementType()->getIntegerBitWidth();;
+  } else if (value->getType()->isPointerTy() &&
              value->getType()->getArrayElementType()->isIntegerTy()) {
     size = value->getType()->getArrayElementType()->getIntegerBitWidth();
   } else if (value->getType()->isPointerTy() &&
@@ -427,8 +431,10 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         break;
       }
 
+      case llvm::Instruction::FAdd:
       case llvm::Instruction::Add:
       case llvm::Instruction::Sub:
+      case llvm::Instruction::FSub:
       case llvm::Instruction::Mul:
       case llvm::Instruction::FMul:
       case llvm::Instruction::FDiv:
@@ -651,6 +657,10 @@ ref<Expr> WeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
           dyn_cast<llvm::ConstantExpr>(inst->getOperand(0));
       left = dependency->getPointerAddress(gep, &WPArrayStore::ac,
                                            WPArrayStore::array, this);
+    } else if (isa<llvm::LoadInst>(inst->getOperand(0))) {
+      llvm::LoadInst *inst2 = dyn_cast<llvm::LoadInst>(inst->getOperand(0));
+      left = dependency->getAddress(inst2->getOperand(0), &WPArrayStore::ac,
+                                          WPArrayStore::array, this);
     } else {
       left = dependency->getAddress(inst->getOperand(0), &WPArrayStore::ac,
                                     WPArrayStore::array, this);
