@@ -25,6 +25,7 @@
 #include <klee/SolverStats.h>
 #include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ExprPPrinter.h>
+#include <klee/util/TxExprUtil.h>
 #include <klee/util/TxPrintUtil.h>
 #include <fstream>
 #include <vector>
@@ -735,12 +736,12 @@ ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
   getSubstitution1(expr->variables, equalities, substitution1);
 
   ref<Expr> interpolant =
-      ApplySubstitutionVisitor(substitution1).visit(body->getKid(0));
+      TxSubstitutionVisitor(substitution1).visit(body->getKid(0));
 
   if (hasVariableInSet(expr->variables, equalities)) {
     // we could also replace the occurrence of some variables with its
     // corresponding substitution mapping.
-    equalities = ApplySubstitutionVisitor(substitution1).visit(equalities);
+    equalities = TxSubstitutionVisitor(substitution1).visit(equalities);
     equalities = removeUnsubstituted(expr->variables, equalities);
   }
 
@@ -748,7 +749,7 @@ ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
   // interpolant itself.
   std::map<ref<Expr>, ref<Expr> > substitution2;
   getSubstitution2(expr->variables, interpolant, substitution2);
-  interpolant = ApplySubstitutionVisitor(substitution2).visit(interpolant);
+  interpolant = TxSubstitutionVisitor(substitution2).visit(interpolant);
 
   ref<Expr> newBody = AndExpr::create(interpolant, equalities);
 

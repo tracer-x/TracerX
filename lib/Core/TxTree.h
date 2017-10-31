@@ -140,27 +140,6 @@ public:
 class SubsumptionTableEntry {
   friend class TxTree;
 
-  /// \brief General substitution mechanism
-  class ApplySubstitutionVisitor : public ExprVisitor {
-  private:
-    const std::map<ref<Expr>, ref<Expr> > &replacements;
-
-  public:
-    ApplySubstitutionVisitor(
-        const std::map<ref<Expr>, ref<Expr> > &_replacements)
-        : ExprVisitor(true), replacements(_replacements) {}
-
-    Action visitExprPost(const Expr &e) {
-      std::map<ref<Expr>, ref<Expr> >::const_iterator it =
-          replacements.find(ref<Expr>(const_cast<Expr *>(&e)));
-      if (it != replacements.end()) {
-        return Action::changeTo(it->second);
-      } else {
-        return Action::doChildren();
-      }
-    }
-  };
-
 #ifdef ENABLE_Z3
   /// \brief Mark begin and end of subsumption check for use within a scope
   struct SubsumptionCheckMarker {
