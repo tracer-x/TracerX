@@ -51,11 +51,12 @@ SubsumptionTableEntry::SubsumptionTableEntry(
     TxTreeNode *node, const std::vector<llvm::Instruction *> &callHistory)
     : programPoint(node->getProgramPoint()),
       nodeSequenceNumber(node->getNodeSequenceNumber()) {
+  std::map<ref<Expr>, ref<Expr> > substitution;
   existentials.clear();
-  interpolant = node->getInterpolant(existentials);
+  interpolant = node->getInterpolant(existentials, substitution);
 
   node->getStoredCoreExpressions(
-      callHistory, existentials, concretelyAddressedStore,
+      callHistory, substitution, existentials, concretelyAddressedStore,
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
       symbolicallyAddressedHistoricalStore);
 }
@@ -2233,10 +2234,11 @@ TxTreeNode::~TxTreeNode() {
     delete dependency;
 }
 
-ref<Expr>
-TxTreeNode::getInterpolant(std::set<const Array *> &replacements) const {
+ref<Expr> TxTreeNode::getInterpolant(
+    std::set<const Array *> &replacements,
+    std::map<ref<Expr>, ref<Expr> > &substitution) const {
   TimerStatIncrementer t(getInterpolantTime);
-  ref<Expr> expr = dependency->packInterpolant(replacements);
+  ref<Expr> expr = dependency->packInterpolant(replacements, substitution);
   return expr;
 }
 
@@ -2283,6 +2285,7 @@ void TxTreeNode::getStoredExpressions(
     TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore)
     const {
   TimerStatIncrementer t(getStoredExpressionsTime);
+  std::map<ref<Expr>, ref<Expr> > dummySubstitution;
   std::set<const Array *> dummyReplacements;
 
   // Since a program point index is a first statement in a basic block,
@@ -2297,8 +2300,8 @@ void TxTreeNode::getStoredExpressions(
       assert(parent->right == this && "mismatched tree edge");
 
     parent->dependency->getStoredExpressions(
-        _callHistory, dummyReplacements, false, leftRetrieval,
-        concretelyAddressedStore, symbolicallyAddressedStore,
+        _callHistory, dummySubstitution, dummyReplacements, false,
+        leftRetrieval, concretelyAddressedStore, symbolicallyAddressedStore,
         concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);
   }
@@ -2306,6 +2309,7 @@ void TxTreeNode::getStoredExpressions(
 
 void TxTreeNode::getStoredCoreExpressions(
     const std::vector<llvm::Instruction *> &_callHistory,
+    const std::map<ref<Expr>, ref<Expr> > &substitution,
     std::set<const Array *> &replacements,
     TxStore::TopInterpolantStore &concretelyAddressedStore,
     TxStore::TopInterpolantStore &symbolicallyAddressedStore,
@@ -2326,7 +2330,7 @@ void TxTreeNode::getStoredCoreExpressions(
       assert(parent->right == this && "mismatched tree edge");
 
     parent->dependency->getStoredExpressions(
-        _callHistory, replacements, true, leftRetrieval,
+        _callHistory, substitution, replacements, true, leftRetrieval,
         concretelyAddressedStore, symbolicallyAddressedStore,
         concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);

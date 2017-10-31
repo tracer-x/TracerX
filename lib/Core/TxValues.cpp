@@ -21,6 +21,7 @@
 
 #include "klee/Internal/Module/TxValues.h"
 #include "klee/Internal/Support/ErrorHandling.h"
+#include "klee/util/TxExprUtil.h"
 #include "klee/util/TxPrintUtil.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
@@ -180,12 +181,11 @@ void TxVariable::print(llvm::raw_ostream &stream,
 
 /**/
 
-void TxInterpolantValue::init(llvm::Value *_value, ref<Expr> _expr,
-                              bool canInterpolateBound,
-                              const std::set<std::string> &_coreReasons,
-                              ref<TxStateAddress> _location,
-                              std::set<const Array *> &replacements,
-                              bool shadowing) {
+void TxInterpolantValue::init(
+    llvm::Value *_value, ref<Expr> _expr, bool canInterpolateBound,
+    const std::set<std::string> &_coreReasons, ref<TxStateAddress> _location,
+    const std::map<ref<Expr>, ref<Expr> > &substitution,
+    std::set<const Array *> &replacements, bool shadowing) {
   refCount = 0;
   id = reinterpret_cast<uintptr_t>(this);
   expr =

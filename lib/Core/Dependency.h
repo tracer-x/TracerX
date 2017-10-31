@@ -382,17 +382,18 @@ namespace klee {
     /// \sa TxStore#getStoredExpressions()
     void getStoredExpressions(
         const std::vector<llvm::Instruction *> &callHistory,
+        const std::map<ref<Expr>, ref<Expr> > &substitution,
         std::set<const Array *> &replacements, bool coreOnly,
         bool leftRetrieval,
         TxStore::TopInterpolantStore &concretelyAddressedStore,
         TxStore::TopInterpolantStore &symbolicallyAddressedStore,
         TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
         TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
-      store->getStoredExpressions(callHistory, replacements, coreOnly,
-                                  leftRetrieval, concretelyAddressedStore,
-                                  symbolicallyAddressedStore,
-                                  concretelyAddressedHistoricalStore,
-                                  symbolicallyAddressedHistoricalStore);
+      store->getStoredExpressions(
+          callHistory, substitution, replacements, coreOnly, leftRetrieval,
+          concretelyAddressedStore, symbolicallyAddressedStore,
+          concretelyAddressedHistoricalStore,
+          symbolicallyAddressedHistoricalStore);
     }
 
     ref<TxStateValue>
@@ -493,8 +494,10 @@ namespace klee {
     }
 
     /// \brief Retrieve the path condition interpolant
-    ref<Expr> packInterpolant(std::set<const Array *> &replacements) const {
-      return pathCondition->packInterpolant(replacements);
+    ref<Expr>
+    packInterpolant(std::set<const Array *> &replacements,
+                    std::map<ref<Expr>, ref<Expr> > &substitution) const {
+      return pathCondition->packInterpolant(replacements, substitution);
     }
 
     /// \brief Marking the core constraints on the path condition, and all the

@@ -446,7 +446,8 @@ public:
   /// \param replacements The replacement bound variables for replacing the
   /// variables in the path condition.
   /// \return The interpolant expression.
-  ref<Expr> getInterpolant(std::set<const Array *> &replacements) const;
+  ref<Expr> getInterpolant(std::set<const Array *> &replacements,
+                           std::map<ref<Expr>, ref<Expr> > &substitution) const;
 
   /// \brief Extend the path condition with another constraint
   ///
@@ -497,6 +498,7 @@ public:
   /// replaced with the bound ones.
   void getStoredCoreExpressions(
       const std::vector<llvm::Instruction *> &callHistory,
+      const std::map<ref<Expr>, ref<Expr> > &substitution,
       std::set<const Array *> &replacements,
       TxStore::TopInterpolantStore &concretelyAddressedStore,
       TxStore::TopInterpolantStore &symbolicallyAddressedStore,

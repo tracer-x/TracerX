@@ -107,7 +107,9 @@ public:
 
   void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore);
 
-  ref<Expr> packInterpolant(std::set<const Array *> &replacements) const;
+  ref<Expr>
+  packInterpolant(std::set<const Array *> &replacements,
+                  std::map<ref<Expr>, ref<Expr> > &substitution) const;
 
   /// \brief Print the content of the object to the LLVM error stream
   void dump() const {

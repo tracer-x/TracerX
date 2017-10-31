@@ -17,6 +17,7 @@
 #include "TxPathCondition.h"
 
 #include "klee/CommandLine.h"
+#include "klee/util/TxExprUtil.h"
 #include "klee/util/TxTreeGraph.h"
 
 using namespace klee;
@@ -145,10 +146,12 @@ void TxPathCondition::unsatCoreInterpolation(
   }
 }
 
-ref<Expr>
-TxPathCondition::packInterpolant(std::set<const Array *> &replacements) const {
+ref<Expr> TxPathCondition::packInterpolant(
+    std::set<const Array *> &replacements,
+    std::map<ref<Expr>, ref<Expr> > &substitution) const {
   ref<Expr> res;
   std::set<ref<PCConstraint> > *usedList;
+  std::vector<ref<Expr> > constraintsList;
 
   if (parent) {
     if (parent->left == this) {
@@ -160,10 +163,29 @@ TxPathCondition::packInterpolant(std::set<const Array *> &replacements) const {
     for (std::set<ref<PCConstraint> >::iterator it = usedList->begin(),
                                                 ie = usedList->end();
          it != ie; ++it) {
-      if (res.isNull()) {
-        res = (*it)->packInterpolant(replacements);
-      } else {
-        res = AndExpr::create((*it)->packInterpolant(replacements), res);
+      ref<Expr> constraint = (*it)->packInterpolant(replacements);
+      if (llvm::isa<EqExpr>(constraint)) {
+        if (llvm::isa<ConcatExpr>(constraint->getKid(0)) ||
+            llvm::isa<ReadExpr>(constraint->getKid(0))) {
+          substitution[constraint->getKid(0)] = constraint->getKid(1);
+        } else if (llvm::isa<ConcatExpr>(constraint->getKid(1)) ||
+                   llvm::isa<ReadExpr>(constraint->getKid(1))) {
+          substitution[constraint->getKid(1)] = constraint->getKid(0);
+        }
+      }
+      constraintsList.push_back(constraint);
+    }
+
+    for (std::vector<ref<Expr> >::iterator it = constraintsList.begin(),
+                                           ie = constraintsList.end();
+         it != ie; ++it) {
+      ref<Expr> constraint = TxSubstitutionVisitor(substitution).visit(*it);
+      if (!constraint->isTrue()) {
+        if (res.isNull()) {
+          res = constraint;
+        } else {
+          res = AndExpr::create(constraint, res);
+        }
       }
     }
   }

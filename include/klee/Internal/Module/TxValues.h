@@ -334,33 +334,38 @@ private:
   void init(llvm::Value *_value, ref<Expr> _expr, bool canInterpolateBound,
             const std::set<std::string> &_coreReasons,
             ref<TxStateAddress> _locations,
+            const std::map<ref<Expr>, ref<Expr> > &substitution,
             std::set<const Array *> &replacements, bool shadowing = false);
 
   TxInterpolantValue(llvm::Value *value, ref<Expr> expr,
                      bool canInterpolateBound,
                      const std::set<std::string> &coreReasons,
                      ref<TxStateAddress> locations,
+                     const std::map<ref<Expr>, ref<Expr> > &substitution,
                      std::set<const Array *> &replacements) {
-    init(value, expr, canInterpolateBound, coreReasons, locations, replacements,
-         true);
+    init(value, expr, canInterpolateBound, coreReasons, locations, substitution,
+         replacements, true);
   }
 
   TxInterpolantValue(llvm::Value *value, ref<Expr> expr,
                      bool canInterpolateBound,
                      const std::set<std::string> &coreReasons,
                      ref<TxStateAddress> location) {
+    const std::map<ref<Expr>, ref<Expr> > dummySubstitution;
     std::set<const Array *> dummyReplacements;
     init(value, expr, canInterpolateBound, coreReasons, location,
-         dummyReplacements);
+         dummySubstitution, dummyReplacements);
   }
 
 public:
   static ref<TxInterpolantValue>
   create(llvm::Value *value, ref<Expr> expr, bool canInterpolateBound,
          const std::set<std::string> &coreReasons, ref<TxStateAddress> location,
+         const std::map<ref<Expr>, ref<Expr> > &substitution,
          std::set<const Array *> &replacements) {
-    ref<TxInterpolantValue> sv(new TxInterpolantValue(
-        value, expr, canInterpolateBound, coreReasons, location, replacements));
+    ref<TxInterpolantValue> sv(
+        new TxInterpolantValue(value, expr, canInterpolateBound, coreReasons,
+                               location, substitution, replacements));
     return sv;
   }
 
@@ -742,9 +747,11 @@ public:
   }
 
   ref<TxInterpolantValue>
-  getInterpolantStyleValue(std::set<const Array *> &replacements) {
+  getInterpolantStyleValue(const std::map<ref<Expr>, ref<Expr> > &substitution,
+                           std::set<const Array *> &replacements) {
     return TxInterpolantValue::create(value, valueExpr, canInterpolateBound(),
-                                      coreReasons, location, replacements);
+                                      coreReasons, location, substitution,
+                                      replacements);
   }
 
   /// \brief Print minimal information about this object.
