@@ -188,8 +188,16 @@ void TxInterpolantValue::init(
     std::set<const Array *> &replacements, bool shadowing) {
   refCount = 0;
   id = reinterpret_cast<uintptr_t>(this);
-  expr =
-      shadowing ? ShadowArray::getShadowExpression(_expr, replacements) : _expr;
+  if (shadowing) {
+    _expr = ShadowArray::getShadowExpression(_expr, replacements);
+    for (std::map<ref<Expr>, ref<Expr> >::const_iterator
+             it = substitution.begin(),
+             ie = substitution.end();
+         it != ie; ++it) {
+      _expr = TxSubstitutionVisitor(substitution).visit(_expr);
+    }
+  }
+  expr = _expr;
   value = _value;
 
   doNotUseBound = !canInterpolateBound;
