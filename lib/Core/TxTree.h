@@ -140,27 +140,6 @@ public:
 class SubsumptionTableEntry {
   friend class TxTree;
 
-  /// \brief General substitution mechanism
-  class ApplySubstitutionVisitor : public ExprVisitor {
-  private:
-    const std::map<ref<Expr>, ref<Expr> > &replacements;
-
-  public:
-    ApplySubstitutionVisitor(
-        const std::map<ref<Expr>, ref<Expr> > &_replacements)
-        : ExprVisitor(true), replacements(_replacements) {}
-
-    Action visitExprPost(const Expr &e) {
-      std::map<ref<Expr>, ref<Expr> >::const_iterator it =
-          replacements.find(ref<Expr>(const_cast<Expr *>(&e)));
-      if (it != replacements.end()) {
-        return Action::changeTo(it->second);
-      } else {
-        return Action::doChildren();
-      }
-    }
-  };
-
 #ifdef ENABLE_Z3
   /// \brief Mark begin and end of subsumption check for use within a scope
   struct SubsumptionCheckMarker {
@@ -275,14 +254,9 @@ class SubsumptionTableEntry {
                                           bool &hasExistentialsOnly);
 
   /// \brief Function to collect substitution from a conjunction of equalities.
-  static void getSubstitution1(std::set<const Array *> &existentials,
-                               ref<Expr> equalities,
-                               std::map<ref<Expr>, ref<Expr> > &map);
-
-  /// \brief Function to collect substitution from a conjunction of formulas.
-  static void getSubstitution2(std::set<const Array *> &replaced,
-                               ref<Expr> conjunction,
-                               std::map<ref<Expr>, ref<Expr> > &map);
+  static void getSubstitution(std::set<const Array *> &existentials,
+                              ref<Expr> equalities,
+                              std::map<ref<Expr>, ref<Expr> > &map);
 
   /// \brief Function to remove equalities whose lhs is a variable in the set.
   static ref<Expr> removeUnsubstituted(std::set<const Array *> &variables,
@@ -467,7 +441,8 @@ public:
   /// \param replacements The replacement bound variables for replacing the
   /// variables in the path condition.
   /// \return The interpolant expression.
-  ref<Expr> getInterpolant(std::set<const Array *> &replacements) const;
+  ref<Expr> getInterpolant(std::set<const Array *> &replacements,
+                           std::map<ref<Expr>, ref<Expr> > &substitution) const;
 
   /// \brief Extend the path condition with another constraint
   ///
@@ -518,6 +493,7 @@ public:
   /// replaced with the bound ones.
   void getStoredCoreExpressions(
       const std::vector<llvm::Instruction *> &callHistory,
+      const std::map<ref<Expr>, ref<Expr> > &substitution,
       std::set<const Array *> &replacements,
       TxStore::TopInterpolantStore &concretelyAddressedStore,
       TxStore::TopInterpolantStore &symbolicallyAddressedStore,

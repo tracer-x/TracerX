@@ -25,6 +25,7 @@
 #include <klee/SolverStats.h>
 #include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ExprPPrinter.h>
+#include <klee/util/TxExprUtil.h>
 #include <klee/util/TxPrintUtil.h>
 #include <fstream>
 #include <vector>
@@ -50,11 +51,12 @@ SubsumptionTableEntry::SubsumptionTableEntry(
     TxTreeNode *node, const std::vector<llvm::Instruction *> &callHistory)
     : programPoint(node->getProgramPoint()),
       nodeSequenceNumber(node->getNodeSequenceNumber()) {
+  std::map<ref<Expr>, ref<Expr> > substitution;
   existentials.clear();
-  interpolant = node->getInterpolant(existentials);
+  interpolant = node->getInterpolant(existentials, substitution);
 
   node->getStoredCoreExpressions(
-      callHistory, existentials, concretelyAddressedStore,
+      callHistory, substitution, existentials, concretelyAddressedStore,
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
       symbolicallyAddressedHistoricalStore);
 }
@@ -548,9 +550,9 @@ ref<Expr> SubsumptionTableEntry::simplifyEqualityExpr(
 }
 
 void
-SubsumptionTableEntry::getSubstitution1(std::set<const Array *> &existentials,
-                                        ref<Expr> equalities,
-                                        std::map<ref<Expr>, ref<Expr> > &map) {
+SubsumptionTableEntry::getSubstitution(std::set<const Array *> &existentials,
+                                       ref<Expr> equalities,
+                                       std::map<ref<Expr>, ref<Expr> > &map) {
   // It is assumed the rhs is an expression on the free variables.
   if (llvm::isa<EqExpr>(equalities)) {
     ref<Expr> lhs = equalities->getKid(0);
@@ -578,30 +580,8 @@ SubsumptionTableEntry::getSubstitution1(std::set<const Array *> &existentials,
       }
     }
   } else if (llvm::isa<AndExpr>(equalities)) {
-    getSubstitution1(existentials, equalities->getKid(0), map);
-    getSubstitution1(existentials, equalities->getKid(1), map);
-  }
-}
-
-void
-SubsumptionTableEntry::getSubstitution2(std::set<const Array *> &replaced,
-                                        ref<Expr> equalities,
-                                        std::map<ref<Expr>, ref<Expr> > &map) {
-  // It is assumed the lhs is an expression on the existentially-quantified
-  // variable whereas the rhs is an expression on the free variables.
-  if (llvm::isa<EqExpr>(equalities)) {
-    ref<Expr> lhs = equalities->getKid(0);
-    ref<Expr> rhs = equalities->getKid(1);
-    if (isVariable(lhs) && hasVariableInSet(replaced, lhs) &&
-        !hasVariableInSet(replaced, rhs)) {
-      map[lhs] = rhs;
-    } else if (!hasVariableInSet(replaced, lhs) && isVariable(rhs) &&
-               hasVariableInSet(replaced, rhs)) {
-      map[rhs] = lhs;
-    }
-  } else if (llvm::isa<AndExpr>(equalities)) {
-    getSubstitution2(replaced, equalities->getKid(0), map);
-    getSubstitution2(replaced, equalities->getKid(1), map);
+    getSubstitution(existentials, equalities->getKid(0), map);
+    getSubstitution(existentials, equalities->getKid(1), map);
   }
 }
 
@@ -730,25 +710,19 @@ ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
 
   assert(llvm::isa<AndExpr>(body));
 
-  std::map<ref<Expr>, ref<Expr> > substitution1;
+  std::map<ref<Expr>, ref<Expr> > substitution;
   ref<Expr> equalities = body->getKid(1);
-  getSubstitution1(expr->variables, equalities, substitution1);
+  getSubstitution(expr->variables, equalities, substitution);
 
   ref<Expr> interpolant =
-      ApplySubstitutionVisitor(substitution1).visit(body->getKid(0));
+      TxSubstitutionVisitor(substitution).visit(body->getKid(0));
 
   if (hasVariableInSet(expr->variables, equalities)) {
     // we could also replace the occurrence of some variables with its
     // corresponding substitution mapping.
-    equalities = ApplySubstitutionVisitor(substitution1).visit(equalities);
+    equalities = TxSubstitutionVisitor(substitution).visit(equalities);
     equalities = removeUnsubstituted(expr->variables, equalities);
   }
-
-  // We look for substitutions in the interpolant part and apply them to the
-  // interpolant itself.
-  std::map<ref<Expr>, ref<Expr> > substitution2;
-  getSubstitution2(expr->variables, interpolant, substitution2);
-  interpolant = ApplySubstitutionVisitor(substitution2).visit(interpolant);
 
   ref<Expr> newBody = AndExpr::create(interpolant, equalities);
 
@@ -2232,10 +2206,11 @@ TxTreeNode::~TxTreeNode() {
     delete dependency;
 }
 
-ref<Expr>
-TxTreeNode::getInterpolant(std::set<const Array *> &replacements) const {
+ref<Expr> TxTreeNode::getInterpolant(
+    std::set<const Array *> &replacements,
+    std::map<ref<Expr>, ref<Expr> > &substitution) const {
   TimerStatIncrementer t(getInterpolantTime);
-  ref<Expr> expr = dependency->packInterpolant(replacements);
+  ref<Expr> expr = dependency->packInterpolant(replacements, substitution);
   return expr;
 }
 
@@ -2282,6 +2257,7 @@ void TxTreeNode::getStoredExpressions(
     TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore)
     const {
   TimerStatIncrementer t(getStoredExpressionsTime);
+  std::map<ref<Expr>, ref<Expr> > dummySubstitution;
   std::set<const Array *> dummyReplacements;
 
   // Since a program point index is a first statement in a basic block,
@@ -2296,8 +2272,8 @@ void TxTreeNode::getStoredExpressions(
       assert(parent->right == this && "mismatched tree edge");
 
     parent->dependency->getStoredExpressions(
-        _callHistory, dummyReplacements, false, leftRetrieval,
-        concretelyAddressedStore, symbolicallyAddressedStore,
+        _callHistory, dummySubstitution, dummyReplacements, false,
+        leftRetrieval, concretelyAddressedStore, symbolicallyAddressedStore,
         concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);
   }
@@ -2305,6 +2281,7 @@ void TxTreeNode::getStoredExpressions(
 
 void TxTreeNode::getStoredCoreExpressions(
     const std::vector<llvm::Instruction *> &_callHistory,
+    const std::map<ref<Expr>, ref<Expr> > &substitution,
     std::set<const Array *> &replacements,
     TxStore::TopInterpolantStore &concretelyAddressedStore,
     TxStore::TopInterpolantStore &symbolicallyAddressedStore,
@@ -2325,7 +2302,7 @@ void TxTreeNode::getStoredCoreExpressions(
       assert(parent->right == this && "mismatched tree edge");
 
     parent->dependency->getStoredExpressions(
-        _callHistory, replacements, true, leftRetrieval,
+        _callHistory, substitution, replacements, true, leftRetrieval,
         concretelyAddressedStore, symbolicallyAddressedStore,
         concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);

@@ -126,23 +126,27 @@ private:
   TxStore *parent, *left, *right;
 
   void concreteToInterpolant(ref<TxVariable> variable, ref<TxStoreEntry> entry,
+                             const std::map<ref<Expr>, ref<Expr> > &substition,
                              std::set<const Array *> &replacements,
                              bool coreOnly, LowerInterpolantStore &map,
                              bool leftRetrieval) const;
 
-  void symbolicToInterpolant(ref<TxVariable> variable, ref<TxStoreEntry> entry,
-                             std::set<const Array *> &replacements,
-                             bool coreOnly, LowerInterpolantStore &map,
-                             bool leftRetrieval) const;
+  void
+  symbolicToInterpolant(ref<TxVariable> variable, ref<TxStoreEntry> entry,
+                        const std::map<ref<Expr>, ref<Expr> > &substitution,
+                        std::set<const Array *> &replacements, bool coreOnly,
+                        LowerInterpolantStore &map, bool leftRetrieval) const;
 
   void getConcreteStore(
       const std::vector<llvm::Instruction *> &callHistory,
+      const std::map<ref<Expr>, ref<Expr> > &substitution,
       std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
       TopInterpolantStore &_concretelyAddressedStore,
       LowerInterpolantStore &_concretelyAddressedHistoricalStore) const;
 
   void getSymbolicStore(
       const std::vector<llvm::Instruction *> &callHistory,
+      const std::map<ref<Expr>, ref<Expr> > &substitution,
       std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
       TopInterpolantStore &_symbolicallyAddressedStore,
       LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const;
@@ -192,6 +196,7 @@ public:
   /// the store.
   void getStoredExpressions(
       const std::vector<llvm::Instruction *> &callHistory,
+      const std::map<ref<Expr>, ref<Expr> > &substitution,
       std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
       TopInterpolantStore &_concretelyAddressedStore,
       TopInterpolantStore &_symbolicallyAddressedStore,
