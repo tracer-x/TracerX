@@ -952,6 +952,12 @@ public:
       rightCoreReasons.insert(reason);
   }
 
+  bool isCore(bool leftMarking) const {
+    if (leftMarking)
+      return leftCore;
+    return rightCore;
+  }
+
   bool isPointer() const { return !leftPointerInfo.isNull(); }
 
   uint64_t getDepth() { return depth; }
