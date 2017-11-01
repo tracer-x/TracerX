@@ -920,25 +920,33 @@ public:
     return disableBoundEntryList;
   }
 
-  ref<TxStateAddress> getLeftPointerInfo() const { return leftPointerInfo; }
-
-  ref<TxStateAddress> getRightPointerInfo() const { return rightPointerInfo; }
-
-  bool leftCanInterpolateBound() { return !leftDoNotInterpolateBound; }
-
-  bool rightCanInterpolateBound() { return !rightDoNotInterpolateBound; }
-
-  void leftDisableBoundInterpolation() { leftDoNotInterpolateBound = true; }
-
-  void rightDisableBoundInterpolation() { rightDoNotInterpolateBound = true; }
-
-  void leftSetAsCore(const std::string reason) {
-    leftCore = true;
-    if (!reason.empty())
-      leftCoreReasons.insert(reason);
+  ref<TxStateAddress> getPointerInfo(bool leftMarking) const {
+    if (leftMarking)
+      return rightPointerInfo;
+    return rightPointerInfo;
   }
 
-  void rightSetAsCore(const std::string reason) {
+  bool canInterpolateBound(bool leftMarking) const {
+    if (leftMarking)
+      return !leftDoNotInterpolateBound;
+    return !rightDoNotInterpolateBound;
+  }
+
+  void disableBoundInterpolation(bool leftMarking) {
+    if (leftMarking) {
+      leftDoNotInterpolateBound = true;
+      return;
+    }
+    rightDoNotInterpolateBound = true;
+  }
+
+  void setAsCore(bool leftMarking, const std::string &reason) {
+    if (leftMarking) {
+      leftCore = true;
+      if (!reason.empty())
+        leftCoreReasons.insert(reason);
+      return;
+    }
     rightCore = true;
     if (!reason.empty())
       rightCoreReasons.insert(reason);
@@ -948,29 +956,26 @@ public:
 
   uint64_t getDepth() { return depth; }
 
-  ref<TxInterpolantValue> getLeftInterpolantStyleValue() {
-    return TxInterpolantValue::create(value, valueExpr,
-                                      !leftDoNotInterpolateBound,
-                                      leftCoreReasons, leftPointerInfo);
-  }
-
-  ref<TxInterpolantValue> getLeftInterpolantStyleValue(
-      const std::map<ref<Expr>, ref<Expr> > &substitution,
-      std::set<const Array *> &replacements) {
-    return TxInterpolantValue::create(
-        value, valueExpr, !leftDoNotInterpolateBound, leftCoreReasons,
-        leftPointerInfo, substitution, replacements);
-  }
-
-  ref<TxInterpolantValue> getRightInterpolantStyleValue() {
+  ref<TxInterpolantValue> getInterpolantStyleValue(bool leftUse) {
+    if (leftUse) {
+      return TxInterpolantValue::create(value, valueExpr,
+                                        !leftDoNotInterpolateBound,
+                                        leftCoreReasons, leftPointerInfo);
+    }
     return TxInterpolantValue::create(value, valueExpr,
                                       !rightDoNotInterpolateBound,
                                       rightCoreReasons, rightPointerInfo);
   }
 
-  ref<TxInterpolantValue> getRightInterpolantStyleValue(
-      const std::map<ref<Expr>, ref<Expr> > &substitution,
-      std::set<const Array *> &replacements) {
+  ref<TxInterpolantValue>
+  getInterpolantStyleValue(bool leftUse,
+                           const std::map<ref<Expr>, ref<Expr> > &substitution,
+                           std::set<const Array *> &replacements) {
+    if (leftUse) {
+      return TxInterpolantValue::create(
+          value, valueExpr, !leftDoNotInterpolateBound, leftCoreReasons,
+          leftPointerInfo, substitution, replacements);
+    }
     return TxInterpolantValue::create(
         value, valueExpr, !rightDoNotInterpolateBound, rightCoreReasons,
         rightPointerInfo, substitution, replacements);
