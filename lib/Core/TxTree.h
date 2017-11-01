@@ -367,7 +367,23 @@ class TxTreeNode {
   static uint64_t nextNodeSequenceNumber;
 
   /// \brief Value dependencies
+<<<<<<< HEAD
   TxDependency *dependency;
+=======
+  Dependency *dependency;
+
+  // \brief Instance of weakest precondition class used to generate WP
+  // interpolant
+  WeakestPreCondition *wp;
+
+  // \brief The unsat core from a infeasible path is temporarily stored here
+  // and in case speculation is failed it's used to do marking related to
+  // the infeasible path
+  std::vector<ref<Expr> > speculationUnsatCore;
+
+  /// \brief Value dependencies
+  ref<Expr> childWPInterpolant[2];
+>>>>>>> 335fc60... Adding speculationUnsatCore to temporarily store the unsat core from a infeasible path
 
   TxTreeNode *parent, *left, *right;
 
