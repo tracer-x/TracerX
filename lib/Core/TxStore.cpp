@@ -418,6 +418,295 @@ void TxStore::markUsed(const std::set<ref<TxStoreEntry> > &entryList) {
   }
 }
 
+void TxStore::recursivelyMarkFlow(ref<TxStoreEntry> entry,
+                                  const TxStore *entryStore, bool leftMarking,
+                                  const std::string &reason) const {
+  if (entry.isNull())
+    return;
+
+  if (entry->isCore(leftMarking)) {
+    if (!entry->canInterpolateBound(leftMarking))
+      return;
+  }
+
+  entry->setAsCore(leftMarking, reason);
+  entry->disableBoundInterpolation(leftMarking);
+
+  std::set<ref<TxStoreEntry> > allowBoundEntryList(
+      entry->getAllowBoundEntryList());
+  for (std::set<ref<TxStoreEntry> >::iterator it = allowBoundEntryList.begin(),
+                                              ie = allowBoundEntryList.end();
+       it != ie; ++it) {
+    uint64_t entryDepth = (*it)->getDepth();
+    const TxStore *current = entryStore;
+    leftMarking = false;
+
+    assert(current->depth < entryDepth &&
+           "entry should have been defined in an ancestor node");
+
+    while (current->depth < entryDepth) {
+      if (current == current->parent->left) {
+        leftMarking = true;
+      } else {
+        leftMarking = false;
+      }
+      current = current->parent;
+    }
+
+    recursivelyMarkFlow(*it, current, leftMarking, reason);
+  }
+
+  std::set<ref<TxStoreEntry> > disableBoundEntryList(
+      entry->getDisableBoundEntryList());
+  for (std::set<ref<TxStoreEntry> >::iterator
+           it = disableBoundEntryList.begin(),
+           ie = disableBoundEntryList.end();
+       it != ie; ++it) {
+    uint64_t entryDepth = (*it)->getDepth();
+    const TxStore *current = entryStore;
+    leftMarking = false;
+
+    assert(current->depth < entryDepth &&
+           "entry should have been defined in an ancestor node");
+
+    while (current->depth < entryDepth) {
+      if (current == current->parent->left) {
+        leftMarking = true;
+      } else {
+        leftMarking = false;
+      }
+      current = current->parent;
+    }
+
+    recursivelyMarkFlow(*it, current, leftMarking, reason);
+  }
+}
+
+void TxStore::markFlow(ref<TxStateValue> target,
+                       const std::string &reason) const {
+  if (target.isNull())
+    return;
+
+  std::set<ref<TxStoreEntry> > allowBoundEntryList(
+      target->getAllowBoundEntryList());
+  for (std::set<ref<TxStoreEntry> >::iterator it = allowBoundEntryList.begin(),
+                                              ie = allowBoundEntryList.end();
+       it != ie; ++it) {
+    uint64_t entryDepth = (*it)->getDepth();
+    const TxStore *current = this;
+    bool leftMarking = false;
+
+    assert(depth < entryDepth &&
+           "entry should have been defined in an ancestor node");
+
+    while (current->depth < entryDepth) {
+      if (current == current->parent->left) {
+        leftMarking = true;
+      } else {
+        leftMarking = false;
+      }
+      current = current->parent;
+    }
+
+    recursivelyMarkFlow(*it, current, leftMarking, reason);
+  }
+
+  std::set<ref<TxStoreEntry> > disableBoundEntryList(
+      target->getDisableBoundEntryList());
+  for (std::set<ref<TxStoreEntry> >::iterator
+           it = disableBoundEntryList.begin(),
+           ie = disableBoundEntryList.end();
+       it != ie; ++it) {
+    uint64_t entryDepth = (*it)->getDepth();
+    const TxStore *current = this;
+    bool leftMarking = false;
+
+    assert(depth < entryDepth &&
+           "entry should have been defined in an ancestor node");
+
+    while (current->depth < entryDepth) {
+      if (current == current->parent->left) {
+        leftMarking = true;
+      } else {
+        leftMarking = false;
+      }
+      current = current->parent;
+    }
+
+    recursivelyMarkFlow(*it, current, leftMarking, reason);
+  }
+}
+
+bool TxStore::recursivelyMarkPointerFlow(ref<TxStoreEntry> entry,
+                                         const TxStore *entryStore,
+                                         bool leftMarking,
+                                         ref<TxStateValue> checkedAddress,
+                                         std::set<uint64_t> &bounds,
+                                         const std::string &reason) const {
+  bool memoryError = false;
+  bool boundUpdated = false;
+
+  if (entry.isNull())
+    return memoryError;
+
+  if (entry->canInterpolateBound(leftMarking)) {
+    memoryError = entry->getPointerInfo(leftMarking)
+                      ->adjustOffsetBound(checkedAddress, bounds, boundUpdated);
+  }
+
+  // If this was the first time this value gets marked, we should propagate the
+  // marking further
+  if (!entry->isCore(leftMarking))
+    boundUpdated = true;
+
+  entry->setAsCore(leftMarking, reason);
+
+  if (memoryError) {
+    std::set<ref<TxStoreEntry> > allowBoundEntryList(
+        entry->getAllowBoundEntryList());
+    for (std::set<ref<TxStoreEntry> >::iterator
+             it = allowBoundEntryList.begin(),
+             ie = allowBoundEntryList.end();
+         it != ie; ++it) {
+      uint64_t entryDepth = (*it)->getDepth();
+      const TxStore *current = this;
+      bool leftMarking = false;
+
+      assert(depth < entryDepth &&
+             "entry should have been defined in an ancestor node");
+
+      while (current->depth < entryDepth) {
+        if (current == current->parent->left) {
+          leftMarking = true;
+        } else {
+          leftMarking = false;
+        }
+        current = current->parent;
+      }
+
+      recursivelyMarkFlow(*it, current, leftMarking, reason);
+    }
+  } else {
+    if (boundUpdated) {
+      std::set<ref<TxStoreEntry> > allowBoundEntryList(
+						       entry->getAllowBoundEntryList());
+      for (std::set<ref<TxStoreEntry> >::iterator it = allowBoundEntryList.begin(),
+	     ie = allowBoundEntryList.end();
+	   it != ie; ++it) {
+	uint64_t entryDepth = (*it)->getDepth();
+	const TxStore *current = entryStore;
+	leftMarking = false;
+
+	assert(current->depth < entryDepth &&
+	       "entry should have been defined in an ancestor node");
+
+	while (current->depth < entryDepth) {
+	  if (current == current->parent->left) {
+	    leftMarking = true;
+	  } else {
+	    leftMarking = false;
+	  }
+	  current = current->parent;
+	}
+
+	if (!(*it)->isPointer()) {
+	  recursivelyMarkFlow(*it, current, leftMarking, reason);
+	} else {
+	  memoryError = recursivelyMarkPointerFlow(*it, current, leftMarking,
+						   checkedAddress, bounds, reason)
+	    ? true
+	    : memoryError;
+	}
+      }
+    }
+  }
+
+  std::set<ref<TxStoreEntry> > disableBoundEntryList(
+      entry->getDisableBoundEntryList());
+  for (std::set<ref<TxStoreEntry> >::iterator
+           it = disableBoundEntryList.begin(),
+           ie = disableBoundEntryList.end();
+       it != ie; ++it) {
+    uint64_t entryDepth = (*it)->getDepth();
+    const TxStore *current = entryStore;
+    leftMarking = false;
+
+    assert(current->depth < entryDepth &&
+           "entry should have been defined in an ancestor node");
+
+    while (current->depth < entryDepth) {
+      if (current == current->parent->left) {
+        leftMarking = true;
+      } else {
+        leftMarking = false;
+      }
+      current = current->parent;
+    }
+
+    recursivelyMarkFlow(*it, current, leftMarking, reason);
+  }
+
+  return memoryError;
+}
+
+void TxStore::markPointerFlow(ref<TxStateValue> target,
+                              ref<TxStateValue> checkedAddress,
+                              std::set<uint64_t> &bounds,
+                              const std::string &reason) const {
+  if (target.isNull())
+    return;
+
+  std::set<ref<TxStoreEntry> > allowBoundEntryList(
+      target->getAllowBoundEntryList());
+  for (std::set<ref<TxStoreEntry> >::iterator it = allowBoundEntryList.begin(),
+                                              ie = allowBoundEntryList.end();
+       it != ie; ++it) {
+    uint64_t entryDepth = (*it)->getDepth();
+    const TxStore *current = this;
+    bool leftMarking = false;
+
+    assert(depth < entryDepth &&
+           "entry should have been defined in an ancestor node");
+
+    while (current->depth < entryDepth) {
+      if (current == current->parent->left) {
+        leftMarking = true;
+      } else {
+        leftMarking = false;
+      }
+      current = current->parent;
+    }
+
+    recursivelyMarkPointerFlow(*it, current, leftMarking, checkedAddress,
+                               bounds, reason);
+  }
+
+  std::set<ref<TxStoreEntry> > disableBoundEntryList(
+      target->getDisableBoundEntryList());
+  for (std::set<ref<TxStoreEntry> >::iterator
+           it = disableBoundEntryList.begin(),
+           ie = disableBoundEntryList.end();
+       it != ie; ++it) {
+    uint64_t entryDepth = (*it)->getDepth();
+    const TxStore *current = this;
+    bool leftMarking = false;
+
+    assert(depth < entryDepth &&
+           "entry should have been defined in an ancestor node");
+
+    while (current->depth < entryDepth) {
+      if (current == current->parent->left) {
+        leftMarking = true;
+      } else {
+        leftMarking = false;
+      }
+      current = current->parent;
+    }
+
+    recursivelyMarkFlow(*it, current, leftMarking, reason);
+  }
+}
+
 /// \brief Print the content of the object to the LLVM error stream
 void TxStore::print(llvm::raw_ostream &stream) const { this->print(stream, 0); }
 

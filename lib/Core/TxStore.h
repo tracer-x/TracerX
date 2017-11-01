@@ -151,6 +151,15 @@ private:
       TopInterpolantStore &_symbolicallyAddressedStore,
       LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const;
 
+  void recursivelyMarkFlow(ref<TxStoreEntry> entry, const TxStore *entryStore,
+                           bool leftMarking, const std::string &reason) const;
+
+  bool recursivelyMarkPointerFlow(ref<TxStoreEntry> entry,
+                                  const TxStore *entryStore, bool leftMarking,
+                                  ref<TxStateValue> checkedAddress,
+                                  std::set<uint64_t> &bounds,
+                                  const std::string &reason) const;
+
   /// \brief Constructor for an empty store.
   TxStore() : depth(0), parent(0), left(0), right(0) {}
 
@@ -215,6 +224,13 @@ public:
 
   /// \brief Register the entries in the entry list as used
   void markUsed(const std::set<ref<TxStoreEntry> > &entryList);
+
+  void markFlow(ref<TxStateValue> target, const std::string &reason) const;
+
+  void markPointerFlow(ref<TxStateValue> target,
+                       ref<TxStateValue> checkedOffset,
+                       std::set<uint64_t> &bounds,
+                       const std::string &reason) const;
 
   /// \brief Print the content of the object to the LLVM error stream
   void dump() const {

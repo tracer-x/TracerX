@@ -298,6 +298,25 @@ namespace klee {
     void addDependencyToNonPointer(ref<TxStateValue> source,
                                    ref<TxStateValue> target);
 
+    void markFlowViaStore(ref<TxStateValue> target,
+                          const std::string &reason) const {
+      store->markFlow(target, reason);
+    }
+
+    void markPointerFlowViaStore(ref<TxStateValue> target,
+                                 ref<TxStateValue> checkedOffset,
+                                 const std::string &reason) const {
+      std::set<uint64_t> bounds;
+      store->markPointerFlow(target, checkedOffset, bounds, reason);
+    }
+
+    void markPointerFlowViaStore(ref<TxStateValue> target,
+                                 ref<TxStateValue> checkedOffset,
+                                 std::set<uint64_t> &bounds,
+                                 const std::string &reason) const {
+      store->markPointerFlow(target, checkedOffset, bounds, reason);
+    }
+
     /// \brief Mark as core all the values and locations that flows to the
     /// target
     void markFlow(ref<TxStateValue> target, const std::string &reason) const;
