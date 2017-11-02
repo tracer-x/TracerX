@@ -374,6 +374,12 @@ class TxTreeNode {
   // the infeasible path
   std::vector<ref<Expr> > speculationUnsatCore;
 
+  // \brief The pointer to solver is temporarily stored here and in case
+  // speculation
+  // is failed it's used to do marking related to the infeasible path
+  TimingSolver *speculationSolver;
+
+  // \brief Used to identify if the node is in the speculation mode
   bool speculationFlag;
 
   TxTreeNode *parent, *left, *right;
@@ -466,6 +472,12 @@ public:
 
   /// \brief Check if the current node is a speculation node
   bool isSpeculationNode();
+
+  /// \brief Store the solver and unsatcore temporarily, so they can be used for
+  /// markings if
+  /// speculation fails
+  void storeSpeculationUnsatCore(TimingSolver *solver,
+                                 std::vector<ref<Expr> > unsatCore);
 
   /// \brief Extend the path condition with another constraint
   ///
@@ -873,6 +885,9 @@ public:
 
   /// \brief Check if the current node is a speculation node
   bool isSpeculationNode();
+
+  void storeSpeculationUnsatCore(TimingSolver *solver,
+                                 std::vector<ref<Expr> > unsatCore);
 
   /// \brief Print the content of the tree node object into a stream.
   ///

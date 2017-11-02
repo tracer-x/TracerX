@@ -2132,6 +2132,11 @@ bool TxTree::isSpeculationNode() {
   return currentTxTreeNode->isSpeculationNode();
 }
 
+void TxTree::storeSpeculationUnsatCore(TimingSolver *solver,
+                                       std::vector<ref<Expr> > unsatCore) {
+  currentTxTreeNode->storeSpeculationUnsatCore(solver, unsatCore);
+}
+
 void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
                        std::string edges) const {
   if (n->left != 0) {
@@ -2248,6 +2253,12 @@ ref<Expr> TxTreeNode::getInterpolant(
 }
 
 bool TxTreeNode::isSpeculationNode() { return speculationFlag; }
+
+void TxTreeNode::storeSpeculationUnsatCore(TimingSolver *solver,
+                                           std::vector<ref<Expr> > unsatCore) {
+  speculationSolver = solver;
+  speculationUnsatCore = unsatCore;
+}
 
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
   TimerStatIncrementer t(addConstraintTime);

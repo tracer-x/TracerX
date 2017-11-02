@@ -178,7 +178,8 @@ llvm::cl::opt<bool> TracerXPointerError(
 llvm::cl::opt<bool> Speculation(
     "speculation",
     llvm::cl::desc(
-        "Perform speculation to remove infeasible paths from interpolants"),
+        "Perform speculation to remove infeasible paths from interpolants."
+        "Speculation should be used with Depth First Search."),
     llvm::cl::init(false));
 #endif // ENABLE_Z3
 
