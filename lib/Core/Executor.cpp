@@ -892,7 +892,57 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       }
     }
 
-    if (INTERPOLATION_ENABLED) {
+    if (Speculation) {
+      // Storing the unsatCore and pointer to the solver
+      // so, in case speculation fails the unsatcore can
+      // be used to perform markings.
+      txTree->storeSpeculationUnsatCore(solver, unsatCore);
+
+      // At this point the speculation node should be created and
+      // added to the working list in a way that its speculated
+      // after the other node is traversed.
+
+      TimerStatIncrementer timer(stats::forkTime);
+      ExecutionState *trueState, *speculationFalseState = &current;
+
+      ++stats::forks;
+
+      trueState = speculationFalseState->branch();
+      addedStates.push_back(trueState);
+
+      current.ptreeNode->data = 0;
+      std::pair<PTree::Node *, PTree::Node *> res = processTree->split(
+          current.ptreeNode, speculationFalseState, trueState);
+      speculationFalseState->ptreeNode = res.first;
+      trueState->ptreeNode = res.second;
+
+      if (!isInternal) {
+        if (pathWriter) {
+          speculationFalseState->pathOS = pathWriter->open(current.pathOS);
+          trueState->pathOS << "1";
+          speculationFalseState->pathOS << "0";
+        }
+        if (symPathWriter) {
+          speculationFalseState->symPathOS =
+              symPathWriter->open(current.symPathOS);
+          trueState->symPathOS << "1";
+          speculationFalseState->symPathOS << "0";
+        }
+      }
+
+      if (INTERPOLATION_ENABLED) {
+        std::pair<TxTreeNode *, TxTreeNode *> ires =
+            txTree->split(current.txTreeNode, speculationFalseState, trueState);
+        speculationFalseState->txTreeNode = ires.first;
+        speculationFalseState->txTreeNode->setSpeculationFlag();
+        trueState->txTreeNode = ires.second;
+      }
+
+      addConstraint(*trueState, condition);
+
+      return StatePair(trueState, speculationFalseState);
+
+    } else if (INTERPOLATION_ENABLED) {
       // Validity proof succeeded of a query: antecedent -> consequent.
       // We then extract the unsatisfiability core of antecedent and not
       // consequent as the Craig interpolant.
@@ -907,7 +957,57 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       }
     }
 
-    if (INTERPOLATION_ENABLED) {
+    if (Speculation) {
+      // Storing the unsatCore and pointer to the solver
+      // so, in case speculation fails the unsatcore can
+      // be used to perform markings.
+      txTree->storeSpeculationUnsatCore(solver, unsatCore);
+
+      // At this point the speculation node should be created and
+      // added to the working list in a way that its speculated
+      // after the other node is traversed.
+
+      TimerStatIncrementer timer(stats::forkTime);
+      ExecutionState *speculationTrueState, *falseState = &current;
+
+      ++stats::forks;
+
+      falseState = speculationTrueState->branch();
+      addedStates.push_back(falseState);
+
+      current.ptreeNode->data = 0;
+      std::pair<PTree::Node *, PTree::Node *> res = processTree->split(
+          current.ptreeNode, speculationTrueState, falseState);
+      speculationTrueState->ptreeNode = res.first;
+      falseState->ptreeNode = res.second;
+
+      if (!isInternal) {
+        if (pathWriter) {
+          speculationTrueState->pathOS = pathWriter->open(current.pathOS);
+          speculationTrueState->pathOS << "1";
+          falseState->pathOS << "0";
+        }
+        if (symPathWriter) {
+          speculationTrueState->symPathOS =
+              symPathWriter->open(current.symPathOS);
+          speculationTrueState->symPathOS << "1";
+          falseState->symPathOS << "0";
+        }
+      }
+
+      if (INTERPOLATION_ENABLED) {
+        std::pair<TxTreeNode *, TxTreeNode *> ires =
+            txTree->split(current.txTreeNode, speculationTrueState, falseState);
+        speculationTrueState->txTreeNode = ires.first;
+        speculationTrueState->txTreeNode->setSpeculationFlag();
+        falseState->txTreeNode = ires.second;
+      }
+
+      addConstraint(*falseState, Expr::createIsZero(condition));
+
+      return StatePair(speculationTrueState, falseState);
+
+    } else if (INTERPOLATION_ENABLED) {
       // Falsity proof succeeded of a query: antecedent -> consequent,
       // which means that antecedent -> not(consequent) is valid. In this
       // case also we extract the unsat core of the proof
