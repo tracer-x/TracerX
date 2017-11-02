@@ -774,7 +774,6 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
 /**/
 
 void TxStateValue::addLoadAddress(ref<TxStateValue> loadAddress) {
-  loadAddresses.insert(loadAddress);
   disableBoundEntryList.insert(loadAddress->allowBoundEntryList.begin(),
                                loadAddress->allowBoundEntryList.end());
   disableBoundEntryList.insert(loadAddress->disableBoundEntryList.begin(),
@@ -793,7 +792,6 @@ void TxStateValue::addLoadAddress(ref<TxStateValue> loadAddress) {
 }
 
 void TxStateValue::addStoreAddress(ref<TxStateValue> storeAddress) {
-  storeAddresses.insert(storeAddress);
   disableBoundEntryList.insert(storeAddress->allowBoundEntryList.begin(),
                                storeAddress->allowBoundEntryList.end());
   disableBoundEntryList.insert(storeAddress->disableBoundEntryList.begin(),
@@ -813,16 +811,6 @@ void TxStateValue::addStoreAddress(ref<TxStateValue> storeAddress) {
 
 void TxStateValue::addDependency(ref<TxStateValue> source,
                                  ref<TxStateAddress> via) {
-  if (via.isNull()) {
-    loadAddresses.insert(source->loadAddresses.begin(),
-                         source->loadAddresses.end());
-    storeAddresses.insert(source->storeAddresses.begin(),
-                          source->storeAddresses.end());
-    sources.insert(source->sources.begin(), source->sources.end());
-  } else {
-    sources[source] = via;
-  }
-
   std::set<ref<TxStoreEntry> > tmpSet;
   for (std::set<ref<TxStoreEntry> >::iterator
            it = source->allowBoundEntryList.begin(),
@@ -879,65 +867,12 @@ void TxStateValue::print(llvm::raw_ostream &stream,
       (*it)->print(stream, tabsNext);
     }
   }
-
-  stream << "\n";
-  if (sources.empty()) {
-    stream << prefix << "no dependencies\n";
-  } else {
-    stream << prefix << "direct dependencies:";
-    for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::const_iterator
-             is = sources.begin(),
-             it = is, ie = sources.end();
-         it != ie; ++it) {
-      stream << "\n";
-      if (it != is)
-        stream << tabsNext << "------------------------------------------\n";
-      (*it->first).printMinimal(stream, tabsNext);
-      if (!it->second.isNull()) {
-        stream << " via\n";
-        (*it->second).print(stream, tabsNext);
-      }
-    }
-  }
-}
-
-ref<TxStateValue> TxStateValue::copy() {
-  ref<TxStateValue> ret(new TxStateValue(value, callHistory, valueExpr));
-  ret->pointerInfo = pointerInfo->copy();
-  for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::iterator
-           it = sources.begin(),
-           ie = sources.end();
-       it != ie; ++it) {
-    ret->sources[it->first] = (it->second)->copy();
-  }
-  ret->loadAddresses = loadAddresses;
-  ret->storeAddresses = storeAddresses;
-  ret->allowBoundEntryList = allowBoundEntryList;
-  ret->disableBoundEntryList = disableBoundEntryList;
-  return ret;
 }
 
 void TxStateValue::printMinimal(llvm::raw_ostream &stream,
                                 const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
-  if (core) {
-    if (!doNotInterpolateBound) {
-      stream << prefix << "a bounded interpolant value\n";
-    } else {
-      stream << prefix << "an interpolant value\n";
-    }
-    if (!coreReasons.empty()) {
-      stream << prefix << "reason(s) for storage:\n";
-      for (std::set<std::string>::const_iterator it = coreReasons.begin(),
-                                                 ie = coreReasons.end();
-           it != ie; ++it) {
-        stream << tabsNext << *it << "\n";
-      }
-    }
-  } else {
-    stream << prefix << "a non-interpolant value\n";
-  }
   stream << prefix << "function/value: ";
   if (outputFunctionName(value, stream))
     stream << "/";

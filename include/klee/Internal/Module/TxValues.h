@@ -640,35 +640,11 @@ private:
   /// \brief Set of memory locations possibly being pointed to
   ref<TxStateAddress> pointerInfo;
 
-  /// \brief Member variable to indicate if an interpolant depends on this
-  /// value.
-  bool core;
-
   /// \brief The id of this object
   uint64_t id;
 
-  /// \brief Dependency sources of this value
-  std::map<ref<TxStateValue>, ref<TxStateAddress> > sources;
-
   /// \brief The context of this value
   std::vector<llvm::Instruction *> callHistory;
-
-  /// \brief Do not compute bounds in interpolation of this value if it was a
-  /// pointer; instead, use exact address
-  bool doNotInterpolateBound;
-
-  /// \brief The load addresses of this value: These are the addresses the loads
-  /// that influence this value was executed on
-  std::set<ref<TxStateValue> > loadAddresses;
-
-  /// \brief The addresses by which this loaded value was stored
-  std::set<ref<TxStateValue> > storeAddresses;
-
-  /// \brief Reasons for this value to be in the core. This may not contain all
-  /// the reasons since values are no longer marked if they were already found
-  /// to be marked, therefore the reasons are not propagated to all the values
-  /// this value is dependent upon.
-  std::set<std::string> coreReasons;
 
   /// \brief Store entries this value is dependent upon, on which memory bound
   /// interpolation may be enabled.
@@ -681,9 +657,8 @@ private:
   TxStateValue(llvm::Value *value,
                const std::vector<llvm::Instruction *> &_callHistory,
                ref<Expr> _valueExpr)
-      : refCount(0), value(value), valueExpr(_valueExpr), core(false),
-        id(reinterpret_cast<uint64_t>(this)), callHistory(_callHistory),
-        doNotInterpolateBound(false) {}
+      : refCount(0), value(value), valueExpr(_valueExpr),
+        id(reinterpret_cast<uint64_t>(this)), callHistory(_callHistory) {}
 
 public:
   ~TxStateValue() {}
@@ -696,21 +671,13 @@ public:
     return vvalue;
   }
 
-  bool canInterpolateBound() { return !doNotInterpolateBound; }
-
-  void disableBoundInterpolation() { doNotInterpolateBound = true; }
-
   /// \brief Set the address this value was loaded from for inclusion in the
   /// interpolant
   void addLoadAddress(ref<TxStateValue> _loadAddress);
 
-  std::set<ref<TxStateValue> > &getLoadAddresses() { return loadAddresses; }
-
   /// \brief Set the address this value was stored into for inclusion in the
   /// interpolant
   void addStoreAddress(ref<TxStateValue> _storeAddress);
-
-  std::set<ref<TxStateValue> > &getStoreAddresses() { return storeAddresses; }
 
   /// \brief The core routine for adding flow dependency between source and
   /// target value
@@ -731,10 +698,6 @@ public:
 
   const std::set<ref<TxStoreEntry> > &getDisableBoundEntryList() const;
 
-  const std::map<ref<TxStateValue>, ref<TxStateAddress> > &getSources() {
-    return sources;
-  }
-
   int compare(const TxStateValue other) const {
     if (id == other.id)
       return 0;
@@ -752,26 +715,13 @@ public:
 
   bool isPointer() const { return !pointerInfo.isNull(); }
 
-  bool hasValue(llvm::Value *value) const { return this->value == value; }
-
   ref<Expr> getExpression() const { return valueExpr; }
-
-  void setAsCore(std::string reason) {
-    core = true;
-    if (!reason.empty())
-      coreReasons.insert(reason);
-  }
-
-  bool isCore() const { return core; }
 
   llvm::Value *getValue() const { return value; }
 
   const std::vector<llvm::Instruction *> &getCallHistory() const {
     return callHistory;
   }
-
-  /// \brief Copy this value
-  ref<TxStateValue> copy();
 
   /// \brief Print minimal information about this object.
   ///
