@@ -2254,6 +2254,8 @@ ref<Expr> TxTreeNode::getInterpolant(
 
 bool TxTreeNode::isSpeculationNode() { return speculationFlag; }
 
+void TxTreeNode::setSpeculationFlag() { speculationFlag = 1; }
+
 void TxTreeNode::storeSpeculationUnsatCore(TimingSolver *solver,
                                            std::vector<ref<Expr> > unsatCore) {
   speculationSolver = solver;

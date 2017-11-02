@@ -473,6 +473,9 @@ public:
   /// \brief Check if the current node is a speculation node
   bool isSpeculationNode();
 
+  /// \brief Set the speculation flag
+  void setSpeculationFlag();
+
   /// \brief Store the solver and unsatcore temporarily, so they can be used for
   /// markings if
   /// speculation fails
