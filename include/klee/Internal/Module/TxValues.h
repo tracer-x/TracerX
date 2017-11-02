@@ -770,19 +770,6 @@ public:
     return callHistory;
   }
 
-  ref<TxInterpolantValue> getInterpolantStyleValue() {
-    return TxInterpolantValue::create(value, valueExpr, canInterpolateBound(),
-                                      coreReasons, pointerInfo);
-  }
-
-  ref<TxInterpolantValue>
-  getInterpolantStyleValue(const std::map<ref<Expr>, ref<Expr> > &substitution,
-                           std::set<const Array *> &replacements) {
-    return TxInterpolantValue::create(value, valueExpr, canInterpolateBound(),
-                                      coreReasons, pointerInfo, substitution,
-                                      replacements);
-  }
-
   /// \brief Copy this value
   ref<TxStateValue> copy();
 
