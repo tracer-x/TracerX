@@ -265,7 +265,7 @@ void Dependency::addDependencyViaExternalFunction(
         stream << "]";
         stream.flush();
       }
-      markPointerFlow(source, source, reason);
+      store->markPointerFlow(source, source, reason);
   }
 
   // Add new location to the target in case of pointer return value
@@ -1203,7 +1203,7 @@ void Dependency::markAllValues(ref<TxStateValue> value,
   if (value.isNull())
     return;
 
-  markFlow(value, reason);
+  store->markFlow(value, reason);
 
   store->markUsed(value->getAllowBoundEntryList());
   store->markUsed(value->getDisableBoundEntryList());
@@ -1215,7 +1215,7 @@ bool Dependency::markAllPointerValues(ref<TxStateValue> value,
   if (value.isNull())
     return false;
 
-  bool ret = markPointerFlow(value, value, bounds, reason);
+  bool ret = store->markPointerFlow(value, value, bounds, reason);
 
   store->markUsed(value->getAllowBoundEntryList());
   store->markUsed(value->getDisableBoundEntryList());
