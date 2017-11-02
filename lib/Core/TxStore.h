@@ -78,7 +78,7 @@ public:
 
     ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;
 
-    ref<TxStoreEntry> updateStore(ref<TxStateAddress> loc,
+    ref<TxStoreEntry> updateStore(const TxStore *store, ref<TxStateAddress> loc,
                                   ref<TxStateValue> address,
                                   ref<TxStateValue> value, uint64_t depth);
 
@@ -151,11 +151,10 @@ private:
       TopInterpolantStore &_symbolicallyAddressedStore,
       LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const;
 
-  void recursivelyMarkFlow(ref<TxStoreEntry> entry, const TxStore *entryStore,
-                           bool leftMarking, const std::string &reason) const;
+  void recursivelyMarkFlow(ref<TxStoreEntry> entry, bool leftMarking,
+                           const std::string &reason) const;
 
-  bool recursivelyMarkPointerFlow(ref<TxStoreEntry> entry,
-                                  const TxStore *entryStore, bool leftMarking,
+  bool recursivelyMarkPointerFlow(ref<TxStoreEntry> entry, bool leftMarking,
                                   ref<TxStateValue> checkedAddress,
                                   std::set<uint64_t> &bounds,
                                   const std::string &reason) const;
@@ -180,6 +179,10 @@ public:
     ret->parent = src;
     return ret;
   }
+
+  /// \brief Returns true if this store is in the left subtree of its ancestor
+  /// at level targetDepth.
+  bool isInLeftSubtree(uint64_t targetDepth) const;
 
   void setLeftChild(TxStore *child) { left = child; }
 

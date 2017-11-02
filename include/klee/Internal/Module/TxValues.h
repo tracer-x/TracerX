@@ -44,6 +44,8 @@ class TxStateValue;
 
 class TxStoreEntry;
 
+class TxStore;
+
 const uint64_t symbolicBoundId = ULONG_MAX;
 
 class AllocationContext {
@@ -846,9 +848,9 @@ private:
   const ref<Expr> valueExpr;
 
   /// \brief Store entries this value is dependent upon
-  std::set<ref<TxStoreEntry> > allowBoundEntryList;
+  std::map<ref<TxStoreEntry>, bool> allowBoundEntryList;
 
-  std::set<ref<TxStoreEntry> > disableBoundEntryList;
+  std::map<ref<TxStoreEntry>, bool> disableBoundEntryList;
 
   /// \brief Set of memory locations possibly being pointed to, which can be
   /// modified by the subtree of the immediate left child.
@@ -885,19 +887,7 @@ private:
 public:
   TxStoreEntry(ref<TxStateAddress> _address, ref<TxStateValue> _addressValue,
                ref<TxStateValue> _content, const TxStore *store,
-               uint64_t _depth)
-      : refCount(0), address(_address), addressValue(_addressValue),
-        content(_content), depth(_depth), value(content->getValue()),
-        valueExpr(content->getExpression()),
-        allowBoundEntryList(content->getAllowBoundEntryList()),
-        disableBoundEntryList(content->getDisableBoundEntryList()),
-        leftDoNotInterpolateBound(false), rightDoNotInterpolateBound(false),
-        leftCore(false), rightCore(false) {
-    if (!content->getPointerInfo().isNull()) {
-      leftPointerInfo = content->getPointerInfo();
-      rightPointerInfo = content->getPointerInfo()->copy();
-    }
-  }
+               uint64_t _depth);
 
   ~TxStoreEntry() {}
 
@@ -913,11 +903,11 @@ public:
 
   ref<Expr> getExpression() const { return valueExpr; }
 
-  std::set<ref<TxStoreEntry> > &getAllowBoundEntryList() {
+  std::map<ref<TxStoreEntry>, bool> &getAllowBoundEntryList() {
     return allowBoundEntryList;
   }
 
-  std::set<ref<TxStoreEntry> > &getDisableBoundEntryList() {
+  std::map<ref<TxStoreEntry>, bool> &getDisableBoundEntryList() {
     return disableBoundEntryList;
   }
 

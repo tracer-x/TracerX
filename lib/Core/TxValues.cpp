@@ -952,4 +952,37 @@ void TxStateValue::printMinimal(llvm::raw_ostream &stream,
   stream << prefix
          << "pointer to location object: " << reinterpret_cast<uintptr_t>(this);
 }
+
+/**/
+
+TxStoreEntry::TxStoreEntry(ref<TxStateAddress> _address,
+                           ref<TxStateValue> _addressValue,
+                           ref<TxStateValue> _content, const TxStore *store,
+                           uint64_t _depth)
+    : refCount(0), address(_address), addressValue(_addressValue),
+      content(_content), depth(_depth), value(content->getValue()),
+      valueExpr(content->getExpression()), leftDoNotInterpolateBound(false),
+      rightDoNotInterpolateBound(false), leftCore(false), rightCore(false) {
+  if (!content->getPointerInfo().isNull()) {
+    leftPointerInfo = content->getPointerInfo();
+    rightPointerInfo = content->getPointerInfo()->copy();
+  }
+
+  const std::set<ref<TxStoreEntry> > &entryList1(
+      content->getAllowBoundEntryList());
+  const std::set<ref<TxStoreEntry> > &entryList2(
+      content->getDisableBoundEntryList());
+
+  for (std::set<ref<TxStoreEntry> >::const_iterator it = entryList1.begin(),
+                                                    ie = entryList1.end();
+       it != ie; ++it) {
+    allowBoundEntryList[*it] = store->isInLeftSubtree((*it)->depth);
+  }
+
+  for (std::set<ref<TxStoreEntry> >::const_iterator it = entryList2.begin(),
+                                                    ie = entryList2.end();
+       it != ie; ++it) {
+    disableBoundEntryList[*it] = store->isInLeftSubtree((*it)->depth);
+  }
+}
 }
