@@ -230,7 +230,7 @@ public:
 
   void markFlow(ref<TxStateValue> target, const std::string &reason) const;
 
-  void markPointerFlow(ref<TxStateValue> target,
+  bool markPointerFlow(ref<TxStateValue> target,
                        ref<TxStateValue> checkedOffset,
                        std::set<uint64_t> &bounds,
                        const std::string &reason) const;

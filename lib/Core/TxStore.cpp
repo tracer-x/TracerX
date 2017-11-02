@@ -558,12 +558,14 @@ bool TxStore::recursivelyMarkPointerFlow(ref<TxStoreEntry> entry,
   return memoryError;
 }
 
-void TxStore::markPointerFlow(ref<TxStateValue> target,
+bool TxStore::markPointerFlow(ref<TxStateValue> target,
                               ref<TxStateValue> checkedAddress,
                               std::set<uint64_t> &bounds,
                               const std::string &reason) const {
+  bool memoryError = false;
+
   if (target.isNull())
-    return;
+    return memoryError;
 
   const std::set<ref<TxStoreEntry> > &allowBoundEntryList(
       target->getAllowBoundEntryList());
@@ -571,8 +573,15 @@ void TxStore::markPointerFlow(ref<TxStateValue> target,
            it = allowBoundEntryList.begin(),
            ie = allowBoundEntryList.end();
        it != ie; ++it) {
-    recursivelyMarkPointerFlow(*it, isInLeftSubtree((*it)->getDepth()),
-                               checkedAddress, bounds, reason);
+    if (!(*it)->isPointer()) {
+      recursivelyMarkFlow(*it, isInLeftSubtree((*it)->getDepth()), reason);
+    } else {
+      memoryError =
+          recursivelyMarkPointerFlow(*it, isInLeftSubtree((*it)->getDepth()),
+                                     checkedAddress, bounds, reason)
+              ? true
+              : memoryError;
+    }
   }
 
   const std::set<ref<TxStoreEntry> > &disableBoundEntryList(
@@ -583,6 +592,8 @@ void TxStore::markPointerFlow(ref<TxStateValue> target,
        it != ie; ++it) {
     recursivelyMarkFlow(*it, isInLeftSubtree((*it)->getDepth()), reason);
   }
+
+  return memoryError;
 }
 
 /// \brief Print the content of the object to the LLVM error stream
