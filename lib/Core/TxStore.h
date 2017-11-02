@@ -228,8 +228,14 @@ public:
   /// \brief Register the entries in the entry list as used
   void markUsed(const std::set<ref<TxStoreEntry> > &entryList);
 
+  /// \brief Mark as core all the values and locations that flows to the
+  /// target
   void markFlow(ref<TxStateValue> target, const std::string &reason) const;
 
+  /// \brief Mark as core all the pointer values and that flows to the target;
+  /// and adjust its offset bound for memory bounds interpolation (a.k.a.
+  /// slackening). Returns true if memory bounds violation is detected; false
+  /// otherwise.
   bool markPointerFlow(ref<TxStateValue> target,
                        ref<TxStateValue> checkedOffset,
                        const std::string &reason) const {
@@ -237,6 +243,9 @@ public:
       return markPointerFlow(target, checkedOffset, bounds, reason);
   }
 
+  /// \brief Mark as core all the pointer values and that flows to the target;
+  /// and adjust its offset bound for memory bounds interpolation (a.k.a.
+  /// slackening)
   bool markPointerFlow(ref<TxStateValue> target,
                        ref<TxStateValue> checkedOffset,
                        std::set<uint64_t> &bounds,
