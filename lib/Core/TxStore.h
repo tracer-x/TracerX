@@ -232,6 +232,13 @@ public:
 
   bool markPointerFlow(ref<TxStateValue> target,
                        ref<TxStateValue> checkedOffset,
+                       const std::string &reason) const {
+      std::set<uint64_t> bounds;
+      return markPointerFlow(target, checkedOffset, bounds, reason);
+  }
+
+  bool markPointerFlow(ref<TxStateValue> target,
+                       ref<TxStateValue> checkedOffset,
                        std::set<uint64_t> &bounds,
                        const std::string &reason) const;
 
