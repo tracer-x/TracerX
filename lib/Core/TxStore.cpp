@@ -171,7 +171,7 @@ inline void TxStore::concreteToInterpolant(
         entry->getInterpolantStyleValue(leftRetrieval);
     interpolantValue->setOriginalValue(stateValue);
     map[variable] = interpolantValue;
-  } else if (entry->getContent()->isCore()) {
+  } else if (entry->isCore(leftRetrieval)) {
     // Do not add to the map if entry is not used
     if (leftRetrieval) {
       if (usedByLeftPath.find(entry) == usedByLeftPath.end())
@@ -206,7 +206,7 @@ inline void TxStore::symbolicToInterpolant(
         entry->getInterpolantStyleValue(leftRetrieval);
     interpolantValue->setOriginalValue(stateValue);
     map[variable] = interpolantValue;
-  } else if (entry->getContent()->isCore()) {
+  } else if (entry->isCore(leftRetrieval)) {
     // Do not add to the map if entry is not used
     if (leftRetrieval) {
       if (usedByLeftPath.find(entry) == usedByLeftPath.end())
