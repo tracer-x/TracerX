@@ -55,7 +55,7 @@ ref<TxStoreEntry> TxStore::MiddleStateStore::updateStore(
   if (loc->getAllocationInfo() != allocInfo)
     return ret;
 
-  ret = ref<TxStoreEntry>(new TxStoreEntry(loc, address, value, _depth));
+  ret = ref<TxStoreEntry>(new TxStoreEntry(loc, address, value, this, _depth));
   if (loc->hasConstantAddress()) {
     concretelyAddressedStore[loc->getAsVariable()] = ret;
   } else {
