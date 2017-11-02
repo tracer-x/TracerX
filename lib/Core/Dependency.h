@@ -298,29 +298,6 @@ namespace klee {
     void addDependencyToNonPointer(ref<TxStateValue> source,
                                    ref<TxStateValue> target);
 
-    /// \brief Mark as core all the values and locations that flows to the
-    /// target
-    void markFlow(ref<TxStateValue> target, const std::string &reason) const;
-
-    /// \brief Mark as core all the pointer values and that flows to the target;
-    /// and adjust its offset bound for memory bounds interpolation (a.k.a.
-    /// slackening). Returns true if memory bounds violation is detected; false
-    /// otherwise.
-    void markPointerFlow(ref<TxStateValue> target,
-                         ref<TxStateValue> checkedOffset,
-                         const std::string &reason) const {
-      std::set<uint64_t> bounds;
-      markPointerFlow(target, checkedOffset, bounds, reason);
-    }
-
-    /// \brief Mark as core all the pointer values and that flows to the target;
-    /// and adjust its offset bound for memory bounds interpolation (a.k.a.
-    /// slackening)
-    bool markPointerFlow(ref<TxStateValue> target,
-                         ref<TxStateValue> checkedOffset,
-                         std::set<uint64_t> &bounds,
-                         const std::string &reason) const;
-
     /// \brief Record the expressions of a call's arguments
     void populateArgumentValuesList(
         llvm::CallInst *site,
