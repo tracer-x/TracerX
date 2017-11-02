@@ -877,6 +877,11 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
     }
   }
 
+  // Opening a node in the speculation node
+  if (Speculation && txTree->isSpeculationNode()){
+
+  }
+
   // XXX - even if the constraint is provable one way or the other we
   // can probably benefit by adding this constraint and allowing it to
   // reduce the other constraints. For example, if we do a binary
