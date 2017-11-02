@@ -168,7 +168,7 @@ inline void TxStore::concreteToInterpolant(
   if (!coreOnly) {
     ref<TxStateValue> stateValue = entry->getContent();
     ref<TxInterpolantValue> interpolantValue =
-        stateValue->getInterpolantStyleValue();
+        entry->getInterpolantStyleValue(leftRetrieval);
     interpolantValue->setOriginalValue(stateValue);
     map[variable] = interpolantValue;
   } else if (entry->getContent()->isCore()) {
@@ -183,14 +183,14 @@ inline void TxStore::concreteToInterpolant(
 // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
     if (!NoExistential) {
-      map[variable] = entry->getContent()->getInterpolantStyleValue(
-          substitution, replacements);
+      map[variable] = entry->getInterpolantStyleValue(
+          leftRetrieval, substitution, replacements);
     } else {
-      map[variable] = entry->getContent()->getInterpolantStyleValue();
+      map[variable] = entry->getInterpolantStyleValue(leftRetrieval);
     }
 #else
-    map[variable] = entry->getContent()->getInterpolantStyleValue(substitution,
-                                                                  replacements);
+    map[variable] = entry->getInterpolantStyleValue(leftRetrieval, substitution,
+                                                    replacements);
 #endif
   }
 }
@@ -203,7 +203,7 @@ inline void TxStore::symbolicToInterpolant(
   if (!coreOnly) {
     ref<TxStateValue> stateValue = entry->getContent();
     ref<TxInterpolantValue> interpolantValue =
-        stateValue->getInterpolantStyleValue();
+        entry->getInterpolantStyleValue(leftRetrieval);
     interpolantValue->setOriginalValue(stateValue);
     map[variable] = interpolantValue;
   } else if (entry->getContent()->isCore()) {
@@ -220,16 +220,16 @@ inline void TxStore::symbolicToInterpolant(
     if (!NoExistential) {
       ref<TxVariable> address = TxStateAddress::create(
           entry->getAddress(), replacements)->getAsVariable();
-      map[address] = entry->getContent()->getInterpolantStyleValue(
-          substitution, replacements);
+      map[address] = entry->getInterpolantStyleValue(
+          leftRetrieval, substitution, replacements);
     } else {
-      map[variable] = entry->getContent()->getInterpolantStyleValue();
+      map[variable] = entry->getInterpolantStyleValue(leftRetrieval);
     }
 #else
     ref<TxVariable> address = TxStateAddress::create(
         entry->getAddress(), replacements)->getAsVariable();
-    map[address] = entry->getContent()->getInterpolantStyleValue(substitution,
-                                                                 replacements);
+    map[address] = entry->getInterpolantStyleValue(leftRetrieval, substitution,
+                                                   replacements);
 #endif
   }
 }
