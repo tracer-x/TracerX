@@ -367,23 +367,14 @@ class TxTreeNode {
   static uint64_t nextNodeSequenceNumber;
 
   /// \brief Value dependencies
-<<<<<<< HEAD
   TxDependency *dependency;
-=======
-  Dependency *dependency;
-
-  // \brief Instance of weakest precondition class used to generate WP
-  // interpolant
-  WeakestPreCondition *wp;
 
   // \brief The unsat core from a infeasible path is temporarily stored here
   // and in case speculation is failed it's used to do marking related to
   // the infeasible path
   std::vector<ref<Expr> > speculationUnsatCore;
 
-  /// \brief Value dependencies
-  ref<Expr> childWPInterpolant[2];
->>>>>>> 335fc60... Adding speculationUnsatCore to temporarily store the unsat core from a infeasible path
+  bool speculationFlag;
 
   TxTreeNode *parent, *left, *right;
 
@@ -472,6 +463,9 @@ public:
   /// \return The interpolant expression.
   ref<Expr> getInterpolant(std::set<const Array *> &replacements,
                            std::map<ref<Expr>, ref<Expr> > &substitution) const;
+
+  /// \brief Check if the current node is a speculation node
+  bool isSpeculationNode();
 
   /// \brief Extend the path condition with another constraint
   ///
@@ -876,6 +870,9 @@ public:
   /// dependency information, given a particular interpolation tree node.
   static void executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
                             std::vector<ref<Expr> > &args);
+
+  /// \brief Check if the current node is a speculation node
+  bool isSpeculationNode();
 
   /// \brief Print the content of the tree node object into a stream.
   ///
