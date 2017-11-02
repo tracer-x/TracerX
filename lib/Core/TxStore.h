@@ -157,7 +157,13 @@ private:
   bool recursivelyMarkPointerFlow(ref<TxStoreEntry> entry, bool leftMarking,
                                   ref<TxStateValue> checkedAddress,
                                   std::set<uint64_t> &bounds,
-                                  const std::string &reason) const;
+                                  const std::string &reason,
+                                  uint64_t startingDepth) const;
+
+  static bool adjustOffsetBound(ref<TxStoreEntry> entry, bool leftMarking,
+                                ref<TxStateValue> checkedAddress,
+                                std::set<uint64_t> &bounds,
+                                const std::string &reason, bool &boundUpdated);
 
   /// \brief Constructor for an empty store.
   TxStore() : depth(0), parent(0), left(0), right(0) {}
