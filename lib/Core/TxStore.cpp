@@ -374,9 +374,6 @@ void TxStore::updateStore(ref<TxStateAddress> location,
   markUsed(value->getAllowBoundEntryList());
   markUsed(value->getDisableBoundEntryList());
 
-  // We want to renew the table entry list, so we first remove the old ones
-  value->resetStoreEntryList();
-
   TopStateStore::iterator middleStoreIter =
       internalStore.find(location->getContext());
 
@@ -386,6 +383,10 @@ void TxStore::updateStore(ref<TxStateAddress> location,
       ref<TxStoreEntry> entry =
           middleStore.updateStore(this, location, address, value, depth);
       if (!entry.isNull()) {
+        // We want to renew the table entry list, so we first remove the old
+        // ones
+        value->resetStoreEntryList();
+
         // We associate this value with the store entry, signifying that the
         // entry is important whenever the value is used. This is used for
         // computing the interpolant.
