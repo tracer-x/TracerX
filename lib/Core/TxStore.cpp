@@ -118,10 +118,13 @@ bool TxStore::isInLeftSubtree(uint64_t targetDepth) const {
   const TxStore *current = this;
   bool inLeftSubtree = false;
 
-  assert(current->depth < targetDepth &&
+  if (current->depth == targetDepth)
+    return false;
+
+  assert(current->depth > targetDepth &&
          "entry should have been defined in an ancestor node");
 
-  while (current->depth < targetDepth) {
+  while (current->depth > targetDepth) {
     if (current == current->parent->left) {
       inLeftSubtree = true;
     } else {
@@ -139,16 +142,17 @@ bool TxStore::adjustOffsetBound(ref<TxStoreEntry> entry, bool leftMarking,
                                 const std::string &reason, bool &boundUpdated) {
   bool memoryError = false;
   if (entry->canInterpolateBound(leftMarking)) {
-    memoryError = entry->getPointerInfo(true)
+    memoryError = entry->getPointerInfo(leftMarking)
                       ->adjustOffsetBound(checkedAddress, bounds, boundUpdated);
   }
 
   // If this was the first time this value gets marked, we should propagate the
   // marking further
-  if (!entry->isCore(true))
+  if (!entry->isCore(leftMarking))
     boundUpdated = true;
 
-  entry->setAsCore(true, reason);
+  entry->setAsCore(leftMarking, reason);
+
   return memoryError;
 }
 
@@ -599,11 +603,6 @@ bool TxStore::markPointerFlow(ref<TxStateValue> target,
        it != ie; ++it) {
     if (!(*it)->isPointer()) {
       recursivelyMarkFlow(*it, isInLeftSubtree((*it)->getDepth()), reason);
-    } else if (depth == (*it)->getDepth()) {
-      memoryError = recursivelyMarkPointerFlow(*it, true, checkedAddress,
-                                               bounds, reason, depth)
-                        ? true
-                        : memoryError;
     } else {
       memoryError =
           recursivelyMarkPointerFlow(*it, isInLeftSubtree((*it)->getDepth()),

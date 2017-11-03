@@ -187,7 +187,8 @@ public:
   }
 
   /// \brief Returns true if this store is in the left subtree of its ancestor
-  /// at level targetDepth.
+  /// at level targetDepth, false otherwise (either local or in the right
+  /// subtree of its ancestor at level targetDepth).
   bool isInLeftSubtree(uint64_t targetDepth) const;
 
   void setLeftChild(TxStore *child) { left = child; }
