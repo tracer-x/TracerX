@@ -342,10 +342,10 @@ private:
   TxInterpolantValue(llvm::Value *value, ref<Expr> expr,
                      bool canInterpolateBound,
                      const std::set<std::string> &coreReasons,
-                     ref<TxStateAddress> locations,
+                     ref<TxStateAddress> location,
                      const std::map<ref<Expr>, ref<Expr> > &substitution,
                      std::set<const Array *> &replacements) {
-    init(value, expr, canInterpolateBound, coreReasons, locations, substitution,
+    init(value, expr, canInterpolateBound, coreReasons, location, substitution,
          replacements, true);
   }
 
