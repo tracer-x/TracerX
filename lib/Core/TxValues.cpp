@@ -43,13 +43,53 @@ bool concreteBound(uint64_t bound) { return bound < symbolicBoundId; }
 void TxStoreEntry::print(llvm::raw_ostream &stream,
                          const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
+  std::string tabsNextNext = appendTab(tabsNext);
 
   stream << prefix << "creation depth: " << depth << "\n";
   stream << prefix << "address:\n";
   address->print(stream, tabsNext);
   stream << "\n";
   stream << prefix << "content:\n";
+  if (leftCore && rightCore) {
+    stream << tabsNext << "a left and right interpolant value:\n";
+    for (std::set<std::string>::iterator it = leftCoreReasons.begin(),
+                                         ie = leftCoreReasons.end();
+         it != ie; ++it) {
+      stream << tabsNextNext << *it << "\n";
+    }
+    for (std::set<std::string>::iterator it = rightCoreReasons.begin(),
+                                         ie = rightCoreReasons.end();
+         it != ie; ++it) {
+      stream << tabsNextNext << *it << "\n";
+    }
+  } else if (leftCore) {
+    stream << tabsNext << "a left interpolant value:\n";
+    for (std::set<std::string>::iterator it = leftCoreReasons.begin(),
+                                         ie = leftCoreReasons.end();
+         it != ie; ++it) {
+      stream << tabsNextNext << *it << "\n";
+    }
+  } else if (rightCore) {
+    stream << tabsNext << "a right interpolant value:\n";
+    for (std::set<std::string>::iterator it = rightCoreReasons.begin(),
+                                         ie = rightCoreReasons.end();
+         it != ie; ++it) {
+      stream << tabsNextNext << *it << "\n";
+    }
+  } else {
+    stream << tabsNext << "a non-interpolant value:\n";
+  }
   content->printMinimal(stream, tabsNext);
+  if (!leftPointerInfo.isNull()) {
+    stream << "\n";
+    stream << tabsNext << "left pointer info:\n";
+    leftPointerInfo->print(stream, tabsNextNext);
+  }
+  if (!rightPointerInfo.isNull()) {
+    stream << "\n";
+    stream << tabsNext << "right pointer info:\n";
+    rightPointerInfo->print(stream, tabsNextNext);
+  }
 }
 
 /**/
