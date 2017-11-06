@@ -850,7 +850,7 @@ public:
 
   ref<TxStateAddress> getPointerInfo(bool leftMarking) const {
     if (leftMarking)
-      return rightPointerInfo;
+      return leftPointerInfo;
     return rightPointerInfo;
   }
 
