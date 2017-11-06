@@ -129,15 +129,16 @@ private:
                              const std::map<ref<Expr>, ref<Expr> > &substition,
                              std::set<const Array *> &replacements,
                              bool coreOnly, LowerInterpolantStore &map,
-                             bool leftRetrieval) const;
+                             bool leftOfEntry) const;
 
   void
   symbolicToInterpolant(ref<TxVariable> variable, ref<TxStoreEntry> entry,
                         const std::map<ref<Expr>, ref<Expr> > &substitution,
                         std::set<const Array *> &replacements, bool coreOnly,
-                        LowerInterpolantStore &map, bool leftRetrieval) const;
+                        LowerInterpolantStore &map, bool leftOfEntry) const;
 
   void getConcreteStore(
+      const TxStore *referenceStore,
       const std::vector<llvm::Instruction *> &callHistory,
       const std::map<ref<Expr>, ref<Expr> > &substitution,
       std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
@@ -145,6 +146,7 @@ private:
       LowerInterpolantStore &_concretelyAddressedHistoricalStore) const;
 
   void getSymbolicStore(
+      const TxStore *referenceStore,
       const std::vector<llvm::Instruction *> &callHistory,
       const std::map<ref<Expr>, ref<Expr> > &substitution,
       std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
@@ -214,7 +216,7 @@ public:
   /// of the store, otherwise, we assume it is requested by the right child of
   /// the store.
   void getStoredExpressions(
-      const std::vector<llvm::Instruction *> &callHistory,
+      const TxStore *store, const std::vector<llvm::Instruction *> &callHistory,
       const std::map<ref<Expr>, ref<Expr> > &substitution,
       std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
       TopInterpolantStore &_concretelyAddressedStore,

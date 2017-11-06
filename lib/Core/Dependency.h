@@ -305,6 +305,23 @@ namespace klee {
         std::vector<ref<Expr> > &arguments,
         std::vector<ref<TxStateValue> > &argumentValuesList);
 
+    void getStoredExpressions(
+        const TxStore *referenceStore,
+        const std::vector<llvm::Instruction *> &callHistory,
+        const std::map<ref<Expr>, ref<Expr> > &substitution,
+        std::set<const Array *> &replacements, bool coreOnly,
+        bool leftRetrieval,
+        TxStore::TopInterpolantStore &concretelyAddressedStore,
+        TxStore::TopInterpolantStore &symbolicallyAddressedStore,
+        TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
+        TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
+      store->getStoredExpressions(
+          referenceStore, callHistory, substitution, replacements, coreOnly,
+          leftRetrieval, concretelyAddressedStore, symbolicallyAddressedStore,
+          concretelyAddressedHistoricalStore,
+          symbolicallyAddressedHistoricalStore);
+    }
+
   public:
     /// \brief This is for dynamic setting up of debug messages.
     int debugSubsumptionLevel;
@@ -357,18 +374,24 @@ namespace klee {
     /// scope.
     ///
     /// \sa TxStore#getStoredExpressions()
-    void getStoredExpressions(
+    void getParentStoredExpressions(
         const std::vector<llvm::Instruction *> &callHistory,
         const std::map<ref<Expr>, ref<Expr> > &substitution,
         std::set<const Array *> &replacements, bool coreOnly,
-        bool leftRetrieval,
         TxStore::TopInterpolantStore &concretelyAddressedStore,
         TxStore::TopInterpolantStore &symbolicallyAddressedStore,
         TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
         TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
-      store->getStoredExpressions(
-          callHistory, substitution, replacements, coreOnly, leftRetrieval,
-          concretelyAddressedStore, symbolicallyAddressedStore,
+      bool leftRetrieval = false;
+
+      if (parent->left == this)
+        leftRetrieval = true;
+      else
+        assert(parent->right == this && "mismatched tree edge");
+
+      parent->getStoredExpressions(
+          store, callHistory, substitution, replacements, coreOnly,
+          leftRetrieval, concretelyAddressedStore, symbolicallyAddressedStore,
           concretelyAddressedHistoricalStore,
           symbolicallyAddressedHistoricalStore);
     }

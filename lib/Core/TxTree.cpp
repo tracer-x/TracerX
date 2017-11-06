@@ -2264,16 +2264,9 @@ void TxTreeNode::getStoredExpressions(
   // the allocations to be stored in subsumption table should be obtained
   // from the parent node.
   if (parent) {
-    bool leftRetrieval = false;
-
-    if (parent->left == this)
-      leftRetrieval = true;
-    else
-      assert(parent->right == this && "mismatched tree edge");
-
-    parent->dependency->getStoredExpressions(
+    dependency->getParentStoredExpressions(
         _callHistory, dummySubstitution, dummyReplacements, false,
-        leftRetrieval, concretelyAddressedStore, symbolicallyAddressedStore,
+        concretelyAddressedStore, symbolicallyAddressedStore,
         concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);
   }
@@ -2294,15 +2287,8 @@ void TxTreeNode::getStoredCoreExpressions(
   // the allocations to be stored in subsumption table should be obtained
   // from the parent node.
   if (parent) {
-    bool leftRetrieval = false;
-
-    if (parent->left == this)
-      leftRetrieval = true;
-    else
-      assert(parent->right == this && "mismatched tree edge");
-
-    parent->dependency->getStoredExpressions(
-        _callHistory, substitution, replacements, true, leftRetrieval,
+    dependency->getParentStoredExpressions(
+        _callHistory, substitution, replacements, true,
         concretelyAddressedStore, symbolicallyAddressedStore,
         concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);

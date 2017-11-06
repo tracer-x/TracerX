@@ -168,6 +168,7 @@ ref<TxStoreEntry> TxStore::find(ref<TxStateAddress> loc) const {
 }
 
 void TxStore::getStoredExpressions(
+    const TxStore *referenceStore,
     const std::vector<llvm::Instruction *> &callHistory,
     const std::map<ref<Expr>, ref<Expr> > &substitution,
     std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
@@ -175,11 +176,11 @@ void TxStore::getStoredExpressions(
     TopInterpolantStore &_symbolicallyAddressedStore,
     LowerInterpolantStore &_concretelyAddressedHistoricalStore,
     LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const {
-  getConcreteStore(callHistory, substitution, replacements, coreOnly,
-                   leftRetrieval, _concretelyAddressedStore,
+  getConcreteStore(referenceStore, callHistory, substitution, replacements,
+                   coreOnly, leftRetrieval, _concretelyAddressedStore,
                    _concretelyAddressedHistoricalStore);
-  getSymbolicStore(callHistory, substitution, replacements, coreOnly,
-                   leftRetrieval, _symbolicallyAddressedStore,
+  getSymbolicStore(referenceStore, callHistory, substitution, replacements,
+                   coreOnly, leftRetrieval, _symbolicallyAddressedStore,
                    _symbolicallyAddressedHistoricalStore);
 }
 
@@ -187,16 +188,16 @@ inline void TxStore::concreteToInterpolant(
     ref<TxVariable> variable, ref<TxStoreEntry> entry,
     const std::map<ref<Expr>, ref<Expr> > &substitution,
     std::set<const Array *> &replacements, bool coreOnly,
-    LowerInterpolantStore &map, bool leftRetrieval) const {
+    LowerInterpolantStore &map, bool leftOfEntry) const {
   if (!coreOnly) {
     ref<TxStateValue> stateValue = entry->getContent();
     ref<TxInterpolantValue> interpolantValue =
-        entry->getInterpolantStyleValue(leftRetrieval);
+        entry->getInterpolantStyleValue(leftOfEntry);
     interpolantValue->setOriginalValue(stateValue);
     map[variable] = interpolantValue;
-  } else if (entry->isCore(leftRetrieval)) {
+  } else if (entry->isCore(leftOfEntry)) {
     // Do not add to the map if entry is not used
-    if (leftRetrieval) {
+    if (leftOfEntry) {
       if (usedByLeftPath.find(entry) == usedByLeftPath.end())
         return;
     } else if (usedByRightPath.find(entry) == usedByRightPath.end()) {
@@ -206,13 +207,13 @@ inline void TxStore::concreteToInterpolant(
 // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
     if (!NoExistential) {
-      map[variable] = entry->getInterpolantStyleValue(
-          leftRetrieval, substitution, replacements);
+      map[variable] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
+                                                      replacements);
     } else {
-      map[variable] = entry->getInterpolantStyleValue(leftRetrieval);
+      map[variable] = entry->getInterpolantStyleValue(leftOfEntry);
     }
 #else
-    map[variable] = entry->getInterpolantStyleValue(leftRetrieval, substitution,
+    map[variable] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
                                                     replacements);
 #endif
   }
@@ -222,16 +223,16 @@ inline void TxStore::symbolicToInterpolant(
     ref<TxVariable> variable, ref<TxStoreEntry> entry,
     const std::map<ref<Expr>, ref<Expr> > &substitution,
     std::set<const Array *> &replacements, bool coreOnly,
-    LowerInterpolantStore &map, bool leftRetrieval) const {
+    LowerInterpolantStore &map, bool leftOfEntry) const {
   if (!coreOnly) {
     ref<TxStateValue> stateValue = entry->getContent();
     ref<TxInterpolantValue> interpolantValue =
-        entry->getInterpolantStyleValue(leftRetrieval);
+        entry->getInterpolantStyleValue(leftOfEntry);
     interpolantValue->setOriginalValue(stateValue);
     map[variable] = interpolantValue;
-  } else if (entry->isCore(leftRetrieval)) {
+  } else if (entry->isCore(leftOfEntry)) {
     // Do not add to the map if entry is not used
-    if (leftRetrieval) {
+    if (leftOfEntry) {
       if (usedByLeftPath.find(entry) == usedByLeftPath.end())
         return;
     } else if (usedByRightPath.find(entry) == usedByRightPath.end()) {
@@ -243,21 +244,22 @@ inline void TxStore::symbolicToInterpolant(
     if (!NoExistential) {
       ref<TxVariable> address = TxStateAddress::create(
           entry->getAddress(), replacements)->getAsVariable();
-      map[address] = entry->getInterpolantStyleValue(
-          leftRetrieval, substitution, replacements);
+      map[address] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
+                                                     replacements);
     } else {
-      map[variable] = entry->getInterpolantStyleValue(leftRetrieval);
+      map[variable] = entry->getInterpolantStyleValue(leftOfEntry);
     }
 #else
     ref<TxVariable> address = TxStateAddress::create(
         entry->getAddress(), replacements)->getAsVariable();
-    map[address] = entry->getInterpolantStyleValue(leftRetrieval, substitution,
+    map[address] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
                                                    replacements);
 #endif
   }
 }
 
 void TxStore::getConcreteStore(
+    const TxStore *referenceStore,
     const std::vector<llvm::Instruction *> &callHistory,
     const std::map<ref<Expr>, ref<Expr> > &substitution,
     std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
@@ -277,8 +279,9 @@ void TxStore::getConcreteStore(
       for (LowerStateStore::const_iterator it1 = middleStore.concreteBegin(),
                                            ie1 = middleStore.concreteEnd();
            it1 != ie1; ++it1) {
-        concreteToInterpolant(it1->first, it1->second, substitution,
-                              replacements, coreOnly, map, leftRetrieval);
+        concreteToInterpolant(
+            it1->first, it1->second, substitution, replacements, coreOnly, map,
+            referenceStore->isInLeftSubtree(it1->second->getDepth()));
       }
 
       // The map is only added when it is not empty; this is to avoid entries
@@ -290,9 +293,10 @@ void TxStore::getConcreteStore(
       for (LowerStateStore::const_iterator it1 = middleStore.concreteBegin(),
                                            ie1 = middleStore.concreteEnd();
            it1 != ie1; ++it1) {
-        concreteToInterpolant(it1->first, it1->second, substitution,
-                              replacements, coreOnly, storeIter->second,
-                              leftRetrieval);
+        concreteToInterpolant(
+            it1->first, it1->second, substitution, replacements, coreOnly,
+            storeIter->second,
+            referenceStore->isInLeftSubtree(it1->second->getDepth()));
       }
     }
   }
@@ -301,13 +305,16 @@ void TxStore::getConcreteStore(
            it = concretelyAddressedHistoricalStore.begin(),
            ie = concretelyAddressedHistoricalStore.end();
        it != ie; ++it) {
-    concreteToInterpolant(it->first, it->second, substitution, replacements,
-                          coreOnly, _concretelyAddressedHistoricalStore,
-                          leftRetrieval);
+
+    concreteToInterpolant(
+        it->first, it->second, substitution, replacements, coreOnly,
+        _concretelyAddressedHistoricalStore,
+        referenceStore->isInLeftSubtree(it->second->getDepth()));
   }
 }
 
 void TxStore::getSymbolicStore(
+    const TxStore *referenceStore,
     const std::vector<llvm::Instruction *> &callHistory,
     const std::map<ref<Expr>, ref<Expr> > &substitution,
     std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
@@ -327,8 +334,9 @@ void TxStore::getSymbolicStore(
       for (LowerStateStore::const_iterator it1 = middleStore.symbolicBegin(),
                                            ie1 = middleStore.symbolicEnd();
            it1 != ie1; ++it1) {
-        symbolicToInterpolant(it1->first, it1->second, substitution,
-                              replacements, coreOnly, map, leftRetrieval);
+        symbolicToInterpolant(
+            it1->first, it1->second, substitution, replacements, coreOnly, map,
+            referenceStore->isInLeftSubtree(it1->second->getDepth()));
       }
 
       // The map is only added when it is not empty; this is to avoid entries
@@ -340,9 +348,10 @@ void TxStore::getSymbolicStore(
       for (LowerStateStore::const_iterator it1 = middleStore.symbolicBegin(),
                                            ie1 = middleStore.symbolicEnd();
            it1 != ie1; ++it1) {
-        symbolicToInterpolant(it1->first, it1->second, substitution,
-                              replacements, coreOnly, storeIter->second,
-                              leftRetrieval);
+        symbolicToInterpolant(
+            it1->first, it1->second, substitution, replacements, coreOnly,
+            storeIter->second,
+            referenceStore->isInLeftSubtree(it1->second->getDepth()));
       }
     }
   }
@@ -351,9 +360,10 @@ void TxStore::getSymbolicStore(
            it = symbolicallyAddressedHistoricalStore.begin(),
            ie = symbolicallyAddressedHistoricalStore.end();
        it != ie; ++it) {
-    symbolicToInterpolant(it->first, it->second, substitution, replacements,
-                          coreOnly, _symbolicallyAddressedHistoricalStore,
-                          leftRetrieval);
+    symbolicToInterpolant(
+        it->first, it->second, substitution, replacements, coreOnly,
+        _symbolicallyAddressedHistoricalStore,
+        referenceStore->isInLeftSubtree(it->second->getDepth()));
   }
 }
 
