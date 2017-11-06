@@ -809,6 +809,14 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
   stream << "\n";
   stream << prefix
          << "pointer to location object: " << reinterpret_cast<uintptr_t>(this);
+  stream << "\n";
+  stream << prefix << "concrete offset bound: ";
+  if (concreteOffsetBound == symbolicBoundId)
+    stream << "(symbolic)";
+  else
+    stream << concreteOffsetBound;
+  stream << "\n";
+  stream << prefix << "size: " << size;
 }
 
 /**/
