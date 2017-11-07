@@ -181,8 +181,6 @@ void Dependency::addTwoDependencies(ref<TxStateValue> source1,
 
 void Dependency::addDependencyOfPossiblePointer(ref<TxStateValue> source,
                                                 ref<TxStateValue> target) {
-  ref<TxStateAddress> nullLocation;
-
   if (source.isNull() || target.isNull())
     return;
 
@@ -196,14 +194,12 @@ void Dependency::addDependencyOfPossiblePointer(ref<TxStateValue> source,
     target->addPointerInfo(
         TxStateAddress::create(pointerInfo, targetExpr, offsetDelta));
   }
-  target->addDependency(source, nullLocation);
+  target->addDependency(source);
 }
 
 void Dependency::addDependencyWithOffset(ref<TxStateValue> source,
                                          ref<TxStateValue> target,
                                          ref<Expr> offsetDelta) {
-  ref<TxStateAddress> nullLocation;
-
   if (source.isNull() || target.isNull())
     return;
 
@@ -235,17 +231,7 @@ void Dependency::addDependencyWithOffset(ref<TxStateValue> source,
           TxStateAddress::create(pointerInfo, targetExpr, offsetDelta));
     }
 
-  target->addDependency(source, nullLocation);
-}
-
-void Dependency::addDependencyViaLocation(ref<TxStateValue> source,
-                                          ref<TxStateValue> target,
-                                          ref<TxStateAddress> via) {
-  if (source.isNull() || target.isNull())
-    return;
-
-  target->addPointerInfo(source->getPointerInfo());
-  target->addDependency(source, via);
+    target->addDependency(source);
 }
 
 void Dependency::addDependencyViaExternalFunction(
@@ -291,8 +277,7 @@ void Dependency::addDependencyToNonPointer(ref<TxStateValue> source,
   if (source.isNull() || target.isNull())
     return;
 
-  ref<TxStateAddress> nullLocation;
-  target->addDependency(source, nullLocation);
+  target->addDependency(source);
 }
 
 void Dependency::populateArgumentValuesList(
@@ -730,8 +715,7 @@ void Dependency::execute(llvm::Instruction *instr,
         // Build the loaded value
         ref<TxStateValue> loadedValue =
             getNewTxStateValue(instr, callHistory, valueExpr);
-        addDependencyViaLocation(storeEntry->getContent(), loadedValue,
-                                 pointerInfo);
+        addDependency(storeEntry->getContent(), loadedValue);
         loadedValue->addLoadAddress(addressValue);
         loadedValue->addStoreAddress(storeEntry->getAddressValue());
       }

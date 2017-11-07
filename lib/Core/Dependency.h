@@ -277,12 +277,6 @@ namespace klee {
                                  ref<TxStateValue> target,
                                  ref<Expr> offsetDelta);
 
-    /// \brief Add flow dependency between source and target value, as the
-    /// result of store/load via a memory location.
-    void addDependencyViaLocation(ref<TxStateValue> source,
-                                  ref<TxStateValue> target,
-                                  ref<TxStateAddress> via);
-
     /// \brief Add a flow dependency from a pointer value to a non-pointer
     /// value, for an external function call.
     ///

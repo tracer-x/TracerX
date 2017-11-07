@@ -681,7 +681,7 @@ public:
 
   /// \brief The core routine for adding flow dependency between source and
   /// target value
-  void addDependency(ref<TxStateValue> source, ref<TxStateAddress> via);
+  void addDependency(ref<TxStateValue> source);
 
   /// \brief Add the store entry used to store the value used to compute this
   /// value
