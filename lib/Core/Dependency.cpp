@@ -716,6 +716,8 @@ void Dependency::execute(llvm::Instruction *instr,
         ref<TxStateValue> loadedValue =
             getNewTxStateValue(instr, callHistory, valueExpr);
         addDependency(storeEntry->getContent(), loadedValue);
+        loadedValue->resetStoreEntryList();
+        loadedValue->addStoreEntry(storeEntry);
         loadedValue->addLoadAddress(addressValue);
         loadedValue->addStoreAddress(storeEntry->getAddressValue());
       }
