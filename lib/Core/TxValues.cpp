@@ -859,6 +859,10 @@ void TxStateValue::addStoreAddress(ref<TxStateValue> storeAddress) {
 
 void TxStateValue::addDependency(ref<TxStateValue> source) {
   std::set<ref<TxStoreEntry> > tmpSet;
+
+  disableBoundEntryList.insert(source->disableBoundEntryList.begin(),
+                               source->disableBoundEntryList.end());
+
   for (std::set<ref<TxStoreEntry> >::iterator
            it = source->allowBoundEntryList.begin(),
            ie = source->allowBoundEntryList.end();
@@ -870,8 +874,6 @@ void TxStateValue::addDependency(ref<TxStateValue> source) {
     }
   }
   allowBoundEntryList.insert(tmpSet.begin(), tmpSet.end());
-  disableBoundEntryList.insert(source->disableBoundEntryList.begin(),
-                               source->disableBoundEntryList.end());
 }
 
 void TxStateValue::addStoreEntry(ref<TxStoreEntry> entry) {
