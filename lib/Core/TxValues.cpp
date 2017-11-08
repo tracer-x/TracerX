@@ -43,13 +43,53 @@ bool concreteBound(uint64_t bound) { return bound < symbolicBoundId; }
 void TxStoreEntry::print(llvm::raw_ostream &stream,
                          const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
+  std::string tabsNextNext = appendTab(tabsNext);
 
   stream << prefix << "creation depth: " << depth << "\n";
   stream << prefix << "address:\n";
   address->print(stream, tabsNext);
   stream << "\n";
   stream << prefix << "content:\n";
+  if (leftCore && rightCore) {
+    stream << tabsNext << "a left and right interpolant value:\n";
+    for (std::set<std::string>::iterator it = leftCoreReasons.begin(),
+                                         ie = leftCoreReasons.end();
+         it != ie; ++it) {
+      stream << tabsNextNext << *it << "\n";
+    }
+    for (std::set<std::string>::iterator it = rightCoreReasons.begin(),
+                                         ie = rightCoreReasons.end();
+         it != ie; ++it) {
+      stream << tabsNextNext << *it << "\n";
+    }
+  } else if (leftCore) {
+    stream << tabsNext << "a left interpolant value:\n";
+    for (std::set<std::string>::iterator it = leftCoreReasons.begin(),
+                                         ie = leftCoreReasons.end();
+         it != ie; ++it) {
+      stream << tabsNextNext << *it << "\n";
+    }
+  } else if (rightCore) {
+    stream << tabsNext << "a right interpolant value:\n";
+    for (std::set<std::string>::iterator it = rightCoreReasons.begin(),
+                                         ie = rightCoreReasons.end();
+         it != ie; ++it) {
+      stream << tabsNextNext << *it << "\n";
+    }
+  } else {
+    stream << tabsNext << "a non-interpolant value:\n";
+  }
   content->printMinimal(stream, tabsNext);
+  if (!leftPointerInfo.isNull()) {
+    stream << "\n";
+    stream << tabsNext << "left pointer info:\n";
+    leftPointerInfo->print(stream, tabsNextNext);
+  }
+  if (!rightPointerInfo.isNull()) {
+    stream << "\n";
+    stream << tabsNext << "right pointer info:\n";
+    rightPointerInfo->print(stream, tabsNextNext);
+  }
 }
 
 /**/
@@ -671,7 +711,7 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
 bool TxStateAddress::adjustOffsetBound(ref<TxStateValue> checkedAddress,
                                        std::set<uint64_t> &_bounds,
                                        bool &boundUpdated) {
-  const ref<TxStateAddress> location = checkedAddress->getLocation();
+  const ref<TxStateAddress> location = checkedAddress->getPointerInfo();
   std::set<uint64_t> bounds(_bounds);
 
   if (bounds.empty()) {
@@ -769,42 +809,85 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
   stream << "\n";
   stream << prefix
          << "pointer to location object: " << reinterpret_cast<uintptr_t>(this);
+  stream << "\n";
+  stream << prefix << "concrete offset bound: ";
+  if (concreteOffsetBound == symbolicBoundId)
+    stream << "(symbolic)";
+  else
+    stream << concreteOffsetBound;
+  stream << "\n";
+  stream << prefix << "size: " << size;
 }
 
 /**/
 
 void TxStateValue::addLoadAddress(ref<TxStateValue> loadAddress) {
-  loadAddresses.insert(loadAddress);
-  entryList.insert(loadAddress->entryList.begin(),
-                   loadAddress->entryList.end());
+  disableBoundEntryList.insert(loadAddress->allowBoundEntryList.begin(),
+                               loadAddress->allowBoundEntryList.end());
+  disableBoundEntryList.insert(loadAddress->disableBoundEntryList.begin(),
+                               loadAddress->disableBoundEntryList.end());
+  std::set<ref<TxStoreEntry> > tmpSet;
+  for (std::set<ref<TxStoreEntry> >::iterator it = allowBoundEntryList.begin(),
+                                              ie = allowBoundEntryList.end();
+       it != ie; ++it) {
+    std::set<ref<TxStoreEntry> >::iterator it1 =
+        disableBoundEntryList.find(*it);
+    if (it1 == disableBoundEntryList.end()) {
+      tmpSet.insert(*it);
+    }
+  }
+  allowBoundEntryList = tmpSet;
 }
 
 void TxStateValue::addStoreAddress(ref<TxStateValue> storeAddress) {
-  storeAddresses.insert(storeAddress);
-  entryList.insert(storeAddress->entryList.begin(),
-                   storeAddress->entryList.end());
+  disableBoundEntryList.insert(storeAddress->allowBoundEntryList.begin(),
+                               storeAddress->allowBoundEntryList.end());
+  disableBoundEntryList.insert(storeAddress->disableBoundEntryList.begin(),
+                               storeAddress->disableBoundEntryList.end());
+  std::set<ref<TxStoreEntry> > tmpSet;
+  for (std::set<ref<TxStoreEntry> >::iterator it = allowBoundEntryList.begin(),
+                                              ie = allowBoundEntryList.end();
+       it != ie; ++it) {
+    std::set<ref<TxStoreEntry> >::iterator it1 =
+        disableBoundEntryList.find(*it);
+    if (it1 == disableBoundEntryList.end()) {
+      tmpSet.insert(*it);
+    }
+  }
+  allowBoundEntryList = tmpSet;
 }
 
-void TxStateValue::addDependency(ref<TxStateValue> source,
-                                 ref<TxStateAddress> via) {
-  if (via.isNull()) {
-    loadAddresses.insert(source->loadAddresses.begin(),
-                         source->loadAddresses.end());
-    storeAddresses.insert(source->storeAddresses.begin(),
-                          source->storeAddresses.end());
-    sources.insert(source->sources.begin(), source->sources.end());
-  } else {
-    sources[source] = via;
+void TxStateValue::addDependency(ref<TxStateValue> source) {
+  std::set<ref<TxStoreEntry> > tmpSet;
+
+  disableBoundEntryList.insert(source->disableBoundEntryList.begin(),
+                               source->disableBoundEntryList.end());
+
+  for (std::set<ref<TxStoreEntry> >::iterator
+           it = source->allowBoundEntryList.begin(),
+           ie = source->allowBoundEntryList.end();
+       it != ie; ++it) {
+    std::set<ref<TxStoreEntry> >::iterator it1 =
+        disableBoundEntryList.find(*it);
+    if (it1 == disableBoundEntryList.end()) {
+      tmpSet.insert(*it);
+    }
   }
-  entryList.insert(source->entryList.begin(), source->entryList.end());
+  allowBoundEntryList.insert(tmpSet.begin(), tmpSet.end());
 }
 
 void TxStateValue::addStoreEntry(ref<TxStoreEntry> entry) {
-  entryList.insert(entry);
+  allowBoundEntryList.insert(entry);
 }
 
-const std::set<ref<TxStoreEntry> > &TxStateValue::getEntryList() const {
-  return entryList;
+const std::set<ref<TxStoreEntry> > &
+TxStateValue::getAllowBoundEntryList() const {
+  return allowBoundEntryList;
+}
+
+const std::set<ref<TxStoreEntry> > &
+TxStateValue::getDisableBoundEntryList() const {
+  return disableBoundEntryList;
 }
 
 void TxStateValue::print(llvm::raw_ostream &stream,
@@ -814,35 +897,23 @@ void TxStateValue::print(llvm::raw_ostream &stream,
   printMinimal(stream, prefix);
   stream << "\n";
 
-  if (entryList.empty()) {
+  if (allowBoundEntryList.empty() && disableBoundEntryList.empty()) {
     stream << prefix << "not dependent on store\n";
   } else {
     stream << prefix << "loaded from store entries:";
-    for (std::set<ref<TxStoreEntry> >::const_iterator it = entryList.begin(),
-                                                      ie = entryList.end();
+    for (std::set<ref<TxStoreEntry> >::const_iterator
+             it = allowBoundEntryList.begin(),
+             ie = allowBoundEntryList.end();
          it != ie; ++it) {
       stream << "\n";
       (*it)->print(stream, tabsNext);
     }
-  }
-
-  stream << "\n";
-  if (sources.empty()) {
-    stream << prefix << "no dependencies\n";
-  } else {
-    stream << prefix << "direct dependencies:";
-    for (std::map<ref<TxStateValue>, ref<TxStateAddress> >::const_iterator
-             is = sources.begin(),
-             it = is, ie = sources.end();
+    for (std::set<ref<TxStoreEntry> >::const_iterator
+             it = disableBoundEntryList.begin(),
+             ie = disableBoundEntryList.end();
          it != ie; ++it) {
       stream << "\n";
-      if (it != is)
-        stream << tabsNext << "------------------------------------------\n";
-      (*it->first).printMinimal(stream, tabsNext);
-      if (!it->second.isNull()) {
-        stream << " via\n";
-        (*it->second).print(stream, tabsNext);
-      }
+      (*it)->print(stream, tabsNext);
     }
   }
 }
@@ -851,23 +922,6 @@ void TxStateValue::printMinimal(llvm::raw_ostream &stream,
                                 const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
-  if (core) {
-    if (!doNotInterpolateBound) {
-      stream << prefix << "a bounded interpolant value\n";
-    } else {
-      stream << prefix << "an interpolant value\n";
-    }
-    if (!coreReasons.empty()) {
-      stream << prefix << "reason(s) for storage:\n";
-      for (std::set<std::string>::const_iterator it = coreReasons.begin(),
-                                                 ie = coreReasons.end();
-           it != ie; ++it) {
-        stream << tabsNext << *it << "\n";
-      }
-    }
-  } else {
-    stream << prefix << "a non-interpolant value\n";
-  }
   stream << prefix << "function/value: ";
   if (outputFunctionName(value, stream))
     stream << "/";
@@ -881,5 +935,38 @@ void TxStateValue::printMinimal(llvm::raw_ostream &stream,
   stream << "\n";
   stream << prefix
          << "pointer to location object: " << reinterpret_cast<uintptr_t>(this);
+}
+
+/**/
+
+TxStoreEntry::TxStoreEntry(ref<TxStateAddress> _address,
+                           ref<TxStateValue> _addressValue,
+                           ref<TxStateValue> _content, const TxStore *store,
+                           uint64_t _depth)
+    : refCount(0), address(_address), addressValue(_addressValue),
+      content(_content), depth(_depth), value(content->getValue()),
+      valueExpr(content->getExpression()), leftDoNotInterpolateBound(false),
+      rightDoNotInterpolateBound(false), leftCore(false), rightCore(false) {
+  if (!content->getPointerInfo().isNull()) {
+    leftPointerInfo = content->getPointerInfo();
+    rightPointerInfo = content->getPointerInfo()->copy();
+  }
+
+  const std::set<ref<TxStoreEntry> > &entryList1(
+      content->getAllowBoundEntryList());
+  const std::set<ref<TxStoreEntry> > &entryList2(
+      content->getDisableBoundEntryList());
+
+  for (std::set<ref<TxStoreEntry> >::const_iterator it = entryList1.begin(),
+                                                    ie = entryList1.end();
+       it != ie; ++it) {
+    allowBoundEntryList[*it] = store->isInLeftSubtree((*it)->depth);
+  }
+
+  for (std::set<ref<TxStoreEntry> >::const_iterator it = entryList2.begin(),
+                                                    ie = entryList2.end();
+       it != ie; ++it) {
+    disableBoundEntryList[*it] = store->isInLeftSubtree((*it)->depth);
+  }
 }
 }

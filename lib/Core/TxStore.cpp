@@ -47,15 +47,15 @@ TxStore::MiddleStateStore::find(ref<TxStateAddress> loc) const {
 }
 
 ref<TxStoreEntry> TxStore::MiddleStateStore::updateStore(
-    ref<TxStateAddress> loc, ref<TxStateValue> address, ref<TxStateValue> value,
-    uint64_t _depth) {
+    const TxStore *store, ref<TxStateAddress> loc, ref<TxStateValue> address,
+    ref<TxStateValue> value, uint64_t _depth) {
   ref<TxStoreEntry> ret;
 
   // Return null entry in case allocation info do not match
   if (loc->getAllocationInfo() != allocInfo)
     return ret;
 
-  ret = ref<TxStoreEntry>(new TxStoreEntry(loc, address, value, _depth));
+  ret = ref<TxStoreEntry>(new TxStoreEntry(loc, address, value, store, _depth));
   if (loc->hasConstantAddress()) {
     concretelyAddressedStore[loc->getAsVariable()] = ret;
   } else {
@@ -114,6 +114,48 @@ void TxStore::MiddleStateStore::print(llvm::raw_ostream &stream,
 
 /**/
 
+bool TxStore::isInLeftSubtree(uint64_t targetDepth) const {
+  const TxStore *current = this;
+  bool inLeftSubtree = false;
+
+  if (current->depth == targetDepth)
+    return false;
+
+  assert(current->depth > targetDepth &&
+         "entry should have been defined in an ancestor node");
+
+  while (current->depth > targetDepth) {
+    if (current == current->parent->left) {
+      inLeftSubtree = true;
+    } else {
+      inLeftSubtree = false;
+    }
+    current = current->parent;
+  }
+
+  return inLeftSubtree;
+}
+
+bool TxStore::adjustOffsetBound(ref<TxStoreEntry> entry, bool leftMarking,
+                                ref<TxStateValue> checkedAddress,
+                                std::set<uint64_t> &bounds,
+                                const std::string &reason, bool &boundUpdated) {
+  bool memoryError = false;
+  if (entry->canInterpolateBound(leftMarking)) {
+    memoryError = entry->getPointerInfo(leftMarking)
+                      ->adjustOffsetBound(checkedAddress, bounds, boundUpdated);
+  }
+
+  // If this was the first time this value gets marked, we should propagate the
+  // marking further
+  if (!entry->isCore(leftMarking))
+    boundUpdated = true;
+
+  entry->setAsCore(leftMarking, reason);
+
+  return memoryError;
+}
+
 ref<TxStoreEntry> TxStore::find(ref<TxStateAddress> loc) const {
   TopStateStore::const_iterator storeIter =
       internalStore.find(loc->getContext());
@@ -126,6 +168,7 @@ ref<TxStoreEntry> TxStore::find(ref<TxStateAddress> loc) const {
 }
 
 void TxStore::getStoredExpressions(
+    const TxStore *referenceStore,
     const std::vector<llvm::Instruction *> &callHistory,
     const std::map<ref<Expr>, ref<Expr> > &substitution,
     std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
@@ -133,11 +176,11 @@ void TxStore::getStoredExpressions(
     TopInterpolantStore &_symbolicallyAddressedStore,
     LowerInterpolantStore &_concretelyAddressedHistoricalStore,
     LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const {
-  getConcreteStore(callHistory, substitution, replacements, coreOnly,
-                   leftRetrieval, _concretelyAddressedStore,
+  getConcreteStore(referenceStore, callHistory, substitution, replacements,
+                   coreOnly, leftRetrieval, _concretelyAddressedStore,
                    _concretelyAddressedHistoricalStore);
-  getSymbolicStore(callHistory, substitution, replacements, coreOnly,
-                   leftRetrieval, _symbolicallyAddressedStore,
+  getSymbolicStore(referenceStore, callHistory, substitution, replacements,
+                   coreOnly, leftRetrieval, _symbolicallyAddressedStore,
                    _symbolicallyAddressedHistoricalStore);
 }
 
@@ -145,16 +188,16 @@ inline void TxStore::concreteToInterpolant(
     ref<TxVariable> variable, ref<TxStoreEntry> entry,
     const std::map<ref<Expr>, ref<Expr> > &substitution,
     std::set<const Array *> &replacements, bool coreOnly,
-    LowerInterpolantStore &map, bool leftRetrieval) const {
+    LowerInterpolantStore &map, bool leftOfEntry) const {
   if (!coreOnly) {
     ref<TxStateValue> stateValue = entry->getContent();
     ref<TxInterpolantValue> interpolantValue =
-        stateValue->getInterpolantStyleValue();
+        entry->getInterpolantStyleValue(leftOfEntry);
     interpolantValue->setOriginalValue(stateValue);
     map[variable] = interpolantValue;
-  } else if (entry->getContent()->isCore()) {
+  } else if (entry->isCore(leftOfEntry)) {
     // Do not add to the map if entry is not used
-    if (leftRetrieval) {
+    if (leftOfEntry) {
       if (usedByLeftPath.find(entry) == usedByLeftPath.end())
         return;
     } else if (usedByRightPath.find(entry) == usedByRightPath.end()) {
@@ -164,14 +207,14 @@ inline void TxStore::concreteToInterpolant(
 // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
     if (!NoExistential) {
-      map[variable] = entry->getContent()->getInterpolantStyleValue(
-          substitution, replacements);
+      map[variable] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
+                                                      replacements);
     } else {
-      map[variable] = entry->getContent()->getInterpolantStyleValue();
+      map[variable] = entry->getInterpolantStyleValue(leftOfEntry);
     }
 #else
-    map[variable] = entry->getContent()->getInterpolantStyleValue(substitution,
-                                                                  replacements);
+    map[variable] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
+                                                    replacements);
 #endif
   }
 }
@@ -180,16 +223,16 @@ inline void TxStore::symbolicToInterpolant(
     ref<TxVariable> variable, ref<TxStoreEntry> entry,
     const std::map<ref<Expr>, ref<Expr> > &substitution,
     std::set<const Array *> &replacements, bool coreOnly,
-    LowerInterpolantStore &map, bool leftRetrieval) const {
+    LowerInterpolantStore &map, bool leftOfEntry) const {
   if (!coreOnly) {
     ref<TxStateValue> stateValue = entry->getContent();
     ref<TxInterpolantValue> interpolantValue =
-        stateValue->getInterpolantStyleValue();
+        entry->getInterpolantStyleValue(leftOfEntry);
     interpolantValue->setOriginalValue(stateValue);
     map[variable] = interpolantValue;
-  } else if (entry->getContent()->isCore()) {
+  } else if (entry->isCore(leftOfEntry)) {
     // Do not add to the map if entry is not used
-    if (leftRetrieval) {
+    if (leftOfEntry) {
       if (usedByLeftPath.find(entry) == usedByLeftPath.end())
         return;
     } else if (usedByRightPath.find(entry) == usedByRightPath.end()) {
@@ -201,21 +244,22 @@ inline void TxStore::symbolicToInterpolant(
     if (!NoExistential) {
       ref<TxVariable> address = TxStateAddress::create(
           entry->getAddress(), replacements)->getAsVariable();
-      map[address] = entry->getContent()->getInterpolantStyleValue(
-          substitution, replacements);
+      map[address] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
+                                                     replacements);
     } else {
-      map[variable] = entry->getContent()->getInterpolantStyleValue();
+      map[variable] = entry->getInterpolantStyleValue(leftOfEntry);
     }
 #else
     ref<TxVariable> address = TxStateAddress::create(
         entry->getAddress(), replacements)->getAsVariable();
-    map[address] = entry->getContent()->getInterpolantStyleValue(substitution,
-                                                                 replacements);
+    map[address] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
+                                                   replacements);
 #endif
   }
 }
 
 void TxStore::getConcreteStore(
+    const TxStore *referenceStore,
     const std::vector<llvm::Instruction *> &callHistory,
     const std::map<ref<Expr>, ref<Expr> > &substitution,
     std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
@@ -235,8 +279,9 @@ void TxStore::getConcreteStore(
       for (LowerStateStore::const_iterator it1 = middleStore.concreteBegin(),
                                            ie1 = middleStore.concreteEnd();
            it1 != ie1; ++it1) {
-        concreteToInterpolant(it1->first, it1->second, substitution,
-                              replacements, coreOnly, map, leftRetrieval);
+        concreteToInterpolant(
+            it1->first, it1->second, substitution, replacements, coreOnly, map,
+            referenceStore->isInLeftSubtree(it1->second->getDepth()));
       }
 
       // The map is only added when it is not empty; this is to avoid entries
@@ -248,9 +293,10 @@ void TxStore::getConcreteStore(
       for (LowerStateStore::const_iterator it1 = middleStore.concreteBegin(),
                                            ie1 = middleStore.concreteEnd();
            it1 != ie1; ++it1) {
-        concreteToInterpolant(it1->first, it1->second, substitution,
-                              replacements, coreOnly, storeIter->second,
-                              leftRetrieval);
+        concreteToInterpolant(
+            it1->first, it1->second, substitution, replacements, coreOnly,
+            storeIter->second,
+            referenceStore->isInLeftSubtree(it1->second->getDepth()));
       }
     }
   }
@@ -259,13 +305,16 @@ void TxStore::getConcreteStore(
            it = concretelyAddressedHistoricalStore.begin(),
            ie = concretelyAddressedHistoricalStore.end();
        it != ie; ++it) {
-    concreteToInterpolant(it->first, it->second, substitution, replacements,
-                          coreOnly, _concretelyAddressedHistoricalStore,
-                          leftRetrieval);
+
+    concreteToInterpolant(
+        it->first, it->second, substitution, replacements, coreOnly,
+        _concretelyAddressedHistoricalStore,
+        referenceStore->isInLeftSubtree(it->second->getDepth()));
   }
 }
 
 void TxStore::getSymbolicStore(
+    const TxStore *referenceStore,
     const std::vector<llvm::Instruction *> &callHistory,
     const std::map<ref<Expr>, ref<Expr> > &substitution,
     std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
@@ -285,8 +334,9 @@ void TxStore::getSymbolicStore(
       for (LowerStateStore::const_iterator it1 = middleStore.symbolicBegin(),
                                            ie1 = middleStore.symbolicEnd();
            it1 != ie1; ++it1) {
-        symbolicToInterpolant(it1->first, it1->second, substitution,
-                              replacements, coreOnly, map, leftRetrieval);
+        symbolicToInterpolant(
+            it1->first, it1->second, substitution, replacements, coreOnly, map,
+            referenceStore->isInLeftSubtree(it1->second->getDepth()));
       }
 
       // The map is only added when it is not empty; this is to avoid entries
@@ -298,9 +348,10 @@ void TxStore::getSymbolicStore(
       for (LowerStateStore::const_iterator it1 = middleStore.symbolicBegin(),
                                            ie1 = middleStore.symbolicEnd();
            it1 != ie1; ++it1) {
-        symbolicToInterpolant(it1->first, it1->second, substitution,
-                              replacements, coreOnly, storeIter->second,
-                              leftRetrieval);
+        symbolicToInterpolant(
+            it1->first, it1->second, substitution, replacements, coreOnly,
+            storeIter->second,
+            referenceStore->isInLeftSubtree(it1->second->getDepth()));
       }
     }
   }
@@ -309,9 +360,10 @@ void TxStore::getSymbolicStore(
            it = symbolicallyAddressedHistoricalStore.begin(),
            ie = symbolicallyAddressedHistoricalStore.end();
        it != ie; ++it) {
-    symbolicToInterpolant(it->first, it->second, substitution, replacements,
-                          coreOnly, _symbolicallyAddressedHistoricalStore,
-                          leftRetrieval);
+    symbolicToInterpolant(
+        it->first, it->second, substitution, replacements, coreOnly,
+        _symbolicallyAddressedHistoricalStore,
+        referenceStore->isInLeftSubtree(it->second->getDepth()));
   }
 }
 
@@ -329,10 +381,8 @@ void TxStore::updateStore(ref<TxStateAddress> location,
 
   // Here we also mark the entries used to build the value as used. Only used
   // entries will be in the interpolant
-  markUsed(value->getEntryList());
-
-  // We want to renew the table entry list, so we first remove the old ones
-  value->resetStoreEntryList();
+  markUsed(value->getAllowBoundEntryList());
+  markUsed(value->getDisableBoundEntryList());
 
   TopStateStore::iterator middleStoreIter =
       internalStore.find(location->getContext());
@@ -341,8 +391,12 @@ void TxStore::updateStore(ref<TxStateAddress> location,
     MiddleStateStore &middleStore = middleStoreIter->second;
     if (middleStore.hasAllocationInfo(location->getAllocationInfo())) {
       ref<TxStoreEntry> entry =
-          middleStore.updateStore(location, address, value, depth);
+          middleStore.updateStore(this, location, address, value, depth);
       if (!entry.isNull()) {
+        // We want to renew the table entry list, so we first remove the old
+        // ones
+        value->resetStoreEntryList();
+
         // We associate this value with the store entry, signifying that the
         // entry is important whenever the value is used. This is used for
         // computing the interpolant.
@@ -362,7 +416,7 @@ void TxStore::updateStore(ref<TxStateAddress> location,
   internalStore[location->getContext()] = newMiddleStateStore;
   MiddleStateStore &middleStateStore = internalStore[location->getContext()];
   ref<TxStoreEntry> entry =
-      middleStateStore.updateStore(location, address, value, depth);
+      middleStateStore.updateStore(this, location, address, value, depth);
   if (!entry.isNull()) {
     // We associate this value with the store entry, signifying that the entry
     // is important whenever the value is used. This is used for computing the
@@ -415,6 +469,170 @@ void TxStore::markUsed(const std::set<ref<TxStoreEntry> > &entryList) {
       current = current->parent;
     }
   }
+}
+
+void TxStore::recursivelyMarkFlow(ref<TxStoreEntry> entry, bool leftMarking,
+                                  const std::string &reason) const {
+  if (entry.isNull())
+    return;
+
+  if (entry->isCore(leftMarking)) {
+    if (!entry->canInterpolateBound(leftMarking))
+      return;
+  }
+
+  entry->setAsCore(leftMarking, reason);
+  entry->disableBoundInterpolation(leftMarking);
+
+  std::map<ref<TxStoreEntry>, bool> &allowBoundEntryList(
+      entry->getAllowBoundEntryList());
+  for (std::map<ref<TxStoreEntry>, bool>::iterator
+           it = allowBoundEntryList.begin(),
+           ie = allowBoundEntryList.end();
+       it != ie; ++it) {
+    recursivelyMarkFlow(it->first, it->second, reason);
+  }
+
+  std::map<ref<TxStoreEntry>, bool> &disableBoundEntryList(
+      entry->getDisableBoundEntryList());
+  for (std::map<ref<TxStoreEntry>, bool>::iterator
+           it = disableBoundEntryList.begin(),
+           ie = disableBoundEntryList.end();
+       it != ie; ++it) {
+    recursivelyMarkFlow(it->first, it->second, reason);
+  }
+}
+
+void TxStore::markFlow(ref<TxStateValue> target,
+                       const std::string &reason) const {
+  if (target.isNull())
+    return;
+
+  const std::set<ref<TxStoreEntry> > &allowBoundEntryList(
+      target->getAllowBoundEntryList());
+  for (std::set<ref<TxStoreEntry> >::const_iterator
+           it = allowBoundEntryList.begin(),
+           ie = allowBoundEntryList.end();
+       it != ie; ++it) {
+    recursivelyMarkFlow(*it, isInLeftSubtree((*it)->getDepth()), reason);
+  }
+
+  const std::set<ref<TxStoreEntry> > &disableBoundEntryList(
+      target->getDisableBoundEntryList());
+  for (std::set<ref<TxStoreEntry> >::const_iterator
+           it = disableBoundEntryList.begin(),
+           ie = disableBoundEntryList.end();
+       it != ie; ++it) {
+    recursivelyMarkFlow(*it, isInLeftSubtree((*it)->getDepth()), reason);
+  }
+}
+
+bool TxStore::recursivelyMarkPointerFlow(ref<TxStoreEntry> entry,
+                                         bool leftMarking,
+                                         ref<TxStateValue> checkedAddress,
+                                         std::set<uint64_t> &bounds,
+                                         const std::string &reason,
+                                         uint64_t startingDepth) const {
+  bool memoryError = false;
+  bool boundUpdated = false;
+
+  if (entry.isNull())
+    return memoryError;
+
+  if (entry->getDepth() == startingDepth) {
+    memoryError = adjustOffsetBound(entry, true, checkedAddress, bounds, reason,
+                                    boundUpdated)
+                      ? true
+                      : memoryError;
+    memoryError = adjustOffsetBound(entry, false, checkedAddress, bounds,
+                                    reason, boundUpdated)
+                      ? true
+                      : memoryError;
+  } else {
+    memoryError = adjustOffsetBound(entry, leftMarking, checkedAddress, bounds,
+                                    reason, boundUpdated)
+                      ? true
+                      : memoryError;
+  }
+
+  if (memoryError) {
+    std::map<ref<TxStoreEntry>, bool> &allowBoundEntryList(
+        entry->getAllowBoundEntryList());
+    for (std::map<ref<TxStoreEntry>, bool>::iterator
+             it = allowBoundEntryList.begin(),
+             ie = allowBoundEntryList.end();
+         it != ie; ++it) {
+      recursivelyMarkFlow(it->first, it->second, reason);
+    }
+  } else {
+    if (boundUpdated) {
+      std::map<ref<TxStoreEntry>, bool> &allowBoundEntryList(
+          entry->getAllowBoundEntryList());
+      for (std::map<ref<TxStoreEntry>, bool>::iterator
+               it = allowBoundEntryList.begin(),
+               ie = allowBoundEntryList.end();
+           it != ie; ++it) {
+        if (!it->first->isPointer()) {
+          recursivelyMarkFlow(it->first, it->second, reason);
+        } else {
+          memoryError =
+              recursivelyMarkPointerFlow(it->first, it->second, checkedAddress,
+                                         bounds, reason, startingDepth)
+                  ? true
+                  : memoryError;
+        }
+      }
+    }
+  }
+
+  std::map<ref<TxStoreEntry>, bool> &disableBoundEntryList(
+      entry->getDisableBoundEntryList());
+  for (std::map<ref<TxStoreEntry>, bool>::iterator
+           it = disableBoundEntryList.begin(),
+           ie = disableBoundEntryList.end();
+       it != ie; ++it) {
+    recursivelyMarkFlow(it->first, it->second, reason);
+  }
+
+  return memoryError;
+}
+
+bool TxStore::markPointerFlow(ref<TxStateValue> target,
+                              ref<TxStateValue> checkedAddress,
+                              std::set<uint64_t> &bounds,
+                              const std::string &reason) const {
+  bool memoryError = false;
+
+  if (target.isNull())
+    return memoryError;
+
+  const std::set<ref<TxStoreEntry> > &allowBoundEntryList(
+      target->getAllowBoundEntryList());
+  for (std::set<ref<TxStoreEntry> >::const_iterator
+           it = allowBoundEntryList.begin(),
+           ie = allowBoundEntryList.end();
+       it != ie; ++it) {
+    if (!(*it)->isPointer()) {
+      recursivelyMarkFlow(*it, isInLeftSubtree((*it)->getDepth()), reason);
+    } else {
+      memoryError =
+          recursivelyMarkPointerFlow(*it, isInLeftSubtree((*it)->getDepth()),
+                                     checkedAddress, bounds, reason, depth)
+              ? true
+              : memoryError;
+    }
+  }
+
+  const std::set<ref<TxStoreEntry> > &disableBoundEntryList(
+      target->getDisableBoundEntryList());
+  for (std::set<ref<TxStoreEntry> >::const_iterator
+           it = disableBoundEntryList.begin(),
+           ie = disableBoundEntryList.end();
+       it != ie; ++it) {
+    recursivelyMarkFlow(*it, isInLeftSubtree((*it)->getDepth()), reason);
+  }
+
+  return memoryError;
 }
 
 /// \brief Print the content of the object to the LLVM error stream

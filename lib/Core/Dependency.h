@@ -215,7 +215,7 @@ namespace klee {
                        ref<Expr> address, uint64_t size) {
       ref<TxStateValue> vvalue =
           TxStateValue::create(loc, callHistory, address);
-      vvalue->addLocation(
+      vvalue->addPointerInfo(
           TxStateAddress::create(loc, callHistory, address, size));
       return registerNewTxStateValue(loc, vvalue);
     }
@@ -227,7 +227,7 @@ namespace klee {
         ref<Expr> address, ref<TxStateAddress> loc, ref<Expr> offset) {
       ref<TxStateValue> vvalue =
           TxStateValue::create(value, callHistory, address);
-      vvalue->addLocation(TxStateAddress::create(loc, address, offset));
+      vvalue->addPointerInfo(TxStateAddress::create(loc, address, offset));
       return registerNewTxStateValue(value, vvalue);
     }
 
@@ -277,12 +277,6 @@ namespace klee {
                                  ref<TxStateValue> target,
                                  ref<Expr> offsetDelta);
 
-    /// \brief Add flow dependency between source and target value, as the
-    /// result of store/load via a memory location.
-    void addDependencyViaLocation(ref<TxStateValue> source,
-                                  ref<TxStateValue> target,
-                                  ref<TxStateAddress> via);
-
     /// \brief Add a flow dependency from a pointer value to a non-pointer
     /// value, for an external function call.
     ///
@@ -298,35 +292,29 @@ namespace klee {
     void addDependencyToNonPointer(ref<TxStateValue> source,
                                    ref<TxStateValue> target);
 
-    /// \brief Mark as core all the values and locations that flows to the
-    /// target
-    void markFlow(ref<TxStateValue> target, const std::string &reason) const;
-
-    /// \brief Mark as core all the pointer values and that flows to the target;
-    /// and adjust its offset bound for memory bounds interpolation (a.k.a.
-    /// slackening). Returns true if memory bounds violation is detected; false
-    /// otherwise.
-    void markPointerFlow(ref<TxStateValue> target,
-                         ref<TxStateValue> checkedOffset,
-                         const std::string &reason) const {
-      std::set<uint64_t> bounds;
-      markPointerFlow(target, checkedOffset, bounds, reason);
-    }
-
-    /// \brief Mark as core all the pointer values and that flows to the target;
-    /// and adjust its offset bound for memory bounds interpolation (a.k.a.
-    /// slackening)
-    bool markPointerFlow(ref<TxStateValue> target,
-                         ref<TxStateValue> checkedOffset,
-                         std::set<uint64_t> &bounds,
-                         const std::string &reason) const;
-
     /// \brief Record the expressions of a call's arguments
     void populateArgumentValuesList(
         llvm::CallInst *site,
         const std::vector<llvm::Instruction *> &callHistory,
         std::vector<ref<Expr> > &arguments,
         std::vector<ref<TxStateValue> > &argumentValuesList);
+
+    void getStoredExpressions(
+        const TxStore *referenceStore,
+        const std::vector<llvm::Instruction *> &callHistory,
+        const std::map<ref<Expr>, ref<Expr> > &substitution,
+        std::set<const Array *> &replacements, bool coreOnly,
+        bool leftRetrieval,
+        TxStore::TopInterpolantStore &concretelyAddressedStore,
+        TxStore::TopInterpolantStore &symbolicallyAddressedStore,
+        TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
+        TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
+      store->getStoredExpressions(
+          referenceStore, callHistory, substitution, replacements, coreOnly,
+          leftRetrieval, concretelyAddressedStore, symbolicallyAddressedStore,
+          concretelyAddressedHistoricalStore,
+          symbolicallyAddressedHistoricalStore);
+    }
 
   public:
     /// \brief This is for dynamic setting up of debug messages.
@@ -380,18 +368,24 @@ namespace klee {
     /// scope.
     ///
     /// \sa TxStore#getStoredExpressions()
-    void getStoredExpressions(
+    void getParentStoredExpressions(
         const std::vector<llvm::Instruction *> &callHistory,
         const std::map<ref<Expr>, ref<Expr> > &substitution,
         std::set<const Array *> &replacements, bool coreOnly,
-        bool leftRetrieval,
         TxStore::TopInterpolantStore &concretelyAddressedStore,
         TxStore::TopInterpolantStore &symbolicallyAddressedStore,
         TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
         TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
-      store->getStoredExpressions(
-          callHistory, substitution, replacements, coreOnly, leftRetrieval,
-          concretelyAddressedStore, symbolicallyAddressedStore,
+      bool leftRetrieval = false;
+
+      if (parent->left == this)
+        leftRetrieval = true;
+      else
+        assert(parent->right == this && "mismatched tree edge");
+
+      parent->getStoredExpressions(
+          store, callHistory, substitution, replacements, coreOnly,
+          leftRetrieval, concretelyAddressedStore, symbolicallyAddressedStore,
           concretelyAddressedHistoricalStore,
           symbolicallyAddressedHistoricalStore);
     }

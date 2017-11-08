@@ -44,6 +44,8 @@ class TxStateValue;
 
 class TxStoreEntry;
 
+class TxStore;
+
 const uint64_t symbolicBoundId = ULONG_MAX;
 
 class AllocationContext {
@@ -340,10 +342,10 @@ private:
   TxInterpolantValue(llvm::Value *value, ref<Expr> expr,
                      bool canInterpolateBound,
                      const std::set<std::string> &coreReasons,
-                     ref<TxStateAddress> locations,
+                     ref<TxStateAddress> location,
                      const std::map<ref<Expr>, ref<Expr> > &substitution,
                      std::set<const Array *> &replacements) {
-    init(value, expr, canInterpolateBound, coreReasons, locations, substitution,
+    init(value, expr, canInterpolateBound, coreReasons, location, substitution,
          replacements, true);
   }
 
@@ -451,6 +453,15 @@ private:
 
   /// \brief The size of this allocation (0 means unknown)
   uint64_t size;
+
+  TxStateAddress(ref<TxVariable> _variable, ref<Expr> _address,
+                 uint64_t _concreteOffsetBound, uint64_t _size)
+      : refCount(0), variable(_variable), address(_address),
+        concreteOffsetBound(_concreteOffsetBound), size(_size) {}
+
+  TxStateAddress(ref<TxVariable> _variable, ref<Expr> _address, uint64_t _size)
+      : refCount(0), variable(_variable), address(_address),
+        concreteOffsetBound(_size), size(_size) {}
 
   TxStateAddress(ref<AllocationContext> _context, ref<Expr> &_address,
                  ref<Expr> &_base, ref<Expr> &_offset, uint64_t _size)
@@ -588,6 +599,12 @@ public:
 
   uint64_t getSize() const { return size; }
 
+  /// \brief Copying function
+  ref<TxStateAddress> copy() const {
+    ref<TxStateAddress> ret(new TxStateAddress(variable, address, size));
+    return ret;
+  }
+
   /// \brief Print the content of the object to the LLVM error stream
   void dump() const {
     print(llvm::errs());
@@ -621,47 +638,27 @@ private:
   const ref<Expr> valueExpr;
 
   /// \brief Set of memory locations possibly being pointed to
-  ref<TxStateAddress> location;
-
-  /// \brief Member variable to indicate if any unsatisfiability core depends
-  /// on this value.
-  bool core;
+  ref<TxStateAddress> pointerInfo;
 
   /// \brief The id of this object
   uint64_t id;
 
-  /// \brief Dependency sources of this value
-  std::map<ref<TxStateValue>, ref<TxStateAddress> > sources;
-
   /// \brief The context of this value
   std::vector<llvm::Instruction *> callHistory;
 
-  /// \brief Do not compute bounds in interpolation of this value if it was a
-  /// pointer; instead, use exact address
-  bool doNotInterpolateBound;
+  /// \brief Store entries this value is dependent upon, on which memory bound
+  /// interpolation may be enabled.
+  std::set<ref<TxStoreEntry> > allowBoundEntryList;
 
-  /// \brief The load addresses of this value: These are the addresses the loads
-  /// that influence this value was executed on
-  std::set<ref<TxStateValue> > loadAddresses;
-
-  /// \brief The addresses by which this loaded value was stored
-  std::set<ref<TxStateValue> > storeAddresses;
-
-  /// \brief Reasons for this value to be in the core. This may not contain all
-  /// the reasons since values are no longer marked if they were already found
-  /// to be marked, therefore the reasons are not propagated to all the values
-  /// this value is dependent upon.
-  std::set<std::string> coreReasons;
-
-  /// \brief Store entries this value is dependent upon
-  std::set<ref<TxStoreEntry> > entryList;
+  /// \brief Store entries this value is dependent upon, upon which memory bound
+  /// interpolation may not be enabled.
+  std::set<ref<TxStoreEntry> > disableBoundEntryList;
 
   TxStateValue(llvm::Value *value,
                const std::vector<llvm::Instruction *> &_callHistory,
                ref<Expr> _valueExpr)
-      : refCount(0), value(value), valueExpr(_valueExpr), core(false),
-        id(reinterpret_cast<uint64_t>(this)), callHistory(_callHistory),
-        doNotInterpolateBound(false) {}
+      : refCount(0), value(value), valueExpr(_valueExpr),
+        id(reinterpret_cast<uint64_t>(this)), callHistory(_callHistory) {}
 
 public:
   ~TxStateValue() {}
@@ -674,25 +671,17 @@ public:
     return vvalue;
   }
 
-  bool canInterpolateBound() { return !doNotInterpolateBound; }
-
-  void disableBoundInterpolation() { doNotInterpolateBound = true; }
-
   /// \brief Set the address this value was loaded from for inclusion in the
   /// interpolant
   void addLoadAddress(ref<TxStateValue> _loadAddress);
-
-  std::set<ref<TxStateValue> > &getLoadAddresses() { return loadAddresses; }
 
   /// \brief Set the address this value was stored into for inclusion in the
   /// interpolant
   void addStoreAddress(ref<TxStateValue> _storeAddress);
 
-  std::set<ref<TxStateValue> > &getStoreAddresses() { return storeAddresses; }
-
   /// \brief The core routine for adding flow dependency between source and
   /// target value
-  void addDependency(ref<TxStateValue> source, ref<TxStateAddress> via);
+  void addDependency(ref<TxStateValue> source);
 
   /// \brief Add the store entry used to store the value used to compute this
   /// value
@@ -700,13 +689,14 @@ public:
 
   /// \brief Clear the contents of the list of entries this value was loaded
   /// from
-  void resetStoreEntryList() { entryList.clear(); }
-
-  const std::set<ref<TxStoreEntry> > &getEntryList() const;
-
-  const std::map<ref<TxStateValue>, ref<TxStateAddress> > &getSources() {
-    return sources;
+  void resetStoreEntryList() {
+    allowBoundEntryList.clear();
+    disableBoundEntryList.clear();
   }
+
+  const std::set<ref<TxStoreEntry> > &getAllowBoundEntryList() const;
+
+  const std::set<ref<TxStoreEntry> > &getDisableBoundEntryList() const;
 
   int compare(const TxStateValue other) const {
     if (id == other.id)
@@ -716,42 +706,21 @@ public:
     return 1;
   }
 
-  void addLocation(ref<TxStateAddress> loc) {
-    assert(location.isNull() && "location already defined");
-    location = loc;
+  void addPointerInfo(ref<TxStateAddress> loc) {
+    assert(pointerInfo.isNull() && "location already defined");
+    pointerInfo = loc;
   }
 
-  const ref<TxStateAddress> getLocation() const { return location; }
+  const ref<TxStateAddress> getPointerInfo() const { return pointerInfo; }
 
-  bool hasValue(llvm::Value *value) const { return this->value == value; }
+  bool isPointer() const { return !pointerInfo.isNull(); }
 
   ref<Expr> getExpression() const { return valueExpr; }
-
-  void setAsCore(std::string reason) {
-    core = true;
-    if (!reason.empty())
-      coreReasons.insert(reason);
-  }
-
-  bool isCore() const { return core; }
 
   llvm::Value *getValue() const { return value; }
 
   const std::vector<llvm::Instruction *> &getCallHistory() const {
     return callHistory;
-  }
-
-  ref<TxInterpolantValue> getInterpolantStyleValue() {
-    return TxInterpolantValue::create(value, valueExpr, canInterpolateBound(),
-                                      coreReasons, location);
-  }
-
-  ref<TxInterpolantValue>
-  getInterpolantStyleValue(const std::map<ref<Expr>, ref<Expr> > &substitution,
-                           std::set<const Array *> &replacements) {
-    return TxInterpolantValue::create(value, valueExpr, canInterpolateBound(),
-                                      coreReasons, location, substitution,
-                                      replacements);
   }
 
   /// \brief Print minimal information about this object.
@@ -788,6 +757,15 @@ public:
   }
 };
 
+/// \brief A class for each entry in the store. This class also stores the
+/// information for memory bound interpolation. Hence, it has a static (e.g.,
+/// TxStoreEntry#value, TxStoreEntry#valueExpr, TxStoreEnty#entryList) as well
+/// as a dynamic part (TxStoreEntry#leftPointerInfo,
+/// TxStoreEntry#rightPointerInfo,
+/// TxStoreEntry#leftDoNotInterpolateBound,
+/// TxStoreEntry#rightDoNotInterpolateBound, TxStoreEntry#leftCore,
+/// TxStoreEntry#rightCore,
+/// TxStoreEntry#leftCoreReasons, TxStoreEntry#rightCoreReasons).
 class TxStoreEntry {
 public:
   unsigned refCount;
@@ -802,11 +780,51 @@ private:
   /// \brief The creation depth of this entry
   uint64_t depth;
 
+  llvm::Value *value;
+
+  const ref<Expr> valueExpr;
+
+  /// \brief Store entries this value is dependent upon
+  std::map<ref<TxStoreEntry>, bool> allowBoundEntryList;
+
+  std::map<ref<TxStoreEntry>, bool> disableBoundEntryList;
+
+  /// \brief Set of memory locations possibly being pointed to, which can be
+  /// modified by the subtree of the immediate left child.
+  ref<TxStateAddress> leftPointerInfo;
+
+  /// \brief Set of memory locations possibly being pointed to, which can be
+  /// modified by the subtree of the immediate right child.
+  ref<TxStateAddress> rightPointerInfo;
+
+  /// \brief Flag to ignore bound interpolation, set from the subtree of the
+  /// immediate left child.
+  bool leftDoNotInterpolateBound;
+
+  /// \brief Flag to ignore bound interpolation, set from the subtree of the
+  /// immediate right child.
+  bool rightDoNotInterpolateBound;
+
+  /// \brief Member variable to indicate if an interpolant depends on this
+  /// value, set from the subtree of the immediate left child.
+  bool leftCore;
+
+  /// \brief Member variable to indicate if an interpolant depends on this
+  /// value, set from the subtree of the immediate right child.
+  bool rightCore;
+
+  /// \brief Reasons for the interpolant marking, from the subtree of the
+  /// immediate left child. This is used for debugging.
+  std::set<std::string> leftCoreReasons;
+
+  /// \brief Reasons for the interpolant marking, from the subtree of the
+  /// immediate right child. This is used for debugging.
+  std::set<std::string> rightCoreReasons;
+
 public:
   TxStoreEntry(ref<TxStateAddress> _address, ref<TxStateValue> _addressValue,
-               ref<TxStateValue> _content, uint64_t _depth)
-      : refCount(0), address(_address), addressValue(_addressValue),
-        content(_content), depth(_depth) {}
+               ref<TxStateValue> _content, const TxStore *store,
+               uint64_t _depth);
 
   ~TxStoreEntry() {}
 
@@ -818,7 +836,84 @@ public:
 
   ref<TxStateValue> getContent() { return content; }
 
+  llvm::Value *getValue() const { return value; }
+
+  ref<Expr> getExpression() const { return valueExpr; }
+
+  std::map<ref<TxStoreEntry>, bool> &getAllowBoundEntryList() {
+    return allowBoundEntryList;
+  }
+
+  std::map<ref<TxStoreEntry>, bool> &getDisableBoundEntryList() {
+    return disableBoundEntryList;
+  }
+
+  ref<TxStateAddress> getPointerInfo(bool leftMarking) const {
+    if (leftMarking)
+      return leftPointerInfo;
+    return rightPointerInfo;
+  }
+
+  bool canInterpolateBound(bool leftMarking) const {
+    if (leftMarking)
+      return !leftDoNotInterpolateBound;
+    return !rightDoNotInterpolateBound;
+  }
+
+  void disableBoundInterpolation(bool leftMarking) {
+    if (leftMarking) {
+      leftDoNotInterpolateBound = true;
+      return;
+    }
+    rightDoNotInterpolateBound = true;
+  }
+
+  void setAsCore(bool leftMarking, const std::string &reason) {
+    if (leftMarking) {
+      leftCore = true;
+      if (!reason.empty())
+        leftCoreReasons.insert(reason);
+      return;
+    }
+    rightCore = true;
+    if (!reason.empty())
+      rightCoreReasons.insert(reason);
+  }
+
+  bool isCore(bool leftMarking) const {
+    if (leftMarking)
+      return leftCore;
+    return rightCore;
+  }
+
+  bool isPointer() const { return !leftPointerInfo.isNull(); }
+
   uint64_t getDepth() { return depth; }
+
+  ref<TxInterpolantValue> getInterpolantStyleValue(bool leftUse) {
+    if (leftUse) {
+      return TxInterpolantValue::create(value, valueExpr,
+                                        !leftDoNotInterpolateBound,
+                                        leftCoreReasons, leftPointerInfo);
+    }
+    return TxInterpolantValue::create(value, valueExpr,
+                                      !rightDoNotInterpolateBound,
+                                      rightCoreReasons, rightPointerInfo);
+  }
+
+  ref<TxInterpolantValue>
+  getInterpolantStyleValue(bool leftUse,
+                           const std::map<ref<Expr>, ref<Expr> > &substitution,
+                           std::set<const Array *> &replacements) {
+    if (leftUse) {
+      return TxInterpolantValue::create(
+          value, valueExpr, !leftDoNotInterpolateBound, leftCoreReasons,
+          leftPointerInfo, substitution, replacements);
+    }
+    return TxInterpolantValue::create(
+        value, valueExpr, !rightDoNotInterpolateBound, rightCoreReasons,
+        rightPointerInfo, substitution, replacements);
+  }
 
   /// \brief A simple pointer comparison
   int compare(const TxStoreEntry &other) const {

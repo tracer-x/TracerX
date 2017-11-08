@@ -78,7 +78,7 @@ public:
 
     ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;
 
-    ref<TxStoreEntry> updateStore(ref<TxStateAddress> loc,
+    ref<TxStoreEntry> updateStore(const TxStore *store, ref<TxStateAddress> loc,
                                   ref<TxStateValue> address,
                                   ref<TxStateValue> value, uint64_t depth);
 
@@ -129,15 +129,16 @@ private:
                              const std::map<ref<Expr>, ref<Expr> > &substition,
                              std::set<const Array *> &replacements,
                              bool coreOnly, LowerInterpolantStore &map,
-                             bool leftRetrieval) const;
+                             bool leftOfEntry) const;
 
   void
   symbolicToInterpolant(ref<TxVariable> variable, ref<TxStoreEntry> entry,
                         const std::map<ref<Expr>, ref<Expr> > &substitution,
                         std::set<const Array *> &replacements, bool coreOnly,
-                        LowerInterpolantStore &map, bool leftRetrieval) const;
+                        LowerInterpolantStore &map, bool leftOfEntry) const;
 
   void getConcreteStore(
+      const TxStore *referenceStore,
       const std::vector<llvm::Instruction *> &callHistory,
       const std::map<ref<Expr>, ref<Expr> > &substitution,
       std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
@@ -145,11 +146,26 @@ private:
       LowerInterpolantStore &_concretelyAddressedHistoricalStore) const;
 
   void getSymbolicStore(
+      const TxStore *referenceStore,
       const std::vector<llvm::Instruction *> &callHistory,
       const std::map<ref<Expr>, ref<Expr> > &substitution,
       std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
       TopInterpolantStore &_symbolicallyAddressedStore,
       LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const;
+
+  void recursivelyMarkFlow(ref<TxStoreEntry> entry, bool leftMarking,
+                           const std::string &reason) const;
+
+  bool recursivelyMarkPointerFlow(ref<TxStoreEntry> entry, bool leftMarking,
+                                  ref<TxStateValue> checkedAddress,
+                                  std::set<uint64_t> &bounds,
+                                  const std::string &reason,
+                                  uint64_t startingDepth) const;
+
+  static bool adjustOffsetBound(ref<TxStoreEntry> entry, bool leftMarking,
+                                ref<TxStateValue> checkedAddress,
+                                std::set<uint64_t> &bounds,
+                                const std::string &reason, bool &boundUpdated);
 
   /// \brief Constructor for an empty store.
   TxStore() : depth(0), parent(0), left(0), right(0) {}
@@ -171,6 +187,11 @@ public:
     ret->parent = src;
     return ret;
   }
+
+  /// \brief Returns true if this store is in the left subtree of its ancestor
+  /// at level targetDepth, false otherwise (either local or in the right
+  /// subtree of its ancestor at level targetDepth).
+  bool isInLeftSubtree(uint64_t targetDepth) const;
 
   void setLeftChild(TxStore *child) { left = child; }
 
@@ -195,7 +216,7 @@ public:
   /// of the store, otherwise, we assume it is requested by the right child of
   /// the store.
   void getStoredExpressions(
-      const std::vector<llvm::Instruction *> &callHistory,
+      const TxStore *store, const std::vector<llvm::Instruction *> &callHistory,
       const std::map<ref<Expr>, ref<Expr> > &substitution,
       std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
       TopInterpolantStore &_concretelyAddressedStore,
@@ -215,6 +236,29 @@ public:
 
   /// \brief Register the entries in the entry list as used
   void markUsed(const std::set<ref<TxStoreEntry> > &entryList);
+
+  /// \brief Mark as core all the values and locations that flows to the
+  /// target
+  void markFlow(ref<TxStateValue> target, const std::string &reason) const;
+
+  /// \brief Mark as core all the pointer values and that flows to the target;
+  /// and adjust its offset bound for memory bounds interpolation (a.k.a.
+  /// slackening). Returns true if memory bounds violation is detected; false
+  /// otherwise.
+  bool markPointerFlow(ref<TxStateValue> target,
+                       ref<TxStateValue> checkedOffset,
+                       const std::string &reason) const {
+      std::set<uint64_t> bounds;
+      return markPointerFlow(target, checkedOffset, bounds, reason);
+  }
+
+  /// \brief Mark as core all the pointer values and that flows to the target;
+  /// and adjust its offset bound for memory bounds interpolation (a.k.a.
+  /// slackening)
+  bool markPointerFlow(ref<TxStateValue> target,
+                       ref<TxStateValue> checkedOffset,
+                       std::set<uint64_t> &bounds,
+                       const std::string &reason) const;
 
   /// \brief Print the content of the object to the LLVM error stream
   void dump() const {
