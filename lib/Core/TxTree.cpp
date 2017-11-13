@@ -1010,8 +1010,8 @@ bool SubsumptionTableEntry::subsumed(
                                msg3.c_str());
                 }
               }
-              coreValues.insert(stateValue->getOriginalValue());
             }
+            coreValues.insert(stateValue->getOriginalValue());
           }
         }
 
