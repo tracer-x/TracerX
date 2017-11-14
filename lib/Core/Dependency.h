@@ -329,13 +329,6 @@ namespace klee {
 
     ~Dependency();
 
-    static Dependency *
-    createRoot(llvm::DataLayout *targetData,
-               std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
-                   globalAddresses) {
-      return new Dependency(0, targetData, globalAddresses);
-    }
-
     Dependency *cdr() const;
 
     /// \brief This retrieves the locations known at this state, and the
