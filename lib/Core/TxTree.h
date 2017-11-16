@@ -291,6 +291,9 @@ public:
       TxStore::TopInterpolantStore &_symbolicallyAddressedStore,
       TxStore::LowerInterpolantStore &_concretelyAddressedHistoricalStore,
       TxStore::LowerInterpolantStore &_symbolicallyAddressedHistoricalStore,
+      TxStore::TopStateStore &__internalStore,
+      TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
+      TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
       int debugSubsumptionLevel);
 
   /// Tests if the argument is a variable. A variable here is defined to be
@@ -477,8 +480,10 @@ public:
       TxStore::TopInterpolantStore &concretelyAddressedStore,
       TxStore::TopInterpolantStore &symbolicallyAddressedStore,
       TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
-      TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore)
-      const;
+      TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore,
+      TxStore::TopStateStore &__internalStore,
+      TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
+      TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) const;
 
   /// \brief This retrieves the allocations known at this state, and the
   /// expressions stored in the allocations, as long as the allocation is

@@ -308,8 +308,30 @@ namespace klee {
         TxStore::TopInterpolantStore &concretelyAddressedStore,
         TxStore::TopInterpolantStore &symbolicallyAddressedStore,
         TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
-        TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
+        TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore,
+        TxStore::TopStateStore &__internalStore,
+        TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
+        TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) {
       store->getStoredExpressions(
+          referenceStore, callHistory, substitution, replacements, coreOnly,
+          leftRetrieval, concretelyAddressedStore, symbolicallyAddressedStore,
+          concretelyAddressedHistoricalStore,
+          symbolicallyAddressedHistoricalStore, __internalStore,
+          __concretelyAddressedHistoricalStore,
+          __symbolicallyAddressedHistoricalStore);
+    }
+
+    void getStoredCoreExpressions(
+        const TxStore *referenceStore,
+        const std::vector<llvm::Instruction *> &callHistory,
+        const std::map<ref<Expr>, ref<Expr> > &substitution,
+        std::set<const Array *> &replacements, bool coreOnly,
+        bool leftRetrieval,
+        TxStore::TopInterpolantStore &concretelyAddressedStore,
+        TxStore::TopInterpolantStore &symbolicallyAddressedStore,
+        TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
+        TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
+      store->getStoredCoreExpressions(
           referenceStore, callHistory, substitution, replacements, coreOnly,
           leftRetrieval, concretelyAddressedStore, symbolicallyAddressedStore,
           concretelyAddressedHistoricalStore,
@@ -368,7 +390,10 @@ namespace klee {
         TxStore::TopInterpolantStore &concretelyAddressedStore,
         TxStore::TopInterpolantStore &symbolicallyAddressedStore,
         TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
-        TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
+        TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore,
+        TxStore::TopStateStore &__internalStore,
+        TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
+        TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) {
       bool leftRetrieval = false;
 
       if (parent->left == this)
@@ -377,6 +402,60 @@ namespace klee {
         assert(parent->right == this && "mismatched tree edge");
 
       parent->getStoredExpressions(
+          store, callHistory, substitution, replacements, coreOnly,
+          leftRetrieval, concretelyAddressedStore, symbolicallyAddressedStore,
+          concretelyAddressedHistoricalStore,
+          symbolicallyAddressedHistoricalStore, __internalStore,
+          __concretelyAddressedHistoricalStore,
+          __symbolicallyAddressedHistoricalStore);
+    }
+
+    /// \brief This retrieves the locations known at this state, and the
+    /// expressions stored in the locations. Returns as the last argument a pair
+    /// of the store part indexed by constants, and the store part indexed by
+    /// symbolic expressions.
+    ///
+    /// \param callHistory The current call history context of the state
+    /// \param replacements The replacement bound variables when
+    /// retrieving state for creating subsumption table entry: As the
+    /// resulting expression will be used for storing in the
+    /// subsumption table, the variables need to be replaced with the
+    /// bound ones.
+    /// \param coreOnly Indicates whether we are retrieving only data
+    /// for locations relevant to an unsatisfiability core.
+    /// \param leftRetrieval Whether the retrieval is requested by the left
+    /// child of the store, otherwise, we assume it is requested by the right
+    /// child of the store.
+    /// \param [out] concretelyAddressedStore The output concretely-addressed
+    /// store.
+    /// \param [out] symbolicallyAddressedStore The output
+    /// symbolically-addressed store.
+    /// \param [out] concretelyAddressedHistoricalStore The output
+    /// concretely-addressed historical store, whose domain consists of
+    /// historical concrete addresses that are no longer valid due to exiting of
+    /// scope.
+    /// \param [out] symbolicallyAddressedHistoricalStore The output
+    /// symbolically-addressed historical store, whose domain consists of
+    /// historical symbolic addresses that are no longer valid due to exiting of
+    /// scope.
+    ///
+    /// \sa TxStore#getStoredExpressions()
+    void getParentStoredCoreExpressions(
+        const std::vector<llvm::Instruction *> &callHistory,
+        const std::map<ref<Expr>, ref<Expr> > &substitution,
+        std::set<const Array *> &replacements, bool coreOnly,
+        TxStore::TopInterpolantStore &concretelyAddressedStore,
+        TxStore::TopInterpolantStore &symbolicallyAddressedStore,
+        TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
+        TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore) {
+      bool leftRetrieval = false;
+
+      if (parent->left == this)
+        leftRetrieval = true;
+      else
+        assert(parent->right == this && "mismatched tree edge");
+
+      parent->getStoredCoreExpressions(
           store, callHistory, substitution, replacements, coreOnly,
           leftRetrieval, concretelyAddressedStore, symbolicallyAddressedStore,
           concretelyAddressedHistoricalStore,

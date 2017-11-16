@@ -222,6 +222,33 @@ public:
       TopInterpolantStore &_concretelyAddressedStore,
       TopInterpolantStore &_symbolicallyAddressedStore,
       LowerInterpolantStore &_concretelyAddressedHistoricalStore,
+      LowerInterpolantStore &_symbolicallyAddressedHistoricalStore,
+      TopStateStore &__internalStore,
+      LowerStateStore &__concretelyAddressedHistoricalStore,
+      LowerStateStore &__symbolicallyAddressedHistoricalStore) const;
+
+  /// \brief This retrieves the locations known at this state, and the
+  /// expressions stored in the locations. Returns as the last argument a pair
+  /// of the store part indexed by constants, and the store part indexed by
+  /// symbolic expressions.
+  ///
+  /// \param replacements The replacement bound variables when
+  /// retrieving state for creating subsumption table entry: As the
+  /// resulting expression will be used for storing in the
+  /// subsumption table, the variables need to be replaced with the
+  /// bound ones.
+  /// \param coreOnly Indicate whether we are retrieving only data
+  /// for locations relevant to an unsatisfiability core.
+  /// \param leftRetrieval Whether the retrieval is requested by the left child
+  /// of the store, otherwise, we assume it is requested by the right child of
+  /// the store.
+  void getStoredCoreExpressions(
+      const TxStore *store, const std::vector<llvm::Instruction *> &callHistory,
+      const std::map<ref<Expr>, ref<Expr> > &substitution,
+      std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
+      TopInterpolantStore &_concretelyAddressedStore,
+      TopInterpolantStore &_symbolicallyAddressedStore,
+      LowerInterpolantStore &_concretelyAddressedHistoricalStore,
       LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const;
 
   /// \brief Newly relate a location with its stored value, when the value is

@@ -787,6 +787,9 @@ bool SubsumptionTableEntry::subsumed(
     TxStore::TopInterpolantStore &_symbolicallyAddressedStore,
     TxStore::LowerInterpolantStore &_concretelyAddressedHistoricalStore,
     TxStore::LowerInterpolantStore &_symbolicallyAddressedHistoricalStore,
+    TxStore::TopStateStore &__internalStore,
+    TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
+    TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
   // Tell the solver implementation that we are checking for subsumption for
@@ -1806,10 +1809,16 @@ bool SubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
     TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore;
     TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore;
 
+    TxStore::TopStateStore __internalStore;
+    TxStore::LowerStateStore __concretelyAddressedHistoricalStore;
+    TxStore::LowerStateStore __symbolicallyAddressedHistoricalStore;
+
     txTreeNode->getStoredExpressions(
         txTreeNode->entryCallHistory, concretelyAddressedStore,
         symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
-        symbolicallyAddressedHistoricalStore);
+        symbolicallyAddressedHistoricalStore, __internalStore,
+        __concretelyAddressedHistoricalStore,
+        __symbolicallyAddressedHistoricalStore);
 
     // Iterate the subsumption table entry with reverse iterator because
     // the successful subsumption mostly happen in the newest entry.
@@ -1818,7 +1827,9 @@ bool SubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
       if ((*it)->subsumed(
               solver, state, timeout, concretelyAddressedStore,
               symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
-              symbolicallyAddressedHistoricalStore, debugSubsumptionLevel)) {
+              symbolicallyAddressedHistoricalStore, __internalStore,
+              __concretelyAddressedHistoricalStore,
+              __symbolicallyAddressedHistoricalStore, debugSubsumptionLevel)) {
         // We mark as subsumed such that the node will not be
         // stored into table (the table already contains a more
         // general entry).
@@ -2254,8 +2265,10 @@ void TxTreeNode::getStoredExpressions(
     TxStore::TopInterpolantStore &concretelyAddressedStore,
     TxStore::TopInterpolantStore &symbolicallyAddressedStore,
     TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
-    TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore)
-    const {
+    TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore,
+    TxStore::TopStateStore &__internalStore,
+    TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
+    TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) const {
   TimerStatIncrementer t(getStoredExpressionsTime);
   std::map<ref<Expr>, ref<Expr> > dummySubstitution;
   std::set<const Array *> dummyReplacements;
@@ -2268,7 +2281,9 @@ void TxTreeNode::getStoredExpressions(
         _callHistory, dummySubstitution, dummyReplacements, false,
         concretelyAddressedStore, symbolicallyAddressedStore,
         concretelyAddressedHistoricalStore,
-        symbolicallyAddressedHistoricalStore);
+        symbolicallyAddressedHistoricalStore, __internalStore,
+        __concretelyAddressedHistoricalStore,
+        __symbolicallyAddressedHistoricalStore);
   }
 }
 
@@ -2287,7 +2302,7 @@ void TxTreeNode::getStoredCoreExpressions(
   // the allocations to be stored in subsumption table should be obtained
   // from the parent node.
   if (parent) {
-    dependency->getParentStoredExpressions(
+    dependency->getParentStoredCoreExpressions(
         _callHistory, substitution, replacements, true,
         concretelyAddressedStore, symbolicallyAddressedStore,
         concretelyAddressedHistoricalStore,
