@@ -902,9 +902,9 @@ public:
   }
 
   ref<TxInterpolantValue>
-  getInterpolantStyleValue(bool leftUse,
-                           const std::map<ref<Expr>, ref<Expr> > &substitution,
-                           std::set<const Array *> &replacements) {
+  getInterpolantValue(bool leftUse,
+                      const std::map<ref<Expr>, ref<Expr> > &substitution,
+                      std::set<const Array *> &replacements) {
     if (leftUse) {
       return TxInterpolantValue::create(
           value, valueExpr, !leftDoNotInterpolateBound, leftCoreReasons,

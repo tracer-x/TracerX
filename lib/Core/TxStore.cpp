@@ -207,14 +207,14 @@ inline void TxStore::concreteToInterpolant(
 // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
     if (!NoExistential) {
-      map[variable] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
-                                                      replacements);
+      map[variable] =
+          entry->getInterpolantValue(leftOfEntry, substitution, replacements);
     } else {
       map[variable] = entry->getInterpolantStyleValue(leftOfEntry);
     }
 #else
-    map[variable] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
-                                                    replacements);
+    map[variable] =
+        entry->getInterpolantValue(leftOfEntry, substitution, replacements);
 #endif
   }
 }
@@ -244,16 +244,16 @@ inline void TxStore::symbolicToInterpolant(
     if (!NoExistential) {
       ref<TxVariable> address = TxStateAddress::create(
           entry->getAddress(), replacements)->getAsVariable();
-      map[address] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
-                                                     replacements);
+      map[address] =
+          entry->getInterpolantValue(leftOfEntry, substitution, replacements);
     } else {
       map[variable] = entry->getInterpolantStyleValue(leftOfEntry);
     }
 #else
     ref<TxVariable> address = TxStateAddress::create(
         entry->getAddress(), replacements)->getAsVariable();
-    map[address] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
-                                                   replacements);
+    map[address] =
+        entry->getInterpolantValue(leftOfEntry, substitution, replacements);
 #endif
   }
 }
