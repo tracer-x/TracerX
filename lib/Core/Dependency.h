@@ -305,19 +305,12 @@ namespace klee {
         const std::map<ref<Expr>, ref<Expr> > &substitution,
         std::set<const Array *> &replacements, bool coreOnly,
         bool leftRetrieval,
-        TxStore::TopInterpolantStore &concretelyAddressedStore,
-        TxStore::TopInterpolantStore &symbolicallyAddressedStore,
-        TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
-        TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore,
         TxStore::TopStateStore &__internalStore,
         TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
         TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) {
       store->getStoredExpressions(
           referenceStore, callHistory, substitution, replacements, coreOnly,
-          leftRetrieval, concretelyAddressedStore, symbolicallyAddressedStore,
-          concretelyAddressedHistoricalStore,
-          symbolicallyAddressedHistoricalStore, __internalStore,
-          __concretelyAddressedHistoricalStore,
+          leftRetrieval, __internalStore, __concretelyAddressedHistoricalStore,
           __symbolicallyAddressedHistoricalStore);
     }
 
@@ -387,10 +380,6 @@ namespace klee {
         const std::vector<llvm::Instruction *> &callHistory,
         const std::map<ref<Expr>, ref<Expr> > &substitution,
         std::set<const Array *> &replacements, bool coreOnly,
-        TxStore::TopInterpolantStore &concretelyAddressedStore,
-        TxStore::TopInterpolantStore &symbolicallyAddressedStore,
-        TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
-        TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore,
         bool &leftRetrieval, TxStore::TopStateStore &__internalStore,
         TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
         TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) {
@@ -401,10 +390,7 @@ namespace klee {
 
       parent->getStoredExpressions(
           store, callHistory, substitution, replacements, coreOnly,
-          leftRetrieval, concretelyAddressedStore, symbolicallyAddressedStore,
-          concretelyAddressedHistoricalStore,
-          symbolicallyAddressedHistoricalStore, __internalStore,
-          __concretelyAddressedHistoricalStore,
+          leftRetrieval, __internalStore, __concretelyAddressedHistoricalStore,
           __symbolicallyAddressedHistoricalStore);
     }
 

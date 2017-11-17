@@ -287,10 +287,6 @@ public:
 
   bool subsumed(
       TimingSolver *solver, ExecutionState &state, double timeout,
-      TxStore::TopInterpolantStore &_concretelyAddressedStore,
-      TxStore::TopInterpolantStore &_symbolicallyAddressedStore,
-      TxStore::LowerInterpolantStore &_concretelyAddressedHistoricalStore,
-      TxStore::LowerInterpolantStore &_symbolicallyAddressedHistoricalStore,
       bool leftRetrieval, TxStore::TopStateStore &__internalStore,
       TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
       TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
@@ -477,10 +473,6 @@ public:
   /// part indexed by symbolic expressions.
   void getStoredExpressions(
       const std::vector<llvm::Instruction *> &callHistory,
-      TxStore::TopInterpolantStore &concretelyAddressedStore,
-      TxStore::TopInterpolantStore &symbolicallyAddressedStore,
-      TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
-      TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore,
       bool &leftRetrieval, TxStore::TopStateStore &__internalStore,
       TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
       TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) const;

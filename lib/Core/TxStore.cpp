@@ -194,22 +194,12 @@ void TxStore::getStoredExpressions(
     const std::vector<llvm::Instruction *> &callHistory,
     const std::map<ref<Expr>, ref<Expr> > &substitution,
     std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
-    TopInterpolantStore &_concretelyAddressedStore,
-    TopInterpolantStore &_symbolicallyAddressedStore,
-    LowerInterpolantStore &_concretelyAddressedHistoricalStore,
-    LowerInterpolantStore &_symbolicallyAddressedHistoricalStore,
     TopStateStore &__internalStore,
     LowerStateStore &__concretelyAddressedHistoricalStore,
     LowerStateStore &__symbolicallyAddressedHistoricalStore) const {
   __internalStore = internalStore;
   __concretelyAddressedHistoricalStore = concretelyAddressedHistoricalStore;
   __symbolicallyAddressedHistoricalStore = symbolicallyAddressedHistoricalStore;
-  getConcreteStore(referenceStore, callHistory, substitution, replacements,
-                   coreOnly, leftRetrieval, _concretelyAddressedStore,
-                   _concretelyAddressedHistoricalStore);
-  getSymbolicStore(referenceStore, callHistory, substitution, replacements,
-                   coreOnly, leftRetrieval, _symbolicallyAddressedStore,
-                   _symbolicallyAddressedHistoricalStore);
 }
 
 void TxStore::getStoredCoreExpressions(
