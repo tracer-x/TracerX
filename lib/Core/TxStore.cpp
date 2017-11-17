@@ -46,6 +46,28 @@ TxStore::MiddleStateStore::find(ref<TxStateAddress> loc) const {
   return ret;
 }
 
+ref<TxStoreEntry>
+TxStore::MiddleStateStore::findConcrete(ref<TxVariable> var) const {
+  ref<TxStoreEntry> ret;
+  TxStore::LowerStateStore::const_iterator lowerStoreIter =
+      concretelyAddressedStore.find(var);
+  if (lowerStoreIter != concretelyAddressedStore.end()) {
+    ret = lowerStoreIter->second;
+  }
+  return ret;
+}
+
+ref<TxStoreEntry>
+TxStore::MiddleStateStore::findSymbolic(ref<TxVariable> var) const {
+  ref<TxStoreEntry> ret;
+  TxStore::LowerStateStore::const_iterator lowerStoreIter =
+      symbolicallyAddressedStore.find(var);
+  if (lowerStoreIter != symbolicallyAddressedStore.end()) {
+    ret = lowerStoreIter->second;
+  }
+  return ret;
+}
+
 ref<TxStoreEntry> TxStore::MiddleStateStore::updateStore(
     const TxStore *store, ref<TxStateAddress> loc, ref<TxStateValue> address,
     ref<TxStateValue> value, uint64_t _depth) {

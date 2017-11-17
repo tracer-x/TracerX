@@ -78,6 +78,10 @@ public:
 
     ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;
 
+    ref<TxStoreEntry> findConcrete(ref<TxVariable> var) const;
+
+    ref<TxStoreEntry> findSymbolic(ref<TxVariable> var) const;
+
     ref<TxStoreEntry> updateStore(const TxStore *store, ref<TxStateAddress> loc,
                                   ref<TxStateValue> address,
                                   ref<TxStateValue> value, uint64_t depth);
