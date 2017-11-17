@@ -291,7 +291,7 @@ public:
       TxStore::TopInterpolantStore &_symbolicallyAddressedStore,
       TxStore::LowerInterpolantStore &_concretelyAddressedHistoricalStore,
       TxStore::LowerInterpolantStore &_symbolicallyAddressedHistoricalStore,
-      TxStore::TopStateStore &__internalStore,
+      bool leftRetrieval, TxStore::TopStateStore &__internalStore,
       TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
       TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
       int debugSubsumptionLevel);
@@ -481,7 +481,7 @@ public:
       TxStore::TopInterpolantStore &symbolicallyAddressedStore,
       TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
       TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore,
-      TxStore::TopStateStore &__internalStore,
+      bool &leftRetrieval, TxStore::TopStateStore &__internalStore,
       TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
       TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) const;
 

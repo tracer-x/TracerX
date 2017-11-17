@@ -391,11 +391,9 @@ namespace klee {
         TxStore::TopInterpolantStore &symbolicallyAddressedStore,
         TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
         TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore,
-        TxStore::TopStateStore &__internalStore,
+        bool &leftRetrieval, TxStore::TopStateStore &__internalStore,
         TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
         TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) {
-      bool leftRetrieval = false;
-
       if (parent->left == this)
         leftRetrieval = true;
       else

@@ -787,7 +787,7 @@ bool SubsumptionTableEntry::subsumed(
     TxStore::TopInterpolantStore &_symbolicallyAddressedStore,
     TxStore::LowerInterpolantStore &_concretelyAddressedHistoricalStore,
     TxStore::LowerInterpolantStore &_symbolicallyAddressedHistoricalStore,
-    TxStore::TopStateStore &__internalStore,
+    bool leftRetrieval, TxStore::TopStateStore &__internalStore,
     TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
@@ -1809,6 +1809,7 @@ bool SubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
     TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore;
     TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore;
 
+    bool leftRetrieval;
     TxStore::TopStateStore __internalStore;
     TxStore::LowerStateStore __concretelyAddressedHistoricalStore;
     TxStore::LowerStateStore __symbolicallyAddressedHistoricalStore;
@@ -1816,7 +1817,7 @@ bool SubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
     txTreeNode->getStoredExpressions(
         txTreeNode->entryCallHistory, concretelyAddressedStore,
         symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
-        symbolicallyAddressedHistoricalStore, __internalStore,
+        symbolicallyAddressedHistoricalStore, leftRetrieval, __internalStore,
         __concretelyAddressedHistoricalStore,
         __symbolicallyAddressedHistoricalStore);
 
@@ -1827,8 +1828,8 @@ bool SubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
       if ((*it)->subsumed(
               solver, state, timeout, concretelyAddressedStore,
               symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
-              symbolicallyAddressedHistoricalStore, __internalStore,
-              __concretelyAddressedHistoricalStore,
+              symbolicallyAddressedHistoricalStore, leftRetrieval,
+              __internalStore, __concretelyAddressedHistoricalStore,
               __symbolicallyAddressedHistoricalStore, debugSubsumptionLevel)) {
         // We mark as subsumed such that the node will not be
         // stored into table (the table already contains a more
@@ -2266,7 +2267,7 @@ void TxTreeNode::getStoredExpressions(
     TxStore::TopInterpolantStore &symbolicallyAddressedStore,
     TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
     TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore,
-    TxStore::TopStateStore &__internalStore,
+    bool &leftRetrieval, TxStore::TopStateStore &__internalStore,
     TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) const {
   TimerStatIncrementer t(getStoredExpressionsTime);
@@ -2281,7 +2282,7 @@ void TxTreeNode::getStoredExpressions(
         _callHistory, dummySubstitution, dummyReplacements, false,
         concretelyAddressedStore, symbolicallyAddressedStore,
         concretelyAddressedHistoricalStore,
-        symbolicallyAddressedHistoricalStore, __internalStore,
+        symbolicallyAddressedHistoricalStore, leftRetrieval, __internalStore,
         __concretelyAddressedHistoricalStore,
         __symbolicallyAddressedHistoricalStore);
   }
