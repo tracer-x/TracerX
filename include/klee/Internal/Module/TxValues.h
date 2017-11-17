@@ -255,6 +255,8 @@ public:
 
   ref<Expr> getOffset() const { return offset; }
 
+  bool hasConstantAddress() const { return isConcrete; }
+
   /// \brief The comparator of this class' objects. This member function checks
   /// for the equality of TxInterpolantAddress#indirectionCount member variables
   /// to
