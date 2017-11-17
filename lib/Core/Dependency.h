@@ -574,6 +574,8 @@ namespace klee {
     void memoryBoundViolationInterpolation(llvm::Instruction *inst,
                                            ref<Expr> address);
 
+    TxStore *getStore() const { return store; }
+
     /// \brief Print the content of the object to the LLVM error stream
     void dump() const {
       this->print(llvm::errs());

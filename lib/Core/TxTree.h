@@ -535,6 +535,8 @@ public:
 
   void setGenericEarlyTermination() { genericEarlyTermination = true; }
 
+  TxStore *getStore() const { return dependency->getStore(); }
+
   /// \brief Print the content of the tree node object to the LLVM error stream.
   void dump() const;
 
