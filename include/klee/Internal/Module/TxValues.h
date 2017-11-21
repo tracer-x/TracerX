@@ -916,10 +916,16 @@ public:
     return rightInterpolantStyleValue;
   }
 
+  ref<TxInterpolantValue> getInterpolantValue(bool leftUse) const {
+    const std::map<ref<Expr>, ref<Expr> > dummySubstitution;
+    std::set<const Array *> dummyReplacements;
+    return getInterpolantValue(leftUse, dummySubstitution, dummyReplacements);
+  }
+
   ref<TxInterpolantValue>
   getInterpolantValue(bool leftUse,
                       const std::map<ref<Expr>, ref<Expr> > &substitution,
-                      std::set<const Array *> &replacements) {
+                      std::set<const Array *> &replacements) const {
     if (leftUse) {
       return TxInterpolantValue::create(
           value, valueExpr, !leftDoNotInterpolateBound, leftCoreReasons,

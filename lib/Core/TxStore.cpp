@@ -257,7 +257,7 @@ inline void TxStore::concreteToInterpolant(
       map[variable] =
           entry->getInterpolantValue(leftOfEntry, substitution, replacements);
     } else {
-      map[variable] = entry->getInterpolantStyleValue(leftOfEntry);
+      map[variable] = entry->getInterpolantValue(leftOfEntry);
     }
 #else
     map[variable] =
@@ -292,7 +292,7 @@ inline void TxStore::symbolicToInterpolant(
       map[address] =
           entry->getInterpolantValue(leftOfEntry, substitution, replacements);
     } else {
-      map[variable] = entry->getInterpolantStyleValue(leftOfEntry);
+      map[variable] = entry->getInterpolantValue(leftOfEntry);
     }
 #else
     ref<TxVariable> address = TxStateAddress::create(
