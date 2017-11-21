@@ -869,9 +869,7 @@ bool SubsumptionTableEntry::subsumed(
         } else {
           bool leftUse =
               state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
-          ref<TxStateValue> originalValue = e->getContent();
           stateValue = e->getInterpolantStyleValue(leftUse);
-          stateValue->setOriginalValue(originalValue);
         }
 
         const ref<TxInterpolantValue> tabledValue = it2->second;
@@ -1016,10 +1014,8 @@ bool SubsumptionTableEntry::subsumed(
           // site and the call history) are equivalent.
           if (it2->first->getContext() == e->getAddress()->getContext()) {
 
-            ref<TxStateValue> originalContent = e->getContent();
             ref<TxInterpolantValue> interpolantValue =
                 e->getInterpolantStyleValue(leftUse);
-            interpolantValue->setOriginalValue(originalContent);
             ref<Expr> constraint = makeConstraint(
                 state, it2->second, interpolantValue, it2->first->getOffset(),
                 e->getAddress()->getOffset(), coreValues, corePointerValues,
@@ -1069,10 +1065,8 @@ bool SubsumptionTableEntry::subsumed(
           ref<TxStoreEntry> e = mIt->second;
           bool leftUse =
               state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
-          ref<TxStateValue> originalValue = e->getContent();
           ref<TxInterpolantValue> interpolantValue =
               e->getInterpolantStyleValue(leftUse);
-          interpolantValue->setOriginalValue(originalValue);
           constraint = makeConstraint(
               state, it1->second, interpolantValue, it1->first->getOffset(),
               e->getAddress()->getOffset(), coreValues, corePointerValues,
@@ -1093,10 +1087,8 @@ bool SubsumptionTableEntry::subsumed(
         ref<TxStoreEntry> e = mIt->second;
         bool leftUse =
             state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
-        ref<TxStateValue> originalValue = e->getContent();
         ref<TxInterpolantValue> interpolantValue =
             e->getInterpolantStyleValue(leftUse);
-        interpolantValue->setOriginalValue(originalValue);
         constraint = makeConstraint(
             state, it1->second, interpolantValue, it1->first->getOffset(),
             e->getAddress()->getOffset(), coreValues, corePointerValues,
@@ -1163,10 +1155,8 @@ bool SubsumptionTableEntry::subsumed(
           // We make sure the context part of the addresses (the allocation site
           // and the call history) are equivalent.
           if (it2->first->getContext() == e->getAddress()->getContext()) {
-            ref<TxStateValue> originalValue = e->getContent();
             ref<TxInterpolantValue> interpolantValue =
                 e->getInterpolantStyleValue(leftUse);
-            interpolantValue->setOriginalValue(originalValue);
             ref<Expr> constraint = makeConstraint(
                 state, it2->second, interpolantValue, it2->first->getOffset(),
                 e->getAddress()->getOffset(), coreValues, corePointerValues,
@@ -1193,10 +1183,8 @@ bool SubsumptionTableEntry::subsumed(
           // We make sure the context part of the addresses (the allocation site
           // and the call history) are equivalent.
           if (it2->first->getContext() == e->getAddress()->getContext()) {
-            ref<TxStateValue> originalValue = e->getContent();
             ref<TxInterpolantValue> interpolantValue =
                 e->getInterpolantStyleValue(leftUse);
-            interpolantValue->setOriginalValue(originalValue);
             ref<Expr> constraint = makeConstraint(
                 state, it2->second, interpolantValue, it2->first->getOffset(),
                 e->getAddress()->getOffset(), coreValues, corePointerValues,
@@ -1240,10 +1228,8 @@ bool SubsumptionTableEntry::subsumed(
           ref<TxStoreEntry> e = mIt->second;
           bool leftUse =
               state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
-          ref<TxStateValue> originalValue = e->getContent();
           ref<TxInterpolantValue> interpolantValue =
               e->getInterpolantStyleValue(leftUse);
-          interpolantValue->setOriginalValue(originalValue);
           constraint = makeConstraint(
               state, it1->second, interpolantValue, it1->first->getOffset(),
               e->getAddress()->getOffset(), coreValues, corePointerValues,
@@ -1264,10 +1250,8 @@ bool SubsumptionTableEntry::subsumed(
         ref<TxStoreEntry> e = mIt->second;
         bool leftUse =
             state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
-        ref<TxStateValue> originalValue = e->getContent();
         ref<TxInterpolantValue> interpolantValue =
             e->getInterpolantStyleValue(leftUse);
-        interpolantValue->setOriginalValue(originalValue);
         constraint = makeConstraint(
             state, it1->second, interpolantValue, it1->first->getOffset(),
             e->getAddress()->getOffset(), coreValues, corePointerValues,

@@ -904,12 +904,14 @@ public:
       if (!leftInterpolantStyleValue.get()) {
         leftInterpolantStyleValue =
             TxInterpolantValue::create(value, valueExpr, leftPointerInfo);
+        leftInterpolantStyleValue->setOriginalValue(content);
       }
       return leftInterpolantStyleValue;
     }
     if (!rightInterpolantStyleValue.get()) {
       rightInterpolantStyleValue =
           TxInterpolantValue::create(value, valueExpr, rightPointerInfo);
+      rightInterpolantStyleValue->setOriginalValue(content);
     }
     return rightInterpolantStyleValue;
   }
