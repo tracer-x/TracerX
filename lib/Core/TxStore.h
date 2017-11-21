@@ -78,7 +78,10 @@ public:
 
     ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;
 
-    ref<TxStoreEntry> findConcrete(ref<TxVariable> var) const;
+    ref<TxStoreEntry> findConcrete(
+        ref<TxVariable> var,
+        std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases)
+        const;
 
     ref<TxStoreEntry> findSymbolic(ref<TxVariable> var) const;
 

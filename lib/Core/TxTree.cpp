@@ -850,7 +850,7 @@ bool SubsumptionTableEntry::subsumed(
            it2 != ie2; ++it2) {
         ref<TxInterpolantValue> stateValue;
 
-        ref<TxStoreEntry> e = m.findConcrete(it2->first);
+        ref<TxStoreEntry> e = m.findConcrete(it2->first, unifiedBases);
 
         if (e.isNull()) {
           // The address is not found in the state, possibly due to differing
@@ -1152,7 +1152,7 @@ bool SubsumptionTableEntry::subsumed(
                ie2 = tabledSymbolicMap.end();
            it2 != ie2; ++it2) {
 
-        ref<TxStoreEntry> e = m.findConcrete(it2->first);
+        ref<TxStoreEntry> e = m.findConcrete(it2->first, unifiedBases);
         bool leftUse =
             state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
 
