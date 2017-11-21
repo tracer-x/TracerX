@@ -126,8 +126,7 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
       }
       return constraint;
     }
-    if (!offsetsCheck->isTrue())
-      constraint = offsetsCheck;
+    constraint = offsetsCheck;
   } else {
     // Implication: if tabledConcreteAddress == stateSymbolicAddress, then
     // tabledValue->getExpression() == stateValue->getExpression()
