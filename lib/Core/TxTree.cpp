@@ -853,32 +853,26 @@ bool SubsumptionTableEntry::subsumed(
         ref<TxStoreEntry> e = m.findConcrete(it2->first, unifiedBases);
 
         if (e.isNull()) {
-          // The address is not found in the state, possibly due to differing
-          // base addresses. In such case, we try to find address translation
-          // here
-          if (e->getAddress()->getOffset() == it2->first->getOffset()) {
-            // stateValue = TxInterpolantValue::create(...);
-            e->getAddress()->getAllocationInfo()->translate(
-                it2->first->getAllocationInfo(), unifiedBases);
-          } else {
-            // Fail the subsumption, since we could not translate the addresses
-            if (debugSubsumptionLevel >= 1) {
-              std::string msg;
-              std::string padding(makeTabs(1));
-              llvm::raw_string_ostream stream(msg);
-              it2->first->print(stream, padding);
-              stream.flush();
-              klee_message("#%lu=>#%lu: Check failure as memory region in the "
-                           "table does not exist in the state:\n%s",
-                           state.txTreeNode->getNodeSequenceNumber(),
-                           nodeSequenceNumber, msg.c_str());
-            }
-            return false;
+          // Fail the subsumption, since the address was not found in the state,
+          // and we could not translate the addresses
+          if (debugSubsumptionLevel >= 1) {
+            std::string msg;
+            std::string padding(makeTabs(1));
+            llvm::raw_string_ostream stream(msg);
+            it2->first->print(stream, padding);
+            stream.flush();
+            klee_message("#%lu=>#%lu: Check failure as memory region in the "
+                         "table does not exist in the state:\n%s",
+                         state.txTreeNode->getNodeSequenceNumber(),
+                         nodeSequenceNumber, msg.c_str());
           }
+          return false;
         } else {
           bool leftUse =
               state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+          ref<TxStateValue> originalValue = e->getContent();
           stateValue = e->getInterpolantStyleValue(leftUse);
+          stateValue->setOriginalValue(originalValue);
         }
 
         const ref<TxInterpolantValue> tabledValue = it2->second;
@@ -1013,7 +1007,6 @@ bool SubsumptionTableEntry::subsumed(
         }
 
         e = m.findSymbolic(it2->first);
-
         if (!e.isNull()) {
           const ref<Expr> tabledConcreteOffset = it2->first->getOffset();
           ref<Expr> conjunction;
@@ -1024,11 +1017,14 @@ bool SubsumptionTableEntry::subsumed(
           // site and the call history) are equivalent.
           if (it2->first->getContext() == e->getAddress()->getContext()) {
 
+            ref<TxStateValue> originalContent = e->getContent();
+            ref<TxInterpolantValue> interpolantValue =
+                e->getInterpolantStyleValue(leftUse);
+            interpolantValue->setOriginalValue(originalContent);
             ref<Expr> constraint = makeConstraint(
-                state, it2->second, e->getInterpolantStyleValue(leftUse),
-                it2->first->getOffset(), e->getAddress()->getOffset(),
-                coreValues, corePointerValues, unifiedBases,
-                debugSubsumptionLevel);
+                state, it2->second, interpolantValue, it2->first->getOffset(),
+                e->getAddress()->getOffset(), coreValues, corePointerValues,
+                unifiedBases, debugSubsumptionLevel);
 
             if (constraint.isNull())
               return false;
@@ -1074,11 +1070,15 @@ bool SubsumptionTableEntry::subsumed(
           ref<TxStoreEntry> e = mIt->second;
           bool leftUse =
               state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+          ref<TxStateValue> originalValue = e->getContent();
+          ref<TxInterpolantValue> interpolantValue =
+              e->getInterpolantStyleValue(leftUse);
+          interpolantValue->setOriginalValue(originalValue);
           constraint = makeConstraint(
-              state, it1->second, e->getInterpolantStyleValue(leftUse),
-              it1->first->getOffset(), e->getAddress()->getOffset(), coreValues,
-              corePointerValues, unifiedBases, debugSubsumptionLevel);
-            if (constraint.isNull())
+              state, it1->second, interpolantValue, it1->first->getOffset(),
+              e->getAddress()->getOffset(), coreValues, corePointerValues,
+              unifiedBases, debugSubsumptionLevel);
+          if (constraint.isNull())
               return false;
             if (stateEqualityConstraints.isNull()) {
               stateEqualityConstraints = constraint;
@@ -1094,10 +1094,14 @@ bool SubsumptionTableEntry::subsumed(
         ref<TxStoreEntry> e = mIt->second;
         bool leftUse =
             state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+        ref<TxStateValue> originalValue = e->getContent();
+        ref<TxInterpolantValue> interpolantValue =
+            e->getInterpolantStyleValue(leftUse);
+        interpolantValue->setOriginalValue(originalValue);
         constraint = makeConstraint(
-            state, it1->second, e->getInterpolantStyleValue(leftUse),
-            it1->first->getOffset(), e->getAddress()->getOffset(), coreValues,
-            corePointerValues, unifiedBases, debugSubsumptionLevel);
+            state, it1->second, interpolantValue, it1->first->getOffset(),
+            e->getAddress()->getOffset(), coreValues, corePointerValues,
+            unifiedBases, debugSubsumptionLevel);
         if (constraint.isNull())
           return false;
         if (stateEqualityConstraints.isNull()) {
@@ -1153,48 +1157,60 @@ bool SubsumptionTableEntry::subsumed(
            it2 != ie2; ++it2) {
 
         ref<TxStoreEntry> e = m.findConcrete(it2->first, unifiedBases);
-        bool leftUse =
-            state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+        if (!e.isNull()) {
+          bool leftUse =
+              state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
 
-        // We make sure the context part of the addresses (the allocation
-        // site and the call history) are equivalent.
-        if (it2->first->getContext() == e->getAddress()->getContext()) {
-          ref<Expr> constraint = makeConstraint(
-              state, it2->second, e->getInterpolantStyleValue(leftUse),
-              it2->first->getOffset(), e->getAddress()->getOffset(), coreValues,
-              corePointerValues, unifiedBases, debugSubsumptionLevel);
+          // We make sure the context part of the addresses (the allocation site
+          // and the call history) are equivalent.
+          if (it2->first->getContext() == e->getAddress()->getContext()) {
+            ref<TxStateValue> originalValue = e->getContent();
+            ref<TxInterpolantValue> interpolantValue =
+                e->getInterpolantStyleValue(leftUse);
+            interpolantValue->setOriginalValue(originalValue);
+            ref<Expr> constraint = makeConstraint(
+                state, it2->second, interpolantValue, it2->first->getOffset(),
+                e->getAddress()->getOffset(), coreValues, corePointerValues,
+                unifiedBases, debugSubsumptionLevel);
 
-          if (constraint.isNull())
-            return false;
+            if (constraint.isNull())
+              return false;
 
-          if (!constraint.isNull()) {
-            if (!conjunction.isNull()) {
-              conjunction = AndExpr::create(constraint, conjunction);
-            } else {
-              conjunction = constraint;
+            if (!constraint.isNull()) {
+              if (!conjunction.isNull()) {
+                conjunction = AndExpr::create(constraint, conjunction);
+              } else {
+                conjunction = constraint;
+              }
             }
           }
         }
 
         e = m.findSymbolic(it2->first);
-        leftUse = state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+        if (!e.isNull()) {
+          bool leftUse =
+              state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
 
-        // We make sure the context part of the addresses (the allocation site
-        // and the call history) are equivalent.
-        if (it2->first->getContext() == e->getAddress()->getContext()) {
+          // We make sure the context part of the addresses (the allocation site
+          // and the call history) are equivalent.
+          if (it2->first->getContext() == e->getAddress()->getContext()) {
+            ref<TxStateValue> originalValue = e->getContent();
+            ref<TxInterpolantValue> interpolantValue =
+                e->getInterpolantStyleValue(leftUse);
+            interpolantValue->setOriginalValue(originalValue);
+            ref<Expr> constraint = makeConstraint(
+                state, it2->second, interpolantValue, it2->first->getOffset(),
+                e->getAddress()->getOffset(), coreValues, corePointerValues,
+                unifiedBases, debugSubsumptionLevel);
 
-          ref<Expr> constraint = makeConstraint(
-              state, it2->second, e->getInterpolantStyleValue(leftUse),
-              it2->first->getOffset(), e->getAddress()->getOffset(), coreValues,
-              corePointerValues, unifiedBases, debugSubsumptionLevel);
+            if (constraint.isNull())
+              return false;
 
-          if (constraint.isNull())
-            return false;
-
-          if (!conjunction.isNull()) {
-            conjunction = AndExpr::create(constraint, conjunction);
-          } else {
-            conjunction = constraint;
+            if (!conjunction.isNull()) {
+              conjunction = AndExpr::create(constraint, conjunction);
+            } else {
+              conjunction = constraint;
+            }
           }
         }
       }
@@ -1225,10 +1241,14 @@ bool SubsumptionTableEntry::subsumed(
           ref<TxStoreEntry> e = mIt->second;
           bool leftUse =
               state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+          ref<TxStateValue> originalValue = e->getContent();
+          ref<TxInterpolantValue> interpolantValue =
+              e->getInterpolantStyleValue(leftUse);
+          interpolantValue->setOriginalValue(originalValue);
           constraint = makeConstraint(
-              state, it1->second, e->getInterpolantStyleValue(leftUse),
-              it1->first->getOffset(), e->getAddress()->getOffset(), coreValues,
-              corePointerValues, unifiedBases, debugSubsumptionLevel);
+              state, it1->second, interpolantValue, it1->first->getOffset(),
+              e->getAddress()->getOffset(), coreValues, corePointerValues,
+              unifiedBases, debugSubsumptionLevel);
           if (constraint.isNull())
             return false;
           if (stateEqualityConstraints.isNull()) {
@@ -1245,10 +1265,14 @@ bool SubsumptionTableEntry::subsumed(
         ref<TxStoreEntry> e = mIt->second;
         bool leftUse =
             state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+        ref<TxStateValue> originalValue = e->getContent();
+        ref<TxInterpolantValue> interpolantValue =
+            e->getInterpolantStyleValue(leftUse);
+        interpolantValue->setOriginalValue(originalValue);
         constraint = makeConstraint(
-            state, it1->second, e->getInterpolantStyleValue(leftUse),
-            it1->first->getOffset(), e->getAddress()->getOffset(), coreValues,
-            corePointerValues, unifiedBases, debugSubsumptionLevel);
+            state, it1->second, interpolantValue, it1->first->getOffset(),
+            e->getAddress()->getOffset(), coreValues, corePointerValues,
+            unifiedBases, debugSubsumptionLevel);
         if (constraint.isNull())
           return false;
         if (stateEqualityConstraints.isNull()) {
