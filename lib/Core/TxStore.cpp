@@ -46,6 +46,42 @@ TxStore::MiddleStateStore::find(ref<TxStateAddress> loc) const {
   return ret;
 }
 
+ref<TxStoreEntry> TxStore::MiddleStateStore::findConcrete(
+    ref<TxVariable> var,
+    std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases) const {
+  ref<TxStoreEntry> ret;
+  TxStore::LowerStateStore::const_iterator lowerStoreIter =
+      concretelyAddressedStore.find(var);
+  if (lowerStoreIter != concretelyAddressedStore.end()) {
+    ret = lowerStoreIter->second;
+  } else {
+    for (TxStore::LowerStateStore::const_iterator
+             it = concretelyAddressedStore.begin(),
+             ie = concretelyAddressedStore.end();
+         it != ie; ++it) {
+      if (it->first->getOffset() == var->getOffset()) {
+        if (it->first->getAllocationInfo()->translate(var->getAllocationInfo(),
+                                                      unifiedBases)) {
+          ret = it->second;
+        }
+        break;
+      }
+    }
+  }
+  return ret;
+}
+
+ref<TxStoreEntry>
+TxStore::MiddleStateStore::findSymbolic(ref<TxVariable> var) const {
+  ref<TxStoreEntry> ret;
+  TxStore::LowerStateStore::const_iterator lowerStoreIter =
+      symbolicallyAddressedStore.find(var);
+  if (lowerStoreIter != symbolicallyAddressedStore.end()) {
+    ret = lowerStoreIter->second;
+  }
+  return ret;
+}
+
 ref<TxStoreEntry> TxStore::MiddleStateStore::updateStore(
     const TxStore *store, ref<TxStateAddress> loc, ref<TxStateValue> address,
     ref<TxStateValue> value, uint64_t _depth) {
@@ -172,6 +208,19 @@ void TxStore::getStoredExpressions(
     const std::vector<llvm::Instruction *> &callHistory,
     const std::map<ref<Expr>, ref<Expr> > &substitution,
     std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
+    TopStateStore &__internalStore,
+    LowerStateStore &__concretelyAddressedHistoricalStore,
+    LowerStateStore &__symbolicallyAddressedHistoricalStore) const {
+  __internalStore = internalStore;
+  __concretelyAddressedHistoricalStore = concretelyAddressedHistoricalStore;
+  __symbolicallyAddressedHistoricalStore = symbolicallyAddressedHistoricalStore;
+}
+
+void TxStore::getStoredCoreExpressions(
+    const TxStore *referenceStore,
+    const std::vector<llvm::Instruction *> &callHistory,
+    const std::map<ref<Expr>, ref<Expr> > &substitution,
+    std::set<const Array *> &replacements, bool coreOnly, bool leftRetrieval,
     TopInterpolantStore &_concretelyAddressedStore,
     TopInterpolantStore &_symbolicallyAddressedStore,
     LowerInterpolantStore &_concretelyAddressedHistoricalStore,
@@ -190,10 +239,8 @@ inline void TxStore::concreteToInterpolant(
     std::set<const Array *> &replacements, bool coreOnly,
     LowerInterpolantStore &map, bool leftOfEntry) const {
   if (!coreOnly) {
-    ref<TxStateValue> stateValue = entry->getContent();
     ref<TxInterpolantValue> interpolantValue =
         entry->getInterpolantStyleValue(leftOfEntry);
-    interpolantValue->setOriginalValue(stateValue);
     map[variable] = interpolantValue;
   } else if (entry->isCore(leftOfEntry)) {
     // Do not add to the map if entry is not used
@@ -207,14 +254,14 @@ inline void TxStore::concreteToInterpolant(
 // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
     if (!NoExistential) {
-      map[variable] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
-                                                      replacements);
+      map[variable] =
+          entry->getInterpolantValue(leftOfEntry, substitution, replacements);
     } else {
-      map[variable] = entry->getInterpolantStyleValue(leftOfEntry);
+      map[variable] = entry->getInterpolantValue(leftOfEntry);
     }
 #else
-    map[variable] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
-                                                    replacements);
+    map[variable] =
+        entry->getInterpolantValue(leftOfEntry, substitution, replacements);
 #endif
   }
 }
@@ -225,10 +272,8 @@ inline void TxStore::symbolicToInterpolant(
     std::set<const Array *> &replacements, bool coreOnly,
     LowerInterpolantStore &map, bool leftOfEntry) const {
   if (!coreOnly) {
-    ref<TxStateValue> stateValue = entry->getContent();
     ref<TxInterpolantValue> interpolantValue =
         entry->getInterpolantStyleValue(leftOfEntry);
-    interpolantValue->setOriginalValue(stateValue);
     map[variable] = interpolantValue;
   } else if (entry->isCore(leftOfEntry)) {
     // Do not add to the map if entry is not used
@@ -244,16 +289,16 @@ inline void TxStore::symbolicToInterpolant(
     if (!NoExistential) {
       ref<TxVariable> address = TxStateAddress::create(
           entry->getAddress(), replacements)->getAsVariable();
-      map[address] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
-                                                     replacements);
+      map[address] =
+          entry->getInterpolantValue(leftOfEntry, substitution, replacements);
     } else {
-      map[variable] = entry->getInterpolantStyleValue(leftOfEntry);
+      map[variable] = entry->getInterpolantValue(leftOfEntry);
     }
 #else
     ref<TxVariable> address = TxStateAddress::create(
         entry->getAddress(), replacements)->getAsVariable();
-    map[address] = entry->getInterpolantStyleValue(leftOfEntry, substitution,
-                                                   replacements);
+    map[address] =
+        entry->getInterpolantValue(leftOfEntry, substitution, replacements);
 #endif
   }
 }

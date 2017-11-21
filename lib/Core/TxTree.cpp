@@ -126,8 +126,7 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
       }
       return constraint;
     }
-    if (!offsetsCheck->isTrue())
-      constraint = offsetsCheck;
+    constraint = offsetsCheck;
   } else {
     // Implication: if tabledConcreteAddress == stateSymbolicAddress, then
     // tabledValue->getExpression() == stateValue->getExpression()
@@ -783,10 +782,9 @@ void SubsumptionTableEntry::interpolateValues(
 
 bool SubsumptionTableEntry::subsumed(
     TimingSolver *solver, ExecutionState &state, double timeout,
-    TxStore::TopInterpolantStore &_concretelyAddressedStore,
-    TxStore::TopInterpolantStore &_symbolicallyAddressedStore,
-    TxStore::LowerInterpolantStore &_concretelyAddressedHistoricalStore,
-    TxStore::LowerInterpolantStore &_symbolicallyAddressedHistoricalStore,
+    bool leftRetrieval, TxStore::TopStateStore &__internalStore,
+    TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
+    TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
   // Tell the solver implementation that we are checking for subsumption for
@@ -827,21 +825,23 @@ bool SubsumptionTableEntry::subsumed(
       assert(!it1->second.empty() && "empty table entry with real index");
 
       const TxStore::LowerInterpolantStore &tabledConcreteMap = it1->second;
-      const TxStore::LowerInterpolantStore &stateConcreteMap =
-          _concretelyAddressedStore[it1->first];
-      const TxStore::LowerInterpolantStore &stateSymbolicMap =
-          _symbolicallyAddressedStore[it1->first];
-
-      // If the current state is empty, subsumption fails.
-      if (stateConcreteMap.empty() && stateSymbolicMap.empty()) {
+      TxStore::TopStateStore::iterator mIt = __internalStore.find(it1->first);
+      if (mIt == __internalStore.end()) {
         if (debugSubsumptionLevel >= 1) {
-          klee_message("#%lu=>#%lu: Check failure due to empty state concrete "
-                       "and symbolic maps",
+          std::string msg;
+          std::string padding(makeTabs(1));
+          llvm::raw_string_ostream stream(msg);
+          it1->first->print(stream, padding);
+          stream.flush();
+          klee_message("#%lu=>#%lu: Check failure as allocated memory region "
+                       "in the table does not exist in the state:\n%s",
                        state.txTreeNode->getNodeSequenceNumber(),
-                       nodeSequenceNumber);
+                       nodeSequenceNumber, msg.c_str());
         }
         return false;
       }
+
+      TxStore::MiddleStateStore &m = mIt->second;
 
       for (TxStore::LowerInterpolantStore::const_iterator
                it2 = tabledConcreteMap.begin(),
@@ -849,39 +849,27 @@ bool SubsumptionTableEntry::subsumed(
            it2 != ie2; ++it2) {
         ref<TxInterpolantValue> stateValue;
 
-        if (!stateConcreteMap.count(it2->first)) {
-          // The address is not found in the state, possibly due to differing
-          // base addresses. In such case, we try to find address translation
-          // here
-          for (TxStore::LowerInterpolantStore::const_iterator
-                   it3 = stateConcreteMap.begin(),
-                   ie3 = stateConcreteMap.end();
-               it3 != ie3; ++it3) {
-            if (it3->first->getOffset() == it2->first->getOffset()) {
-              stateValue = it3->second;
-              it3->first->getAllocationInfo()->translate(
-                  it2->first->getAllocationInfo(), unifiedBases);
-              break;
-            }
-          }
+        ref<TxStoreEntry> e = m.findConcrete(it2->first, unifiedBases);
 
-          // Fail the subsumption, since we could not translate the addresses
-          if (stateValue.isNull()) {
-            if (debugSubsumptionLevel >= 1) {
-              std::string msg;
-              std::string padding(makeTabs(1));
-              llvm::raw_string_ostream stream(msg);
-              it2->first->print(stream, padding);
-              stream.flush();
-              klee_message("#%lu=>#%lu: Check failure as memory region in the "
-                           "table does not exist in the state:\n%s",
-                           state.txTreeNode->getNodeSequenceNumber(),
-                           nodeSequenceNumber, msg.c_str());
-            }
-            return false;
+        if (e.isNull()) {
+          // Fail the subsumption, since the address was not found in the state,
+          // and we could not translate the addresses
+          if (debugSubsumptionLevel >= 1) {
+            std::string msg;
+            std::string padding(makeTabs(1));
+            llvm::raw_string_ostream stream(msg);
+            it2->first->print(stream, padding);
+            stream.flush();
+            klee_message("#%lu=>#%lu: Check failure as memory region in the "
+                         "table does not exist in the state:\n%s",
+                         state.txTreeNode->getNodeSequenceNumber(),
+                         nodeSequenceNumber, msg.c_str());
           }
+          return false;
         } else {
-          stateValue = stateConcreteMap.at(it2->first);
+          bool leftUse =
+              state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+          stateValue = e->getInterpolantStyleValue(leftUse);
         }
 
         const ref<TxInterpolantValue> tabledValue = it2->second;
@@ -1015,23 +1003,22 @@ bool SubsumptionTableEntry::subsumed(
           }
         }
 
-        if (!stateSymbolicMap.empty()) {
+        e = m.findSymbolic(it2->first);
+        if (!e.isNull()) {
           const ref<Expr> tabledConcreteOffset = it2->first->getOffset();
           ref<Expr> conjunction;
+          bool leftUse =
+              state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
 
-          for (TxStore::LowerInterpolantStore::const_iterator
-                   it3 = stateSymbolicMap.begin(),
-                   ie3 = stateSymbolicMap.end();
-               it3 != ie3; ++it3) {
+          // We make sure the context part of the addresses (the allocation
+          // site and the call history) are equivalent.
+          if (it2->first->getContext() == e->getAddress()->getContext()) {
 
-            // We make sure the context part of the addresses (the allocation
-            // site and the call history) are equivalent.
-            if (it2->first->getContext() != it3->first->getContext())
-              continue;
-
+            ref<TxInterpolantValue> interpolantValue =
+                e->getInterpolantStyleValue(leftUse);
             ref<Expr> constraint = makeConstraint(
-                state, it2->second, it3->second, it2->first->getOffset(),
-                it3->first->getOffset(), coreValues, corePointerValues,
+                state, it2->second, interpolantValue, it2->first->getOffset(),
+                e->getAddress()->getOffset(), coreValues, corePointerValues,
                 unifiedBases, debugSubsumptionLevel);
 
             if (constraint.isNull())
@@ -1043,6 +1030,7 @@ bool SubsumptionTableEntry::subsumed(
               conjunction = constraint;
             }
           }
+
           // If there were corresponding concrete as well as symbolic
           // allocations in the current state, conjunct them
           if (!conjunction.isNull()) {
@@ -1067,26 +1055,23 @@ bool SubsumptionTableEntry::subsumed(
              it1 = concretelyAddressedHistoricalStore.begin(),
              ie1 = concretelyAddressedHistoricalStore.end();
          it1 != ie1; ++it1) {
+      TxStore::LowerStateStore::const_iterator mIt =
+          __concretelyAddressedHistoricalStore.find(it1->first);
       ref<Expr> constraint;
-      TxStore::LowerInterpolantStore::const_iterator stateIt =
-          _concretelyAddressedHistoricalStore.find(it1->first);
 
-      if (stateIt == _concretelyAddressedHistoricalStore.end()) {
-        // FIXME: This is horribly inefficient: should implement better indexing
-        // based on the allocation info instead
-        bool matchFound = false;
-        for (TxStore::LowerInterpolantStore::const_iterator
-                 it2 = _symbolicallyAddressedHistoricalStore.begin(),
-                 ie2 = _symbolicallyAddressedHistoricalStore.end();
-             it2 != ie2; ++it2) {
-          if (it1->first->getAllocationInfo() ==
-              it2->first->getAllocationInfo()) {
-            matchFound = true;
-            constraint = makeConstraint(
-                state, it1->second, it2->second, it1->first->getOffset(),
-                it2->first->getOffset(), coreValues, corePointerValues,
-                unifiedBases, debugSubsumptionLevel);
-            if (constraint.isNull())
+      if (mIt == __concretelyAddressedHistoricalStore.end()) {
+        mIt = __symbolicallyAddressedHistoricalStore.find(it1->first);
+        if (mIt != __symbolicallyAddressedHistoricalStore.end()) {
+          ref<TxStoreEntry> e = mIt->second;
+          bool leftUse =
+              state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+          ref<TxInterpolantValue> interpolantValue =
+              e->getInterpolantStyleValue(leftUse);
+          constraint = makeConstraint(
+              state, it1->second, interpolantValue, it1->first->getOffset(),
+              e->getAddress()->getOffset(), coreValues, corePointerValues,
+              unifiedBases, debugSubsumptionLevel);
+          if (constraint.isNull())
               return false;
             if (stateEqualityConstraints.isNull()) {
               stateEqualityConstraints = constraint;
@@ -1094,13 +1079,28 @@ bool SubsumptionTableEntry::subsumed(
               stateEqualityConstraints =
                   AndExpr::create(constraint, stateEqualityConstraints);
             }
-          }
-        }
-        if (!matchFound)
+        } else {
+          // Match not found
           return false;
+        }
       } else {
-        constraint = EqExpr::create(it1->second->getExpression(),
-                                    stateIt->second->getExpression());
+        ref<TxStoreEntry> e = mIt->second;
+        bool leftUse =
+            state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+        ref<TxInterpolantValue> interpolantValue =
+            e->getInterpolantStyleValue(leftUse);
+        constraint = makeConstraint(
+            state, it1->second, interpolantValue, it1->first->getOffset(),
+            e->getAddress()->getOffset(), coreValues, corePointerValues,
+            unifiedBases, debugSubsumptionLevel);
+        if (constraint.isNull())
+          return false;
+        if (stateEqualityConstraints.isNull()) {
+          stateEqualityConstraints = constraint;
+        } else {
+          stateEqualityConstraints =
+              AndExpr::create(constraint, stateEqualityConstraints);
+        }
       }
 
       if (stateEqualityConstraints.isNull()) {
@@ -1122,10 +1122,23 @@ bool SubsumptionTableEntry::subsumed(
       assert(!it1->second.empty() && "empty table entry with real index");
 
       const TxStore::LowerInterpolantStore &tabledSymbolicMap = it1->second;
-      const TxStore::LowerInterpolantStore &stateConcreteMap =
-          _concretelyAddressedStore[it1->first];
-      const TxStore::LowerInterpolantStore &stateSymbolicMap =
-          _symbolicallyAddressedStore[it1->first];
+      TxStore::TopStateStore::iterator mIt = __internalStore.find(it1->first);
+      if (mIt == __internalStore.end()) {
+        if (debugSubsumptionLevel >= 1) {
+          std::string msg;
+          std::string padding(makeTabs(1));
+          llvm::raw_string_ostream stream(msg);
+          it1->first->print(stream, padding);
+          stream.flush();
+          klee_message("#%lu=>#%lu: Check failure as allocated memory region "
+                       "in the table does not exist in the state:\n%s",
+                       state.txTreeNode->getNodeSequenceNumber(),
+                       nodeSequenceNumber, msg.c_str());
+        }
+        return false;
+      }
+
+      TxStore::MiddleStateStore &m = mIt->second;
 
       ref<Expr> conjunction;
 
@@ -1134,55 +1147,57 @@ bool SubsumptionTableEntry::subsumed(
                ie2 = tabledSymbolicMap.end();
            it2 != ie2; ++it2) {
 
-        for (TxStore::LowerInterpolantStore::const_iterator
-                 it3 = stateConcreteMap.begin(),
-                 ie3 = stateConcreteMap.end();
-             it3 != ie3; ++it3) {
+        ref<TxStoreEntry> e = m.findConcrete(it2->first, unifiedBases);
+        if (!e.isNull()) {
+          bool leftUse =
+              state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
 
-          // We make sure the context part of the addresses (the allocation
-          // site and the call history) are equivalent.
-          if (it2->first->getContext() != it3->first->getContext())
-            continue;
+          // We make sure the context part of the addresses (the allocation site
+          // and the call history) are equivalent.
+          if (it2->first->getContext() == e->getAddress()->getContext()) {
+            ref<TxInterpolantValue> interpolantValue =
+                e->getInterpolantStyleValue(leftUse);
+            ref<Expr> constraint = makeConstraint(
+                state, it2->second, interpolantValue, it2->first->getOffset(),
+                e->getAddress()->getOffset(), coreValues, corePointerValues,
+                unifiedBases, debugSubsumptionLevel);
 
-          ref<Expr> constraint = makeConstraint(
-              state, it2->second, it3->second, it2->first->getOffset(),
-              it3->first->getOffset(), coreValues, corePointerValues,
-              unifiedBases, debugSubsumptionLevel);
+            if (constraint.isNull())
+              return false;
 
-          if (constraint.isNull())
-            return false;
+            if (!constraint.isNull()) {
+              if (!conjunction.isNull()) {
+                conjunction = AndExpr::create(constraint, conjunction);
+              } else {
+                conjunction = constraint;
+              }
+            }
+          }
+        }
 
-          if (!constraint.isNull()) {
+        e = m.findSymbolic(it2->first);
+        if (!e.isNull()) {
+          bool leftUse =
+              state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+
+          // We make sure the context part of the addresses (the allocation site
+          // and the call history) are equivalent.
+          if (it2->first->getContext() == e->getAddress()->getContext()) {
+            ref<TxInterpolantValue> interpolantValue =
+                e->getInterpolantStyleValue(leftUse);
+            ref<Expr> constraint = makeConstraint(
+                state, it2->second, interpolantValue, it2->first->getOffset(),
+                e->getAddress()->getOffset(), coreValues, corePointerValues,
+                unifiedBases, debugSubsumptionLevel);
+
+            if (constraint.isNull())
+              return false;
+
             if (!conjunction.isNull()) {
               conjunction = AndExpr::create(constraint, conjunction);
             } else {
               conjunction = constraint;
             }
-          }
-        }
-
-        for (TxStore::LowerInterpolantStore::const_iterator
-                 it3 = stateSymbolicMap.begin(),
-                 ie3 = stateSymbolicMap.end();
-             it3 != ie3; ++it3) {
-
-          // We make sure the context part of the addresses (the allocation
-          // site and the call history) are equivalent.
-          if (it2->first->getContext() != it3->first->getContext())
-            continue;
-
-          ref<Expr> constraint = makeConstraint(
-              state, it2->second, it3->second, it2->first->getOffset(),
-              it3->first->getOffset(), coreValues, corePointerValues,
-              unifiedBases, debugSubsumptionLevel);
-
-          if (constraint.isNull())
-            return false;
-
-          if (!conjunction.isNull()) {
-            conjunction = AndExpr::create(constraint, conjunction);
-          } else {
-            conjunction = constraint;
           }
         }
       }
@@ -1202,18 +1217,22 @@ bool SubsumptionTableEntry::subsumed(
              it1 = symbolicallyAddressedHistoricalStore.begin(),
              ie1 = symbolicallyAddressedHistoricalStore.end();
          it1 != ie1; ++it1) {
-      bool matchFound = false;
-      // FIXME: This is horribly inefficient: should implement better indexing
-      // based on allocation info instead
-      for (TxStore::LowerInterpolantStore::const_iterator
-               it2 = _concretelyAddressedHistoricalStore.begin(),
-               ie2 = _concretelyAddressedHistoricalStore.end();
-           it2 != ie2; ++it2) {
-        if (it1->first->getAllocationInfo() ==
-            it2->first->getAllocationInfo()) {
-          ref<Expr> constraint = makeConstraint(
-              state, it1->second, it2->second, it1->first->getOffset(),
-              it2->first->getOffset(), coreValues, corePointerValues,
+
+      TxStore::LowerStateStore::const_iterator mIt =
+          __concretelyAddressedHistoricalStore.find(it1->first);
+      ref<Expr> constraint;
+
+      if (mIt == __concretelyAddressedHistoricalStore.end()) {
+        mIt = __symbolicallyAddressedHistoricalStore.find(it1->first);
+        if (mIt != __symbolicallyAddressedHistoricalStore.end()) {
+          ref<TxStoreEntry> e = mIt->second;
+          bool leftUse =
+              state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+          ref<TxInterpolantValue> interpolantValue =
+              e->getInterpolantStyleValue(leftUse);
+          constraint = makeConstraint(
+              state, it1->second, interpolantValue, it1->first->getOffset(),
+              e->getAddress()->getOffset(), coreValues, corePointerValues,
               unifiedBases, debugSubsumptionLevel);
           if (constraint.isNull())
             return false;
@@ -1223,36 +1242,29 @@ bool SubsumptionTableEntry::subsumed(
             stateEqualityConstraints =
                 AndExpr::create(constraint, stateEqualityConstraints);
           }
-          matchFound = true;
-        }
-      }
-
-      // FIXME: This is horribly inefficient: should implement better indexing
-      // based on allocation info instead
-      for (TxStore::LowerInterpolantStore::const_iterator
-               it2 = _symbolicallyAddressedHistoricalStore.begin(),
-               ie2 = _symbolicallyAddressedHistoricalStore.end();
-           it2 != ie2; ++it2) {
-        if (it1->first->getAllocationInfo() ==
-            it2->first->getAllocationInfo()) {
-          ref<Expr> constraint = makeConstraint(
-              state, it1->second, it2->second, it1->first->getOffset(),
-              it2->first->getOffset(), coreValues, corePointerValues,
-              unifiedBases, debugSubsumptionLevel);
-          if (constraint.isNull())
-            return false;
-          if (stateEqualityConstraints.isNull()) {
-            stateEqualityConstraints = constraint;
           } else {
-            stateEqualityConstraints =
-                AndExpr::create(constraint, stateEqualityConstraints);
+            // Match not found
+            return false;
           }
-          matchFound = true;
+      } else {
+        ref<TxStoreEntry> e = mIt->second;
+        bool leftUse =
+            state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+        ref<TxInterpolantValue> interpolantValue =
+            e->getInterpolantStyleValue(leftUse);
+        constraint = makeConstraint(
+            state, it1->second, interpolantValue, it1->first->getOffset(),
+            e->getAddress()->getOffset(), coreValues, corePointerValues,
+            unifiedBases, debugSubsumptionLevel);
+        if (constraint.isNull())
+          return false;
+        if (stateEqualityConstraints.isNull()) {
+          stateEqualityConstraints = constraint;
+        } else {
+          stateEqualityConstraints =
+              AndExpr::create(constraint, stateEqualityConstraints);
         }
       }
-
-      if (!matchFound)
-        return false;
     }
   }
 
@@ -1806,19 +1818,24 @@ bool SubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
     TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore;
     TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore;
 
-    txTreeNode->getStoredExpressions(
-        txTreeNode->entryCallHistory, concretelyAddressedStore,
-        symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
-        symbolicallyAddressedHistoricalStore);
+    bool leftRetrieval;
+    TxStore::TopStateStore __internalStore;
+    TxStore::LowerStateStore __concretelyAddressedHistoricalStore;
+    TxStore::LowerStateStore __symbolicallyAddressedHistoricalStore;
+
+    txTreeNode->getStoredExpressions(txTreeNode->entryCallHistory,
+                                     leftRetrieval, __internalStore,
+                                     __concretelyAddressedHistoricalStore,
+                                     __symbolicallyAddressedHistoricalStore);
 
     // Iterate the subsumption table entry with reverse iterator because
     // the successful subsumption mostly happen in the newest entry.
     for (EntryIterator it = iterPair.first, ie = iterPair.second; it != ie;
          ++it) {
-      if ((*it)->subsumed(
-              solver, state, timeout, concretelyAddressedStore,
-              symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
-              symbolicallyAddressedHistoricalStore, debugSubsumptionLevel)) {
+      if ((*it)->subsumed(solver, state, timeout, leftRetrieval,
+                          __internalStore, __concretelyAddressedHistoricalStore,
+                          __symbolicallyAddressedHistoricalStore,
+                          debugSubsumptionLevel)) {
         // We mark as subsumed such that the node will not be
         // stored into table (the table already contains a more
         // general entry).
@@ -2251,11 +2268,9 @@ void TxTreeNode::bindReturnValue(llvm::CallInst *site, llvm::Instruction *inst,
 
 void TxTreeNode::getStoredExpressions(
     const std::vector<llvm::Instruction *> &_callHistory,
-    TxStore::TopInterpolantStore &concretelyAddressedStore,
-    TxStore::TopInterpolantStore &symbolicallyAddressedStore,
-    TxStore::LowerInterpolantStore &concretelyAddressedHistoricalStore,
-    TxStore::LowerInterpolantStore &symbolicallyAddressedHistoricalStore)
-    const {
+    bool &leftRetrieval, TxStore::TopStateStore &__internalStore,
+    TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
+    TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) const {
   TimerStatIncrementer t(getStoredExpressionsTime);
   std::map<ref<Expr>, ref<Expr> > dummySubstitution;
   std::set<const Array *> dummyReplacements;
@@ -2266,9 +2281,8 @@ void TxTreeNode::getStoredExpressions(
   if (parent) {
     dependency->getParentStoredExpressions(
         _callHistory, dummySubstitution, dummyReplacements, false,
-        concretelyAddressedStore, symbolicallyAddressedStore,
-        concretelyAddressedHistoricalStore,
-        symbolicallyAddressedHistoricalStore);
+        leftRetrieval, __internalStore, __concretelyAddressedHistoricalStore,
+        __symbolicallyAddressedHistoricalStore);
   }
 }
 
@@ -2287,7 +2301,7 @@ void TxTreeNode::getStoredCoreExpressions(
   // the allocations to be stored in subsumption table should be obtained
   // from the parent node.
   if (parent) {
-    dependency->getParentStoredExpressions(
+    dependency->getParentStoredCoreExpressions(
         _callHistory, substitution, replacements, true,
         concretelyAddressedStore, symbolicallyAddressedStore,
         concretelyAddressedHistoricalStore,

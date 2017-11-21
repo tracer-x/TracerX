@@ -255,6 +255,8 @@ public:
 
   ref<Expr> getOffset() const { return offset; }
 
+  bool hasConstantAddress() const { return isConcrete; }
+
   /// \brief The comparator of this class' objects. This member function checks
   /// for the equality of TxInterpolantAddress#indirectionCount member variables
   /// to
@@ -371,12 +373,11 @@ public:
     return sv;
   }
 
-  static ref<TxInterpolantValue>
-  create(llvm::Value *value, ref<Expr> expr, bool canInterpolateBound,
-         const std::set<std::string> &coreReasons,
-         ref<TxStateAddress> location) {
-    ref<TxInterpolantValue> sv(new TxInterpolantValue(
-        value, expr, canInterpolateBound, coreReasons, location));
+  static ref<TxInterpolantValue> create(llvm::Value *value, ref<Expr> expr,
+                                        ref<TxStateAddress> location) {
+    std::set<std::string> dummyCoreReasons;
+    ref<TxInterpolantValue> sv(
+        new TxInterpolantValue(value, expr, false, dummyCoreReasons, location));
     return sv;
   }
 
@@ -821,6 +822,14 @@ private:
   /// immediate right child. This is used for debugging.
   std::set<std::string> rightCoreReasons;
 
+  /// \brief Cached interpolant-style value for left querying in subsumption
+  /// check.
+  ref<TxInterpolantValue> leftInterpolantStyleValue;
+
+  /// \brief Cached interpolant-style value for right querying in subsumption
+  /// check.
+  ref<TxInterpolantValue> rightInterpolantStyleValue;
+
 public:
   TxStoreEntry(ref<TxStateAddress> _address, ref<TxStateValue> _addressValue,
                ref<TxStateValue> _content, const TxStore *store,
@@ -892,19 +901,31 @@ public:
 
   ref<TxInterpolantValue> getInterpolantStyleValue(bool leftUse) {
     if (leftUse) {
-      return TxInterpolantValue::create(value, valueExpr,
-                                        !leftDoNotInterpolateBound,
-                                        leftCoreReasons, leftPointerInfo);
+      if (!leftInterpolantStyleValue.get()) {
+        leftInterpolantStyleValue =
+            TxInterpolantValue::create(value, valueExpr, leftPointerInfo);
+        leftInterpolantStyleValue->setOriginalValue(content);
+      }
+      return leftInterpolantStyleValue;
     }
-    return TxInterpolantValue::create(value, valueExpr,
-                                      !rightDoNotInterpolateBound,
-                                      rightCoreReasons, rightPointerInfo);
+    if (!rightInterpolantStyleValue.get()) {
+      rightInterpolantStyleValue =
+          TxInterpolantValue::create(value, valueExpr, rightPointerInfo);
+      rightInterpolantStyleValue->setOriginalValue(content);
+    }
+    return rightInterpolantStyleValue;
+  }
+
+  ref<TxInterpolantValue> getInterpolantValue(bool leftUse) const {
+    const std::map<ref<Expr>, ref<Expr> > dummySubstitution;
+    std::set<const Array *> dummyReplacements;
+    return getInterpolantValue(leftUse, dummySubstitution, dummyReplacements);
   }
 
   ref<TxInterpolantValue>
-  getInterpolantStyleValue(bool leftUse,
-                           const std::map<ref<Expr>, ref<Expr> > &substitution,
-                           std::set<const Array *> &replacements) {
+  getInterpolantValue(bool leftUse,
+                      const std::map<ref<Expr>, ref<Expr> > &substitution,
+                      std::set<const Array *> &replacements) const {
     if (leftUse) {
       return TxInterpolantValue::create(
           value, valueExpr, !leftDoNotInterpolateBound, leftCoreReasons,
