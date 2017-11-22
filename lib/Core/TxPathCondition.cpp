@@ -96,32 +96,39 @@ void TxPathCondition::unsatCoreInterpolation(
     const std::vector<ref<Expr> > &unsatCore, ref<Expr> replacementConstraint) {
 
   if (unsatCore.size() == 1 && !replacementConstraint.isNull()) {
-    std::map<ref<Expr>, ref<TxPCConstraint> >::iterator pcDepthIter =
-        pcDepth.find(*(unsatCore.begin()));
+    if (llvm::isa<EqExpr>(replacementConstraint) &&
+        llvm::isa<ConstantExpr>(replacementConstraint->getKid(0)) &&
+        replacementConstraint->getKid(0)->getWidth() != Expr::Bool) {
+      std::map<ref<Expr>, ref<TxPCConstraint> >::iterator pcDepthIter =
+          pcDepth.find(*(unsatCore.begin()));
 
-    assert(pcDepthIter != pcDepth.end() &&
-           "unsat core constraint not found on path condition");
+      replacementConstraint = EqExpr::create(
+          ConstantExpr::create(0, Expr::Bool), replacementConstraint);
 
-    uint64_t constraintDepth = pcDepthIter->second->getDepth();
-    ref<TxPCConstraint> pcConstraint = pcDepthIter->second;
+      assert(pcDepthIter != pcDepth.end() &&
+             "unsat core constraint not found on path condition");
 
-    TxPathCondition *currentPC = this;
+      uint64_t constraintDepth = pcDepthIter->second->getDepth();
+      ref<TxPCConstraint> pcConstraint = pcDepthIter->second;
 
-    while (currentPC && currentPC->parent &&
-           currentPC->depth >= constraintDepth) {
-      if (currentPC->parent->left == currentPC) {
-        currentPC = currentPC->parent;
-        currentPC->usedByLeftPath.insert(pcConstraint);
-        pcConstraint->setReplacementConstraint(replacementConstraint);
-      } else if (currentPC->parent->right == currentPC) {
-        currentPC = currentPC->parent;
-        pcConstraint = pcConstraint->copy();
-        currentPC->usedByRightPath.insert(pcConstraint);
-        pcConstraint->setReplacementConstraint(replacementConstraint);
+      TxPathCondition *currentPC = this;
+
+      while (currentPC && currentPC->parent &&
+             currentPC->depth >= constraintDepth) {
+        if (currentPC->parent->left == currentPC) {
+          currentPC = currentPC->parent;
+          currentPC->usedByLeftPath.insert(pcConstraint);
+          pcConstraint->setReplacementConstraint(replacementConstraint);
+        } else if (currentPC->parent->right == currentPC) {
+          currentPC = currentPC->parent;
+          pcConstraint = pcConstraint->copy();
+          currentPC->usedByRightPath.insert(pcConstraint);
+          pcConstraint->setReplacementConstraint(replacementConstraint);
+        }
       }
-    }
 
-    return;
+      return;
+    }
   }
 
   std::map<uint64_t, std::set<ref<TxPCConstraint> > > depthToConstraintSet;
