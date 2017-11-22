@@ -518,7 +518,15 @@ public:
 
   /// \brief Marking the core constraints on the path condition, and all the
   /// relevant values on the dependency graph, given an unsatistiability core.
-  void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore);
+  void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore,
+                              ref<Expr> replacementConstraint);
+
+  /// \brief Marking the core constraints on the path condition, and all the
+  /// relevant values on the dependency graph, given an unsatistiability core.
+  void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore) {
+    ref<Expr> dummyReplacementConstraint;
+    unsatCoreInterpolation(unsatCore, dummyReplacementConstraint);
+  }
 
   /// \brief Memory bounds interpolation from a target address. Returns true if
   /// memory bounds check fails somehow.

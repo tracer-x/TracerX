@@ -2320,8 +2320,9 @@ uint64_t TxTreeNode::getInstructionsDepth() { return instructionsDepth; }
 void TxTreeNode::incInstructionsDepth() { ++instructionsDepth; }
 
 void
-TxTreeNode::unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore) {
-  dependency->unsatCoreInterpolation(unsatCore);
+TxTreeNode::unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore,
+                                   ref<Expr> replacementConstraint) {
+  dependency->unsatCoreInterpolation(unsatCore, replacementConstraint);
 }
 
 void TxTreeNode::dump() const {
