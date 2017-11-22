@@ -90,7 +90,34 @@ TxPathCondition::addConstraint(ref<Expr> constraint,
 }
 
 void TxPathCondition::unsatCoreInterpolation(
-    const std::vector<ref<Expr> > &unsatCore) {
+    const std::vector<ref<Expr> > &unsatCore, ref<Expr> replacementConstraint) {
+
+  if (unsatCore.size() == 1 && !replacementConstraint.isNull()) {
+    std::map<ref<Expr>, ref<TxPCConstraint> >::iterator pcDepthIter =
+        pcDepth.find(*(unsatCore.begin()));
+
+    assert(pcDepthIter != pcDepth.end() &&
+           "unsat core constraint not found on path condition");
+
+    uint64_t constraintDepth = pcDepthIter->second->getDepth();
+    ref<TxPCConstraint> pcConstraint = pcDepthIter->second;
+
+    TxPathCondition *currentPC = this;
+
+    while (currentPC && currentPC->parent &&
+           currentPC->depth >= constraintDepth) {
+      if (currentPC->parent->left == currentPC) {
+        currentPC = currentPC->parent;
+        currentPC->usedByLeftPath.insert(pcConstraint);
+      } else if (currentPC->parent->right == currentPC) {
+        currentPC = currentPC->parent;
+        currentPC->usedByRightPath.insert(pcConstraint->copy());
+      }
+    }
+
+    return;
+  }
+
   std::map<uint64_t, std::set<ref<TxPCConstraint> > > depthToConstraintSet;
   std::set<uint64_t> keySet;
   std::vector<uint64_t> sortedKeys;

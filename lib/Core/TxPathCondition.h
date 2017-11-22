@@ -117,7 +117,13 @@ public:
   ref<TxPCConstraint> addConstraint(ref<Expr> constraint,
                                     ref<TxStateValue> condition);
 
-  void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore);
+  void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore) {
+    ref<Expr> dummyReplacementConstraint;
+    unsatCoreInterpolation(unsatCore, dummyReplacementConstraint);
+  }
+
+  void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore,
+                              ref<Expr> replacementConstraint);
 
   ref<Expr>
   packInterpolant(std::set<const Array *> &replacements,
