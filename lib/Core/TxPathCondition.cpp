@@ -142,8 +142,12 @@ void TxPathCondition::unsatCoreInterpolation(
                                          constraintSet.end());
       } else if (currentPC->parent->right == currentPC) {
         currentPC = currentPC->parent;
-        currentPC->usedByRightPath.insert(constraintSet.begin(),
-                                          constraintSet.end());
+        for (std::set<ref<TxPCConstraint> >::iterator
+                 it = constraintSet.begin(),
+                 ie = constraintSet.end();
+             it != ie; ++it) {
+          currentPC->usedByRightPath.insert((*it)->copy());
+        }
       }
     }
   }

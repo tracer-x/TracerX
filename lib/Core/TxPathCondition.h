@@ -31,6 +31,9 @@ private:
   /// \brief KLEE expression
   ref<Expr> constraint;
 
+  /// \brief The replacement, weaker constraint
+  ref<Expr> replacementConstraint;
+
   /// \brief KLEE expression with variables (arrays) replaced by their shadows
   ref<Expr> shadowConstraint;
 
@@ -57,6 +60,15 @@ public:
   ref<Expr> packInterpolant(std::set<const Array *> &replacements);
 
   uint64_t getDepth() const { return depth; }
+
+  ref<TxPCConstraint> copy() {
+    ref<TxPCConstraint> ret(new TxPCConstraint(constraint, condition, depth));
+    ret->replacementConstraint = replacementConstraint;
+    ret->shadowConstraint = shadowConstraint;
+    ret->shadowed = shadowed;
+    ret->boundVariables = boundVariables;
+    return ret;
+  }
 
   int compare(const TxPCConstraint &other) const;
 
