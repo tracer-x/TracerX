@@ -2077,7 +2077,8 @@ TxTree::split(TxTreeNode *parent, ExecutionState *left, ExecutionState *right) {
 }
 
 void TxTree::markPathCondition(ExecutionState &state,
-                               std::vector<ref<Expr> > &unsatCore) {
+                               std::vector<ref<Expr> > &unsatCore,
+                               ref<Expr> replacementConstraint) {
   TimerStatIncrementer t(markPathConditionTime);
   int debugSubsumptionLevel =
       currentTxTreeNode->dependency->debugSubsumptionLevel;
@@ -2107,7 +2108,7 @@ void TxTree::markPathCondition(ExecutionState &state,
   }
 
   // We create path condition marking structure and mark core constraints
-  currentTxTreeNode->unsatCoreInterpolation(unsatCore);
+  currentTxTreeNode->unsatCoreInterpolation(unsatCore, replacementConstraint);
 }
 
 void TxTree::executePHI(llvm::Instruction *instr, unsigned incomingBlock,

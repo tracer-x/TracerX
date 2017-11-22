@@ -749,7 +749,8 @@ public:
   /// \brief Mark the path condition in the Tracer-X tree node associated with
   /// the given KLEE execution state.
   void markPathCondition(ExecutionState &state,
-                         std::vector<ref<Expr> > &unsatCore);
+                         std::vector<ref<Expr> > &unsatCore,
+                         ref<Expr> replacementConstraint);
 
   /// \brief Creates fresh interpolation data holder for the two given KLEE
   /// execution states.
