@@ -34,13 +34,16 @@ TxPCConstraint::~TxPCConstraint() {}
 ref<Expr>
 TxPCConstraint::packInterpolant(std::set<const Array *> &replacements) {
   ref<Expr> res;
+  ref<Expr> constraintToUse =
+      replacementConstraint.isNull() ? constraint : replacementConstraint;
+
   if (!shadowed) {
 #ifdef ENABLE_Z3
     shadowConstraint =
-        (NoExistential ? constraint : TxShadowArray::getShadowExpression(
-                                          constraint, replacements));
+        (NoExistential ? constraintToUse : TxShadowArray::getShadowExpression(
+                                               constraintToUse, replacements));
 #else
-    shadowConstraint = constraint;
+    shadowConstraint = constraintToUse;
 #endif
     shadowed = true;
     boundVariables.insert(replacements.begin(), replacements.end());
