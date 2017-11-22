@@ -112,9 +112,12 @@ void TxPathCondition::unsatCoreInterpolation(
       if (currentPC->parent->left == currentPC) {
         currentPC = currentPC->parent;
         currentPC->usedByLeftPath.insert(pcConstraint);
+        pcConstraint->setReplacementConstraint(replacementConstraint);
       } else if (currentPC->parent->right == currentPC) {
         currentPC = currentPC->parent;
-        currentPC->usedByRightPath.insert(pcConstraint->copy());
+        pcConstraint = pcConstraint->copy();
+        currentPC->usedByRightPath.insert(pcConstraint);
+        pcConstraint->setReplacementConstraint(replacementConstraint);
       }
     }
 

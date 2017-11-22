@@ -70,6 +70,16 @@ public:
     return ret;
   }
 
+  void setReplacementConstraint(ref<Expr> _replacementConstraint) {
+    if (replacementConstraint.isNull()) {
+      replacementConstraint = _replacementConstraint;
+      return;
+    }
+    if (replacementConstraint != _replacementConstraint)
+      replacementConstraint =
+          AndExpr::create(_replacementConstraint, replacementConstraint);
+  }
+
   int compare(const TxPCConstraint &other) const;
 
   void dump() const;
