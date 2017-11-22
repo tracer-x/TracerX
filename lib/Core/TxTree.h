@@ -731,9 +731,9 @@ public:
   bool subsumptionCheck(TimingSolver *solver, ExecutionState &state,
                         double timeout);
 
-  /// \brief Mark the path condition in the Tracer-X tree node associated
-  /// with the given KLEE execution state.
-  void markPathCondition(ExecutionState &state, TimingSolver *solver,
+  /// \brief Mark the path condition in the Tracer-X tree node associated with
+  /// the given KLEE execution state.
+  void markPathCondition(ExecutionState &state,
                          std::vector<ref<Expr> > &unsatCore);
 
   /// \brief Creates fresh interpolation data holder for the two given KLEE

@@ -2070,7 +2070,7 @@ TxTree::split(TxTreeNode *parent, ExecutionState *left, ExecutionState *right) {
   return ret;
 }
 
-void TxTree::markPathCondition(ExecutionState &state, TimingSolver *solver,
+void TxTree::markPathCondition(ExecutionState &state,
                                std::vector<ref<Expr> > &unsatCore) {
   TimerStatIncrementer t(markPathConditionTime);
   int debugSubsumptionLevel =
