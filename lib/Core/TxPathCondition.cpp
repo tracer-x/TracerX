@@ -102,9 +102,6 @@ void TxPathCondition::unsatCoreInterpolation(
       std::map<ref<Expr>, ref<TxPCConstraint> >::iterator pcDepthIter =
           pcDepth.find(*(unsatCore.begin()));
 
-      replacementConstraint = EqExpr::create(
-          ConstantExpr::create(0, Expr::Bool), replacementConstraint);
-
       assert(pcDepthIter != pcDepth.end() &&
              "unsat core constraint not found on path condition");
 

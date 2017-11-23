@@ -923,7 +923,17 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       // Falsity proof succeeded of a query: antecedent -> consequent,
       // which means that antecedent -> not(consequent) is valid. In this
       // case also we extract the unsat core of the proof
-      txTree->markPathCondition(current, unsatCore, condition);
+      ref<Expr> replacementConstraint(condition);
+      if (llvm::isa<EqExpr>(replacementConstraint) &&
+          replacementConstraint->getKid(0)->getWidth() == Expr::Bool &&
+          replacementConstraint->getKid(0) ==
+              ConstantExpr::create(0, Expr::Bool)) {
+        replacementConstraint = replacementConstraint->getKid(1);
+      } else {
+        replacementConstraint = EqExpr::create(
+            ConstantExpr::create(0, Expr::Bool), replacementConstraint);
+      }
+      txTree->markPathCondition(current, unsatCore, replacementConstraint);
     }
 
     return StatePair(0, &current);
