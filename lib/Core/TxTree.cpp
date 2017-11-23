@@ -324,6 +324,7 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
 
         // When the if condition holds, we perform substitution
         if (interpolantAtom->getNumKids() > 0 &&
+            !llvm::isa<ConstantExpr>(equalityConstraintLeft) &&
             hasSubExpression(equalityConstraintLeft,
                              interpolantAtom->getKid(0))) {
           // Here we perform substitution, where given
@@ -2070,7 +2071,7 @@ TxTree::split(TxTreeNode *parent, ExecutionState *left, ExecutionState *right) {
   return ret;
 }
 
-void TxTree::markPathCondition(ExecutionState &state, TimingSolver *solver,
+void TxTree::markPathCondition(ExecutionState &state,
                                std::vector<ref<Expr> > &unsatCore) {
   TimerStatIncrementer t(markPathConditionTime);
   int debugSubsumptionLevel =
