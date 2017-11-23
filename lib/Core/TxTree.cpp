@@ -324,6 +324,7 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
 
         // When the if condition holds, we perform substitution
         if (interpolantAtom->getNumKids() > 0 &&
+            !llvm::isa<ConstantExpr>(equalityConstraintLeft) &&
             hasSubExpression(equalityConstraintLeft,
                              interpolantAtom->getKid(0))) {
           // Here we perform substitution, where given
