@@ -72,7 +72,8 @@ public:
 
   void setReplacementConstraint(ref<Expr> _replacementConstraint) {
     if (replacementConstraint.isNull()) {
-      replacementConstraint = _replacementConstraint;
+      if (_replacementConstraint != constraint)
+        replacementConstraint = _replacementConstraint;
       return;
     }
     if (replacementConstraint != _replacementConstraint)
