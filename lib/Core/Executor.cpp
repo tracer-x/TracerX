@@ -1021,6 +1021,11 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
 
     return StatePair(0, &current);
   } else {
+    bool inSpeculationMode = false;
+    if (Speculation && current.txTreeNode->isSpeculationNode()) {
+      inSpeculationMode = true;
+    }
+
     TimerStatIncrementer timer(stats::forkTime);
     ExecutionState *falseState, *trueState = &current;
 
@@ -1093,6 +1098,10 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
           txTree->split(current.txTreeNode, falseState, trueState);
       falseState->txTreeNode = ires.first;
       trueState->txTreeNode = ires.second;
+      if (inSpeculationMode == true) {
+        falseState->txTreeNode->setSpeculationFlag();
+        trueState->txTreeNode->setSpeculationFlag();
+      }
     }
 
     addConstraint(*trueState, condition);
