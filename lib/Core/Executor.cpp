@@ -879,8 +879,15 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
   }
 
   // Opening a node in the speculation node
-  if (Speculation && txTree->isSpeculationNode()){
-
+  if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode()) {
+    if (current.txTreeNode->isSpeculativeProgramPointRevisted(
+            current.txTreeNode->getProgramPoint())) {
+      // Todo: implementing the backjump and marking for the parent node.
+      terminateState(current);
+      return StatePair(0, 0);
+    }
+    current.txTreeNode->storingSpeculativeProgramPoint(
+        current.txTreeNode->getProgramPoint());
   }
 
   // XXX - even if the constraint is provable one way or the other we
@@ -897,7 +904,8 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
         current.pathOS << "1";
       }
     }
-    if (Speculation && speculativeRun::isSpeculable(current)) {
+    if (INTERPOLATION_ENABLED && Speculation &&
+        speculativeRun::isSpeculable(current)) {
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
@@ -940,6 +948,7 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
             txTree->split(current.txTreeNode, speculationFalseState, trueState);
         speculationFalseState->txTreeNode = ires.first;
         speculationFalseState->txTreeNode->setSpeculationFlag();
+        speculationFalseState->txTreeNode->resetSpeculationVisitedPPs();
         trueState->txTreeNode = ires.second;
       }
 
@@ -962,7 +971,8 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       }
     }
 
-    if (Speculation && speculativeRun::isSpeculable(current)) {
+    if (INTERPOLATION_ENABLED && Speculation &&
+        speculativeRun::isSpeculable(current)) {
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
@@ -1005,6 +1015,7 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
             txTree->split(current.txTreeNode, speculationTrueState, falseState);
         speculationTrueState->txTreeNode = ires.first;
         speculationTrueState->txTreeNode->setSpeculationFlag();
+        speculationTrueState->txTreeNode->resetSpeculationVisitedPPs();
         falseState->txTreeNode = ires.second;
       }
 
@@ -1022,8 +1033,12 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
     return StatePair(0, &current);
   } else {
     bool inSpeculationMode = false;
-    if (Speculation && current.txTreeNode->isSpeculationNode()) {
+    speculativeRun *parentSpeculationVisitedPPs;
+    if (INTERPOLATION_ENABLED && Speculation &&
+        current.txTreeNode->isSpeculationNode()) {
       inSpeculationMode = true;
+      parentSpeculationVisitedPPs =
+          current.txTreeNode->getSpeculationVisitedPPs();
     }
 
     TimerStatIncrementer timer(stats::forkTime);
@@ -1100,7 +1115,11 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       trueState->txTreeNode = ires.second;
       if (inSpeculationMode == true) {
         falseState->txTreeNode->setSpeculationFlag();
+        falseState->txTreeNode->setSpeculationVisitedPPs(
+            parentSpeculationVisitedPPs);
         trueState->txTreeNode->setSpeculationFlag();
+        trueState->txTreeNode->setSpeculationVisitedPPs(
+            parentSpeculationVisitedPPs);
       }
     }
 
