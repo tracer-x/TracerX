@@ -23,9 +23,16 @@ namespace klee {
 
 /// \brief Implements the speculation mode
 class speculativeRun {
+  std::set<uintptr_t> visitedProgramPoints;
 
 public:
   static bool isSpeculable(ExecutionState &current);
+
+  void storingProgramPoint(uintptr_t pp) { visitedProgramPoints.insert(pp); }
+
+  bool isProgramPointRevisted(uintptr_t pp) {
+    return (visitedProgramPoints.find(pp) != visitedProgramPoints.end());
+  }
 };
 }
 
