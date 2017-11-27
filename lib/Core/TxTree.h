@@ -26,8 +26,9 @@
 #include "klee/util/ExprVisitor.h"
 #include "klee/util/TxTreeGraph.h"
 
-#include "llvm/Support/raw_ostream.h"
+#include "Speculation.h"
 #include "TxDependency.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace klee {
 
@@ -375,12 +376,16 @@ class TxTreeNode {
   std::vector<ref<Expr> > speculationUnsatCore;
 
   // \brief The pointer to solver is temporarily stored here and in case
-  // speculation
-  // is failed it's used to do marking related to the infeasible path
+  // speculation is failed it's used to do marking related to the infeasible
+  // path
   TimingSolver *speculationSolver;
 
   // \brief Used to identify if the node is in the speculation mode
   bool speculationFlag;
+
+  // \brief This object contains the visited program points in the speculation
+  // node
+  speculativeRun *speculationVisitedPPs;
 
   TxTreeNode *parent, *left, *right;
 
@@ -477,10 +482,27 @@ public:
   void setSpeculationFlag();
 
   /// \brief Store the solver and unsatcore temporarily, so they can be used for
-  /// markings if
-  /// speculation fails
+  /// markings if speculation fails
   void storeSpeculationUnsatCore(TimingSolver *solver,
                                  std::vector<ref<Expr> > unsatCore);
+
+  void resetSpeculationVisitedPPs() {
+    speculationVisitedPPs = new speculativeRun;
+  }
+
+  speculativeRun *getSpeculationVisitedPPs() { return speculationVisitedPPs; }
+
+  void setSpeculationVisitedPPs(speculativeRun *parentSpeculationVisitedPPs) {
+    speculationVisitedPPs = parentSpeculationVisitedPPs;
+  }
+
+  void storingSpeculativeProgramPoint(uintptr_t pp) {
+    speculationVisitedPPs->storingProgramPoint(pp);
+  }
+
+  bool isSpeculativeProgramPointRevisted(uintptr_t pp) {
+    return speculationVisitedPPs->isProgramPointRevisted(pp);
+  }
 
   /// \brief Extend the path condition with another constraint
   ///
@@ -491,8 +513,7 @@ public:
   /// \brief Creates fresh interpolation data holder for the two given KLEE
   /// execution states.
   /// This member function is to be invoked after KLEE splits its own state due
-  /// to state
-  /// forking.
+  /// to state forking.
   ///
   /// \param leftData The first KLEE execution state
   /// \param rightData The second KLEE execution state
