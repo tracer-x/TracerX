@@ -220,17 +220,6 @@ namespace klee {
       return registerNewTxStateValue(loc, vvalue);
     }
 
-    /// \brief Create a new versioned value object, which is a pointer which
-    /// offsets existing pointer
-    ref<TxStateValue> getNewPointerValue(
-        llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,
-        ref<Expr> address, ref<TxStateAddress> loc, ref<Expr> offset) {
-      ref<TxStateValue> vvalue =
-          TxStateValue::create(value, callHistory, address);
-      vvalue->addPointerInfo(TxStateAddress::create(loc, address, offset));
-      return registerNewTxStateValue(value, vvalue);
-    }
-
     /// \brief Get a KLEE expression from a constant. This was shamelessly
     /// copied from Executor::evalConstant.
     ref<TxStateValue>
