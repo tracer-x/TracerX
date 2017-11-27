@@ -290,6 +290,8 @@ public:
                        std::set<uint64_t> &bounds,
                        const std::string &reason) const;
 
+  uint64_t getDepth() const { return depth; }
+
   /// \brief Print the content of the object to the LLVM error stream
   void dump() const {
     this->print(llvm::errs());
