@@ -677,6 +677,16 @@ public:
     return vvalue;
   }
 
+  ref<TxStateValue> copy(uint64_t depth) const {
+    ref<TxStateValue> vvalue(
+        new TxStateValue(value, callHistory, valueExpr, depth));
+    vvalue->allowBoundEntryList = allowBoundEntryList;
+    vvalue->disableBoundEntryList = disableBoundEntryList;
+    return vvalue;
+  }
+
+  uint64_t getDepth() const { return depth; }
+
   /// \brief Set the address this value was loaded from for inclusion in the
   /// interpolant
   void addLoadAddress(ref<TxStateValue> _loadAddress);
