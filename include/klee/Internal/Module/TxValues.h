@@ -655,22 +655,37 @@ private:
   /// interpolation may not be enabled.
   std::set<ref<TxStoreEntry> > disableBoundEntryList;
 
+  /// \brief The creation depth of this value.
+  uint64_t depth;
+
   TxStateValue(llvm::Value *value,
                const std::vector<llvm::Instruction *> &_callHistory,
-               ref<Expr> _valueExpr)
+               ref<Expr> _valueExpr, uint64_t _depth)
       : refCount(0), value(value), valueExpr(_valueExpr),
-        id(reinterpret_cast<uint64_t>(this)), callHistory(_callHistory) {}
+        id(reinterpret_cast<uint64_t>(this)), callHistory(_callHistory),
+        depth(_depth) {}
 
 public:
   ~TxStateValue() {}
 
   static ref<TxStateValue>
-  create(llvm::Value *value,
+  create(uint64_t depth, llvm::Value *value,
          const std::vector<llvm::Instruction *> &_callHistory,
          ref<Expr> valueExpr) {
-    ref<TxStateValue> vvalue(new TxStateValue(value, _callHistory, valueExpr));
+    ref<TxStateValue> vvalue(
+        new TxStateValue(value, _callHistory, valueExpr, depth));
     return vvalue;
   }
+
+  ref<TxStateValue> copy(uint64_t depth) const {
+    ref<TxStateValue> vvalue(
+        new TxStateValue(value, callHistory, valueExpr, depth));
+    vvalue->allowBoundEntryList = allowBoundEntryList;
+    vvalue->disableBoundEntryList = disableBoundEntryList;
+    return vvalue;
+  }
+
+  uint64_t getDepth() const { return depth; }
 
   /// \brief Set the address this value was loaded from for inclusion in the
   /// interpolant

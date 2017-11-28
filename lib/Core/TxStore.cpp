@@ -412,15 +412,18 @@ void TxStore::getSymbolicStore(
   }
 }
 
-void TxStore::updateStoreWithLoadedValue(ref<TxStateAddress> loc,
-                                         ref<TxStateValue> address,
-                                         ref<TxStateValue> value) {
-  updateStore(loc, address, value);
+void TxStore::updateStoreWithLoadedValue(
+    std::map<llvm::Value *, std::vector<ref<TxStateValue> > > &valuesMap,
+    ref<TxStateAddress> loc, ref<TxStateValue> address,
+    ref<TxStateValue> value) {
+  updateStore(valuesMap, loc, address, value);
   value->addLoadAddress(address);
 }
 
-void TxStore::updateStore(ref<TxStateAddress> location,
-                          ref<TxStateValue> address, ref<TxStateValue> value) {
+void TxStore::updateStore(
+    std::map<llvm::Value *, std::vector<ref<TxStateValue> > > &valuesMap,
+    ref<TxStateAddress> location, ref<TxStateValue> address,
+    ref<TxStateValue> value) {
   if (location.isNull())
     return;
 
@@ -438,6 +441,11 @@ void TxStore::updateStore(ref<TxStateAddress> location,
       ref<TxStoreEntry> entry =
           middleStore.updateStore(this, location, address, value, depth);
       if (!entry.isNull()) {
+        if (value->getDepth() < depth) {
+          value = value->copy(depth);
+          valuesMap[value->getValue()].push_back(value);
+        }
+
         // We want to renew the table entry list, so we first remove the old
         // ones
         value->resetStoreEntryList();

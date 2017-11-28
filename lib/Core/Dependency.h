@@ -204,7 +204,8 @@ namespace klee {
                        const std::vector<llvm::Instruction *> &callHistory,
                        ref<Expr> valueExpr) {
       return registerNewTxStateValue(
-          value, TxStateValue::create(value, callHistory, valueExpr));
+          value, TxStateValue::create(store->getDepth(), value, callHistory,
+                                      valueExpr));
     }
 
     /// \brief Create a new versioned value object, which is a pointer with
@@ -214,21 +215,10 @@ namespace klee {
                        const std::vector<llvm::Instruction *> &callHistory,
                        ref<Expr> address, uint64_t size) {
       ref<TxStateValue> vvalue =
-          TxStateValue::create(loc, callHistory, address);
+          TxStateValue::create(store->getDepth(), loc, callHistory, address);
       vvalue->addPointerInfo(
           TxStateAddress::create(loc, callHistory, address, size));
       return registerNewTxStateValue(loc, vvalue);
-    }
-
-    /// \brief Create a new versioned value object, which is a pointer which
-    /// offsets existing pointer
-    ref<TxStateValue> getNewPointerValue(
-        llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,
-        ref<Expr> address, ref<TxStateAddress> loc, ref<Expr> offset) {
-      ref<TxStateValue> vvalue =
-          TxStateValue::create(value, callHistory, address);
-      vvalue->addPointerInfo(TxStateAddress::create(loc, address, offset));
-      return registerNewTxStateValue(value, vvalue);
     }
 
     /// \brief Get a KLEE expression from a constant. This was shamelessly
