@@ -627,7 +627,8 @@ void Dependency::execute(llvm::Instruction *instr,
                   ? getNewPointerValue(instr, callHistory, valueExpr, 0)
                   : getNewTxStateValue(instr, callHistory, valueExpr);
 
-          store->updateStoreWithLoadedValue(loc, addressValue, loadedValue);
+          store->updateStoreWithLoadedValue(valuesMap, loc, addressValue,
+                                            loadedValue);
           break;
         } else {
           ref<TxStateAddress> pointerInfo = addressValue->getPointerInfo();
@@ -674,8 +675,8 @@ void Dependency::execute(llvm::Instruction *instr,
                     ? getNewPointerValue(instr, callHistory, valueExpr, 0)
                     : getNewTxStateValue(instr, callHistory, valueExpr);
 
-            store->updateStoreWithLoadedValue(pointerInfo, addressValue,
-                                              loadedValue);
+            store->updateStoreWithLoadedValue(valuesMap, pointerInfo,
+                                              addressValue, loadedValue);
             break;
           }
         }
@@ -691,7 +692,8 @@ void Dependency::execute(llvm::Instruction *instr,
                   ? getNewPointerValue(instr, callHistory, valueExpr, 0)
                   : getNewTxStateValue(instr, callHistory, valueExpr);
 
-          store->updateStoreWithLoadedValue(addressValue->getPointerInfo(),
+          store->updateStoreWithLoadedValue(valuesMap,
+                                            addressValue->getPointerInfo(),
                                             addressValue, loadedValue);
           break;
         }
@@ -709,7 +711,7 @@ void Dependency::execute(llvm::Instruction *instr,
                 ? getNewPointerValue(instr, callHistory, valueExpr, 0)
                 : getNewTxStateValue(instr, callHistory, valueExpr);
         // We could not find the stored value, create a new one.
-        store->updateStoreWithLoadedValue(pointerInfo, addressValue,
+        store->updateStoreWithLoadedValue(valuesMap, pointerInfo, addressValue,
                                           loadedValue);
       } else {
         // Build the loaded value
@@ -748,8 +750,8 @@ void Dependency::execute(llvm::Instruction *instr,
         }
       }
 
-      store->updateStore(addressValue->getPointerInfo(), addressValue,
-                         storedValue);
+      store->updateStore(valuesMap, addressValue->getPointerInfo(),
+                         addressValue, storedValue);
       break;
     }
     case llvm::Instruction::Trunc:
@@ -944,7 +946,8 @@ void Dependency::executeMakeSymbolic(
     }
   }
 
-  store->updateStore(addressValue->getPointerInfo(), addressValue, storedValue);
+  store->updateStore(valuesMap, addressValue->getPointerInfo(), addressValue,
+                     storedValue);
 }
 
 void Dependency::executePHI(llvm::Instruction *instr,

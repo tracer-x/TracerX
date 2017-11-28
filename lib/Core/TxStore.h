@@ -256,13 +256,16 @@ public:
 
   /// \brief Newly relate a location with its stored value, when the value is
   /// loaded from the location
-  void updateStoreWithLoadedValue(ref<TxStateAddress> loc,
-                                  ref<TxStateValue> address,
-                                  ref<TxStateValue> value);
+  void updateStoreWithLoadedValue(
+      std::map<llvm::Value *, std::vector<ref<TxStateValue> > > &valuesMap,
+      ref<TxStateAddress> loc, ref<TxStateValue> address,
+      ref<TxStateValue> value);
 
   /// \brief Newly relate an location with its stored value
-  void updateStore(ref<TxStateAddress> location, ref<TxStateValue> address,
-                   ref<TxStateValue> value);
+  void updateStore(
+      std::map<llvm::Value *, std::vector<ref<TxStateValue> > > &valuesMap,
+      ref<TxStateAddress> location, ref<TxStateValue> address,
+      ref<TxStateValue> value);
 
   /// \brief Register the entries in the entry list as used
   void markUsed(const std::set<ref<TxStoreEntry> > &entryList);
