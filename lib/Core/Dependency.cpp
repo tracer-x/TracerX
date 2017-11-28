@@ -295,8 +295,8 @@ void Dependency::populateArgumentValuesList(
     else {
       // This is for the case when latestValue was NULL, which means there is
       // no source dependency information for this node, e.g., a constant.
-      argumentValuesList.push_back(
-          TxStateValue::create(argOperand, callHistory, arguments[i]));
+      argumentValuesList.push_back(TxStateValue::create(
+          store->getDepth(), argOperand, callHistory, arguments[i]));
     }
   }
 }

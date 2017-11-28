@@ -204,7 +204,8 @@ namespace klee {
                        const std::vector<llvm::Instruction *> &callHistory,
                        ref<Expr> valueExpr) {
       return registerNewTxStateValue(
-          value, TxStateValue::create(value, callHistory, valueExpr));
+          value, TxStateValue::create(store->getDepth(), value, callHistory,
+                                      valueExpr));
     }
 
     /// \brief Create a new versioned value object, which is a pointer with
@@ -214,7 +215,7 @@ namespace klee {
                        const std::vector<llvm::Instruction *> &callHistory,
                        ref<Expr> address, uint64_t size) {
       ref<TxStateValue> vvalue =
-          TxStateValue::create(loc, callHistory, address);
+          TxStateValue::create(store->getDepth(), loc, callHistory, address);
       vvalue->addPointerInfo(
           TxStateAddress::create(loc, callHistory, address, size));
       return registerNewTxStateValue(loc, vvalue);
