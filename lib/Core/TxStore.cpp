@@ -438,14 +438,13 @@ void TxStore::updateStore(
   if (middleStoreIter != internalStore.end()) {
     MiddleStateStore &middleStore = middleStoreIter->second;
     if (middleStore.hasAllocationInfo(location->getAllocationInfo())) {
+      if (value->getDepth() < depth) {
+        value = value->copy(depth);
+        valuesMap[value->getValue()].push_back(value);
+      }
       ref<TxStoreEntry> entry =
           middleStore.updateStore(this, location, address, value, depth);
       if (!entry.isNull()) {
-        if (value->getDepth() < depth) {
-          value = value->copy(depth);
-          valuesMap[value->getValue()].push_back(value);
-        }
-
         // We want to renew the table entry list, so we first remove the old
         // ones
         value->resetStoreEntryList();
@@ -468,6 +467,10 @@ void TxStore::updateStore(
   MiddleStateStore newMiddleStateStore(location->getAllocationInfo());
   internalStore[location->getContext()] = newMiddleStateStore;
   MiddleStateStore &middleStateStore = internalStore[location->getContext()];
+  if (value->getDepth() < depth) {
+    value = value->copy(depth);
+    valuesMap[value->getValue()].push_back(value);
+  }
   ref<TxStoreEntry> entry =
       middleStateStore.updateStore(this, location, address, value, depth);
   if (!entry.isNull()) {
