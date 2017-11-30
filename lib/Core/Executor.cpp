@@ -748,8 +748,14 @@ void Executor::branch(ExecutionState &state,
       addConstraint(*result[i], conditions[i]);
 }
 
-Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
-                                   bool isInternal) {
+Executor::StatePair 
+Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
+
+  // The current node is in the speculation node
+  if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode()) {
+    return speculationFork(current, condition, isInternal);
+  }
+
   Solver::Validity res;
   std::map<ExecutionState *, std::vector<SeedInfo> >::iterator it =
       seedMap.find(&current);
@@ -878,18 +884,6 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
     }
   }
 
-  // Opening a node in the speculation node
-  if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode()) {
-    if (current.txTreeNode->isSpeculativeProgramPointRevisted(
-            current.txTreeNode->getProgramPoint())) {
-      // Todo: implementing the backjump and marking for the parent node.
-      terminateState(current);
-      return StatePair(0, 0);
-    }
-    current.txTreeNode->storingSpeculativeProgramPoint(
-        current.txTreeNode->getProgramPoint());
-  }
-
   // XXX - even if the constraint is provable one way or the other we
   // can probably benefit by adding this constraint and allowing it to
   // reduce the other constraints. For example, if we do a binary
@@ -910,51 +904,7 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       txTree->storeSpeculationUnsatCore(solver, unsatCore);
-
-      // At this point the speculation node should be created and
-      // added to the working list in a way that its speculated
-      // after the other node is traversed.
-
-      TimerStatIncrementer timer(stats::forkTime);
-      ExecutionState *trueState, *speculationFalseState = &current;
-
-      ++stats::forks;
-
-      trueState = speculationFalseState->branch();
-      addedStates.push_back(trueState);
-
-      current.ptreeNode->data = 0;
-      std::pair<PTree::Node *, PTree::Node *> res = processTree->split(
-          current.ptreeNode, speculationFalseState, trueState);
-      speculationFalseState->ptreeNode = res.first;
-      trueState->ptreeNode = res.second;
-
-      if (!isInternal) {
-        if (pathWriter) {
-          speculationFalseState->pathOS = pathWriter->open(current.pathOS);
-          trueState->pathOS << "1";
-          speculationFalseState->pathOS << "0";
-        }
-        if (symPathWriter) {
-          speculationFalseState->symPathOS =
-              symPathWriter->open(current.symPathOS);
-          trueState->symPathOS << "1";
-          speculationFalseState->symPathOS << "0";
-        }
-      }
-
-      if (INTERPOLATION_ENABLED) {
-        std::pair<TxTreeNode *, TxTreeNode *> ires =
-            txTree->split(current.txTreeNode, speculationFalseState, trueState);
-        speculationFalseState->txTreeNode = ires.first;
-        speculationFalseState->txTreeNode->setSpeculationFlag();
-        speculationFalseState->txTreeNode->resetSpeculationVisitedPPs();
-        trueState->txTreeNode = ires.second;
-      }
-
-      addConstraint(*trueState, condition);
-
-      return StatePair(trueState, speculationFalseState);
+      return addSpeculationNode(current, condition, isInternal, true);
 
     } else if (INTERPOLATION_ENABLED) {
       // Validity proof succeeded of a query: antecedent -> consequent.
@@ -978,50 +928,7 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       // be used to perform markings.
       txTree->storeSpeculationUnsatCore(solver, unsatCore);
 
-      // At this point the speculation node should be created and
-      // added to the working list in a way that its speculated
-      // after the other node is traversed.
-
-      TimerStatIncrementer timer(stats::forkTime);
-      ExecutionState *speculationTrueState = &current, *falseState;
-
-      ++stats::forks;
-
-      falseState = speculationTrueState->branch();
-      addedStates.push_back(falseState);
-
-      current.ptreeNode->data = 0;
-      std::pair<PTree::Node *, PTree::Node *> res = processTree->split(
-          current.ptreeNode, speculationTrueState, falseState);
-      speculationTrueState->ptreeNode = res.first;
-      falseState->ptreeNode = res.second;
-
-      if (!isInternal) {
-        if (pathWriter) {
-          speculationTrueState->pathOS = pathWriter->open(current.pathOS);
-          speculationTrueState->pathOS << "1";
-          falseState->pathOS << "0";
-        }
-        if (symPathWriter) {
-          speculationTrueState->symPathOS =
-              symPathWriter->open(current.symPathOS);
-          speculationTrueState->symPathOS << "1";
-          falseState->symPathOS << "0";
-        }
-      }
-
-      if (INTERPOLATION_ENABLED) {
-        std::pair<TxTreeNode *, TxTreeNode *> ires =
-            txTree->split(current.txTreeNode, speculationTrueState, falseState);
-        speculationTrueState->txTreeNode = ires.first;
-        speculationTrueState->txTreeNode->setSpeculationFlag();
-        speculationTrueState->txTreeNode->resetSpeculationVisitedPPs();
-        falseState->txTreeNode = ires.second;
-      }
-
-      addConstraint(*falseState, Expr::createIsZero(condition));
-
-      return StatePair(speculationTrueState, falseState);
+      return addSpeculationNode(current, condition, isInternal, false);
 
     } else if (INTERPOLATION_ENABLED) {
       // Falsity proof succeeded of a query: antecedent -> consequent,
@@ -1032,14 +939,6 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
 
     return StatePair(0, &current);
   } else {
-    bool inSpeculationMode = false;
-    speculativeRun *parentSpeculationVisitedPPs;
-    if (INTERPOLATION_ENABLED && Speculation &&
-        current.txTreeNode->isSpeculationNode()) {
-      inSpeculationMode = true;
-      parentSpeculationVisitedPPs =
-          current.txTreeNode->getSpeculationVisitedPPs();
-    }
 
     TimerStatIncrementer timer(stats::forkTime);
     ExecutionState *falseState, *trueState = &current;
@@ -1113,14 +1012,228 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
           txTree->split(current.txTreeNode, falseState, trueState);
       falseState->txTreeNode = ires.first;
       trueState->txTreeNode = ires.second;
-      if (inSpeculationMode == true) {
-        falseState->txTreeNode->setSpeculationFlag();
-        falseState->txTreeNode->setSpeculationVisitedPPs(
-            parentSpeculationVisitedPPs);
-        trueState->txTreeNode->setSpeculationFlag();
-        trueState->txTreeNode->setSpeculationVisitedPPs(
-            parentSpeculationVisitedPPs);
+    }
+
+    addConstraint(*trueState, condition);
+    addConstraint(*falseState, Expr::createIsZero(condition));
+
+    // Kinda gross, do we even really still want this option?
+    if (MaxDepth && MaxDepth <= trueState->depth) {
+      terminateStateEarly(*trueState, "max-depth exceeded.");
+      terminateStateEarly(*falseState, "max-depth exceeded.");
+      return StatePair(0, 0);
+    }
+
+    return StatePair(trueState, falseState);
+  }
+}
+
+Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
+                                                 ref<Expr> condition,
+                                                 bool isInternal,
+                                                 bool falseBranchIsInfeasible) {
+  if (falseBranchIsInfeasible == true) {
+    // At this point the speculation node should be created and
+    // added to the working list in a way that its speculated
+    // after the other node is traversed.
+
+    TimerStatIncrementer timer(stats::forkTime);
+    ExecutionState *trueState, *speculationFalseState = &current;
+
+    ++stats::forks;
+
+    trueState = speculationFalseState->branch();
+    addedStates.push_back(trueState);
+
+    current.ptreeNode->data = 0;
+    std::pair<PTree::Node *, PTree::Node *> res =
+        processTree->split(current.ptreeNode, speculationFalseState, trueState);
+    speculationFalseState->ptreeNode = res.first;
+    trueState->ptreeNode = res.second;
+
+    if (!isInternal) {
+      if (pathWriter) {
+        speculationFalseState->pathOS = pathWriter->open(current.pathOS);
+        trueState->pathOS << "1";
+        speculationFalseState->pathOS << "0";
       }
+      if (symPathWriter) {
+        speculationFalseState->symPathOS =
+            symPathWriter->open(current.symPathOS);
+        trueState->symPathOS << "1";
+        speculationFalseState->symPathOS << "0";
+      }
+    }
+
+    if (INTERPOLATION_ENABLED) {
+      std::pair<TxTreeNode *, TxTreeNode *> ires =
+          txTree->split(current.txTreeNode, speculationFalseState, trueState);
+      speculationFalseState->txTreeNode = ires.first;
+      speculationFalseState->txTreeNode->setSpeculationFlag();
+      speculationFalseState->txTreeNode->resetSpeculationVisitedPPs();
+      trueState->txTreeNode = ires.second;
+    }
+
+    addConstraint(*trueState, condition);
+
+    return StatePair(trueState, speculationFalseState);
+  } else {
+    // At this point the speculation node should be created and
+    // added to the working list in a way that its speculated
+    // after the other node is traversed.
+
+    TimerStatIncrementer timer(stats::forkTime);
+    ExecutionState *speculationTrueState = &current, *falseState;
+
+    ++stats::forks;
+
+    falseState = speculationTrueState->branch();
+    addedStates.push_back(falseState);
+
+    current.ptreeNode->data = 0;
+    std::pair<PTree::Node *, PTree::Node *> res =
+        processTree->split(current.ptreeNode, speculationTrueState, falseState);
+    speculationTrueState->ptreeNode = res.first;
+    falseState->ptreeNode = res.second;
+
+    if (!isInternal) {
+      if (pathWriter) {
+        speculationTrueState->pathOS = pathWriter->open(current.pathOS);
+        speculationTrueState->pathOS << "1";
+        falseState->pathOS << "0";
+      }
+      if (symPathWriter) {
+        speculationTrueState->symPathOS =
+            symPathWriter->open(current.symPathOS);
+        speculationTrueState->symPathOS << "1";
+        falseState->symPathOS << "0";
+      }
+    }
+
+    if (INTERPOLATION_ENABLED) {
+      std::pair<TxTreeNode *, TxTreeNode *> ires =
+          txTree->split(current.txTreeNode, speculationTrueState, falseState);
+      speculationTrueState->txTreeNode = ires.first;
+      speculationTrueState->txTreeNode->setSpeculationFlag();
+      speculationTrueState->txTreeNode->resetSpeculationVisitedPPs();
+      falseState->txTreeNode = ires.second;
+    }
+
+    addConstraint(*falseState, Expr::createIsZero(condition));
+
+    return StatePair(speculationTrueState, falseState);
+  }
+}
+
+Executor::StatePair Executor::speculationFork(ExecutionState &current,
+                                              ref<Expr> condition,
+                                              bool isInternal) {
+
+  // Checking not revisiting the same program point twice (should fail since
+  // speculation wouldn't be linear then)
+  if (current.txTreeNode->isSpeculativeProgramPointRevisted(
+          current.txTreeNode->getProgramPoint())) {
+    current.txTreeNode->speculativeBackJump(this, current);
+    terminateState(current);
+    return StatePair(0, 0);
+  }
+
+  // Storing the visited program points.
+  current.txTreeNode->storingSpeculativeProgramPoint(
+      current.txTreeNode->getProgramPoint());
+
+  Solver::Validity res;
+
+  double timeout = coreSolverTimeout;
+
+  // llvm::errs() << "Calling solver->evaluate on query:\n";
+  // ExprPPrinter::printQuery(llvm::errs(), current.constraints, condition);
+
+  solver->setTimeout(timeout);
+  std::vector<ref<Expr> > unsatCore;
+  bool success = solver->evaluate(current, condition, res, unsatCore);
+  solver->setTimeout(0);
+
+  if (!success) {
+    current.pc = current.prevPC;
+    terminateStateEarly(current, "Query timed out (fork).");
+    return StatePair(0, 0);
+  }
+
+  // XXX - even if the constraint is provable one way or the other we
+  // can probably benefit by adding this constraint and allowing it to
+  // reduce the other constraints. For example, if we do a binary
+  // search on a particular value, and then see a comparison against
+  // the value it has been fixed at, we should take this as a nice
+  // hint to just use the single constraint instead of all the binary
+  // search ones. If that makes sense.
+  if (res == Solver::True &&
+      current.prevPC->inst->getOperand(1)->getName() == "cond.false") {
+
+    if (!isInternal) {
+      if (pathWriter) {
+        current.pathOS << "1";
+      }
+    }
+    if (WPInterpolant)
+      txTree->markInstruction(current.prevPC, true);
+    return StatePair(&current, 0);
+  } else if (res == Solver::False &&
+             current.prevPC->inst->getOperand(1)->getName() == "cond.false") {
+
+    if (!isInternal) {
+      if (pathWriter) {
+        current.pathOS << "0";
+      }
+    }
+    if (WPInterpolant)
+      txTree->markInstruction(current.prevPC, false);
+    return StatePair(0, &current);
+  } else {
+
+    speculativeRun *parentSpeculationVisitedPPs =
+        current.txTreeNode->getSpeculationVisitedPPs();
+    TimerStatIncrementer timer(stats::forkTime);
+    ExecutionState *falseState, *trueState = &current;
+
+    ++stats::forks;
+
+    falseState = trueState->branch();
+    addedStates.push_back(falseState);
+
+    if (RandomizeFork && theRNG.getBool())
+      std::swap(trueState, falseState);
+
+    current.ptreeNode->data = 0;
+    std::pair<PTree::Node *, PTree::Node *> resNode =
+        processTree->split(current.ptreeNode, falseState, trueState);
+    falseState->ptreeNode = resNode.first;
+    trueState->ptreeNode = resNode.second;
+
+    if (!isInternal) {
+      if (pathWriter) {
+        falseState->pathOS = pathWriter->open(current.pathOS);
+        trueState->pathOS << "1";
+        falseState->pathOS << "0";
+      }
+      if (symPathWriter) {
+        falseState->symPathOS = symPathWriter->open(current.symPathOS);
+        trueState->symPathOS << "1";
+        falseState->symPathOS << "0";
+      }
+    }
+
+    if (INTERPOLATION_ENABLED) {
+      std::pair<TxTreeNode *, TxTreeNode *> ires =
+          txTree->split(current.txTreeNode, falseState, trueState);
+      falseState->txTreeNode = ires.first;
+      trueState->txTreeNode = ires.second;
+      falseState->txTreeNode->setSpeculationFlag();
+      falseState->txTreeNode->setSpeculationVisitedPPs(
+          parentSpeculationVisitedPPs);
+      trueState->txTreeNode->setSpeculationFlag();
+      trueState->txTreeNode->setSpeculationVisitedPPs(
+          parentSpeculationVisitedPPs);
     }
 
     addConstraint(*trueState, condition);

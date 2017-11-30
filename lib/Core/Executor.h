@@ -329,6 +329,17 @@ private:
   // current state, and one of the states may be null.
   StatePair fork(ExecutionState &current, ref<Expr> condition, bool isInternal);
 
+  // Generally the nodes are in normal mode. In case an infeasible path
+  // is found, an speculation node is generated for the infeasible path
+  // excluding the last constraint and the execution of the speculation
+  // node will be continued in speculationFork.
+  StatePair addSpeculationNode(ExecutionState &current, ref<Expr> condition,
+                               bool isInternal, bool falseBranchIsInfeasible);
+
+  // Speculation fork performs fork in the speculation mode.
+  StatePair speculationFork(ExecutionState &current, ref<Expr> condition,
+                            bool isInternal);
+
   /// Add the given (boolean) condition as a constraint on state. This
   /// function is a wrapper around the state's addConstraint function
   /// which also manages propagation of implied values,
