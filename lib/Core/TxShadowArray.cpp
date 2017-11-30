@@ -1,4 +1,4 @@
-//===-- Dependency.cpp - Memory location dependency -------------*- C++ -*-===//
+//===-- TxShadowArray.cpp ---------------------------------------*- C++ -*-===//
 //
 //               The Tracer-X KLEE Symbolic Virtual Machine
 //
@@ -8,29 +8,13 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file contains the declarations for the shadow array, which replaces KLEE arrays with their shadow counterparts as existentially-quantified variables in the interpolant.
+/// This file contains the implementations for the shadow array, which
+/// replaces KLEE arrays with their shadow counterparts as
+/// existentially-quantified variables in the interpolant.
 ///
 //===----------------------------------------------------------------------===//
 
 #include "TxShadowArray.h"
-
-/*
-#include "Dependency.h"
-
-#include "klee/CommandLine.h"
-#include "klee/Internal/Support/ErrorHandling.h"
-
-#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/Intrinsics.h>
-#else
-#include <llvm/Constants.h>
-#include <llvm/DataLayout.h>
-#include <llvm/Intrinsics.h>
-#endif
-*/
-
 
 using namespace klee;
 

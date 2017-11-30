@@ -1,4 +1,4 @@
-//===--- ShadowArray.h ------------------------------------------*- C++ -*-===//
+//===--- TxShadowArray.h ----------------------------------------*- C++ -*-===//
 //
 //               The Tracer-X KLEE Symbolic Virtual Machine
 //
@@ -8,7 +8,9 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file contains the declarations for the shadow array, which replaces KLEE arrays with their shadow counterparts as existentially-quantified variables in the interpolant.
+/// This file contains the declarations for the shadow array, which
+/// replaces KLEE arrays with their shadow counterparts as
+/// existentially-quantified variables in the interpolant.
 ///
 //===----------------------------------------------------------------------===//
 

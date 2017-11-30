@@ -1,4 +1,4 @@
-//===--- Dependency.h - Memory location dependency --------------*- C++ -*-===//
+//===--- TxDependency.h - Memory location dependency ------------*- C++ -*-===//
 //
 //               The Tracer-X KLEE Symbolic Virtual Machine
 //
@@ -46,7 +46,7 @@ namespace klee {
 /// \brief Computation of memory regions the unsatisfiability core depends
 /// upon, which is used to compute the interpolant stored in the table.
 ///
-/// <b>Problem statement</b>
+/// <b>Problem Statement</b>
 ///
 /// Memory regions of program states upon which the unsatisfiability
 /// core depends need to be computed. These regions are represented
@@ -110,9 +110,9 @@ namespace klee {
 /// \f$x_p'\f$ of \f$x_p\f$ that are relevant based on the computed
 /// domain of \f$h'\f$.
 ///
-/// <b>Data types</b>
+/// <b>Data Types</b>
 ///
-/// In the LLVM language, a <i>state</i> is a mapping of memory
+/// We assume a <i>state</i> to be a mapping of memory
 /// locations to the values stored in them. <i>State update</i> is
 /// the loading of values from the memory locations, their
 /// manipulation, and the subsequent storing of their values into
@@ -120,27 +120,29 @@ namespace klee {
 /// the domain of \f$h'\f$ is based on shadow data structure with
 /// the following main components:
 ///
-/// - TxStateValue: LLVM values (i.e., variables) with versioning
-///   index. This represents the values loaded from memory into LLVM
-///   temporary variables. They have versioning index, as, different
-///   from LLVM values themselves which are static entities, a
-///   (symbolic) execution may go through the same instruction
-///   multiple times. Hence the value of that instruction has to be
-///   versioned.
-/// - TxStateAddress: A representation of pointers. It is important
-///   to note that each pointer is associated with memory allocation
-///   and its displacement (offset) wrt. the base address of the
-///   allocation.
+/// - The <i>path condition</i> TxDependency#pathCondition. This field
+///   maintains all the constraints accumulated through the execution.
 ///
-/// The results of the computation is stored in several member
-/// variables as follows, mainly Dependency#concretelyAddressedStore and
-/// Dependency#symbolicallyAddressedStore which represent the components of
-/// the state associated with the owner TxTreeNode object of the Dependency
-/// object. Dependency#concretelyAddressedStore is the part of the state that
-/// are concretely addressed, whereas Dependency#symbolicallyAddressedStore is
-/// the part that is symbolically addressed.
+/// - The <i>store</i> TxDependency#store. This field points to an object of TxStore
+///   class. The store is essentially a continer of mappings from addresses to values.
+///   The store has two such mappings, depending on whether the address is
+///   concrete or is a symbolic expression.
+///   Each entry in the mappings represents an element of the mapping.
+///   Objects of the following classes are used in a store entry.
 ///
-/// <b>Notes on pointer flow propagation</b>
+///   * The TxStateAddress class represents pointers. It is important
+///     to note that each pointer is associated with memory allocation
+///     and its displacement (offset) wrt. the base address of the
+///     allocation.
+///
+///   * TxStateValue: LLVM values (i.e., variables) with versioning
+///     index. This represents the values loaded from memory into LLVM
+///     temporary variables. They have versioning index, as, different
+///     from LLVM values themselves which are static entities, a
+///     (symbolic) execution may go through the same instruction
+///     multiple times.
+///
+/// <b>Notes on Pointer Flow Propagation</b>
 ///
 /// A TxStateValue object may represent a pointer value, in which
 /// case it is linked to possibly several TxStateAddress objects via
