@@ -1,4 +1,4 @@
-//===-- Dependency.cpp - Memory location dependency -------------*- C++ -*-===//
+//===-- TxShadowArray.cpp ---------------------------------------*- C++ -*-===//
 //
 //               The Tracer-X KLEE Symbolic Virtual Machine
 //
@@ -8,38 +8,22 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file contains the declarations for the shadow array, which replaces KLEE arrays with their shadow counterparts as existentially-quantified variables in the interpolant.
+/// This file contains the implementations for the shadow array, which
+/// replaces KLEE arrays with their shadow counterparts as
+/// existentially-quantified variables in the interpolant.
 ///
 //===----------------------------------------------------------------------===//
 
-#include "ShadowArray.h"
-
-/*
-#include "Dependency.h"
-
-#include "klee/CommandLine.h"
-#include "klee/Internal/Support/ErrorHandling.h"
-
-#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/DataLayout.h>
-#include <llvm/IR/Intrinsics.h>
-#else
-#include <llvm/Constants.h>
-#include <llvm/DataLayout.h>
-#include <llvm/Intrinsics.h>
-#endif
-*/
-
+#include "TxShadowArray.h"
 
 using namespace klee;
 
 namespace klee {
 
-std::map<const Array *, const Array *> ShadowArray::shadowArray;
+std::map<const Array *, const Array *> TxShadowArray::shadowArray;
 
 UpdateNode *
-ShadowArray::getShadowUpdate(const UpdateNode *source,
+TxShadowArray::getShadowUpdate(const UpdateNode *source,
                              std::set<const Array *> &replacements) {
   if (!source)
     return 0;
@@ -49,7 +33,7 @@ ShadowArray::getShadowUpdate(const UpdateNode *source,
                         getShadowExpression(source->value, replacements));
 }
 
-ref<Expr> ShadowArray::createBinaryOfSameKind(ref<Expr> originalExpr,
+ref<Expr> TxShadowArray::createBinaryOfSameKind(ref<Expr> originalExpr,
                                               ref<Expr> newLhs,
                                               ref<Expr> newRhs) {
   std::vector<Expr::CreateArg> exprs;
@@ -60,12 +44,12 @@ ref<Expr> ShadowArray::createBinaryOfSameKind(ref<Expr> originalExpr,
   return Expr::createFromKind(originalExpr->getKind(), exprs);
 }
 
-void ShadowArray::addShadowArrayMap(const Array *source, const Array *target) {
+void TxShadowArray::addShadowArrayMap(const Array *source, const Array *target) {
   shadowArray[source] = target;
 }
 
 ref<Expr>
-ShadowArray::getShadowExpression(ref<Expr> expr,
+TxShadowArray::getShadowExpression(ref<Expr> expr,
                                  std::set<const Array *> &replacements) {
   ref<Expr> ret;
 

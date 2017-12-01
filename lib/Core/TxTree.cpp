@@ -15,8 +15,6 @@
 
 #include "TxTree.h"
 
-#include "Dependency.h"
-#include "ShadowArray.h"
 #include "TimingSolver.h"
 
 #include <klee/CommandLine.h>
@@ -29,6 +27,8 @@
 #include <klee/util/TxPrintUtil.h>
 #include <fstream>
 #include <vector>
+#include "TxDependency.h"
+#include "TxShadowArray.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
@@ -40,14 +40,15 @@
 
 using namespace klee;
 
-Statistic SubsumptionTableEntry::concretelyAddressedStoreExpressionBuildTime(
+Statistic TxSubsumptionTableEntry::concretelyAddressedStoreExpressionBuildTime(
     "concretelyAddressedStoreExpressionBuildTime", "concreteStoreTime");
-Statistic SubsumptionTableEntry::symbolicallyAddressedStoreExpressionBuildTime(
+Statistic
+TxSubsumptionTableEntry::symbolicallyAddressedStoreExpressionBuildTime(
     "symbolicallyAddressedStoreExpressionBuildTime", "symbolicStoreTime");
-Statistic SubsumptionTableEntry::solverAccessTime("solverAccessTime",
-                                                  "solverAccessTime");
+Statistic TxSubsumptionTableEntry::solverAccessTime("solverAccessTime",
+                                                    "solverAccessTime");
 
-SubsumptionTableEntry::SubsumptionTableEntry(
+TxSubsumptionTableEntry::TxSubsumptionTableEntry(
     TxTreeNode *node, const std::vector<llvm::Instruction *> &callHistory)
     : programPoint(node->getProgramPoint()),
       nodeSequenceNumber(node->getNodeSequenceNumber()) {
@@ -61,14 +62,14 @@ SubsumptionTableEntry::SubsumptionTableEntry(
       symbolicallyAddressedHistoricalStore);
 }
 
-SubsumptionTableEntry::~SubsumptionTableEntry() {}
+TxSubsumptionTableEntry::~TxSubsumptionTableEntry() {}
 
-ref<Expr> SubsumptionTableEntry::makeConstraint(
+ref<Expr> TxSubsumptionTableEntry::makeConstraint(
     ExecutionState &state, ref<TxInterpolantValue> tabledValue,
     ref<TxInterpolantValue> stateValue, ref<Expr> tabledOffset,
     ref<Expr> stateOffset, std::set<ref<TxStateValue> > &coreValues,
     std::map<ref<TxStateValue>, std::set<uint64_t> > &corePointerValues,
-    std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+    std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases,
     int debugSubsumptionLevel) const {
   ref<Expr> constraint;
 
@@ -79,7 +80,7 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
     // equal whenever their values are of different width
     constraint = EqExpr::create(ConstantExpr::create(0, Expr::Bool),
                                 EqExpr::create(tabledOffset, stateOffset));
-  } else if (Dependency::boundInterpolation() && tabledValue->isPointer() &&
+  } else if (TxDependency::boundInterpolation() && tabledValue->isPointer() &&
              stateValue->isPointer()) {
     if (!ExactAddressInterpolant && tabledValue->useBound()) {
       std::set<uint64_t> bounds;
@@ -144,8 +145,8 @@ ref<Expr> SubsumptionTableEntry::makeConstraint(
 }
 
 bool
-SubsumptionTableEntry::hasVariableInSet(std::set<const Array *> &existentials,
-                                        ref<Expr> expr) {
+TxSubsumptionTableEntry::hasVariableInSet(std::set<const Array *> &existentials,
+                                          ref<Expr> expr) {
   for (int i = 0, numKids = expr->getNumKids(); i < numKids; ++i) {
     if (llvm::isa<ReadExpr>(expr)) {
       ReadExpr *readExpr = llvm::dyn_cast<ReadExpr>(expr);
@@ -162,7 +163,7 @@ SubsumptionTableEntry::hasVariableInSet(std::set<const Array *> &existentials,
   return false;
 }
 
-ref<Expr> SubsumptionTableEntry::getBoundFreeConjunction(
+ref<Expr> TxSubsumptionTableEntry::getBoundFreeConjunction(
     std::set<const Array *> &existentials, ref<Expr> expr) {
 
   if (llvm::isa<AndExpr>(expr)) {
@@ -189,7 +190,7 @@ ref<Expr> SubsumptionTableEntry::getBoundFreeConjunction(
   return expr;
 }
 
-bool SubsumptionTableEntry::hasVariableNotInSet(
+bool TxSubsumptionTableEntry::hasVariableNotInSet(
     std::set<const Array *> &existentials, ref<Expr> expr) {
   for (int i = 0, numKids = expr->getNumKids(); i < numKids; ++i) {
     if (llvm::isa<ReadExpr>(expr)) {
@@ -209,8 +210,8 @@ bool SubsumptionTableEntry::hasVariableNotInSet(
 }
 
 ref<Expr>
-SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
-                                              bool &hasExistentialsOnly) {
+TxSubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
+                                                bool &hasExistentialsOnly) {
   ExistsExpr *expr = llvm::dyn_cast<ExistsExpr>(existsExpr);
 
   assert(expr && "expression is not existentially quantified");
@@ -353,7 +354,7 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
                             interpolantAtom->getKid(1));
           }
 
-          interpolantAtom = ShadowArray::createBinaryOfSameKind(
+          interpolantAtom = TxShadowArray::createBinaryOfSameKind(
               interpolantAtom, newIntpLeft, newIntpRight);
         }
       }
@@ -389,30 +390,30 @@ SubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
   return existsExpr->rebuild(&newBody);
 }
 
-ref<Expr> SubsumptionTableEntry::replaceExpr(ref<Expr> originalExpr,
-                                             ref<Expr> replacedExpr,
-                                             ref<Expr> replacementExpr) {
+ref<Expr> TxSubsumptionTableEntry::replaceExpr(ref<Expr> originalExpr,
+                                               ref<Expr> replacedExpr,
+                                               ref<Expr> replacementExpr) {
   // We only handle binary expressions
   if (!llvm::isa<BinaryExpr>(originalExpr) ||
       llvm::isa<ConcatExpr>(originalExpr))
     return originalExpr;
 
   if (originalExpr->getKid(0) == replacedExpr)
-    return ShadowArray::createBinaryOfSameKind(originalExpr, replacementExpr,
+    return TxShadowArray::createBinaryOfSameKind(originalExpr, replacementExpr,
                                                originalExpr->getKid(1));
 
   if (originalExpr->getKid(1) == replacedExpr)
-    return ShadowArray::createBinaryOfSameKind(
+    return TxShadowArray::createBinaryOfSameKind(
         originalExpr, originalExpr->getKid(0), replacementExpr);
 
-  return ShadowArray::createBinaryOfSameKind(
+  return TxShadowArray::createBinaryOfSameKind(
       originalExpr,
       replaceExpr(originalExpr->getKid(0), replacedExpr, replacementExpr),
       replaceExpr(originalExpr->getKid(1), replacedExpr, replacementExpr));
 }
 
-bool SubsumptionTableEntry::hasSubExpression(ref<Expr> expr,
-                                             ref<Expr> subExpr) {
+bool TxSubsumptionTableEntry::hasSubExpression(ref<Expr> expr,
+                                               ref<Expr> subExpr) {
   if (expr == subExpr)
     return true;
   if (expr->getNumKids() < 2 && expr != subExpr)
@@ -422,7 +423,7 @@ bool SubsumptionTableEntry::hasSubExpression(ref<Expr> expr,
          hasSubExpression(expr->getKid(1), subExpr);
 }
 
-ref<Expr> SubsumptionTableEntry::simplifyInterpolantExpr(
+ref<Expr> TxSubsumptionTableEntry::simplifyInterpolantExpr(
     std::vector<ref<Expr> > &interpolantPack, ref<Expr> expr) {
   if (expr->getNumKids() < 2)
     return expr;
@@ -485,7 +486,7 @@ ref<Expr> SubsumptionTableEntry::simplifyInterpolantExpr(
   return AndExpr::create(simplifiedLhs, simplifiedRhs);
 }
 
-ref<Expr> SubsumptionTableEntry::simplifyEqualityExpr(
+ref<Expr> TxSubsumptionTableEntry::simplifyEqualityExpr(
     std::vector<ref<Expr> > &equalityPack, ref<Expr> expr) {
   if (expr->getNumKids() < 2)
     return expr;
@@ -550,9 +551,9 @@ ref<Expr> SubsumptionTableEntry::simplifyEqualityExpr(
 }
 
 void
-SubsumptionTableEntry::getSubstitution(std::set<const Array *> &existentials,
-                                       ref<Expr> equalities,
-                                       std::map<ref<Expr>, ref<Expr> > &map) {
+TxSubsumptionTableEntry::getSubstitution(std::set<const Array *> &existentials,
+                                         ref<Expr> equalities,
+                                         std::map<ref<Expr>, ref<Expr> > &map) {
   // It is assumed the rhs is an expression on the free variables.
   if (llvm::isa<EqExpr>(equalities)) {
     ref<Expr> lhs = equalities->getKid(0);
@@ -586,8 +587,8 @@ SubsumptionTableEntry::getSubstitution(std::set<const Array *> &existentials,
 }
 
 ref<Expr>
-SubsumptionTableEntry::removeUnsubstituted(std::set<const Array *> &variables,
-                                           ref<Expr> equalities) {
+TxSubsumptionTableEntry::removeUnsubstituted(std::set<const Array *> &variables,
+                                             ref<Expr> equalities) {
   // It is assumed the lhs is an expression on the existentially-quantified
   // variable whereas the rhs is an expression on the free variables.
   if (llvm::isa<EqExpr>(equalities)) {
@@ -636,8 +637,8 @@ SubsumptionTableEntry::removeUnsubstituted(std::set<const Array *> &variables,
   return equalities;
 }
 
-bool SubsumptionTableEntry::detectConflictPrimitives(ExecutionState &state,
-                                                     ref<Expr> expr) {
+bool TxSubsumptionTableEntry::detectConflictPrimitives(ExecutionState &state,
+                                                       ref<Expr> expr) {
   if (llvm::isa<ExistsExpr>(expr))
     return true;
 
@@ -678,7 +679,7 @@ bool SubsumptionTableEntry::detectConflictPrimitives(ExecutionState &state,
   return true;
 }
 
-bool SubsumptionTableEntry::fetchExprEqualityConjucts(
+bool TxSubsumptionTableEntry::fetchExprEqualityConjucts(
     std::vector<ref<Expr> > &conjunction, ref<Expr> expr) {
 
   if (!llvm::isa<AndExpr>(expr)) {
@@ -701,8 +702,9 @@ bool SubsumptionTableEntry::fetchExprEqualityConjucts(
          fetchExprEqualityConjucts(conjunction, expr->getKid(1));
 }
 
-ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
-                                                    bool &hasExistentialsOnly) {
+ref<Expr>
+TxSubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
+                                            bool &hasExistentialsOnly) {
   assert(llvm::isa<ExistsExpr>(existsExpr));
 
   ExistsExpr *expr = llvm::dyn_cast<ExistsExpr>(existsExpr);
@@ -735,7 +737,7 @@ ref<Expr> SubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
   return ret;
 }
 
-void SubsumptionTableEntry::interpolateValues(
+void TxSubsumptionTableEntry::interpolateValues(
     ExecutionState &state, std::set<ref<TxStateValue> > &coreValues,
     std::map<ref<TxStateValue>, std::set<uint64_t> > &corePointerValues,
     int debugSubsumptionLevel) {
@@ -766,7 +768,7 @@ void SubsumptionTableEntry::interpolateValues(
   }
 
 #ifdef ENABLE_Z3
-  if (Dependency::boundInterpolation() && !ExactAddressInterpolant) {
+  if (TxDependency::boundInterpolation() && !ExactAddressInterpolant) {
     reason = "interpolating memory bound for " + reason;
 
     for (std::map<ref<TxStateValue>, std::set<uint64_t> >::iterator
@@ -781,7 +783,7 @@ void SubsumptionTableEntry::interpolateValues(
 #endif
 }
 
-bool SubsumptionTableEntry::subsumed(
+bool TxSubsumptionTableEntry::subsumed(
     TimingSolver *solver, ExecutionState &state, double timeout,
     bool leftRetrieval, TxStore::TopStateStore &__internalStore,
     TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
@@ -807,7 +809,7 @@ bool SubsumptionTableEntry::subsumed(
   // Translation of allocation in the current state into an allocation in the
   // tabled interpolant. This translation is used to equate absolute address
   // values for allocations of matching sizes.
-  std::map<ref<AllocationInfo>, ref<AllocationInfo> > unifiedBases;
+  std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > unifiedBases;
 
   // Non-pointer / exact pointer values to be marked as in the interpolant
   std::set<ref<TxStateValue> > coreValues;
@@ -890,7 +892,7 @@ bool SubsumptionTableEntry::subsumed(
                            nodeSequenceNumber, msg.c_str());
             }
             return false;
-          } else if (Dependency::boundInterpolation() &&
+          } else if (TxDependency::boundInterpolation() &&
                      tabledValue->isPointer() && stateValue->isPointer()) {
             ref<Expr> boundsCheck;
             if (!ExactAddressInterpolant && tabledValue->useBound()) {
@@ -1312,7 +1314,7 @@ bool SubsumptionTableEntry::subsumed(
       ref<Expr> existsExpr = ExistsExpr::create(existentials, expr);
       if (debugSubsumptionLevel >= 2) {
         klee_message("Before simplification:\n%s",
-                     PrettyExpressionBuilder::constructQuery(
+                     TxPrettyExpressionBuilder::constructQuery(
                          state.constraints, existsExpr).c_str());
       }
       expr = simplifyExistsExpr(existsExpr, exprHasNoFreeVariables);
@@ -1387,7 +1389,7 @@ bool SubsumptionTableEntry::subsumed(
 
           if (debugSubsumptionLevel >= 2) {
             klee_message("Querying for subsumption check:\n%s",
-                         PrettyExpressionBuilder::constructQuery(
+                         TxPrettyExpressionBuilder::constructQuery(
                              state.constraints, expr).c_str());
           }
 
@@ -1423,7 +1425,7 @@ bool SubsumptionTableEntry::subsumed(
       } else {
         if (debugSubsumptionLevel >= 2) {
           klee_message("Querying for subsumption check:\n%s",
-                       PrettyExpressionBuilder::constructQuery(
+                       TxPrettyExpressionBuilder::constructQuery(
                            state.constraints, expr).c_str());
         }
         // We call the solver in the standard way if the
@@ -1490,19 +1492,21 @@ bool SubsumptionTableEntry::subsumed(
   return false;
 }
 
-ref<Expr> SubsumptionTableEntry::getInterpolant() const { return interpolant; }
+ref<Expr> TxSubsumptionTableEntry::getInterpolant() const {
+  return interpolant;
+}
 
-void SubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
+void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
   print(stream, 0);
 }
 
-void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
-                                  const unsigned paddingAmount) const {
+void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
+                                    const unsigned paddingAmount) const {
   print(stream, makeTabs(paddingAmount));
 }
 
-void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
-                                  const std::string &prefix) const {
+void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
+                                    const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
   std::string tabsNextNext = appendTab(tabsNext);
 
@@ -1618,7 +1622,7 @@ void SubsumptionTableEntry::print(llvm::raw_ostream &stream,
   stream << "]";
 }
 
-void SubsumptionTableEntry::printStat(std::stringstream &stream) {
+void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
   stream << "KLEE: done:     Time for actual solver calls in subsumption check "
             "(ms) = " << ((double)stats::subsumptionQueryTime.getValue()) / 1000
          << "\n";
@@ -1637,17 +1641,17 @@ void SubsumptionTableEntry::printStat(std::stringstream &stream) {
 
 /**/
 
-void SubsumptionTable::CallHistoryIndexedTable::Node::print(
+void TxSubsumptionTable::CallHistoryIndexedTable::Node::print(
     llvm::raw_ostream &stream) const {
   print(stream, 0);
 }
 
-void SubsumptionTable::CallHistoryIndexedTable::Node::print(
+void TxSubsumptionTable::CallHistoryIndexedTable::Node::print(
     llvm::raw_ostream &stream, const unsigned paddingAmount) const {
   print(stream, makeTabs(paddingAmount));
 }
 
-void SubsumptionTable::CallHistoryIndexedTable::Node::print(
+void TxSubsumptionTable::CallHistoryIndexedTable::Node::print(
     llvm::raw_ostream &stream, const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
@@ -1676,7 +1680,7 @@ void SubsumptionTable::CallHistoryIndexedTable::Node::print(
 
 /**/
 
-void SubsumptionTable::CallHistoryIndexedTable::clearTree(Node *node) {
+void TxSubsumptionTable::CallHistoryIndexedTable::clearTree(Node *node) {
   for (std::map<llvm::Instruction *, Node *>::iterator it = node->next.begin(),
                                                        ie = node->next.end();
        it != ie; ++it) {
@@ -1684,7 +1688,7 @@ void SubsumptionTable::CallHistoryIndexedTable::clearTree(Node *node) {
     delete it->second;
   }
 
-  for (std::deque<SubsumptionTableEntry *>::iterator
+  for (std::deque<TxSubsumptionTableEntry *>::iterator
            it = node->entryList.begin(),
            ie = node->entryList.end();
        it != ie; ++it) {
@@ -1692,9 +1696,9 @@ void SubsumptionTable::CallHistoryIndexedTable::clearTree(Node *node) {
   }
 }
 
-void SubsumptionTable::CallHistoryIndexedTable::insert(
+void TxSubsumptionTable::CallHistoryIndexedTable::insert(
     const std::vector<llvm::Instruction *> &callHistory,
-    SubsumptionTableEntry *entry) {
+    TxSubsumptionTableEntry *entry) {
   Node *current = root;
 
   for (std::vector<llvm::Instruction *>::const_iterator
@@ -1715,8 +1719,8 @@ void SubsumptionTable::CallHistoryIndexedTable::insert(
   current->entryList.push_back(entry);
 }
 
-std::pair<SubsumptionTable::EntryIterator, SubsumptionTable::EntryIterator>
-SubsumptionTable::CallHistoryIndexedTable::find(
+std::pair<TxSubsumptionTable::EntryIterator, TxSubsumptionTable::EntryIterator>
+TxSubsumptionTable::CallHistoryIndexedTable::find(
     const std::vector<llvm::Instruction *> &callHistory, bool &found) const {
   Node *current = root;
   std::pair<EntryIterator, EntryIterator> ret;
@@ -1739,7 +1743,7 @@ SubsumptionTable::CallHistoryIndexedTable::find(
                                                  current->entryList.rend());
 }
 
-void SubsumptionTable::CallHistoryIndexedTable::printNode(
+void TxSubsumptionTable::CallHistoryIndexedTable::printNode(
     llvm::raw_ostream &stream, Node *n, std::string edges) const {
   for (std::map<llvm::Instruction *, Node *>::const_iterator
            it = n->next.begin(),
@@ -1752,21 +1756,21 @@ void SubsumptionTable::CallHistoryIndexedTable::printNode(
   }
 }
 
-void SubsumptionTable::CallHistoryIndexedTable::print(llvm::raw_ostream &stream)
-    const {
+void TxSubsumptionTable::CallHistoryIndexedTable::print(
+    llvm::raw_ostream &stream) const {
   root->print(stream);
   printNode(stream, root, "");
 }
 
 /**/
 
-std::map<uintptr_t, SubsumptionTable::CallHistoryIndexedTable *>
-SubsumptionTable::instance;
+std::map<uintptr_t, TxSubsumptionTable::CallHistoryIndexedTable *>
+TxSubsumptionTable::instance;
 
 void
-SubsumptionTable::insert(uintptr_t id,
-                         const std::vector<llvm::Instruction *> &callHistory,
-                         SubsumptionTableEntry *entry) {
+TxSubsumptionTable::insert(uintptr_t id,
+                           const std::vector<llvm::Instruction *> &callHistory,
+                           TxSubsumptionTableEntry *entry) {
   CallHistoryIndexedTable *subTable = 0;
 
   TxTree::entryNumber++; // Count of entries in the table
@@ -1784,8 +1788,8 @@ SubsumptionTable::insert(uintptr_t id,
   subTable->insert(callHistory, entry);
 }
 
-bool SubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
-                             double timeout, int debugSubsumptionLevel) {
+bool TxSubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
+                               double timeout, int debugSubsumptionLevel) {
   CallHistoryIndexedTable *subTable = 0;
   TxTreeNode *txTreeNode = state.txTreeNode;
 
@@ -1851,7 +1855,7 @@ bool SubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
   return false;
 }
 
-void SubsumptionTable::clear() {
+void TxSubsumptionTable::clear() {
   for (std::map<uintptr_t, CallHistoryIndexedTable *>::iterator
            it = instance.begin(),
            ie = instance.end();
@@ -1904,7 +1908,7 @@ void TxTree::printTimeStat(std::stringstream &stream) {
 }
 
 void TxTree::printTableStat(std::stringstream &stream) {
-  SubsumptionTableEntry::printStat(stream);
+  TxSubsumptionTableEntry::printStat(stream);
 
   stream
       << "KLEE: done:     Average table entries per subsumption checkpoint = "
@@ -1990,7 +1994,8 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
 
   TimerStatIncrementer t(subsumptionCheckTime);
 
-  return SubsumptionTable::check(solver, state, timeout, debugSubsumptionLevel);
+  return TxSubsumptionTable::check(solver, state, timeout,
+                                   debugSubsumptionLevel);
 #endif
   return false;
 }
@@ -2030,10 +2035,10 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
                      node->getNodeSequenceNumber());
       }
 
-      SubsumptionTableEntry *entry =
-          new SubsumptionTableEntry(node, node->entryCallHistory);
-      SubsumptionTable::insert(node->getProgramPoint(), node->entryCallHistory,
-                               entry);
+      TxSubsumptionTableEntry *entry =
+          new TxSubsumptionTableEntry(node, node->entryCallHistory);
+      TxSubsumptionTable::insert(node->getProgramPoint(),
+                                 node->entryCallHistory, entry);
 
       TxTreeGraph::addTableEntryMapping(node, entry);
 
@@ -2154,7 +2159,7 @@ void TxTree::print(llvm::raw_ostream &stream) const {
   this->printNode(stream, this->root, "");
   stream << "\n------------------------- Subsumption Table "
             "-------------------------\n";
-  SubsumptionTable::print(stream);
+  TxSubsumptionTable::print(stream);
 }
 
 void TxTree::dump() const { this->print(llvm::errs()); }
@@ -2215,8 +2220,8 @@ TxTreeNode::TxTreeNode(
   }
 
   // Inherit the abstract dependency or NULL
-  dependency = new Dependency(_parent ? _parent->dependency : 0, _targetData,
-                              _globalAddresses);
+  dependency = new TxDependency(_parent ? _parent->dependency : 0, _targetData,
+                                _globalAddresses);
 }
 
 TxTreeNode::~TxTreeNode() {
@@ -2234,7 +2239,7 @@ ref<Expr> TxTreeNode::getInterpolant(
 
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
   TimerStatIncrementer t(addConstraintTime);
-  ref<PCConstraint> pcConstraint =
+  ref<TxPCConstraint> pcConstraint =
       dependency->addConstraint(constraint, condition, callHistory);
   graph->addPathCondition(this, pcConstraint.get(), constraint);
 }

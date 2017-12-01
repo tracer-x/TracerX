@@ -27,9 +27,9 @@ namespace klee {
 
 class ExecutionState;
 
-class PCConstraint;
+class TxPCConstraint;
 
-class SubsumptionTableEntry;
+class TxSubsumptionTableEntry;
 
 class TxTreeNode;
 
@@ -66,7 +66,8 @@ private:
     bool subsumed;
 
     /// \brief Conditions under which this node is visited from its parent
-    std::map<PCConstraint *, std::pair<std::string, bool> > pathConditionTable;
+    std::map<TxPCConstraint *, std::pair<std::string, bool> >
+    pathConditionTable;
 
     /// \brief Human-readable identifier of this node
     std::string name;
@@ -130,9 +131,9 @@ private:
 
   TxTreeGraph::Node *root;
   std::map<TxTreeNode *, TxTreeGraph::Node *> txTreeNodeMap;
-  std::map<SubsumptionTableEntry *, TxTreeGraph::Node *> tableEntryMap;
+  std::map<TxSubsumptionTableEntry *, TxTreeGraph::Node *> tableEntryMap;
   std::vector<TxTreeGraph::NumberedEdge *> subsumptionEdges;
-  std::map<PCConstraint *, TxTreeGraph::Node *> pathConditionMap;
+  std::map<TxPCConstraint *, TxTreeGraph::Node *> pathConditionMap;
 
   /// \brief The set of known leaves
   std::set<TxTreeGraph::Node *> leaves;
@@ -180,16 +181,16 @@ public:
                              const uint64_t _nodeSequenceNumber);
 
   static void markAsSubsumed(TxTreeNode *txTreeNode,
-                             SubsumptionTableEntry *entry);
+                             TxSubsumptionTableEntry *entry);
 
   static void addPathCondition(TxTreeNode *txTreeNode,
-                               PCConstraint *pathCondition,
+                               TxPCConstraint *pathCondition,
                                ref<Expr> condition);
 
   static void addTableEntryMapping(TxTreeNode *txTreeNode,
-                                   SubsumptionTableEntry *entry);
+                                   TxSubsumptionTableEntry *entry);
 
-  static void setAsCore(PCConstraint *pathCondition);
+  static void setAsCore(TxPCConstraint *pathCondition);
 
   static void setError(const ExecutionState &state,
                        TxTreeGraph::Error errorType);

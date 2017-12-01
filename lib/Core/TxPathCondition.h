@@ -23,7 +23,7 @@
 namespace klee {
 
 /// \brief A conjunct on the path condition
-class PCConstraint {
+class TxPCConstraint {
 public:
   unsigned refCount;
 
@@ -49,16 +49,16 @@ private:
   uint64_t depth;
 
 public:
-  PCConstraint(ref<Expr> _constraint, ref<TxStateValue> _condition,
-               uint64_t _depth);
+  TxPCConstraint(ref<Expr> _constraint, ref<TxStateValue> _condition,
+                 uint64_t _depth);
 
-  ~PCConstraint();
+  ~TxPCConstraint();
 
   ref<Expr> packInterpolant(std::set<const Array *> &replacements);
 
   uint64_t getDepth() const { return depth; }
 
-  int compare(const PCConstraint &other) const;
+  int compare(const TxPCConstraint &other) const;
 
   void dump() const;
 
@@ -67,13 +67,13 @@ public:
 
 class TxPathCondition {
   /// \brief The path condition, with the levels each one is introduced
-  std::map<ref<Expr>, ref<PCConstraint> > pcDepth;
+  std::map<ref<Expr>, ref<TxPCConstraint> > pcDepth;
 
   /// \brief Store elements used by left path
-  std::set<ref<PCConstraint> > usedByLeftPath;
+  std::set<ref<TxPCConstraint> > usedByLeftPath;
 
   /// \brief Store elements used by right path
-  std::set<ref<PCConstraint> > usedByRightPath;
+  std::set<ref<TxPCConstraint> > usedByRightPath;
 
   /// \brief The depth level of this store
   uint64_t depth;
@@ -102,8 +102,8 @@ public:
 
   void setRightChild(TxPathCondition *child) { right = child; }
 
-  ref<PCConstraint> addConstraint(ref<Expr> constraint,
-                                  ref<TxStateValue> condition);
+  ref<TxPCConstraint> addConstraint(ref<Expr> constraint,
+                                    ref<TxStateValue> condition);
 
   void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore);
 

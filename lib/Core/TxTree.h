@@ -26,14 +26,26 @@
 #include "klee/util/ExprVisitor.h"
 #include "klee/util/TxTreeGraph.h"
 
-#include "Dependency.h"
-
 #include "llvm/Support/raw_ostream.h"
+#include "TxDependency.h"
 
 namespace klee {
 
-class SubsumptionTable {
-  typedef std::deque<SubsumptionTableEntry *>::const_reverse_iterator
+/// \brief The subsumption table.
+///
+/// This is the database of states that have been generalized by the
+/// interpolation process to be used in subsuming other states. This
+/// member variable is a map indexed by code fragment id, which is the
+/// pointer value of the first instruction of a basic block. It
+/// represents control location in a program. In a subsumption check,
+/// the map is queried for such id of a state. If the entry of the id
+/// is found in the subsumption table, then the corresponding
+/// subsubmption table entries are compared against the state,
+/// possibly via a call to the constraint solver.
+///
+/// \see TxSubsumptionTableEntry
+class TxSubsumptionTable {
+  typedef std::deque<TxSubsumptionTableEntry *>::const_reverse_iterator
   EntryIterator;
 
   class CallHistoryIndexedTable {
@@ -42,7 +54,7 @@ class SubsumptionTable {
 
       llvm::Instruction *id;
 
-      std::deque<SubsumptionTableEntry *> entryList;
+      std::deque<TxSubsumptionTableEntry *> entryList;
 
       std::map<llvm::Instruction *, Node *> next;
 
@@ -72,7 +84,7 @@ class SubsumptionTable {
     void clearTree(Node *node);
 
     void insert(const std::vector<llvm::Instruction *> &callHistory,
-                SubsumptionTableEntry *entry);
+                TxSubsumptionTableEntry *entry);
 
     std::pair<EntryIterator, EntryIterator>
     find(const std::vector<llvm::Instruction *> &callHistory,
@@ -91,7 +103,7 @@ class SubsumptionTable {
 public:
   static void insert(uintptr_t id,
                      const std::vector<llvm::Instruction *> &callHistory,
-                     SubsumptionTableEntry *entry);
+                     TxSubsumptionTableEntry *entry);
 
   static bool check(TimingSolver *solver, ExecutionState &state, double timeout,
                     int debugSubsumptionLevel);
@@ -123,12 +135,12 @@ public:
 /// This class implements an entry in the subsumption table. It is
 /// instantiated when the a traversal of a symbolic execution subtree has
 /// finished in the TxTree#remove method. This class basically stores a
-/// subset of the path condition (the SubsumptionTableEntry#interpolant
+/// subset of the path condition (the TxSubsumptionTableEntry#interpolant
 /// field), plus the fragment of memory (allocations). They are components
 /// that are needed to ensure the previously-seen conclusions. The memory
 /// fragments are stored in either
-/// SubsumptionTableEntry#concretelyAddressedStore
-/// or SubsumptionTableEntry#symbolicallyAddressedStore, depending on whether
+/// TxSubsumptionTableEntry#concretelyAddressedStore
+/// or TxSubsumptionTableEntry#symbolicallyAddressedStore, depending on whether
 /// the memory fragment is concretely addressed or symbolically addressed.
 /// Both fields are multi-level maps that are first indexed by the LLVM
 /// value that represents the allocation (e.g., the call to <b>malloc</b>,
@@ -136,8 +148,9 @@ public:
 ///
 /// \see TxTree
 /// \see TxTreeNode
-/// \see Dependency
-class SubsumptionTableEntry {
+/// \see TxDependency
+/// \see TxSubsumptionTable
+class TxSubsumptionTableEntry {
   friend class TxTree;
 
 #ifdef ENABLE_Z3
@@ -174,7 +187,7 @@ class SubsumptionTableEntry {
       ref<TxInterpolantValue> stateValue, ref<Expr> tabledOffset,
       ref<Expr> stateOffset, std::set<ref<TxStateValue> > &coreValues,
       std::map<ref<TxStateValue>, std::set<uint64_t> > &corePointerValues,
-      std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+      std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases,
       int debugSubsumptionLevel) const;
 
   /// \brief Test for the existence of a variable in a set in an expression.
@@ -280,10 +293,10 @@ public:
 
   const uint64_t nodeSequenceNumber;
 
-  SubsumptionTableEntry(TxTreeNode *node,
-                        const std::vector<llvm::Instruction *> &callHistory);
+  TxSubsumptionTableEntry(TxTreeNode *node,
+                          const std::vector<llvm::Instruction *> &callHistory);
 
-  ~SubsumptionTableEntry();
+  ~TxSubsumptionTableEntry();
 
   bool subsumed(
       TimingSolver *solver, ExecutionState &state, double timeout,
@@ -323,14 +336,15 @@ public:
 /// Each Tracer-X tree node has an associated KLEE execution state
 /// (implemented using the type ExecutionState) from which it is referenced
 /// via the member variable ExecutionState#txTreeNode.
-/// It adds information for abstraction learning to the ExecutionState object.
+/// It adds information for lazy annotation to the ExecutionState object.
 /// The whole structure of the Tracer-X tree itself is maintained by
 /// the class TxTree, which also refers to objects of type TxTreeNode via
 /// its TxTree#root and TxTree#currentTxTreeNode member variables.
 ///
 /// \see TxTree
-/// \see Dependency
-/// \see SubsumptionTableEntry
+/// \see TxDependency
+/// \see TxSubsumptionTable
+/// \see TxSubsumptionTableEntry
 class TxTreeNode {
   friend class TxTree;
 
@@ -353,7 +367,7 @@ class TxTreeNode {
   static uint64_t nextNodeSequenceNumber;
 
   /// \brief Value dependencies
-  Dependency *dependency;
+  TxDependency *dependency;
 
   TxTreeNode *parent, *left, *right;
 
@@ -538,63 +552,53 @@ public:
   void print(llvm::raw_ostream &stream) const;
 };
 
-/// \brief The top-level structure that implements abstraction learning.
+/// \brief The top-level structure that implements lazy annotation.
 ///
-/// The TxTree is just the symbolic execution tree, a parallel of what is implemented
-/// by KLEE's existing PTree class, however, it implements shadow information for use
-/// in abstraction learning. Each node of the tree is implemented by
-/// the TxTreeNode class. The TxTree class itself contains several important
+/// The TxTree is the symbolic execution tree, a parallel of what is implemented
+/// by KLEE's existing PTree class. It implements shadow information for use
+/// in lazy annotation. Each node of the tree is implemented by
+/// the TxTreeNode class. The TxTree class itself contains two important
 /// components:
 ///
-/// 1. The subsumption table (as the member variable TxTree#subsumptionTable).
-/// This is the
-///    database of states that have been generalized by the interpolation
-/// process
-///    to be used in subsuming other states. This member variable is a map
-/// indexed
-///    by code fragment id, which is the pointer value of the first instruction
-///    of a basic block. It represents control location in a program. In a
-///    subsumption check, the map is queried for such id of a state. If the
-///    entry of the id is found in the subsumption table, then the corresponding
-///    subsubmption table entries are compared against the state, possibly via a
-///    call to the constraint solver.
-///
-/// 2. The root of the Tracer-X tree, which is an object of type TxTreeNode,
+/// 1. The root of the Tracer-X tree, which is an object of type TxTreeNode,
 ///    and referenced by the member TxTree#root.
 ///
-/// 3. The currently-active tree node, which is also an object of
+/// 2. The currently-active tree node, which is also an object of
 ///    type TxTreeNode, and referenced by the member TxTree#currentTxTreeNode.
 ///
 /// TxTree has several public member functions, most importantly, the various
-/// versions of
-/// the TxTree::execute member function. The TxTree::execute member functions are
-/// called mainly from
-/// the Executor class. The Executor class is the core symbolic executor of
-/// KLEE.
-/// Hooks are implemented in the Executor class that calls various polymorphic
-/// variants of TxTree::execute. The main functionality of the TxTree::execute
-/// themselves is to simply delegate the call to Dependency::execute, which
-/// implements the shadow memory dependency computation used in computing the
-/// regions of memory that need to be kept as part of the interpolant stored
-/// in the subsumption table.
+/// versions of the TxTree#execute function, including TxTree#executePHI,
+/// TxTree#executeMemoryOperation, TxTree#executeOnNode. These are called mainly
+/// from
+/// KLEE's Executor class, which is the core symbolic executor of KLEE.
+/// The main functionality of the TxTree#execute versions
+/// themselves is to simply delegate the call to TxDependency#execute and related
+/// functions, which
+/// implements the construction of memory dependency used in computing the
+/// regions of memory
+/// that need to be kept as part of the interpolant stored in the subsumption
+/// table.
 ///
-/// The member functions TxTree::store and TxTree::subsumptionCheck implement the
-/// subsumption checking mechanism. TxTree::store is called from the
-/// TxTree::remove
-/// member function, which is invoked when the symbolic execution emanating from
-/// a certain
-/// state has finished and the state is to be removed. The completion of
+/// The member function TxTree#subsumptionCheck is the topmost interface to the
+/// subsumption checking mechanism. The function consults the subsumption table
+/// (implemented by the TxSubsumptionTable class)
+/// to compare the current state to a state stored in the subsumption table.
+/// TxSubsumptionTable#insert is called from the
+/// TxTree#remove member function, which is invoked when the symbolic execution
+/// starting from a certain
+/// state has completed and the state is to be removed. The completion of
 /// the symbolic execution here is assumed to mean that the interpolants have
-/// been
-/// completely recorded from all the execution paths emanating from the state.
-/// The TxTree::store member functions builds an object of SubsumptionTableEntry
-/// and stores
-/// it in the subsumption table (member variable TxTree#subsumptionTable).
+/// been completely recorded from all the execution paths that start from the
+/// state.
+/// The TxTree#subsumptionCheck function builds an object of
+/// TxSubsumptionTableEntry
+/// and stores it in the subsumption table via a call to
+/// TxSubsumptionTable#insert.
 ///
 /// To see how everything fits together, first we explain the important parts of
 /// KLEE's
 /// algorithm, and then we explain the modifications to KLEE's algorithm for
-/// abstraction learning.
+/// lazy annotation.
 ///
 /// Following is the pseudocode of KLEE relevant to our discussion:
 ///
@@ -604,8 +608,9 @@ public:
 /// 2. While there are leaves, do the following:
 ///    a. Pick a leaf
 ///    b. Symbolically execute the instruction:
-///       i. If it is a branch, test if one of branches unsatisfiable
-///          * If it is, execute the instruction without creating tree node
+///       i. If it is a branch instruction, test if one of branches is
+/// unsatisfiable
+///          * If yes, execute the instruction without creating tree node
 ///          * Otherwise, generate the two tree nodes for the branches
 ///       ii. If it is an error/end point, register the leaf for deletion
 ///    c. Delete nodes registered for deletion. Recursively, if a
@@ -616,7 +621,7 @@ public:
 ///
 /// For comparison, following is the pseudocode of Tracer-X KLEE. Please note that to
 /// support interpolation, each leaf is now augmented with a path condition.
-/// We highlight the added procedures using CAPITAL LETTERS, and we note the member
+/// We highlight the added procedures using CAPITAL LETTERS, and we note the
 /// functions involved.
 ///
 /// <hr>
@@ -630,8 +635,9 @@ public:
 ///       iii. GOTO d
 ///    c. Symbolically execute the instruction (TxTree::execute, TxTree::executePHI,
 ///       TxTree::executeMemoryOperation, TxTree::executeOnNode):
-///       i. If it is a branch, test if one of branches unsatisfiable
-///          * If it is, execute the instruction without creating tree node
+///       i. If it is a branch instruction, test if one of branches is
+/// unsatisfiable
+///          * If yes, execute the instruction without creating tree node
 ///            MARK CONSTRAINTS NEEDED FOR UNSATISFIABILITY
 ///            (TxTree::markPathCondition)
 ///          * Otherwise, generate the two tree nodes for the branches
@@ -642,14 +648,15 @@ public:
 ///       parent tree node is found to no longer have any children,
 ///       delete the parent as well, and recursively its parent
 ///       FOR EACH DELETED NODE, STORE MARKED
-///       CONSTRAINTS ON PC AS INTERPOLANT (TxTree::store)
+///       CONSTRAINTS ON PC AS INTERPOLANT (TxSubsumptionTable::insert)
 /// </pre>
 /// <hr>
 ///
 /// \see TxTreeNode
-/// \see Dependency
+/// \see TxDependency
 /// \see Executor
-/// \see SubsumptionTableEntry
+/// \see TxSubsumptionTable
+/// \see TxSubsumptionTableEntry
 class TxTree {
   typedef std::vector<ref<Expr> > ExprList;
   typedef ExprList::iterator iterator;
@@ -709,7 +716,7 @@ public:
          std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
              _globalAddresses);
 
-  ~TxTree() { SubsumptionTable::clear(); }
+  ~TxTree() { TxSubsumptionTable::clear(); }
 
   /// \brief Set the reference to the KLEE state in the current interpolation
   /// data holder (Tracer-X tree node) that is currently being processed.

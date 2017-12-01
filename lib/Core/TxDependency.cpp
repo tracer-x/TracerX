@@ -14,14 +14,14 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "Dependency.h"
-#include "Context.h"
-#include "ShadowArray.h"
+#include "TxDependency.h"
 
+#include "Context.h"
 #include "klee/CommandLine.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "klee/util/GetElementPtrTypeIterator.h"
 #include "klee/util/TxPrintUtil.h"
+#include "TxShadowArray.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
@@ -45,7 +45,7 @@ using namespace klee;
 
 namespace klee {
 
-bool Dependency::isMainArgument(const llvm::Value *loc) {
+bool TxDependency::isMainArgument(const llvm::Value *loc) {
   const llvm::Argument *vArg = llvm::dyn_cast<llvm::Argument>(loc);
 
   // FIXME: We need a more precise way to detect main argument
@@ -58,16 +58,15 @@ bool Dependency::isMainArgument(const llvm::Value *loc) {
 }
 
 ref<TxStateValue>
-Dependency::registerNewTxStateValue(llvm::Value *value,
-                                    ref<TxStateValue> vvalue) {
+TxDependency::registerNewTxStateValue(llvm::Value *value,
+                                      ref<TxStateValue> vvalue) {
   valuesMap[value].push_back(vvalue);
   return vvalue;
 }
 
-ref<TxStateValue>
-Dependency::getLatestValue(llvm::Value *value,
-                           const std::vector<llvm::Instruction *> &callHistory,
-                           ref<Expr> valueExpr, bool allowInconsistency) {
+ref<TxStateValue> TxDependency::getLatestValue(
+    llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,
+    ref<Expr> valueExpr, bool allowInconsistency) {
   assert(value && !valueExpr.isNull() && "value cannot be null");
 
   ref<TxStateValue> ret;
@@ -81,7 +80,7 @@ Dependency::getLatestValue(llvm::Value *value,
   return ret;
 }
 
-ref<TxStateValue> Dependency::getLatestValueNoConstantCheck(
+ref<TxStateValue> TxDependency::getLatestValueNoConstantCheck(
     llvm::Value *value, ref<Expr> valueExpr, bool allowInconsistency) const {
   assert(value && "value cannot be null");
 
@@ -125,8 +124,8 @@ ref<TxStateValue> Dependency::getLatestValueNoConstantCheck(
   return 0;
 }
 
-ref<TxStateValue> Dependency::getLatestValueForMarking(llvm::Value *val,
-                                                       ref<Expr> expr) {
+ref<TxStateValue> TxDependency::getLatestValueForMarking(llvm::Value *val,
+                                                         ref<Expr> expr) {
   ref<TxStateValue> value = getLatestValueNoConstantCheck(val, expr);
 
   // Right now we simply ignore the __dso_handle values. They are due
@@ -149,17 +148,17 @@ ref<TxStateValue> Dependency::getLatestValueForMarking(llvm::Value *val,
   return value;
 }
 
-void Dependency::addDependency(ref<TxStateValue> source,
-                               ref<TxStateValue> target) {
+void TxDependency::addDependency(ref<TxStateValue> source,
+                                 ref<TxStateValue> target) {
   if (source.isNull() || target.isNull())
     return;
 
   addDependencyOfPossiblePointer(source, target);
 }
 
-void Dependency::addTwoDependencies(ref<TxStateValue> source1,
-                                    ref<TxStateValue> source2,
-                                    ref<TxStateValue> target) {
+void TxDependency::addTwoDependencies(ref<TxStateValue> source1,
+                                      ref<TxStateValue> source2,
+                                      ref<TxStateValue> target) {
   if (source1.isNull() || source2.isNull() || target.isNull())
     return;
 
@@ -179,8 +178,8 @@ void Dependency::addTwoDependencies(ref<TxStateValue> source1,
   }
 }
 
-void Dependency::addDependencyOfPossiblePointer(ref<TxStateValue> source,
-                                                ref<TxStateValue> target) {
+void TxDependency::addDependencyOfPossiblePointer(ref<TxStateValue> source,
+                                                  ref<TxStateValue> target) {
   if (source.isNull() || target.isNull())
     return;
 
@@ -197,9 +196,9 @@ void Dependency::addDependencyOfPossiblePointer(ref<TxStateValue> source,
   target->addDependency(source);
 }
 
-void Dependency::addDependencyWithOffset(ref<TxStateValue> source,
-                                         ref<TxStateValue> target,
-                                         ref<Expr> offsetDelta) {
+void TxDependency::addDependencyWithOffset(ref<TxStateValue> source,
+                                           ref<TxStateValue> target,
+                                           ref<Expr> offsetDelta) {
   if (source.isNull() || target.isNull())
     return;
 
@@ -218,40 +217,40 @@ void Dependency::addDependencyWithOffset(ref<TxStateValue> source,
   uint64_t a = ce ? ce->getZExtValue() : 0;
 
   ConstantExpr *be = llvm::dyn_cast<ConstantExpr>(pointerInfo->getBase());
-    uint64_t b = be ? be->getZExtValue() : 0;
+  uint64_t b = be ? be->getZExtValue() : 0;
 
-    ConstantExpr *oe = llvm::dyn_cast<ConstantExpr>(pointerInfo->getOffset());
-    uint64_t o = (oe ? oe->getZExtValue() : 0) + d;
+  ConstantExpr *oe = llvm::dyn_cast<ConstantExpr>(pointerInfo->getOffset());
+  uint64_t o = (oe ? oe->getZExtValue() : 0) + d;
 
-    // The following if conditional implements a mechanism to
-    // only add memory locations that make sense; that is, when
-    // the offset is address minus base
-    if (!(ce && de && be && oe && o != (a - b) && (b != 0))) {
-      target->addPointerInfo(
-          TxStateAddress::create(pointerInfo, targetExpr, offsetDelta));
-    }
+  // The following if conditional implements a mechanism to
+  // only add memory locations that make sense; that is, when
+  // the offset is address minus base
+  if (!(ce && de && be && oe && o != (a - b) && (b != 0))) {
+    target->addPointerInfo(
+        TxStateAddress::create(pointerInfo, targetExpr, offsetDelta));
+  }
 
-    target->addDependency(source);
+  target->addDependency(source);
 }
 
-void Dependency::addDependencyViaExternalFunction(
+void TxDependency::addDependencyViaExternalFunction(
     const std::vector<llvm::Instruction *> &callHistory,
     ref<TxStateValue> source, ref<TxStateValue> target) {
   if (source.isNull() || target.isNull())
     return;
 
   if (source->isPointer()) {
-      std::string reason = "";
-      if (debugSubsumptionLevel >= 1) {
-        llvm::raw_string_ostream stream(reason);
-        stream << "parameter [";
-        source->getValue()->print(stream);
-        stream << "] of external call [";
-        target->getValue()->print(stream);
-        stream << "]";
-        stream.flush();
-      }
-      store->markPointerFlow(source, source, reason);
+    std::string reason = "";
+    if (debugSubsumptionLevel >= 1) {
+      llvm::raw_string_ostream stream(reason);
+      stream << "parameter [";
+      source->getValue()->print(stream);
+      stream << "] of external call [";
+      target->getValue()->print(stream);
+      stream << "]";
+      stream.flush();
+    }
+    store->markPointerFlow(source, source, reason);
   }
 
   // Add new location to the target in case of pointer return value
@@ -272,15 +271,15 @@ void Dependency::addDependencyViaExternalFunction(
   addDependencyToNonPointer(source, target);
 }
 
-void Dependency::addDependencyToNonPointer(ref<TxStateValue> source,
-                                           ref<TxStateValue> target) {
+void TxDependency::addDependencyToNonPointer(ref<TxStateValue> source,
+                                             ref<TxStateValue> target) {
   if (source.isNull() || target.isNull())
     return;
 
   target->addDependency(source);
 }
 
-void Dependency::populateArgumentValuesList(
+void TxDependency::populateArgumentValuesList(
     llvm::CallInst *site, const std::vector<llvm::Instruction *> &callHistory,
     std::vector<ref<Expr> > &arguments,
     std::vector<ref<TxStateValue> > &argumentValuesList) {
@@ -301,8 +300,8 @@ void Dependency::populateArgumentValuesList(
   }
 }
 
-Dependency::Dependency(
-    Dependency *parent, llvm::DataLayout *_targetData,
+TxDependency::TxDependency(
+    TxDependency *parent, llvm::DataLayout *_targetData,
     std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses)
     : parent(parent), left(0), right(0), targetData(_targetData),
       globalAddresses(_globalAddresses) {
@@ -324,7 +323,7 @@ Dependency::Dependency(
   }
 }
 
-Dependency::~Dependency() {
+TxDependency::~TxDependency() {
   // Delete valuesMap
   for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
            it = valuesMap.begin(),
@@ -337,12 +336,12 @@ Dependency::~Dependency() {
   valuesMap.clear();
 }
 
-Dependency *Dependency::cdr() const { return parent; }
+TxDependency *TxDependency::cdr() const { return parent; }
 
-void Dependency::execute(llvm::Instruction *instr,
-                         const std::vector<llvm::Instruction *> &callHistory,
-                         std::vector<ref<Expr> > &args,
-                         bool symbolicExecutionError) {
+void TxDependency::execute(llvm::Instruction *instr,
+                           const std::vector<llvm::Instruction *> &callHistory,
+                           std::vector<ref<Expr> > &args,
+                           bool symbolicExecutionError) {
   // The basic design principle that we need to be careful here
   // is that we should not store quadratic-sized structures in
   // the database of computed relations, e.g., not storing the
@@ -354,11 +353,12 @@ void Dependency::execute(llvm::Instruction *instr,
     llvm::Function *f = callInst->getCalledFunction();
 
     if (!f) {
-	// Handles the case when the callee is wrapped within another expression
-	llvm::ConstantExpr *calledValue = llvm::dyn_cast<llvm::ConstantExpr>(callInst->getCalledValue());
-	if (calledValue && calledValue->getOperand(0)) {
-	    f = llvm::dyn_cast<llvm::Function>(calledValue->getOperand(0));
-	}
+      // Handles the case when the callee is wrapped within another expression
+      llvm::ConstantExpr *calledValue =
+          llvm::dyn_cast<llvm::ConstantExpr>(callInst->getCalledValue());
+      if (calledValue && calledValue->getOperand(0)) {
+        f = llvm::dyn_cast<llvm::Function>(calledValue->getOperand(0));
+      }
     }
 
     if (f && f->getIntrinsicID() == llvm::Intrinsic::not_intrinsic) {
@@ -923,7 +923,7 @@ void Dependency::execute(llvm::Instruction *instr,
   assert(!"unhandled instruction arguments number");
 }
 
-void Dependency::executeMakeSymbolic(
+void TxDependency::executeMakeSymbolic(
     llvm::Instruction *instr,
     const std::vector<llvm::Instruction *> &callHistory, ref<Expr> address,
     const Array *array) {
@@ -950,10 +950,10 @@ void Dependency::executeMakeSymbolic(
                      storedValue);
 }
 
-void Dependency::executePHI(llvm::Instruction *instr,
-                            unsigned int incomingBlock,
-                            const std::vector<llvm::Instruction *> &callHistory,
-                            ref<Expr> valueExpr, bool symbolicExecutionError) {
+void
+TxDependency::executePHI(llvm::Instruction *instr, unsigned int incomingBlock,
+                         const std::vector<llvm::Instruction *> &callHistory,
+                         ref<Expr> valueExpr, bool symbolicExecutionError) {
   llvm::PHINode *node = llvm::dyn_cast<llvm::PHINode>(instr);
   llvm::Value *llvmArgValue = node->getIncomingValue(incomingBlock);
   ref<TxStateValue> val = getLatestValue(llvmArgValue, callHistory, valueExpr);
@@ -968,7 +968,7 @@ void Dependency::executePHI(llvm::Instruction *instr,
   }
 }
 
-bool Dependency::executeMemoryOperation(
+bool TxDependency::executeMemoryOperation(
     llvm::Instruction *instr,
     const std::vector<llvm::Instruction *> &callHistory,
     std::vector<ref<Expr> > &args, bool inBounds, bool symbolicExecutionError) {
@@ -1026,9 +1026,9 @@ bool Dependency::executeMemoryOperation(
 }
 
 void
-Dependency::bindCallArguments(llvm::Instruction *i,
-                              std::vector<llvm::Instruction *> &callHistory,
-                              std::vector<ref<Expr> > &arguments) {
+TxDependency::bindCallArguments(llvm::Instruction *i,
+                                std::vector<llvm::Instruction *> &callHistory,
+                                std::vector<ref<Expr> > &arguments) {
   llvm::CallInst *site = llvm::dyn_cast<llvm::CallInst>(i);
 
   if (!site)
@@ -1062,9 +1062,10 @@ Dependency::bindCallArguments(llvm::Instruction *i,
   }
 }
 
-void Dependency::bindReturnValue(llvm::CallInst *site,
-                                 std::vector<llvm::Instruction *> &callHistory,
-                                 llvm::Instruction *i, ref<Expr> returnValue) {
+void
+TxDependency::bindReturnValue(llvm::CallInst *site,
+                              std::vector<llvm::Instruction *> &callHistory,
+                              llvm::Instruction *i, ref<Expr> returnValue) {
   llvm::ReturnInst *retInst = llvm::dyn_cast<llvm::ReturnInst>(i);
   if (site && retInst &&
       retInst->getReturnValue() // For functions returning void
@@ -1079,8 +1080,8 @@ void Dependency::bindReturnValue(llvm::CallInst *site,
   }
 }
 
-void Dependency::markAllValues(ref<TxStateValue> value,
-                               const std::string &reason) {
+void TxDependency::markAllValues(ref<TxStateValue> value,
+                                 const std::string &reason) {
   if (value.isNull())
     return;
 
@@ -1090,9 +1091,9 @@ void Dependency::markAllValues(ref<TxStateValue> value,
   store->markUsed(value->getDisableBoundEntryList());
 }
 
-bool Dependency::markAllPointerValues(ref<TxStateValue> value,
-                                      std::set<uint64_t> &bounds,
-                                      const std::string &reason) {
+bool TxDependency::markAllPointerValues(ref<TxStateValue> value,
+                                        std::set<uint64_t> &bounds,
+                                        const std::string &reason) {
   if (value.isNull())
     return false;
 
@@ -1104,7 +1105,7 @@ bool Dependency::markAllPointerValues(ref<TxStateValue> value,
 }
 
 /// \brief Tests if bound interpolation shold be enabled
-bool Dependency::boundInterpolation(llvm::Value *val) {
+bool TxDependency::boundInterpolation(llvm::Value *val) {
 #ifdef ENABLE_Z3
   if (SpecialFunctionBoundInterpolation) {
     if (!val)
@@ -1123,8 +1124,8 @@ bool Dependency::boundInterpolation(llvm::Value *val) {
 #endif // ENABLE_Z3
 }
 
-void Dependency::memoryBoundViolationInterpolation(llvm::Instruction *inst,
-                                                   ref<Expr> address) {
+void TxDependency::memoryBoundViolationInterpolation(llvm::Instruction *inst,
+                                                     ref<Expr> address) {
   // Memory bounds violation with constant address.
   llvm::Value *addressOperand;
 
@@ -1164,20 +1165,19 @@ void Dependency::memoryBoundViolationInterpolation(llvm::Instruction *inst,
   }
 }
 
-inline ref<TxStateValue> Dependency::createConstantValue(
+inline ref<TxStateValue> TxDependency::createConstantValue(
     llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,
     ref<Expr> expr) {
   if (value->getType()->isPointerTy()) {
-      llvm::Type *ty = value->getType()->getPointerElementType();
-      uint64_t size = ty->isSized() ? targetData->getTypeStoreSize(ty) : 0;
-      return getNewPointerValue(value, callHistory, expr, size);
+    llvm::Type *ty = value->getType()->getPointerElementType();
+    uint64_t size = ty->isSized() ? targetData->getTypeStoreSize(ty) : 0;
+    return getNewPointerValue(value, callHistory, expr, size);
   }
   return getNewTxStateValue(value, callHistory, expr);
 }
 
-ref<TxStateValue>
-Dependency::evalConstant(llvm::Constant *c,
-                         const std::vector<llvm::Instruction *> &callHistory) {
+ref<TxStateValue> TxDependency::evalConstant(
+    llvm::Constant *c, const std::vector<llvm::Instruction *> &callHistory) {
   if (llvm::ConstantExpr *ce = llvm::dyn_cast<llvm::ConstantExpr>(c)) {
     return evalConstantExpr(ce, callHistory);
   } else {
@@ -1258,7 +1258,7 @@ Dependency::evalConstant(llvm::Constant *c,
   }
 }
 
-ref<TxStateValue> Dependency::evalConstantExpr(
+ref<TxStateValue> TxDependency::evalConstantExpr(
     llvm::ConstantExpr *ce,
     const std::vector<llvm::Instruction *> &callHistory) {
   LLVM_TYPE_Q llvm::Type *type = ce->getType();
@@ -1534,12 +1534,12 @@ ref<TxStateValue> Dependency::evalConstantExpr(
 }
 
 /// \brief Print the content of the object to the LLVM error stream
-void Dependency::print(llvm::raw_ostream &stream) const {
+void TxDependency::print(llvm::raw_ostream &stream) const {
   this->print(stream, 0);
 }
 
-void Dependency::print(llvm::raw_ostream &stream,
-                       const unsigned paddingAmount) const {
+void TxDependency::print(llvm::raw_ostream &stream,
+                         const unsigned paddingAmount) const {
   std::string tabs = makeTabs(paddingAmount);
 
   pathCondition->print(stream, paddingAmount);
@@ -1552,5 +1552,4 @@ void Dependency::print(llvm::raw_ostream &stream,
     parent->print(stream, paddingAmount);
   }
 }
-
 }

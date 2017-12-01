@@ -1,4 +1,4 @@
-//===--- ShadowArray.h ------------------------------------------*- C++ -*-===//
+//===--- TxShadowArray.h ----------------------------------------*- C++ -*-===//
 //
 //               The Tracer-X KLEE Symbolic Virtual Machine
 //
@@ -8,7 +8,9 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file contains the declarations for the shadow array, which replaces KLEE arrays with their shadow counterparts as existentially-quantified variables in the interpolant.
+/// This file contains the declarations for the shadow array, which
+/// replaces KLEE arrays with their shadow counterparts as
+/// existentially-quantified variables in the interpolant.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -21,7 +23,7 @@ namespace klee {
 
   /// \brief Implements the replacement mechanism for replacing variables, used in
   /// replacing free with bound variables.
-  class ShadowArray {
+  class TxShadowArray {
     static std::map<const Array *, const Array *> shadowArray;
 
     static UpdateNode *getShadowUpdate(const UpdateNode *chain,
