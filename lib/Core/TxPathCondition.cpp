@@ -13,30 +13,31 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "ShadowArray.h"
 #include "TxPathCondition.h"
 
 #include "klee/CommandLine.h"
 #include "klee/util/TxExprUtil.h"
 #include "klee/util/TxTreeGraph.h"
+#include "TxShadowArray.h"
 
 using namespace klee;
 
 namespace klee {
 
-PCConstraint::PCConstraint(ref<Expr> _constraint, ref<TxStateValue> _condition,
-                           uint64_t _depth)
+TxPCConstraint::TxPCConstraint(ref<Expr> _constraint,
+                               ref<TxStateValue> _condition, uint64_t _depth)
     : refCount(0), constraint(_constraint), shadowConstraint(_constraint),
       shadowed(false), condition(_condition), depth(_depth) {}
 
-PCConstraint::~PCConstraint() {}
+TxPCConstraint::~TxPCConstraint() {}
 
-ref<Expr> PCConstraint::packInterpolant(std::set<const Array *> &replacements) {
+ref<Expr>
+TxPCConstraint::packInterpolant(std::set<const Array *> &replacements) {
   ref<Expr> res;
   if (!shadowed) {
 #ifdef ENABLE_Z3
     shadowConstraint =
-        (NoExistential ? constraint : ShadowArray::getShadowExpression(
+        (NoExistential ? constraint : TxShadowArray::getShadowExpression(
                                           constraint, replacements));
 #else
     shadowConstraint = constraint;
@@ -55,25 +56,27 @@ ref<Expr> PCConstraint::packInterpolant(std::set<const Array *> &replacements) {
   return res;
 }
 
-int PCConstraint::compare(const PCConstraint &other) const {
+int TxPCConstraint::compare(const TxPCConstraint &other) const {
   Expr &otherExpr = *(other.constraint.get());
   return constraint->compare(otherExpr);
 }
 
-void PCConstraint::dump() const {
+void TxPCConstraint::dump() const {
   this->print(llvm::errs());
   llvm::errs() << "\n";
 }
 
-void PCConstraint::print(llvm::raw_ostream &stream) const {
+void TxPCConstraint::print(llvm::raw_ostream &stream) const {
   constraint->print(stream);
 }
 
 /**/
 
-ref<PCConstraint> TxPathCondition::addConstraint(ref<Expr> constraint,
-                                                 ref<TxStateValue> condition) {
-  ref<PCConstraint> pcConstraint(new PCConstraint(constraint, condition, depth));
+ref<TxPCConstraint>
+TxPathCondition::addConstraint(ref<Expr> constraint,
+                               ref<TxStateValue> condition) {
+  ref<TxPCConstraint> pcConstraint(
+      new TxPCConstraint(constraint, condition, depth));
   pcDepth[constraint] = pcConstraint;
   if (llvm::isa<OrExpr>(constraint)) {
     // FIXME: Break up disjunction into its components, because each disjunct is
@@ -88,19 +91,19 @@ ref<PCConstraint> TxPathCondition::addConstraint(ref<Expr> constraint,
 
 void TxPathCondition::unsatCoreInterpolation(
     const std::vector<ref<Expr> > &unsatCore) {
-  std::map<uint64_t, std::set<ref<PCConstraint> > > depthToConstraintSet;
+  std::map<uint64_t, std::set<ref<TxPCConstraint> > > depthToConstraintSet;
   std::set<uint64_t> keySet;
   std::vector<uint64_t> sortedKeys;
 
   for (std::vector<ref<Expr> >::const_iterator it = unsatCore.begin(),
                                                ie = unsatCore.end();
        it != ie; ++it) {
-    std::map<ref<Expr>, ref<PCConstraint> >::iterator pcDepthIter =
+    std::map<ref<Expr>, ref<TxPCConstraint> >::iterator pcDepthIter =
         pcDepth.find(*it);
     // FIXME: Sometimes some constraints are not in the PC. This is
     // because constraints are not properly added at state merge.
     if (pcDepthIter != pcDepth.end()) {
-      ref<PCConstraint> &pcConstraint = pcDepthIter->second;
+      ref<TxPCConstraint> &pcConstraint = pcDepthIter->second;
       depthToConstraintSet[pcConstraint->getDepth()].insert(pcConstraint);
       keySet.insert(pcConstraint->getDepth());
 
@@ -115,11 +118,11 @@ void TxPathCondition::unsatCoreInterpolation(
 
   std::sort(sortedKeys.begin(), sortedKeys.end());
 
-  std::set<ref<PCConstraint> > currentSet;
+  std::set<ref<TxPCConstraint> > currentSet;
   for (std::vector<uint64_t>::iterator it = sortedKeys.begin(),
                                        ie = sortedKeys.end();
        it != ie; ++it) {
-    std::set<ref<PCConstraint> > &constraintSet = depthToConstraintSet[*it];
+    std::set<ref<TxPCConstraint> > &constraintSet = depthToConstraintSet[*it];
     currentSet.insert(constraintSet.begin(), constraintSet.end());
     depthToConstraintSet[*it] = currentSet;
   }
@@ -128,7 +131,7 @@ void TxPathCondition::unsatCoreInterpolation(
                                                ie = sortedKeys.rend();
        it != ie; ++it) {
     uint64_t constraintDepth = *it;
-    std::set<ref<PCConstraint> > &constraintSet =
+    std::set<ref<TxPCConstraint> > &constraintSet =
         depthToConstraintSet[constraintDepth];
     TxPathCondition *currentPC = this;
 
@@ -150,7 +153,7 @@ ref<Expr> TxPathCondition::packInterpolant(
     std::set<const Array *> &replacements,
     std::map<ref<Expr>, ref<Expr> > &substitution) const {
   ref<Expr> res;
-  std::set<ref<PCConstraint> > *usedList;
+  std::set<ref<TxPCConstraint> > *usedList;
   std::vector<ref<Expr> > constraintsList;
 
   if (parent) {
@@ -160,8 +163,8 @@ ref<Expr> TxPathCondition::packInterpolant(
       usedList = &(parent->usedByRightPath);
     }
 
-    for (std::set<ref<PCConstraint> >::iterator it = usedList->begin(),
-                                                ie = usedList->end();
+    for (std::set<ref<TxPCConstraint> >::iterator it = usedList->begin(),
+                                                  ie = usedList->end();
          it != ie; ++it) {
       ref<Expr> constraint = (*it)->packInterpolant(replacements);
       if (llvm::isa<EqExpr>(constraint)) {
@@ -203,7 +206,7 @@ void TxPathCondition::print(llvm::raw_ostream &stream,
   std::string tabsNext = appendTab(tabs);
 
   stream << tabs << "path condition = [";
-  for (std::map<ref<Expr>, ref<PCConstraint> >::const_iterator
+  for (std::map<ref<Expr>, ref<TxPCConstraint> >::const_iterator
            is = pcDepth.begin(),
            it = is, ie = pcDepth.end();
        it != ie; ++it) {

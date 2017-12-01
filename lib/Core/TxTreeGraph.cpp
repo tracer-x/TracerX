@@ -108,7 +108,7 @@ std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
     }
   }
   stream << "\\l";
-  for (std::map<PCConstraint *, std::pair<std::string, bool> >::const_iterator
+  for (std::map<TxPCConstraint *, std::pair<std::string, bool> >::const_iterator
            it = node->pathConditionTable.begin(),
            ie = node->pathConditionTable.end();
        it != ie; ++it) {
@@ -334,7 +334,7 @@ void TxTreeGraph::setCurrentNode(ExecutionState &state,
 }
 
 void TxTreeGraph::markAsSubsumed(TxTreeNode *txTreeNode,
-                                 SubsumptionTableEntry *entry) {
+                                 TxSubsumptionTableEntry *entry) {
   if (!OUTPUT_INTERPOLATION_TREE)
     return;
 
@@ -348,7 +348,7 @@ void TxTreeGraph::markAsSubsumed(TxTreeNode *txTreeNode,
 }
 
 void TxTreeGraph::addPathCondition(TxTreeNode *txTreeNode,
-                                   PCConstraint *pathCondition,
+                                   TxPCConstraint *pathCondition,
                                    ref<Expr> condition) {
   if (!OUTPUT_INTERPOLATION_TREE)
     return;
@@ -357,7 +357,7 @@ void TxTreeGraph::addPathCondition(TxTreeNode *txTreeNode,
 
   TxTreeGraph::Node *node = instance->txTreeNodeMap[txTreeNode];
 
-  std::string s = PrettyExpressionBuilder::construct(condition);
+  std::string s = TxPrettyExpressionBuilder::construct(condition);
 
   std::pair<std::string, bool> p(s, false);
   node->pathConditionTable[pathCondition] = p;
@@ -365,7 +365,7 @@ void TxTreeGraph::addPathCondition(TxTreeNode *txTreeNode,
 }
 
 void TxTreeGraph::addTableEntryMapping(TxTreeNode *txTreeNode,
-                                       SubsumptionTableEntry *entry) {
+                                       TxSubsumptionTableEntry *entry) {
   if (!OUTPUT_INTERPOLATION_TREE)
     return;
 
@@ -375,7 +375,7 @@ void TxTreeGraph::addTableEntryMapping(TxTreeNode *txTreeNode,
   instance->tableEntryMap[entry] = node;
 }
 
-void TxTreeGraph::setAsCore(PCConstraint *pathCondition) {
+void TxTreeGraph::setAsCore(TxPCConstraint *pathCondition) {
   if (!OUTPUT_INTERPOLATION_TREE)
     return;
 

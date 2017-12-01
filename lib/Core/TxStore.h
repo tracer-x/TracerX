@@ -30,10 +30,10 @@ public:
 
   typedef std::map<ref<TxVariable>, ref<TxInterpolantValue> >
   LowerInterpolantStore;
-  typedef std::map<ref<AllocationContext>, LowerInterpolantStore>
+  typedef std::map<ref<TxAllocationContext>, LowerInterpolantStore>
   TopInterpolantStore;
   typedef std::map<ref<TxVariable>, ref<TxStoreEntry> > LowerStateStore;
-  typedef std::map<ref<AllocationContext>, MiddleStateStore> TopStateStore;
+  typedef std::map<ref<TxAllocationContext>, MiddleStateStore> TopStateStore;
 
   class MiddleStateStore {
   private:
@@ -41,13 +41,13 @@ public:
 
     LowerStateStore symbolicallyAddressedStore;
 
-    ref<AllocationInfo> allocInfo;
-
+    ref<TxAllocationInfo> allocInfo;
 
   public:
     MiddleStateStore() {}
 
-    MiddleStateStore(ref<AllocationInfo> _allocInfo) : allocInfo(_allocInfo) {}
+    MiddleStateStore(ref<TxAllocationInfo> _allocInfo)
+        : allocInfo(_allocInfo) {}
 
     /// \brief The copy constructor
     MiddleStateStore(const MiddleStateStore &obj) {
@@ -72,7 +72,7 @@ public:
       return symbolicallyAddressedStore.end();
     }
 
-    bool hasAllocationInfo(ref<AllocationInfo> _allocInfo) const {
+    bool hasAllocationInfo(ref<TxAllocationInfo> _allocInfo) const {
       return allocInfo == _allocInfo;
     }
 
@@ -80,7 +80,7 @@ public:
 
     ref<TxStoreEntry> findConcrete(
         ref<TxVariable> var,
-        std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases)
+        std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases)
         const;
 
     ref<TxStoreEntry> findSymbolic(ref<TxVariable> var) const;

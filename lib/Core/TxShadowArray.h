@@ -21,7 +21,7 @@ namespace klee {
 
   /// \brief Implements the replacement mechanism for replacing variables, used in
   /// replacing free with bound variables.
-  class ShadowArray {
+  class TxShadowArray {
     static std::map<const Array *, const Array *> shadowArray;
 
     static UpdateNode *getShadowUpdate(const UpdateNode *chain,

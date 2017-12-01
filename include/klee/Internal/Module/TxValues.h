@@ -48,7 +48,7 @@ class TxStore;
 
 const uint64_t symbolicBoundId = ULONG_MAX;
 
-class AllocationContext {
+class TxAllocationContext {
 
 public:
   unsigned refCount;
@@ -60,14 +60,14 @@ private:
   /// \brief The call history by which the allocation is reached
   std::vector<llvm::Instruction *> callHistory;
 
-  AllocationContext(llvm::Value *_value,
-                    const std::vector<llvm::Instruction *> &_callHistory)
+  TxAllocationContext(llvm::Value *_value,
+                      const std::vector<llvm::Instruction *> &_callHistory)
       : refCount(0), value(_value), callHistory(_callHistory) {}
 
 public:
-  ~AllocationContext() { callHistory.clear(); }
+  ~TxAllocationContext() { callHistory.clear(); }
 
-  static ref<AllocationContext>
+  static ref<TxAllocationContext>
   create(llvm::Value *_value,
          const std::vector<llvm::Instruction *> &_callHistory);
 
@@ -77,7 +77,7 @@ public:
     return callHistory;
   }
 
-  int compare(const AllocationContext &other) const {
+  int compare(const TxAllocationContext &other) const {
     if (value == other.value) {
       // Please note the use of reverse iterator here, which improves
       // performance.
@@ -131,30 +131,30 @@ public:
   void print(llvm::raw_ostream &stream, const std::string &prefix) const;
 };
 
-class AllocationInfo {
+class TxAllocationInfo {
 public:
   unsigned refCount;
 
 private:
-  ref<AllocationContext> context;
+  ref<TxAllocationContext> context;
 
   ref<Expr> base;
 
   uint64_t size;
 
-  AllocationInfo(ref<AllocationContext> &_context, ref<Expr> _base,
-                 uint64_t _size)
+  TxAllocationInfo(ref<TxAllocationContext> &_context, ref<Expr> _base,
+                   uint64_t _size)
       : refCount(0), context(_context), base(_base), size(_size) {}
 
 public:
-  ~AllocationInfo() {}
+  ~TxAllocationInfo() {}
 
-  static ref<AllocationInfo> create(ref<AllocationContext> &context,
-                                    ref<Expr> base, uint64_t size) {
-    return ref<AllocationInfo>(new AllocationInfo(context, base, size));
+  static ref<TxAllocationInfo> create(ref<TxAllocationContext> &context,
+                                      ref<Expr> base, uint64_t size) {
+    return ref<TxAllocationInfo>(new TxAllocationInfo(context, base, size));
   }
 
-  ref<AllocationContext> getContext() { return context; }
+  ref<TxAllocationContext> getContext() { return context; }
 
   ref<Expr> getBase() { return base; }
 
@@ -167,11 +167,11 @@ public:
   /// new translation.
   ///
   /// \return true if the translation was successful, false otherwise.
-  bool
-  translate(ref<AllocationInfo> other,
-            std::map<ref<AllocationInfo>, ref<AllocationInfo> > &table) const;
+  bool translate(ref<TxAllocationInfo> other,
+                 std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &table)
+      const;
 
-  int compare(const AllocationInfo &other) const;
+  int compare(const TxAllocationInfo &other) const;
 
   /// \brief Print the content of the object to the LLVM error stream
   void dump() const {
@@ -210,7 +210,7 @@ public:
 
 private:
   /// \brief The allocation information of this variable
-  ref<AllocationInfo> allocInfo;
+  ref<TxAllocationInfo> allocInfo;
 
   /// \brief The offset wrt. the allocation
   ref<Expr> offset;
@@ -227,7 +227,7 @@ private:
         isConcrete(src.isConcrete), concreteOffset(src.concreteOffset) {}
 
   /// \brief The normal constructor.
-  TxVariable(ref<AllocationInfo> _allocInfo, ref<Expr> _offset)
+  TxVariable(ref<TxAllocationInfo> _allocInfo, ref<Expr> _offset)
       : refCount(0), allocInfo(_allocInfo), offset(_offset) {
     isConcrete = false;
     concreteOffset = 0;
@@ -239,19 +239,21 @@ private:
   }
 
 public:
-  static ref<TxVariable> create(ref<AllocationInfo> allocInfo,
+  static ref<TxVariable> create(ref<TxAllocationInfo> allocInfo,
                                 ref<Expr> offset) {
     ref<TxVariable> ret(new TxVariable(allocInfo, offset));
     return ret;
   }
 
-  ref<AllocationInfo> getAllocationInfo() const { return allocInfo; }
+  ref<TxAllocationInfo> getAllocationInfo() const { return allocInfo; }
 
   llvm::Value *getValue() const { return allocInfo->getContext()->getValue(); }
 
   ref<Expr> getBase() const { return allocInfo->getBase(); }
 
-  ref<AllocationContext> getContext() const { return allocInfo->getContext(); }
+  ref<TxAllocationContext> getContext() const {
+    return allocInfo->getContext();
+  }
 
   ref<Expr> getOffset() const { return offset; }
 
@@ -311,13 +313,13 @@ private:
   /// This constitutes the weakest liberal precondition of the memory checks
   /// against which the offsets of the pointer values of the current state are
   /// to be checked.
-  std::map<ref<AllocationInfo>, std::set<uint64_t> > allocationBounds;
+  std::map<ref<TxAllocationInfo>, std::set<uint64_t> > allocationBounds;
 
   /// \brief In case the stored value was a pointer, then this should be a
   /// non-empty map mapping of allocation sites to the set of offsets. This is
   /// the offset values of the current state to be checked against the offset
   /// bounds.
-  std::map<ref<AllocationInfo>, std::set<ref<Expr> > > allocationOffsets;
+  std::map<ref<TxAllocationInfo>, std::set<ref<Expr> > > allocationOffsets;
 
   /// \brief The id of this object
   uint64_t id;
@@ -409,12 +411,12 @@ public:
   /// the bound checking constraint otherwise.
   ref<Expr> getBoundsCheck(
       ref<TxInterpolantValue> svalue, std::set<uint64_t> &bounds,
-      std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+      std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases,
       int debugSubsumptionLevel) const;
 
   ref<Expr> getOffsetsCheck(
       ref<TxInterpolantValue> svalue,
-      std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+      std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases,
       int debugSubsumptionLevel) const;
 
   ref<Expr> getExpression() const { return expr; }
@@ -464,7 +466,7 @@ private:
       : refCount(0), variable(_variable), address(_address),
         concreteOffsetBound(_size), size(_size) {}
 
-  TxStateAddress(ref<AllocationContext> _context, ref<Expr> &_address,
+  TxStateAddress(ref<TxAllocationContext> _context, ref<Expr> &_address,
                  ref<Expr> &_base, ref<Expr> &_offset, uint64_t _size)
       : refCount(0), concreteOffsetBound(_size), size(_size) {
     bool unknownBase = false;
@@ -497,12 +499,12 @@ private:
       concreteOffsetBound = symbolicBoundId;
     }
 
-    ref<AllocationInfo> allocInfo;
+    ref<TxAllocationInfo> allocInfo;
     if (_base->getWidth() < pointerWidth) {
-      allocInfo = AllocationInfo::create(
+      allocInfo = TxAllocationInfo::create(
           _context, ZExtExpr::create(_base, pointerWidth), _size);
     } else {
-      allocInfo = AllocationInfo::create(_context, _base, _size);
+      allocInfo = TxAllocationInfo::create(_context, _base, _size);
     }
 
     if (unknownBase) {
@@ -512,7 +514,7 @@ private:
       } else {
         tmpOffset = _offset;
       }
-      allocInfo = AllocationInfo::create(
+      allocInfo = TxAllocationInfo::create(
           _context, SubExpr::create(address, tmpOffset), _size);
     }
 
@@ -528,7 +530,7 @@ public:
          ref<Expr> &address, uint64_t size) {
     ref<Expr> zeroPointer = Expr::createPointer(0);
     ref<TxStateAddress> ret(
-        new TxStateAddress(AllocationContext::create(value, _callHistory),
+        new TxStateAddress(TxAllocationContext::create(value, _callHistory),
                            address, address, zeroPointer, size));
     return ret;
   }
@@ -588,9 +590,9 @@ public:
 
   inline bool hasSymbolicOffsetBounds() const;
 
-  ref<AllocationContext> getContext() const { return variable->getContext(); }
+  ref<TxAllocationContext> getContext() const { return variable->getContext(); }
 
-  ref<AllocationInfo> getAllocationInfo() const {
+  ref<TxAllocationInfo> getAllocationInfo() const {
     return variable->getAllocationInfo();
   }
 

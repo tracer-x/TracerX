@@ -48,7 +48,8 @@ TxStore::MiddleStateStore::find(ref<TxStateAddress> loc) const {
 
 ref<TxStoreEntry> TxStore::MiddleStateStore::findConcrete(
     ref<TxVariable> var,
-    std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases) const {
+    std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases)
+    const {
   ref<TxStoreEntry> ret;
   TxStore::LowerStateStore::const_iterator lowerStoreIter =
       concretelyAddressedStore.find(var);

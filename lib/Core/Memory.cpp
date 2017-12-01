@@ -10,7 +10,6 @@
 #include "Memory.h"
 
 #include "Context.h"
-#include "ShadowArray.h"
 #include "klee/CommandLine.h"
 #include "klee/Expr.h"
 #include "klee/Solver.h"
@@ -20,6 +19,7 @@
 
 #include "ObjectHolder.h"
 #include "MemoryManager.h"
+#include "TxShadowArray.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include <llvm/IR/Function.h>
@@ -123,8 +123,8 @@ ObjectState::ObjectState(const MemoryObject *mo)
     if (INTERPOLATION_ENABLED) {
       // We create shadow array as existentially-quantified
       // variables for subsumption checking
-      const Array *shadow = getArrayCache()->CreateArray(ShadowArray::getShadowName(arrayName), arrayWidth);
-      ShadowArray::addShadowArrayMap(array, shadow);
+      const Array *shadow = getArrayCache()->CreateArray(TxShadowArray::getShadowName(arrayName), arrayWidth);
+      TxShadowArray::addShadowArrayMap(array, shadow);
     }
   }
   memset(concreteStore, 0, size);
@@ -247,8 +247,8 @@ const UpdateList &ObjectState::getUpdates() const {
     if (INTERPOLATION_ENABLED) {
       // We create shadow array as existentially-quantified
       // variables for subsumption checking
-      const Array *shadow = getArrayCache()->CreateArray(ShadowArray::getShadowName(arrayName), arrayWidth);
-      ShadowArray::addShadowArrayMap(array, shadow);
+      const Array *shadow = getArrayCache()->CreateArray(TxShadowArray::getShadowName(arrayName), arrayWidth);
+      TxShadowArray::addShadowArrayMap(array, shadow);
     }
   }
 

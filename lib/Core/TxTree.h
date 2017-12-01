@@ -26,14 +26,13 @@
 #include "klee/util/ExprVisitor.h"
 #include "klee/util/TxTreeGraph.h"
 
-#include "Dependency.h"
-
 #include "llvm/Support/raw_ostream.h"
+#include "TxDependency.h"
 
 namespace klee {
 
-class SubsumptionTable {
-  typedef std::deque<SubsumptionTableEntry *>::const_reverse_iterator
+class TxSubsumptionTable {
+  typedef std::deque<TxSubsumptionTableEntry *>::const_reverse_iterator
   EntryIterator;
 
   class CallHistoryIndexedTable {
@@ -42,7 +41,7 @@ class SubsumptionTable {
 
       llvm::Instruction *id;
 
-      std::deque<SubsumptionTableEntry *> entryList;
+      std::deque<TxSubsumptionTableEntry *> entryList;
 
       std::map<llvm::Instruction *, Node *> next;
 
@@ -72,7 +71,7 @@ class SubsumptionTable {
     void clearTree(Node *node);
 
     void insert(const std::vector<llvm::Instruction *> &callHistory,
-                SubsumptionTableEntry *entry);
+                TxSubsumptionTableEntry *entry);
 
     std::pair<EntryIterator, EntryIterator>
     find(const std::vector<llvm::Instruction *> &callHistory,
@@ -91,7 +90,7 @@ class SubsumptionTable {
 public:
   static void insert(uintptr_t id,
                      const std::vector<llvm::Instruction *> &callHistory,
-                     SubsumptionTableEntry *entry);
+                     TxSubsumptionTableEntry *entry);
 
   static bool check(TimingSolver *solver, ExecutionState &state, double timeout,
                     int debugSubsumptionLevel);
@@ -137,7 +136,7 @@ public:
 /// \see TxTree
 /// \see TxTreeNode
 /// \see Dependency
-class SubsumptionTableEntry {
+class TxSubsumptionTableEntry {
   friend class TxTree;
 
 #ifdef ENABLE_Z3
@@ -174,7 +173,7 @@ class SubsumptionTableEntry {
       ref<TxInterpolantValue> stateValue, ref<Expr> tabledOffset,
       ref<Expr> stateOffset, std::set<ref<TxStateValue> > &coreValues,
       std::map<ref<TxStateValue>, std::set<uint64_t> > &corePointerValues,
-      std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+      std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases,
       int debugSubsumptionLevel) const;
 
   /// \brief Test for the existence of a variable in a set in an expression.
@@ -280,10 +279,10 @@ public:
 
   const uint64_t nodeSequenceNumber;
 
-  SubsumptionTableEntry(TxTreeNode *node,
-                        const std::vector<llvm::Instruction *> &callHistory);
+  TxSubsumptionTableEntry(TxTreeNode *node,
+                          const std::vector<llvm::Instruction *> &callHistory);
 
-  ~SubsumptionTableEntry();
+  ~TxSubsumptionTableEntry();
 
   bool subsumed(
       TimingSolver *solver, ExecutionState &state, double timeout,
@@ -353,7 +352,7 @@ class TxTreeNode {
   static uint64_t nextNodeSequenceNumber;
 
   /// \brief Value dependencies
-  Dependency *dependency;
+  TxDependency *dependency;
 
   TxTreeNode *parent, *left, *right;
 
@@ -709,7 +708,7 @@ public:
          std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
              _globalAddresses);
 
-  ~TxTree() { SubsumptionTable::clear(); }
+  ~TxTree() { TxSubsumptionTable::clear(); }
 
   /// \brief Set the reference to the KLEE state in the current interpolation
   /// data holder (Tracer-X tree node) that is currently being processed.

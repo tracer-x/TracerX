@@ -30,7 +30,7 @@
 namespace klee {
 
 /// Encapsulates functionality of expression builder
-class PrettyExpressionBuilder {
+class TxPrettyExpressionBuilder {
 
   std::string bvOne() {
     return "1";
@@ -105,9 +105,9 @@ class PrettyExpressionBuilder {
   std::string getFalse();
   std::string getInitialRead(const Array *root, unsigned index);
 
-  PrettyExpressionBuilder();
+  TxPrettyExpressionBuilder();
 
-  ~PrettyExpressionBuilder();
+  ~TxPrettyExpressionBuilder();
 
 public:
   static std::string construct(ref<Expr> e);

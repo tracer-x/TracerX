@@ -17,7 +17,6 @@
 #include "PTree.h"
 #include "Searcher.h"
 #include "SeedInfo.h"
-#include "ShadowArray.h"
 #include "SpecialFunctionHandler.h"
 #include "StatsTracker.h"
 #include "TimingSolver.h"
@@ -48,6 +47,7 @@
 #include "klee/Internal/System/Time.h"
 #include "klee/Internal/System/MemoryUsage.h"
 #include "klee/SolverStats.h"
+#include "TxShadowArray.h"
 #include "TxTree.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
@@ -3500,8 +3500,8 @@ ref<Expr> Executor::replaceReadWithSymbolic(ExecutionState &state,
     // We create shadow array as existentially-quantified
     // variables for subsumption checking
     const Array *shadow = arrayCache.CreateArray(
-        ShadowArray::getShadowName(arrayName), arrayWidth);
-    ShadowArray::addShadowArrayMap(array, shadow);
+        TxShadowArray::getShadowName(arrayName), arrayWidth);
+    TxShadowArray::addShadowArrayMap(array, shadow);
   }
 
   return res;
@@ -3873,8 +3873,8 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
       // We create shadow array as existentially-quantified
       // variables for subsumption checking
       const Array *shadow =
-          arrayCache.CreateArray(ShadowArray::getShadowName(uniqueName), mo->size);
-      ShadowArray::addShadowArrayMap(array, shadow);
+          arrayCache.CreateArray(TxShadowArray::getShadowName(uniqueName), mo->size);
+      TxShadowArray::addShadowArrayMap(array, shadow);
       txTree->executeMakeSymbolic(state.prevPC->inst, mo->getBaseExpr(), array);
     }
 

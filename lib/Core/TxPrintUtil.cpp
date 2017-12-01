@@ -53,176 +53,178 @@ std::string appendTab(const std::string &prefix) { return prefix + "        "; }
 
 /**/
 
-std::string PrettyExpressionBuilder::bvConst32(uint32_t value) {
+std::string TxPrettyExpressionBuilder::bvConst32(uint32_t value) {
   std::ostringstream stream;
   stream << value;
   return stream.str();
 }
-std::string PrettyExpressionBuilder::bvConst64(uint64_t value) {
+std::string TxPrettyExpressionBuilder::bvConst64(uint64_t value) {
   std::ostringstream stream;
   stream << value;
   return stream.str();
 }
-std::string PrettyExpressionBuilder::bvZExtConst(uint64_t value) {
+std::string TxPrettyExpressionBuilder::bvZExtConst(uint64_t value) {
   return bvConst64(value);
 }
-std::string PrettyExpressionBuilder::bvSExtConst(uint64_t value) {
+std::string TxPrettyExpressionBuilder::bvSExtConst(uint64_t value) {
   return bvConst64(value);
 }
-std::string PrettyExpressionBuilder::bvBoolExtract(std::string expr, int bit) {
+std::string TxPrettyExpressionBuilder::bvBoolExtract(std::string expr,
+                                                     int bit) {
   std::ostringstream stream;
   stream << expr << "[" << bit << "]";
   return stream.str();
 }
-std::string PrettyExpressionBuilder::bvExtract(std::string expr, unsigned top,
-                                               unsigned bottom) {
+std::string TxPrettyExpressionBuilder::bvExtract(std::string expr, unsigned top,
+                                                 unsigned bottom) {
   std::ostringstream stream;
   stream << expr << "[" << top << "," << bottom << "]";
   return stream.str();
 }
-std::string PrettyExpressionBuilder::eqExpr(std::string a, std::string b) {
+std::string TxPrettyExpressionBuilder::eqExpr(std::string a, std::string b) {
   if (a == "false")
     return "!" + b;
   return "(" + a + " = " + b + ")";
 }
 
 // logical left and right shift (not arithmetic)
-std::string PrettyExpressionBuilder::bvLeftShift(std::string expr,
-                                                 unsigned shift) {
+std::string TxPrettyExpressionBuilder::bvLeftShift(std::string expr,
+                                                   unsigned shift) {
   std::ostringstream stream;
   stream << "(" << expr << " \\<\\< " << shift << ")";
   return stream.str();
 }
-std::string PrettyExpressionBuilder::bvRightShift(std::string expr,
-                                                  unsigned shift) {
+std::string TxPrettyExpressionBuilder::bvRightShift(std::string expr,
+                                                    unsigned shift) {
   std::ostringstream stream;
   stream << "(" << expr << " \\>\\> " << shift << ")";
   return stream.str();
 }
-std::string PrettyExpressionBuilder::bvVarLeftShift(std::string expr,
-                                                    std::string shift) {
+std::string TxPrettyExpressionBuilder::bvVarLeftShift(std::string expr,
+                                                      std::string shift) {
   return "(" + expr + " \\<\\< " + shift + ")";
 }
-std::string PrettyExpressionBuilder::bvVarRightShift(std::string expr,
-                                                     std::string shift) {
+std::string TxPrettyExpressionBuilder::bvVarRightShift(std::string expr,
+                                                       std::string shift) {
   return "(" + expr + " \\>\\> " + shift + ")";
 }
-std::string PrettyExpressionBuilder::bvVarArithRightShift(std::string expr,
-                                                          std::string shift) {
+std::string TxPrettyExpressionBuilder::bvVarArithRightShift(std::string expr,
+                                                            std::string shift) {
   return bvVarRightShift(expr, shift);
 }
 
 // Some STP-style bitvector arithmetic
-std::string PrettyExpressionBuilder::bvMinusExpr(std::string minuend,
-                                                 std::string subtrahend) {
+std::string TxPrettyExpressionBuilder::bvMinusExpr(std::string minuend,
+                                                   std::string subtrahend) {
   return "(" + minuend + " - " + subtrahend + ")";
 }
-std::string PrettyExpressionBuilder::bvPlusExpr(std::string augend,
-                                                std::string addend) {
+std::string TxPrettyExpressionBuilder::bvPlusExpr(std::string augend,
+                                                  std::string addend) {
   return "(" + augend + " + " + addend + ")";
 }
-std::string PrettyExpressionBuilder::bvMultExpr(std::string multiplacand,
-                                                std::string multiplier) {
+std::string TxPrettyExpressionBuilder::bvMultExpr(std::string multiplacand,
+                                                  std::string multiplier) {
   return "(" + multiplacand + " * " + multiplier + ")";
 }
-std::string PrettyExpressionBuilder::bvDivExpr(std::string dividend,
-                                               std::string divisor) {
+std::string TxPrettyExpressionBuilder::bvDivExpr(std::string dividend,
+                                                 std::string divisor) {
   return "(" + dividend + " / " + divisor + ")";
 }
-std::string PrettyExpressionBuilder::sbvDivExpr(std::string dividend,
-                                                std::string divisor) {
+std::string TxPrettyExpressionBuilder::sbvDivExpr(std::string dividend,
+                                                  std::string divisor) {
   return "(" + dividend + " / " + divisor + ")";
 }
-std::string PrettyExpressionBuilder::bvModExpr(std::string dividend,
-                                               std::string divisor) {
+std::string TxPrettyExpressionBuilder::bvModExpr(std::string dividend,
+                                                 std::string divisor) {
   return "(" + dividend + " % " + divisor + ")";
 }
-std::string PrettyExpressionBuilder::sbvModExpr(std::string dividend,
-                                                std::string divisor) {
+std::string TxPrettyExpressionBuilder::sbvModExpr(std::string dividend,
+                                                  std::string divisor) {
   return "(" + dividend + " % " + divisor + ")";
 }
-std::string PrettyExpressionBuilder::notExpr(std::string expr) {
+std::string TxPrettyExpressionBuilder::notExpr(std::string expr) {
   return "!(" + expr + ")";
 }
-std::string PrettyExpressionBuilder::bvAndExpr(std::string lhs,
-                                               std::string rhs) {
+std::string TxPrettyExpressionBuilder::bvAndExpr(std::string lhs,
+                                                 std::string rhs) {
   return "(" + lhs + " & " + rhs + ")";
 }
-std::string PrettyExpressionBuilder::bvOrExpr(std::string lhs,
-                                              std::string rhs) {
+std::string TxPrettyExpressionBuilder::bvOrExpr(std::string lhs,
+                                                std::string rhs) {
   return "(" + lhs + " \\| " + rhs + ")";
 }
-std::string PrettyExpressionBuilder::iffExpr(std::string lhs, std::string rhs) {
+std::string TxPrettyExpressionBuilder::iffExpr(std::string lhs,
+                                               std::string rhs) {
   return "(" + lhs + " \\<=\\> " + rhs + ")";
 }
-std::string PrettyExpressionBuilder::bvXorExpr(std::string lhs,
-                                               std::string rhs) {
+std::string TxPrettyExpressionBuilder::bvXorExpr(std::string lhs,
+                                                 std::string rhs) {
   return "(" + lhs + " xor " + rhs + ")";
 }
-std::string PrettyExpressionBuilder::bvSignExtend(std::string src) {
+std::string TxPrettyExpressionBuilder::bvSignExtend(std::string src) {
   return src;
 }
 
 // Some STP-style array domain interface
-std::string PrettyExpressionBuilder::writeExpr(std::string array,
-                                               std::string index,
-                                               std::string value) {
+std::string TxPrettyExpressionBuilder::writeExpr(std::string array,
+                                                 std::string index,
+                                                 std::string value) {
   return "update(" + array + "," + index + "," + value + ")";
 }
-std::string PrettyExpressionBuilder::readExpr(std::string array,
-                                              std::string index) {
+std::string TxPrettyExpressionBuilder::readExpr(std::string array,
+                                                std::string index) {
   return array + "[" + index + "]";
 }
 
 // ITE-expression constructor
-std::string PrettyExpressionBuilder::iteExpr(std::string condition,
-                                             std::string whenTrue,
-                                             std::string whenFalse) {
+std::string TxPrettyExpressionBuilder::iteExpr(std::string condition,
+                                               std::string whenTrue,
+                                               std::string whenFalse) {
   return "ite(" + condition + "," + whenTrue + "," + whenFalse + ")";
 }
 
 // Bitvector comparison
-std::string PrettyExpressionBuilder::bvLtExpr(std::string lhs,
-                                              std::string rhs) {
+std::string TxPrettyExpressionBuilder::bvLtExpr(std::string lhs,
+                                                std::string rhs) {
   return "(" + lhs + " \\< " + rhs + ")";
 }
-std::string PrettyExpressionBuilder::bvLeExpr(std::string lhs,
-                                              std::string rhs) {
+std::string TxPrettyExpressionBuilder::bvLeExpr(std::string lhs,
+                                                std::string rhs) {
   return "(" + lhs + " \\<= " + rhs + ")";
 }
-std::string PrettyExpressionBuilder::sbvLtExpr(std::string lhs,
-                                               std::string rhs) {
+std::string TxPrettyExpressionBuilder::sbvLtExpr(std::string lhs,
+                                                 std::string rhs) {
   return "(" + lhs + " \\< " + rhs + ")";
 }
-std::string PrettyExpressionBuilder::sbvLeExpr(std::string lhs,
-                                               std::string rhs) {
+std::string TxPrettyExpressionBuilder::sbvLeExpr(std::string lhs,
+                                                 std::string rhs) {
   return "(" + lhs + " \\<= " + rhs + ")";
 }
 
-std::string PrettyExpressionBuilder::constructAShrByConstant(
+std::string TxPrettyExpressionBuilder::constructAShrByConstant(
     std::string expr, unsigned shift, std::string isSigned) {
   return bvRightShift(expr, shift);
 }
-std::string PrettyExpressionBuilder::constructMulByConstant(std::string expr,
-                                                            uint64_t x) {
+std::string TxPrettyExpressionBuilder::constructMulByConstant(std::string expr,
+                                                              uint64_t x) {
   std::ostringstream stream;
   stream << "(" << expr << " * " << x << ")";
   return stream.str();
 }
-std::string PrettyExpressionBuilder::constructUDivByConstant(std::string expr,
-                                                             uint64_t d) {
+std::string TxPrettyExpressionBuilder::constructUDivByConstant(std::string expr,
+                                                               uint64_t d) {
   std::ostringstream stream;
   stream << "(" << expr << " / " << d << ")";
   return stream.str();
 }
-std::string PrettyExpressionBuilder::constructSDivByConstant(std::string expr,
-                                                             uint64_t d) {
+std::string TxPrettyExpressionBuilder::constructSDivByConstant(std::string expr,
+                                                               uint64_t d) {
   std::ostringstream stream;
   stream << "(" << expr << " / " << d << ")";
   return stream.str();
 }
 
-std::string PrettyExpressionBuilder::getInitialArray(const Array *root) {
+std::string TxPrettyExpressionBuilder::getInitialArray(const Array *root) {
   std::string arrayExpr =
       buildArray(root->name.c_str(), root->getDomain(), root->getRange());
 
@@ -236,8 +238,8 @@ std::string PrettyExpressionBuilder::getInitialArray(const Array *root) {
   }
   return arrayExpr;
 }
-std::string PrettyExpressionBuilder::getArrayForUpdate(const Array *root,
-                                                       const UpdateNode *un) {
+std::string TxPrettyExpressionBuilder::getArrayForUpdate(const Array *root,
+                                                         const UpdateNode *un) {
   if (!un) {
     return (getInitialArray(root));
   }
@@ -245,7 +247,7 @@ std::string PrettyExpressionBuilder::getArrayForUpdate(const Array *root,
                    constructActual(un->index), constructActual(un->value));
 }
 
-std::string PrettyExpressionBuilder::constructActual(ref<Expr> e) {
+std::string TxPrettyExpressionBuilder::constructActual(ref<Expr> e) {
   switch (e->getKind()) {
   case Expr::Constant: {
     ConstantExpr *CE = cast<ConstantExpr>(e);
@@ -522,16 +524,16 @@ std::string PrettyExpressionBuilder::constructActual(ref<Expr> e) {
     return getTrue();
   }
 }
-std::string PrettyExpressionBuilder::construct(ref<Expr> e) {
-  PrettyExpressionBuilder *instance = new PrettyExpressionBuilder();
+std::string TxPrettyExpressionBuilder::construct(ref<Expr> e) {
+  TxPrettyExpressionBuilder *instance = new TxPrettyExpressionBuilder();
   std::string ret = instance->constructActual(e);
   delete instance;
   return ret;
 }
 
 std::string
-PrettyExpressionBuilder::constructQuery(ConstraintManager &constraints,
-                                        ref<Expr> query) {
+TxPrettyExpressionBuilder::constructQuery(ConstraintManager &constraints,
+                                          ref<Expr> query) {
   std::string msg;
   std::string tabs = makeTabs(1);
   llvm::raw_string_ostream stream(msg);
@@ -547,20 +549,20 @@ PrettyExpressionBuilder::constructQuery(ConstraintManager &constraints,
   return msg;
 }
 
-std::string PrettyExpressionBuilder::buildArray(const char *name,
-                                                unsigned indexWidth,
-                                                unsigned valueWidth) {
+std::string TxPrettyExpressionBuilder::buildArray(const char *name,
+                                                  unsigned indexWidth,
+                                                  unsigned valueWidth) {
   return name;
 }
 
-std::string PrettyExpressionBuilder::getTrue() { return "true"; }
-std::string PrettyExpressionBuilder::getFalse() { return "false"; }
-std::string PrettyExpressionBuilder::getInitialRead(const Array *root,
-                                                    unsigned index) {
+std::string TxPrettyExpressionBuilder::getTrue() { return "true"; }
+std::string TxPrettyExpressionBuilder::getFalse() { return "false"; }
+std::string TxPrettyExpressionBuilder::getInitialRead(const Array *root,
+                                                      unsigned index) {
   return readExpr(getInitialArray(root), bvConst32(index));
 }
 
-PrettyExpressionBuilder::PrettyExpressionBuilder() {}
+TxPrettyExpressionBuilder::TxPrettyExpressionBuilder() {}
 
-PrettyExpressionBuilder::~PrettyExpressionBuilder() {}
+TxPrettyExpressionBuilder::~TxPrettyExpressionBuilder() {}
 }

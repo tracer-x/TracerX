@@ -16,13 +16,13 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "ShadowArray.h"
 #include "TxStore.h"
 
 #include "klee/Internal/Module/TxValues.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "klee/util/TxExprUtil.h"
 #include "klee/util/TxPrintUtil.h"
+#include "TxShadowArray.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include <llvm/IR/Function.h>
@@ -94,16 +94,16 @@ void TxStoreEntry::print(llvm::raw_ostream &stream,
 
 /**/
 
-bool AllocationInfo::translate(
-    ref<AllocationInfo> other,
-    std::map<ref<AllocationInfo>, ref<AllocationInfo> > &table) const {
-  ref<AllocationContext> _context(context);
-  ref<AllocationInfo> self(new AllocationInfo(_context, base, size));
+bool TxAllocationInfo::translate(
+    ref<TxAllocationInfo> other,
+    std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &table) const {
+  ref<TxAllocationContext> _context(context);
+  ref<TxAllocationInfo> self(new TxAllocationInfo(_context, base, size));
 
   if (self == other)
     return true;
 
-  std::map<ref<AllocationInfo>, ref<AllocationInfo> >::const_iterator it =
+  std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> >::const_iterator it =
       table.find(self);
   if (it != table.end()) {
     if (it->second != other) {
@@ -116,7 +116,7 @@ bool AllocationInfo::translate(
   return true;
 }
 
-int AllocationInfo::compare(const AllocationInfo &other) const {
+int TxAllocationInfo::compare(const TxAllocationInfo &other) const {
   if (base == other.base) {
     if (size == other.size) {
       return 0;
@@ -145,8 +145,8 @@ int AllocationInfo::compare(const AllocationInfo &other) const {
   return 1;
 }
 
-void AllocationInfo::print(llvm::raw_ostream &stream,
-                           const std::string &prefix) const {
+void TxAllocationInfo::print(llvm::raw_ostream &stream,
+                             const std::string &prefix) const {
   stream << prefix << "[base: ";
   base->print(stream);
   stream << ", size: " << size << "]";
@@ -154,14 +154,14 @@ void AllocationInfo::print(llvm::raw_ostream &stream,
 
 /**/
 
-ref<AllocationContext> AllocationContext::create(
+ref<TxAllocationContext> TxAllocationContext::create(
     llvm::Value *_value, const std::vector<llvm::Instruction *> &_callHistory) {
-  ref<AllocationContext> ret(new AllocationContext(_value, _callHistory));
+  ref<TxAllocationContext> ret(new TxAllocationContext(_value, _callHistory));
   return ret;
 }
 
-void AllocationContext::print(llvm::raw_ostream &stream,
-                              const std::string &prefix) const {
+void TxAllocationContext::print(llvm::raw_ostream &stream,
+                                const std::string &prefix) const {
   std::string tabs = makeTabs(1);
   if (value) {
     stream << prefix << "Location: ";
@@ -229,7 +229,7 @@ void TxInterpolantValue::init(
   refCount = 0;
   id = reinterpret_cast<uintptr_t>(this);
   if (shadowing) {
-    _expr = ShadowArray::getShadowExpression(_expr, replacements);
+    _expr = TxShadowArray::getShadowExpression(_expr, replacements);
     for (std::map<ref<Expr>, ref<Expr> >::const_iterator
              it = substitution.begin(),
              ie = substitution.end();
@@ -245,10 +245,10 @@ void TxInterpolantValue::init(
   coreReasons = _coreReasons;
 
   if (!_location.isNull()) {
-    ref<AllocationInfo> allocInfo =
+    ref<TxAllocationInfo> allocInfo =
         _location->getAllocationInfo(); // The allocation context
 
-    ref<Expr> offset = shadowing ? ShadowArray::getShadowExpression(
+    ref<Expr> offset = shadowing ? TxShadowArray::getShadowExpression(
                                        _location->getOffset(), replacements)
                                  : _location->getOffset();
 
@@ -287,7 +287,7 @@ void TxInterpolantValue::init(
     // Here we compute memory bounds for checking pointer values. The memory
     // bound is the size of the allocation minus the offset; this is the weakest
     // precondition (interpolant) of memory bound checks done by KLEE.
-    ref<AllocationInfo> allocInfo =
+    ref<TxAllocationInfo> allocInfo =
         _location->getAllocationInfo(); // The allocation info
 
     // Concrete bound
@@ -306,7 +306,7 @@ void TxInterpolantValue::init(
 
 ref<Expr> TxInterpolantValue::getBoundsCheck(
     ref<TxInterpolantValue> other, std::set<uint64_t> &bounds,
-    std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+    std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases,
     int debugSubsumptionLevel) const {
   ref<Expr> res;
 #ifdef ENABLE_Z3
@@ -328,12 +328,12 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
   // information from the argument object; in this way resulting in
   // less iterations compared to doing it the other way around.
   bool matchFound = false;
-  for (std::map<ref<AllocationInfo>, std::set<uint64_t> >::const_iterator
+  for (std::map<ref<TxAllocationInfo>, std::set<uint64_t> >::const_iterator
            selfBoundsListIt = allocationBounds.begin(),
            selfBoundsListIe = allocationBounds.end();
        selfBoundsListIt != selfBoundsListIe; ++selfBoundsListIt) {
     std::set<uint64_t> selfBounds = selfBoundsListIt->second;
-    std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::iterator
+    std::map<ref<TxAllocationInfo>, std::set<ref<Expr> > >::iterator
     otherOffsetsListIt = other->allocationOffsets.find(selfBoundsListIt->first);
     if (otherOffsetsListIt == other->allocationOffsets.end()) {
       continue;
@@ -415,12 +415,12 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
       return ConstantExpr::create(1, Expr::Bool);
     else {
       // Match not found; we force match via address translation
-      for (std::map<ref<AllocationInfo>, std::set<uint64_t> >::const_iterator
+      for (std::map<ref<TxAllocationInfo>, std::set<uint64_t> >::const_iterator
                selfBoundsListIt = allocationBounds.begin(),
                selfBoundsListIe = allocationBounds.end();
            selfBoundsListIt != selfBoundsListIe && !matchFound;
            ++selfBoundsListIt) {
-        for (std::map<ref<AllocationInfo>,
+        for (std::map<ref<TxAllocationInfo>,
                       std::set<ref<Expr> > >::const_iterator
                  otherOffsetsListIt = other->allocationOffsets.begin(),
                  otherOffsetsListIe = other->allocationOffsets.end();
@@ -480,7 +480,7 @@ ref<Expr> TxInterpolantValue::getBoundsCheck(
 
 ref<Expr> TxInterpolantValue::getOffsetsCheck(
     ref<TxInterpolantValue> other,
-    std::map<ref<AllocationInfo>, ref<AllocationInfo> > &unifiedBases,
+    std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases,
     int debugSubsumptionLevel) const {
   ref<Expr> res;
 #ifdef ENABLE_Z3
@@ -493,12 +493,12 @@ ref<Expr> TxInterpolantValue::getOffsetsCheck(
   // information from the argument object; in this way resulting in
   // less iterations compared to doing it the other way around.
   bool matchFound = false;
-  for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
+  for (std::map<ref<TxAllocationInfo>, std::set<ref<Expr> > >::const_iterator
            selfOffsetsListIt = allocationOffsets.begin(),
            selfOffsetsListIe = allocationOffsets.end();
        selfOffsetsListIt != selfOffsetsListIe; ++selfOffsetsListIt) {
     const std::set<ref<Expr> > &selfOffsets = selfOffsetsListIt->second;
-    std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::iterator
+    std::map<ref<TxAllocationInfo>, std::set<ref<Expr> > >::iterator
     otherOffsetsListIt =
         other->allocationOffsets.find(selfOffsetsListIt->first);
     if (otherOffsetsListIt == other->allocationOffsets.end()) {
@@ -566,12 +566,13 @@ ref<Expr> TxInterpolantValue::getOffsetsCheck(
       return ConstantExpr::create(1, Expr::Bool);
     else {
       // Match not found; we force match via address translation
-      for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
+      for (std::map<ref<TxAllocationInfo>,
+                    std::set<ref<Expr> > >::const_iterator
                selfOffsetsListIt = allocationOffsets.begin(),
                selfOffsetsListIe = allocationOffsets.end();
            selfOffsetsListIt != selfOffsetsListIe && !matchFound;
            ++selfOffsetsListIt) {
-        for (std::map<ref<AllocationInfo>,
+        for (std::map<ref<TxAllocationInfo>,
                       std::set<ref<Expr> > >::const_iterator
                  otherOffsetsListIt = other->allocationOffsets.begin(),
                  otherOffsetsListIe = other->allocationOffsets.end();
@@ -640,7 +641,7 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
 
   if (!doNotUseBound && !allocationBounds.empty()) {
     stream << prefix << "BOUNDS:";
-    for (std::map<ref<AllocationInfo>, std::set<uint64_t> >::const_iterator
+    for (std::map<ref<TxAllocationInfo>, std::set<uint64_t> >::const_iterator
              it = allocationBounds.begin(),
              ie = allocationBounds.end();
          it != ie; ++it) {
@@ -667,7 +668,7 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
     if (offsetDisplayed)
       stream << "\n";
     stream << prefix << "OFFSETS:";
-    for (std::map<ref<AllocationInfo>, std::set<ref<Expr> > >::const_iterator
+    for (std::map<ref<TxAllocationInfo>, std::set<ref<Expr> > >::const_iterator
              it = allocationOffsets.begin(),
              ie = allocationOffsets.end();
          it != ie; ++it) {
@@ -780,10 +781,10 @@ ref<TxStateAddress>
 TxStateAddress::create(ref<TxStateAddress> loc,
                        std::set<const Array *> &replacements) {
   ref<Expr> _address(
-      ShadowArray::getShadowExpression(loc->address, replacements)),
-      _base(ShadowArray::getShadowExpression(loc->variable->getBase(),
+      TxShadowArray::getShadowExpression(loc->address, replacements)),
+      _base(TxShadowArray::getShadowExpression(loc->variable->getBase(),
                                              replacements)),
-      _offset(ShadowArray::getShadowExpression(loc->getOffset(), replacements));
+      _offset(TxShadowArray::getShadowExpression(loc->getOffset(), replacements));
   ref<TxStateAddress> ret(new TxStateAddress(loc->getContext(), _address, _base,
                                              _offset, loc->size));
   return ret;
