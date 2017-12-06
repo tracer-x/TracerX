@@ -1128,13 +1128,17 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
 Executor::StatePair Executor::speculationFork(ExecutionState &current,
                                               ref<Expr> condition,
                                               bool isInternal) {
-
+  klee_warning("Speculaion node");
   // Checking not revisiting the same program point twice (should fail since
   // speculation wouldn't be linear then)
+  // Back jumping to the parent node
   if (current.txTreeNode->isSpeculativeProgramPointRevisted(
           current.txTreeNode->getProgramPoint())) {
-    current.txTreeNode->speculativeBackJump(this, current);
-    terminateState(current);
+    std::vector<ExecutionState *> states = searcher->getStates();
+    if (states.empty())
+      klee_error("Executor::speculationFork\nback jump not implemented for "
+                 "this Searcher class");
+    speculativeBackJump(current, states);
     return StatePair(0, 0);
   }
 
@@ -1247,6 +1251,38 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     }
 
     return StatePair(trueState, falseState);
+  }
+}
+
+void Executor::speculativeBackJump(ExecutionState &current,
+                                   std::vector<ExecutionState *> states) {
+
+  klee_message("");
+
+  // marking the speculation nodes to be terminated
+  if (current.txTreeNode->getLeft() && current.txTreeNode->isSpeculationNode())
+    current.txTreeNode->getLeft()->setSpeculationFailed();
+  if (current.txTreeNode->getRight() && current.txTreeNode->isSpeculationNode())
+    current.txTreeNode->getRight()->setSpeculationFailed();
+  TxTreeNode *parent = current.txTreeNode->getParent();
+  while (parent && parent->isSpeculationNode()) {
+    parent->setSpeculationFailed();
+    parent = parent->getParent();
+    if (parent->getLeft() && parent->getLeft()->isSpeculationNode())
+      parent->getLeft()->setSpeculationFailed();
+    if (parent->getRight() && parent->getRight()->isSpeculationNode())
+      parent->getRight()->setSpeculationFailed();
+  }
+  // removing the marked speculation nodes
+  terminateState(current);
+  for (std::vector<ExecutionState *>::const_iterator it = states.begin(),
+                                                     ie = states.end();
+       it != ie; ++it) {
+    ExecutionState *state = (*it);
+    if (state->txTreeNode->isSpeculationFailedNode()) {
+      errs() << state->txTreeNode->isSpeculationNode() << "is speculative\n";
+      state->prevPC->inst->dump();
+    }
   }
 }
 
