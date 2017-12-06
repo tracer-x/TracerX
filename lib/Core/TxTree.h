@@ -383,6 +383,9 @@ class TxTreeNode {
   // \brief Used to identify if the node is in the speculation mode
   bool speculationFlag;
 
+  // \brief Set if the speculation has failed and the node should be removed
+  bool speculationFailed;
+
   // \brief This object contains the visited program points in the speculation
   // node
   speculativeRun *speculationVisitedPPs;
@@ -480,6 +483,23 @@ public:
 
   /// \brief Set the speculation flag
   void setSpeculationFlag();
+
+  /// \brief Check if the current respective state of the node should be
+  /// terminated since speculation has failed
+  bool isSpeculationFailedNode();
+
+  /// \brief Set the respective state of the node to be terminated since
+  /// speculation has failed
+  void setSpeculationFailed();
+
+  /// \brief Returning the parent node
+  TxTreeNode *getParent() { return parent; }
+
+  /// \brief Returning the left node
+  TxTreeNode *getLeft() { return left; }
+
+  /// \brief Returning the right node
+  TxTreeNode *getRight() { return right; }
 
   /// \brief Store the solver and unsatcore temporarily, so they can be used for
   /// markings if speculation fails

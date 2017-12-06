@@ -2256,6 +2256,10 @@ bool TxTreeNode::isSpeculationNode() { return speculationFlag; }
 
 void TxTreeNode::setSpeculationFlag() { speculationFlag = 1; }
 
+bool TxTreeNode::isSpeculationFailedNode() { return speculationFailed; }
+
+void TxTreeNode::setSpeculationFailed() { speculationFailed = 1; }
+
 void TxTreeNode::storeSpeculationUnsatCore(TimingSolver *solver,
                                            std::vector<ref<Expr> > unsatCore) {
   speculationSolver = solver;
