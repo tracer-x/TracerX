@@ -343,7 +343,9 @@ TxSubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
           // operation
           // we could directly assign newIntpRight = D, otherwise,
           // newIntpRight == A[D/C]
-          if (!llvm::isa<BinaryExpr>(equalityConstraintLeft))
+          if (!llvm::isa<BinaryExpr>(equalityConstraintLeft) ||
+              equalityConstraintLeft->getWidth() !=
+                  interpolantAtom->getKid(1)->getWidth())
             newIntpRight = interpolantAtom->getKid(1);
           else {
             // newIntpRight is A, but with every occurrence of C replaced
