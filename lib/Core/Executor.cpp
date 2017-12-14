@@ -19,24 +19,18 @@
 #include "Searcher.h"
 #include "SeedInfo.h"
 #include "SpecialFunctionHandler.h"
-#include "Speculation.h"
 #include "StatsTracker.h"
 #include "TimingSolver.h"
 #include "UserSearcher.h"
 
-#include "klee/ExecutionState.h"
-#include "klee/Expr.h"
-#include "klee/Interpreter.h"
-#include "klee/TimerStatIncrementer.h"
+#include "TxShadowArray.h"
+#include "TxSpeculation.h"
+#include "TxTree.h"
 #include "klee/CommandLine.h"
 #include "klee/Common.h"
-#include "klee/util/Assignment.h"
-#include "klee/util/ExprPPrinter.h"
-#include "klee/util/ExprSMTLIBPrinter.h"
-#include "klee/util/ExprUtil.h"
-#include "klee/util/GetElementPtrTypeIterator.h"
-#include "klee/util/TxPrintUtil.h"
 #include "klee/Config/Version.h"
+#include "klee/ExecutionState.h"
+#include "klee/Expr.h"
 #include "klee/Internal/ADT/KTest.h"
 #include "klee/Internal/ADT/RNG.h"
 #include "klee/Internal/Module/Cell.h"
@@ -45,11 +39,17 @@
 #include "klee/Internal/Module/KModule.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "klee/Internal/Support/FloatEvaluation.h"
-#include "klee/Internal/System/Time.h"
 #include "klee/Internal/System/MemoryUsage.h"
+#include "klee/Internal/System/Time.h"
+#include "klee/Interpreter.h"
 #include "klee/SolverStats.h"
-#include "TxShadowArray.h"
-#include "TxTree.h"
+#include "klee/TimerStatIncrementer.h"
+#include "klee/util/Assignment.h"
+#include "klee/util/ExprPPrinter.h"
+#include "klee/util/ExprSMTLIBPrinter.h"
+#include "klee/util/ExprUtil.h"
+#include "klee/util/GetElementPtrTypeIterator.h"
+#include "klee/util/TxPrintUtil.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include "llvm/IR/Function.h"
@@ -899,7 +899,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       }
     }
     if (INTERPOLATION_ENABLED && Speculation &&
-        speculativeRun::isSpeculable(current)) {
+        TxSpeculativeRun::isSpeculable(current)) {
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
@@ -922,7 +922,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
     }
 
     if (INTERPOLATION_ENABLED && Speculation &&
-        speculativeRun::isSpeculable(current)) {
+        TxSpeculativeRun::isSpeculable(current)) {
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
@@ -1191,7 +1191,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     return StatePair(0, &current);
   } else {
 
-    speculativeRun *parentSpeculationVisitedPPs =
+    TxSpeculativeRun *parentSpeculationVisitedPPs =
         current.txTreeNode->getSpeculationVisitedPPs();
     TimerStatIncrementer timer(stats::forkTime);
     ExecutionState *falseState, *trueState = &current;

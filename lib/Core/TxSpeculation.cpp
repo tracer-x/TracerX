@@ -14,11 +14,11 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "Speculation.h"
+#include "TxSpeculation.h"
 
 using namespace klee;
 
-bool speculativeRun::isSpeculable(ExecutionState &current) {
+bool TxSpeculativeRun::isSpeculable(ExecutionState &current) {
 
   if (isa<llvm::BranchInst>(current.prevPC->inst) &&
       (current.prevPC->inst->getOperand(1)->getName() != "cond.false")) {

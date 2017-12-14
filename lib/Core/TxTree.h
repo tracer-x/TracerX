@@ -26,8 +26,8 @@
 #include "klee/util/ExprVisitor.h"
 #include "klee/util/TxTreeGraph.h"
 
-#include "Speculation.h"
 #include "TxDependency.h"
+#include "TxSpeculation.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace klee {
@@ -388,7 +388,7 @@ class TxTreeNode {
 
   // \brief This object contains the visited program points in the speculation
   // node
-  speculativeRun *speculationVisitedPPs;
+  TxSpeculativeRun *speculationVisitedPPs;
 
   TxTreeNode *parent, *left, *right;
 
@@ -507,12 +507,12 @@ public:
                                  std::vector<ref<Expr> > unsatCore);
 
   void resetSpeculationVisitedPPs() {
-    speculationVisitedPPs = new speculativeRun;
+    speculationVisitedPPs = new TxSpeculativeRun;
   }
 
-  speculativeRun *getSpeculationVisitedPPs() { return speculationVisitedPPs; }
+  TxSpeculativeRun *getSpeculationVisitedPPs() { return speculationVisitedPPs; }
 
-  void setSpeculationVisitedPPs(speculativeRun *parentSpeculationVisitedPPs) {
+  void setSpeculationVisitedPPs(TxSpeculativeRun *parentSpeculationVisitedPPs) {
     speculationVisitedPPs = parentSpeculationVisitedPPs;
   }
 

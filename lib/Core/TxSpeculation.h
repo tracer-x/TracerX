@@ -14,15 +14,15 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SPECULATION_H_
-#define SPECULATION_H_
+#ifndef TXSPECULATION_H_
+#define TXSPECULATION_H_
 
 #include "klee/ExecutionState.h"
 
 namespace klee {
 
 /// \brief Implements the speculation mode
-class speculativeRun {
+class TxSpeculativeRun {
   std::set<uintptr_t> visitedProgramPoints;
 
 public:
@@ -36,4 +36,4 @@ public:
 };
 }
 
-#endif /* SPECULATION_H_ */
+#endif /* TXSPECULATION_H_ */
