@@ -1179,8 +1179,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         current.pathOS << "1";
       }
     }
-    if (WPInterpolant)
-      txTree->markInstruction(current.prevPC, true);
     return StatePair(&current, 0);
   } else if (res == Solver::False &&
              current.prevPC->inst->getOperand(1)->getName() == "cond.false") {
@@ -1190,8 +1188,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         current.pathOS << "0";
       }
     }
-    if (WPInterpolant)
-      txTree->markInstruction(current.prevPC, false);
     return StatePair(0, &current);
   } else {
 
@@ -1256,8 +1252,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 
 void Executor::speculativeBackJump(ExecutionState &current,
                                    std::vector<ExecutionState *> states) {
-
-  klee_message("");
 
   // marking the speculation nodes to be terminated
   if (current.txTreeNode->getLeft() && current.txTreeNode->isSpeculationNode())
