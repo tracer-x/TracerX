@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TxStore.h"
-
+#include <stdio.h>
 #include "klee/CommandLine.h"
 #include "klee/Internal/Module/TxValues.h"
 #include "klee/util/TxPrintUtil.h"
@@ -245,12 +245,9 @@ inline void TxStore::concreteToInterpolant(
     map[variable] = interpolantValue;
   } else if (entry->isCore(leftOfEntry)) {
     // Do not add to the map if entry is not used
-    if (leftOfEntry) {
-      if (usedByLeftPath.find(entry) == usedByLeftPath.end())
-        return;
-    } else if (usedByRightPath.find(entry) == usedByRightPath.end()) {
-      return;
-    }
+	if (usedByLeftPath.find(entry) == usedByLeftPath.end() &&
+		usedByRightPath.find(entry) == usedByRightPath.end())
+          return;
 
 // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
@@ -278,12 +275,9 @@ inline void TxStore::symbolicToInterpolant(
     map[variable] = interpolantValue;
   } else if (entry->isCore(leftOfEntry)) {
     // Do not add to the map if entry is not used
-    if (leftOfEntry) {
-      if (usedByLeftPath.find(entry) == usedByLeftPath.end())
-        return;
-    } else if (usedByRightPath.find(entry) == usedByRightPath.end()) {
+    if (usedByLeftPath.find(entry) == usedByLeftPath.end() &&
+        usedByRightPath.find(entry) == usedByRightPath.end())
       return;
-    }
 
 // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
