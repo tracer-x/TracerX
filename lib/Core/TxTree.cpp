@@ -2291,18 +2291,15 @@ void TxTree::markInstruction(KInstruction *instr, bool branchFlag) {
       std::find(currentTxTreeNode->reverseInstructionList.begin(),
                 currentTxTreeNode->reverseInstructionList.end(),
                 std::pair<KInstruction *, int>(instr, 0));
-  // Only mark the br instruction that jumps to cond.false condition for now.
-  // TODO: remove this condition so all branch instructions are marked.
-
+  // Marking all the br instruction that have one branch as infeasible.
+  // Other infeasible paths (like the infeasible paths in the internal
+  // KLEE function klee_make_symbolic are not tracked by weakest pre-
+  // condition approach.
   if (isa<llvm::BranchInst>(iter->first->inst)) {
-    llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(iter->first->inst);
-    if (br->getSuccessor(1)->getName() == "cond.false" ||
-        br->getSuccessor(1)->getName() == "cond.false") {
       if (branchFlag == true)
         iter->second = 1;
       else
         iter->second = 2;
-    }
   }
 }
 
