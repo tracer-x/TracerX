@@ -175,7 +175,7 @@ class TxSubsumptionTableEntry {
 
   TxStore::TopInterpolantStore symbolicallyAddressedStore;
 
-  ref<Expr> wpInterpolant;
+  std::vector<ref<Expr> > wpInterpolant;
 
   std::set<const Array *> existentials;
 
@@ -321,7 +321,7 @@ public:
 
   ref<Expr> getInterpolant() const;
 
-  ref<Expr> getWPInterpolant() const;
+  std::vector<ref<Expr> > getWPInterpolant() const;
 
   TxStore::LowerInterpolantStore getConcretelyAddressedHistoricalStore() const;
 
@@ -414,7 +414,7 @@ class TxTreeNode {
   WeakestPreCondition *wp;
 
   /// \brief Value dependencies
-  ref<Expr> childWPInterpolant[2];
+  std::vector<ref<Expr> > childWPInterpolant[2];
 
   TxTreeNode *parent, *left, *right;
 
@@ -515,27 +515,29 @@ public:
   /// \brief Retrieve the weakest precondition interpolant for this node as KLEE expression object
   ///
   /// \return Generate and return the weakest precondition interpolant
-  /// expression.
-  ref<Expr> getWPInterpolant();
+  /// expression. The WP expression is stored in a vector of expressions
+  /// where the WP expression is the conjunction of the expressions in
+  /// the vector
+  std::vector<ref<Expr> > getWPInterpolant();
 
   /// \return Return the weakest precondition object
   WeakestPreCondition *getWP() { return wp; }
 
   /// \brief Store the child WP interpolants in the parent node
-  void setChildWPInterpolant(ref<Expr> interpolant);
+  void setChildWPInterpolant(std::vector<ref<Expr> > interpolant);
 
   /// \brief Get the stored child WP interpolants in the parent node
-  ref<Expr> getChildWPInterpolant(int flag);
+  std::vector<ref<Expr> > getChildWPInterpolant(int flag);
 
   /// \brief Check WP Interpolant holds at subsumption point
   bool checkWPAtSubsumption(
-    ref<Expr> wpInterpolant, ExecutionState &state,
-	TxStore::LowerStateStore &concretelyAddressedHistoricalStore,
-    TxStore::LowerStateStore &symbolicallyAddressedHistoricalStore,
-    double timeout, int debugSubsumptionLevel);
-      
+      std::vector<ref<Expr> > wpInterpolant, ExecutionState &state,
+      TxStore::LowerStateStore &concretelyAddressedHistoricalStore,
+      TxStore::LowerStateStore &symbolicallyAddressedHistoricalStore,
+      double timeout, int debugSubsumptionLevel);
+
   /// \brief Copy WP to the parent node at subsumption point
-  void setWPAtSubsumption(ref<Expr> _wpInterpolant);
+  void setWPAtSubsumption(std::vector<ref<Expr> > _wpInterpolant);
 
   /// \brief Extend the path condition with another constraint
   ///
