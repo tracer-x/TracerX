@@ -83,7 +83,7 @@ ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
   const std::string ext(".addr");
   if (arrayName.find(ext) != std::string::npos)
     arrayName = arrayName.substr(0, arrayName.size() - ext.size());
-  const Array *symArray = TxShadowArray::getSymbolicArray(value->getName());
+  const Array *symArray = TxShadowArray::getSymbolicArray(arrayName);
   if (symArray != NULL) {
     // Symbolic array exists. Generating shadow Expr.
     ref<Expr> Res(0);
