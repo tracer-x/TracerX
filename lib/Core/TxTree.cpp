@@ -1546,7 +1546,9 @@ ref<Expr> TxSubsumptionTableEntry::getInterpolant() const {
   return interpolant;
 }
 
-ref<Expr> TxSubsumptionTableEntry::getWPInterpolant() const { return wpInterpolant; }
+std::vector<ref<Expr> > TxSubsumptionTableEntry::getWPInterpolant() const {
+  return wpInterpolant;
+}
 
 TxStore::LowerInterpolantStore
 TxSubsumptionTableEntry::getConcretelyAddressedHistoricalStore() const {
@@ -1740,9 +1742,14 @@ void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
                                     const std::string &prefix) const {
 
   stream << prefix << "\nwp interpolant = ";
-  if (!wpInterpolant.isNull())
-    wpInterpolant->print(stream);
-  else
+  if (wpInterpolant.size() > 0) {
+    for (std::vector<ref<Expr> >::const_reverse_iterator
+             it = wpInterpolant.rbegin(),
+             ie = wpInterpolant.rend();
+         it != ie; ++it) {
+      (*it)->print(stream);
+    }
+  } else
     stream << "(empty)";
   stream << "\n";
 }
@@ -2171,10 +2178,12 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
                                  node->entryCallHistory, entry);
 
       if (WPInterpolant) {
-        ref<Expr> WPExpr = entry->getWPInterpolant();
+        // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO
+        // VECTOR<EXPR>
+        /*std::vector<ref<Expr> > WPExpr = entry->getWPInterpolant();
         Solver::Validity result;
         std::vector<ref<Expr> > unsatCore;
-        ref<Expr> WPExprInstantiated = ConstantExpr::create(0, 32);
+        std::vector<ref<Expr> > WPExprInstantiated;;
         if (node->parent)
           WPExprInstantiated = node->wp->instantiateWPExpression(
               node->parent->dependency, node->parent->callHistory, WPExpr);
@@ -2190,7 +2199,7 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
           // improves the interpolant from the deletion algorithm
           // is slim. As a result, in such cases the interpolant
           // from deletion is not changed.
-        }
+        }*/
       }
 
       TxSubsumptionTable::insert(node->getProgramPoint(), node->entryCallHistory,
@@ -2292,18 +2301,15 @@ void TxTree::markInstruction(KInstruction *instr, bool branchFlag) {
       std::find(currentTxTreeNode->reverseInstructionList.begin(),
                 currentTxTreeNode->reverseInstructionList.end(),
                 std::pair<KInstruction *, int>(instr, 0));
-  // Only mark the br instruction that jumps to cond.false condition for now.
-  // TODO: remove this condition so all branch instructions are marked.
-
+  // Marking all the br instruction that have one branch as infeasible.
+  // Other infeasible paths (like the infeasible paths in the internal
+  // KLEE function klee_make_symbolic are not tracked by weakest pre-
+  // condition approach.
   if (isa<llvm::BranchInst>(iter->first->inst)) {
-    llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(iter->first->inst);
-    if (br->getSuccessor(1)->getName() == "cond.false" ||
-        br->getSuccessor(1)->getName() == "cond.false") {
       if (branchFlag == true)
         iter->second = 1;
       else
         iter->second = 2;
-    }
   }
 }
 
@@ -2412,8 +2418,8 @@ TxTreeNode::TxTreeNode(
 
   // Set the child WP Interpolant to true
   wp = new WeakestPreCondition(this, this->dependency);
-  childWPInterpolant[0] = wp->False();
-  childWPInterpolant[1] = wp->False();
+  childWPInterpolant[0].push_back(wp->False());
+  childWPInterpolant[1].push_back(wp->False());
 }
 
 TxTreeNode::~TxTreeNode() {
@@ -2432,21 +2438,22 @@ ref<Expr> TxTreeNode::getInterpolant(
   return expr;
 }
 
-ref<Expr> TxTreeNode::getWPInterpolant() {
+std::vector<ref<Expr> > TxTreeNode::getWPInterpolant() {
   TimerStatIncrementer t(getWPInterpolantTime);
 
-  ref<Expr> expr;
-  bool markAllFlag;
-  if (childWPInterpolant[0] == wp->False() &&
-      childWPInterpolant[1] == wp->False()) {
+  std::vector<ref<Expr> > expr;
+
+  if (std::find(childWPInterpolant[0].begin(), childWPInterpolant[0].end(),
+                wp->False()) != childWPInterpolant[0].end() &&
+      std::find(childWPInterpolant[1].begin(), childWPInterpolant[1].end(),
+                wp->False()) != childWPInterpolant[1].end()) {
     wp->resetWPExpr();
     // Preprocessing phase: marking the instructions that contribute
     // to the target or an infeasible path.
-    reverseInstructionList = wp->markVariables(reverseInstructionList);
+    // reverseInstructionList = wp->markVariables(reverseInstructionList);
 
     // Generate weakest precondition from pathCondition and/or BB instructions
-    markAllFlag = 0;
-    expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
+    expr = wp->GenerateWP(reverseInstructionList);
     if (parent)
       this->parent->setChildWPInterpolant(expr);
   } else {
@@ -2457,22 +2464,22 @@ ref<Expr> TxTreeNode::getWPInterpolant() {
 
     // Generate weakest precondition fot the current node
     // All instructions are marked
-    markAllFlag = 1;
-    expr = wp->GenerateWP(reverseInstructionList, markAllFlag);
+    expr = wp->GenerateWP(reverseInstructionList);
     if (parent)
       this->parent->setChildWPInterpolant(expr);
   }
   return expr;
 }
 
-void TxTreeNode::setChildWPInterpolant(ref<Expr> interpolant) {
-  if (childWPInterpolant[0] == wp->False())
+void TxTreeNode::setChildWPInterpolant(std::vector<ref<Expr> > interpolant) {
+  if (std::find(childWPInterpolant[0].begin(), childWPInterpolant[0].end(),
+                wp->False()) != childWPInterpolant[0].end())
     childWPInterpolant[0] = interpolant;
   else
     childWPInterpolant[1] = interpolant;
 }
 
-ref<Expr> TxTreeNode::getChildWPInterpolant(int flag) {
+std::vector<ref<Expr> > TxTreeNode::getChildWPInterpolant(int flag) {
   if (flag == 0)
     return childWPInterpolant[0];
   else
@@ -2480,11 +2487,12 @@ ref<Expr> TxTreeNode::getChildWPInterpolant(int flag) {
 }
 
 bool TxTreeNode::checkWPAtSubsumption(
-    ref<Expr> wpInterpolant, ExecutionState &state,
+    std::vector<ref<Expr> > wpInterpolant, ExecutionState &state,
     TxStore::LowerStateStore &concretelyAddressedHistoricalStore,
     TxStore::LowerStateStore &symbolicallyAddressedHistoricalStore,
     double timeout, int debugSubsumptionLevel) {
-  ref<Expr> wpInstantiatedInterpolant =
+  // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO VECTOR<EXPR>
+  /*ref<Expr> wpInstantiatedInterpolant =
       wp->instantiateWPExpression(dependency, callHistory, wpInterpolant);
 
   if (wpInstantiatedInterpolant->isTrue())
@@ -2495,11 +2503,11 @@ bool TxTreeNode::checkWPAtSubsumption(
     wpInstantiatedInterpolant->dump();
     klee_error("TxTreeNode::checkWPAtSubsumption non constant WCET is not "
                "handled yet");
-  }
+  }*/
   return false;
 }
 
-void TxTreeNode::setWPAtSubsumption(ref<Expr> _wpInterpolant) {
+void TxTreeNode::setWPAtSubsumption(std::vector<ref<Expr> > _wpInterpolant) {
   if (parent)
     parent->setChildWPInterpolant(_wpInterpolant);
 }

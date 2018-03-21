@@ -21,8 +21,11 @@
 #include <klee/ExprBuilder.h>
 #include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ArrayCache.h>
+#include "PartitionHelper.h"
 #include "TxDependency.h"
 #include "TxTree.h"
+#include "WPHelper.h"
+#include <vector>
 
 namespace klee {
 
@@ -63,7 +66,7 @@ class WeakestPreCondition {
   std::set<llvm::Value *> markedVariables;
 
   ref<Expr> WPExpr;
-  ExprBuilder *eb;
+  std::vector<ref<Expr> > WPExprs;
 
   // Respective interpolation tree node
   TxTreeNode *node;
@@ -79,19 +82,23 @@ public:
 
   ~WeakestPreCondition();
 
-  ref<Expr> True() { return eb->True(); };
-  ref<Expr> False() { return eb->False(); };
+  ref<Expr> True() {
+    return ConstantExpr::alloc(1, Expr::Bool);
+  };
+  ref<Expr> False() {
+    return ConstantExpr::alloc(0, Expr::Bool);
+  };
 
-  void resetWPExpr() { WPExpr = eb->False(); }
+  void resetWPExpr() { WPExpr = False(); }
 
-  void setWPExpr(ref<Expr> expr) { WPExpr = expr; }
+  void setWPExpr(std::vector<ref<Expr> > expr) { WPExprs = expr; }
 
-  ref<Expr> getWPExpr() { return WPExpr; }
+  std::vector<ref<Expr> > getWPExpr() { return WPExprs; }
 
   // \brief Preprocessing phase: marking the instructions that contribute
   // to the target or an infeasible path.
-  std::vector<std::pair<KInstruction *, int> > markVariables(
-      std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
+  // std::vector<std::pair<KInstruction *, int> > markVariables(
+  //      std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
 
   // \brief Generate and return the weakest precondition expression.
   ref<Expr> GenerateWP(
@@ -104,43 +111,23 @@ public:
   // \brief Return LHS of an instruction as a read expression
   ref<Expr> getLHS(llvm::Instruction *i);
 
-  // \brief Update the weakest precondition with a new condition
-  void updateWPExpr(ref<Expr> result);
-
-  // \brief Substitute the rhs of result with its lhs in the weakest
-  // precondition expression
-  void substituteExpr(ref<Expr> result);
-
-  // \brief Recursive substitute function
-  ref<Expr> substituteExpr(ref<Expr> Base, const ref<Expr> lhs,
-                           const ref<Expr> rhs);
-
-  // \brief Convert the weakest precondition expression to canonical form
-  void simplifyWPExpr();
-
-  // \brief Simplify terms in the weakest precondition expression to canonical
-  // form
-  std::map<ref<Expr>, uint64_t> *
-  simplifyWPTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
-                 ref<Expr> linearTerm);
-
-  // \brief Insert a variable with coefficient in newLinearTerm
-  void insertTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm, uint64_t coeff,
-                  ref<Expr> variable);
-
-  // \brief Convert newLinearTerm to an expression and store it at WPExpr(in
-  // canonical form)
-  void convertToExpr(std::map<ref<Expr>, uint64_t> *newLinearTerm);
-
   // \brief Instantiates the variables in WPExpr by their latest value for the
   // implication test.
-  ref<Expr>
+  std::vector<ref<Expr> >
   instantiateWPExpression(TxDependency *dependency,
                           const std::vector<llvm::Instruction *> &callHistory,
-                          ref<Expr> WPExpr);
+                          std::vector<ref<Expr> > WPExpr);
+
+  ref<Expr>
+  instantiateSingleExpression(TxDependency *dependency,
+      const std::vector<llvm::Instruction *> &callHistory,
+      ref<Expr> singleWPExpr);
 
   // \brief Perform the intersection of two weakest precondition expression
-  ref<Expr> intersectExpr(ref<Expr> expr1,ref<Expr> expr2);
+  std::vector<ref<Expr> > intersectExpr(std::vector<ref<Expr> > expr1,
+                                        std::vector<ref<Expr> > expr2);
+  std::vector<ref<Expr> > intersectExpr_aux(std::vector<ref<Expr> > expr1,
+                                          std::vector<ref<Expr> > expr2);
 
   // \brief Return the minimum of two constant expressions
   ref<ConstantExpr> getMinOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2);
@@ -181,6 +168,14 @@ public:
   // the WPExpr
   ref<Expr> replaceCallArguments(ref<Expr> wp, llvm::Value *funcArg,
                                  llvm::Value *callArg);
+
+  // \brief Generate and return the weakest precondition expressions.
+  std::vector<ref<Expr> > GenerateWP(
+      std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
+  ref<Expr> getPrevExpr(ref<Expr> e, llvm::Instruction *i);
+
+  private:
+    ref<Expr> getCondition(llvm::Instruction *ins);
 };
 }
 #endif /* WP_H_ */
