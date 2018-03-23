@@ -23,6 +23,7 @@
 #include <klee/util/ArrayCache.h>
 #include "TxDependency.h"
 #include "TxTree.h"
+#include <vector>
 
 namespace klee {
 
@@ -63,6 +64,7 @@ class WeakestPreCondition {
   std::set<llvm::Value *> markedVariables;
 
   ref<Expr> WPExpr;
+  std::vector<ref<Expr> > WPExprs;
   ExprBuilder *eb;
 
   // Respective interpolation tree node
@@ -181,6 +183,11 @@ public:
   // the WPExpr
   ref<Expr> replaceCallArguments(ref<Expr> wp, llvm::Value *funcArg,
                                  llvm::Value *callArg);
+  // \brief Generate and return the weakest precondition expression.
+    ref<Expr> GenerateWP1(
+    		std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
+  private:
+    ref<Expr> getCondition(std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
 };
 }
 #endif /* WP_H_ */

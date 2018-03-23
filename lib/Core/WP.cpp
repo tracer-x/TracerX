@@ -1716,3 +1716,32 @@ ref<Expr> WeakestPreCondition::replaceCallArguments(ref<Expr> interpolant,
              "WeakestPreCondition::replaceCallArguments");
   return interpolant;
 }
+
+ref<Expr> WeakestPreCondition::GenerateWP1(
+		std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
+  for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
+			it = reverseInstructionList.rbegin(), ie =
+					reverseInstructionList.rend(); it != ie; ++it) {
+    llvm::Instruction *i = (*it).first->inst;
+    int flag = (*it).second;
+    if (flag == 1) {
+      // 1- call getCondition on the cond argument of the branch instruction
+      // 2- create and expression from the condition and this->WPExpr
+      ref<Expr> cond = getCondition(reverseInstructionList);
+      WPExprs.push_back(cond);
+    } else if (flag == 2) {
+		// 1- call getCondition on the cond argument of the branch instruction
+		// 2- generate not(condition): expr::not(condition)
+		// 3- create and expression from the condition and this->WPExpr
+    	ref<Expr> negCond = NotExpr::create(getCondition(reverseInstructionList));
+        WPExprs.push_back(negCond);
+    } else {
+			// i is 0
+			// todo later on
+    }
+  }
+}
+
+ref<Expr> WeakestPreCondition::getCondition(std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
+  return 0;
+}
