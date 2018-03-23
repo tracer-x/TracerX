@@ -65,6 +65,7 @@ class WeakestPreCondition {
 
   ref<Expr> WPExpr;
   std::vector<ref<Expr> > WPExprs;
+
   ExprBuilder *eb;
 
   // Respective interpolation tree node
@@ -96,7 +97,7 @@ public:
       std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
 
   // \brief Generate and return the weakest precondition expression.
-  ref<Expr> GenerateWP(
+  ref<Expr> GenerateWPOld(
       std::vector<std::pair<KInstruction *, int> > reverseInstructionList,
       bool markAllFlag);
 
@@ -183,9 +184,11 @@ public:
   // the WPExpr
   ref<Expr> replaceCallArguments(ref<Expr> wp, llvm::Value *funcArg,
                                  llvm::Value *callArg);
+
   // \brief Generate and return the weakest precondition expression.
-    ref<Expr> GenerateWP1(
-    		std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
+  ref<Expr> GenerateWP(
+      std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
+
   private:
     ref<Expr> getCondition(std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
 };

@@ -292,7 +292,7 @@ std::vector<std::pair<KInstruction *, int> > WeakestPreCondition::markVariables(
   return reverseInstructionList;
 }
 
-ref<Expr> WeakestPreCondition::GenerateWP(
+ref<Expr> WeakestPreCondition::GenerateWPOld(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList,
     bool markAllFlag) {
 
@@ -1717,8 +1717,8 @@ ref<Expr> WeakestPreCondition::replaceCallArguments(ref<Expr> interpolant,
   return interpolant;
 }
 
-ref<Expr> WeakestPreCondition::GenerateWP1(
-		std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
+ref<Expr> WeakestPreCondition::GenerateWP(
+    std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
   for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
 			it = reverseInstructionList.rbegin(), ie =
 					reverseInstructionList.rend(); it != ie; ++it) {
