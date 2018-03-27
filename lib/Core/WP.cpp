@@ -171,7 +171,7 @@ std::string WPArrayStore::getFunctionName(llvm::Value *i) {
     return "Global";
   } else if (isa<llvm::ConstantExpr>(i)) {
     // llvm::ConstantExpr* ce = dyn_cast<llvm::ConstantExpr>(i);
-    // klee_error("WeakestPreCondition::getFunctionName sajjad");
+    // klee_error("WeakestPreCondition::getFunctionName");
     return "Constant";
   } else {
     i->dump();
@@ -211,88 +211,90 @@ WeakestPreCondition::WeakestPreCondition(TxTreeNode *_node,
 
 WeakestPreCondition::~WeakestPreCondition() {}
 
-std::vector<std::pair<KInstruction *, int> > WeakestPreCondition::markVariables(
-    std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
+// std::vector<std::pair<KInstruction *, int> >
+// WeakestPreCondition::markVariables(
+//    std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
+//
+//  for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
+//           it = reverseInstructionList.rbegin(),
+//           ie = reverseInstructionList.rend();
+//       it != ie; ++it) {
+//
+//    // Retrieve the instruction
+//    KInstruction *i = (*it).first;
+//
+//    std::vector<std::pair<KInstruction *, int> >::iterator iter =
+//        std::find(reverseInstructionList.begin(),
+// reverseInstructionList.end(),
+//                  std::pair<KInstruction *, int>(i, 0));
+//
+//    // Mark the instructions
+//    if (markedVariables.find(i->inst) != markedVariables.end()) {
+//      iter->second = 1;
+//    } else if (dyn_cast<llvm::StoreInst>(i->inst) &&
+//               markedVariables.find(i->inst->getOperand(1)) !=
+//                   markedVariables.end()) {
+//      iter->second = 1;
+//    }
+//
+//    // Add the variables in the RHS of marked instructions to markedVariables
+//    // set
+//    if ((*it).second == 1) {
+//      if (dyn_cast<llvm::BinaryOperator>(i->inst) ||
+//          dyn_cast<llvm::LoadInst>(i->inst) ||
+//          dyn_cast<llvm::UnaryInstruction>(i->inst) ||
+//          dyn_cast<llvm::StoreInst>(i->inst) ||
+//          dyn_cast<llvm::CmpInst>(i->inst)) {
+//        unsigned int j = 0;
+//        while (j < i->inst->getNumOperands()) {
+//          llvm::Value *operand = i->inst->getOperand(j);
+//          if ((!isa<llvm::Constant>(operand) ||
+//               isa<llvm::GlobalValue>(operand)) &&
+//              markedVariables.find(operand) == markedVariables.end()) {
+//            markedVariables.insert(operand);
+//          }
+//          j++;
+//        }
+//      } else {
+//        switch (i->inst->getOpcode()) {
+//        case llvm::Instruction::Br: {
+//          llvm::BranchInst *bi = cast<llvm::BranchInst>(i->inst);
+//          if (bi->isUnconditional()) {
+//            klee_error("Unconditional BR should not be marked in WP!");
+//          } else {
+//            markedVariables.insert(bi->getCondition());
+//          }
+//          break;
+//        }
+//        case llvm::Instruction::Call: {
+//          // Interprocedural Marking not implemented yet!
+//          // At the current moment it is not needed.
+//          break;
+//        }
+//        default: {
+//          i->inst->dump();
+//          klee_error("Marking not implemented for this instruction yet!");
+//        }
+//        }
+//      }
+//    } else if ((*it).second == 2) {
+//      // Marking not implemented for false dependency in instruction yet!
+//      // At the current moment it is not needed.
+//    }
+//  }
+//
+//  // Printing reverseInstructionList will be omitted in the final commit
+//  /*for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
+//           it = reverseInstructionList.rbegin(),
+//           ie = reverseInstructionList.rend();
+//       it != ie; ++it) {
+//    (*it).first->inst->dump();
+//    llvm::errs() << " " << (*it).second << "\n";
+//  }*/
+//  return reverseInstructionList;
+//}
 
-  for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
-           it = reverseInstructionList.rbegin(),
-           ie = reverseInstructionList.rend();
-       it != ie; ++it) {
-
-    // Retrieve the instruction
-    KInstruction *i = (*it).first;
-
-    std::vector<std::pair<KInstruction *, int> >::iterator iter =
-        std::find(reverseInstructionList.begin(), reverseInstructionList.end(),
-                  std::pair<KInstruction *, int>(i, 0));
-
-    // Mark the instructions
-    if (markedVariables.find(i->inst) != markedVariables.end()) {
-      iter->second = 1;
-    } else if (dyn_cast<llvm::StoreInst>(i->inst) &&
-               markedVariables.find(i->inst->getOperand(1)) !=
-                   markedVariables.end()) {
-      iter->second = 1;
-    }
-
-    // Add the variables in the RHS of marked instructions to markedVariables
-    // set
-    if ((*it).second == 1) {
-      if (dyn_cast<llvm::BinaryOperator>(i->inst) ||
-          dyn_cast<llvm::LoadInst>(i->inst) ||
-          dyn_cast<llvm::UnaryInstruction>(i->inst) ||
-          dyn_cast<llvm::StoreInst>(i->inst) ||
-          dyn_cast<llvm::CmpInst>(i->inst)) {
-        unsigned int j = 0;
-        while (j < i->inst->getNumOperands()) {
-          llvm::Value *operand = i->inst->getOperand(j);
-          if ((!isa<llvm::Constant>(operand) ||
-               isa<llvm::GlobalValue>(operand)) &&
-              markedVariables.find(operand) == markedVariables.end()) {
-            markedVariables.insert(operand);
-          }
-          j++;
-        }
-      } else {
-        switch (i->inst->getOpcode()) {
-        case llvm::Instruction::Br: {
-          llvm::BranchInst *bi = cast<llvm::BranchInst>(i->inst);
-          if (bi->isUnconditional()) {
-            klee_error("Unconditional BR should not be marked in WP!");
-          } else {
-            markedVariables.insert(bi->getCondition());
-          }
-          break;
-        }
-        case llvm::Instruction::Call: {
-          // Interprocedural Marking not implemented yet!
-          // At the current moment it is not needed.
-          break;
-        }
-        default: {
-          i->inst->dump();
-          klee_error("Marking not implemented for this instruction yet!");
-        }
-        }
-      }
-    } else if ((*it).second == 2) {
-      // Marking not implemented for false dependency in instruction yet!
-      // At the current moment it is not needed.
-    }
-  }
-
-  // Printing reverseInstructionList will be omitted in the final commit
-  /*for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
-           it = reverseInstructionList.rbegin(),
-           ie = reverseInstructionList.rend();
-       it != ie; ++it) {
-    (*it).first->inst->dump();
-    llvm::errs() << " " << (*it).second << "\n";
-  }*/
-  return reverseInstructionList;
-}
-
-ref<Expr> WeakestPreCondition::GenerateWPOld(
+ref<Expr> WeakestPreCondition::GenerateWP(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList,
     bool markAllFlag) {
 
@@ -915,11 +917,12 @@ void WeakestPreCondition::convertToExpr(
   WPExpr = WPExpr->rebuild(kids);
 }
 
-ref<Expr> WeakestPreCondition::instantiateWPExpression(
-    TxDependency *dependency, const std::vector<llvm::Instruction *> &callHistory,
-    ref<Expr> WPExpr) {
-
-  ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
+std::vector<ref<Expr> > WeakestPreCondition::instantiateWPExpression(
+    TxDependency *dependency,
+    const std::vector<llvm::Instruction *> &callHistory,
+    std::vector<ref<Expr> > WPExpr) {
+  // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO VECTOR<EXPR>
+  /*ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
   switch (WPExpr->getKind()) {
   case Expr::InvalidKind:
   case Expr::Constant: {
@@ -1006,27 +1009,34 @@ ref<Expr> WeakestPreCondition::instantiateWPExpression(
   }
   // Sanity check
   klee_error("Control should not reach here in "
-             "WeakestPreCondition::instantiateWPExpression!");
+             "WeakestPreCondition::instantiateWPExpression!");*/
   return WPExpr;
 }
 
-
-ref<Expr> WeakestPreCondition::intersectExpr(ref<Expr> expr1,ref<Expr> expr2){
-  if(expr1->getKind() == Expr::Sle && expr2->getKind() == Expr::Sle) {
-	  if (expr1->getKid(0) == expr2->getKid(0)){
-		  ref<Expr> kids[2];
-		  kids[0] = expr1->getKid(0);
-			//sanity check
-		  assert(isa<ConstantExpr>(expr1->getKid(1)) && "expr1->getKid(1) should be constant expression");
-		  assert(isa<ConstantExpr>(expr2->getKid(1)) && "expr2->getKid(1) should be constant expression");
-		  kids[1] = this->getMinOfConstExpr(dyn_cast<ConstantExpr>(expr1->getKid(1)),dyn_cast<ConstantExpr>(expr2->getKid(1)));
-		  return expr1->rebuild(kids);
-	  }else{
-		  expr1->dump();
-		  expr2->dump();
-		  klee_error("WeakestPreCondition::intersectExpr left operands are not the same.");
-		  return AndExpr::create(expr1,expr2);
-	  }
+std::vector<ref<Expr> >
+WeakestPreCondition::intersectExpr(std::vector<ref<Expr> > expr1,
+                                   std::vector<ref<Expr> > expr2) {
+  return expr1;
+  // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO VECTOR<EXPR>
+  /*if(expr1->getKind() == Expr::Sle && expr2->getKind() == Expr::Sle) {
+          if (expr1->getKid(0) == expr2->getKid(0)){
+                  ref<Expr> kids[2];
+                  kids[0] = expr1->getKid(0);
+                        //sanity check
+                  assert(isa<ConstantExpr>(expr1->getKid(1)) &&
+  "expr1->getKid(1) should be constant expression");
+                  assert(isa<ConstantExpr>(expr2->getKid(1)) &&
+  "expr2->getKid(1) should be constant expression");
+                  kids[1] =
+  this->getMinOfConstExpr(dyn_cast<ConstantExpr>(expr1->getKid(1)),dyn_cast<ConstantExpr>(expr2->getKid(1)));
+                  return expr1->rebuild(kids);
+          }else{
+                  expr1->dump();
+                  expr2->dump();
+                  klee_error("WeakestPreCondition::intersectExpr left operands
+  are not the same.");
+                  return AndExpr::create(expr1,expr2);
+          }
   } else if (expr1->getKind() == Expr::Slt && expr2->getKind() == Expr::Slt) {
     if (expr1->getKid(0) == expr2->getKid(0)) {
       ref<Expr> kids[2];
@@ -1048,11 +1058,12 @@ ref<Expr> WeakestPreCondition::intersectExpr(ref<Expr> expr1,ref<Expr> expr2){
       return AndExpr::create(expr1, expr2);
     }
   }else{
-	  expr1->dump();
-	  expr2->dump();
-	  klee_error("WeakestPreCondition::intersectExpr for these expressions is not implemented yet.");
-	  return AndExpr::create(expr1,expr2);
-  }
+          expr1->dump();
+          expr2->dump();
+          klee_error("WeakestPreCondition::intersectExpr for these expressions
+  is not implemented yet.");
+          return AndExpr::create(expr1,expr2);
+  }*/
 }
 
 ref<ConstantExpr> WeakestPreCondition::getMinOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2){
@@ -1717,31 +1728,149 @@ ref<Expr> WeakestPreCondition::replaceCallArguments(ref<Expr> interpolant,
   return interpolant;
 }
 
-ref<Expr> WeakestPreCondition::GenerateWP(
+// =========================================================================
+// Updated Version of Weakest PreCondition
+// =========================================================================
+std::vector<ref<Expr> > WeakestPreCondition::GenerateWP(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
+
   for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
-			it = reverseInstructionList.rbegin(), ie =
-					reverseInstructionList.rend(); it != ie; ++it) {
+           it = reverseInstructionList.rbegin(),
+           ie = reverseInstructionList.rend();
+       it != ie; ++it) {
     llvm::Instruction *i = (*it).first->inst;
     int flag = (*it).second;
     if (flag == 1) {
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- create and expression from the condition and this->WPExpr
-      ref<Expr> cond = getCondition(reverseInstructionList);
+      ref<Expr> cond = getCondition(i);
       WPExprs.push_back(cond);
     } else if (flag == 2) {
 		// 1- call getCondition on the cond argument of the branch instruction
 		// 2- generate not(condition): expr::not(condition)
 		// 3- create and expression from the condition and this->WPExpr
-    	ref<Expr> negCond = NotExpr::create(getCondition(reverseInstructionList));
+      ref<Expr> negCond = NotExpr::create(getCondition(i));
         WPExprs.push_back(negCond);
     } else {
-			// i is 0
-			// todo later on
+      // i is 0
+      // todo later on
     }
   }
+  klee_warning("Start printing the WP");
+  if (WPExprs.size() > 0) {
+    for (std::vector<ref<Expr> >::const_reverse_iterator it = WPExprs.rbegin(),
+                                                         ie = WPExprs.rend();
+         it != ie; ++it) {
+      (*it)->dump();
+    }
+  }
+  klee_warning("end of printing the WP");
+
+  return WPExprs;
 }
 
-ref<Expr> WeakestPreCondition::getCondition(std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
-  return 0;
+ref<Expr> WeakestPreCondition::getCondition(llvm::Instruction *ins) {
+  if (!llvm::isa<llvm::BranchInst>(ins))
+    return True();
+
+  llvm::BranchInst *br = llvm::dyn_cast<llvm::BranchInst>(ins);
+
+  if (!llvm::isa<llvm::CmpInst>(br->getCondition()))
+    return True();
+
+  llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(br->getCondition());
+
+  // Getting the expressions from the left and right operand
+  ref<Expr> left = this->generateExprFromOperand(cmp, 0);
+  ref<Expr> right = this->generateExprFromOperand(cmp, 1);
+  ref<Expr> result;
+  // second step is to Storing the updated WP expression
+  switch (cmp->getPredicate()) {
+  case llvm::CmpInst::ICMP_EQ:
+    result = EqExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_NE:
+    result = NeExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_UGT:
+    result = UgtExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_UGE:
+    result = UgeExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_ULT:
+    result = UltExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_ULE:
+    result = UleExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_SGT:
+    result = SgtExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_SGE:
+    result = SgeExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_SLT:
+    result = SltExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_SLE:
+    result = SleExpr::create(left, right);
+    break;
+  // todo Handle Floating Point
+  case llvm::CmpInst::FCMP_FALSE:
+    klee_error("FCMP_FALSE not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_OEQ:
+    klee_error("FCMP_OEQ not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_OGT:
+    klee_error("FCMP_OGT not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_OGE:
+    klee_error("FCMP_OGE not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_OLT:
+    klee_error("FCMP_OLT not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_OLE:
+    klee_error("FCMP_OLE not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_ONE:
+    klee_error("FCMP_ONE not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_ORD:
+    klee_error("FCMP_ORD not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_UNO:
+    klee_error("FCMP_UNO not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_UEQ:
+    klee_error("FCMP_UEQ not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_UGT:
+    klee_error("FCMP_UGT not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_UGE:
+    klee_error("FCMP_UGE not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_ULT:
+    klee_error("FCMP_ULT not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_ULE:
+    klee_error("FCMP_ULE not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_UNE:
+    klee_error("FCMP_UNE not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_TRUE:
+    klee_error("FCMP_TRUE not implemented yet!");
+    break;
+  case llvm::CmpInst::BAD_FCMP_PREDICATE:
+    klee_error("BAD_FCMP_PREDICATE not implemented yet!");
+    break;
+  case llvm::CmpInst::BAD_ICMP_PREDICATE:
+    klee_error("BAD_ICMP_PREDICATE not implemented yet!");
+    break;
+  }
+  return result;
 }
