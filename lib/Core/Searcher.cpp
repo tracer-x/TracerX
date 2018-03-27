@@ -132,6 +132,48 @@ void BFSSearcher::update(ExecutionState *current,
 
 ///
 
+ExecutionState &ITERDEPSearcher::selectState() { return *states.front(); }
+
+void
+ITERDEPSearcher::update(ExecutionState *current,
+                        const std::vector<ExecutionState *> &addedStates,
+                        const std::vector<ExecutionState *> &removedStates) {
+  for (std::vector<ExecutionState *>::const_iterator it = addedStates.begin(),
+                                                     ie = addedStates.end();
+       it != ie; ++it) {
+    if ((*it)->depth <= 10) {
+      states.insert(states.end(), (*it));
+    } else {
+      // Do something, otherwise, the code will fail
+    }
+  }
+
+  for (std::vector<ExecutionState *>::const_iterator it = removedStates.begin(),
+                                                     ie = removedStates.end();
+       it != ie; ++it) {
+    ExecutionState *es = *it;
+    if (es == states.front()) {
+      states.pop_front();
+    } else {
+      bool ok = false;
+
+      for (std::deque<ExecutionState *>::iterator it = states.begin(),
+                                                  ie = states.end();
+           it != ie; ++it) {
+        if (es == *it) {
+          states.erase(it);
+          ok = true;
+          break;
+        }
+      }
+
+      assert(ok && "invalid state removed");
+    }
+  }
+}
+
+///
+
 ExecutionState &RandomSearcher::selectState() {
   return *states[theRNG.getInt32()%states.size()];
 }

@@ -69,6 +69,7 @@ namespace klee {
     enum CoreSearchType {
       DFS,
       BFS,
+      ITERDEP,
       RandomState,
       RandomPath,
       NURS_CovNew,
@@ -106,6 +107,18 @@ namespace klee {
     void printName(llvm::raw_ostream &os) {
       os << "BFSSearcher\n";
     }
+  };
+
+  class ITERDEPSearcher : public Searcher {
+    std::deque<ExecutionState *> states;
+
+  public:
+    ExecutionState &selectState();
+    void update(ExecutionState *current,
+                const std::vector<ExecutionState *> &addedStates,
+                const std::vector<ExecutionState *> &removedStates);
+    bool empty() { return states.empty(); }
+    void printName(llvm::raw_ostream &os) { os << "ITERDEPSearcher\n"; }
   };
 
   class RandomSearcher : public Searcher {

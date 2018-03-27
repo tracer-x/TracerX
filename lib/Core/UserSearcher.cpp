@@ -19,19 +19,29 @@ using namespace llvm;
 using namespace klee;
 
 namespace {
-  cl::list<Searcher::CoreSearchType>
-  CoreSearch("search", cl::desc("Specify the search heuristic (default=random-path interleaved with nurs:covnew)"),
-	     cl::values(clEnumValN(Searcher::DFS, "dfs", "use Depth First Search (DFS)"),
-			clEnumValN(Searcher::BFS, "bfs", "use Breadth First Search (BFS)"),
-			clEnumValN(Searcher::RandomState, "random-state", "randomly select a state to explore"),
-			clEnumValN(Searcher::RandomPath, "random-path", "use Random Path Selection (see OSDI'08 paper)"),
-			clEnumValN(Searcher::NURS_CovNew, "nurs:covnew", "use Non Uniform Random Search (NURS) with Coverage-New"),
-			clEnumValN(Searcher::NURS_MD2U, "nurs:md2u", "use NURS with Min-Dist-to-Uncovered"),
-			clEnumValN(Searcher::NURS_Depth, "nurs:depth", "use NURS with 2^depth"),
-			clEnumValN(Searcher::NURS_ICnt, "nurs:icnt", "use NURS with Instr-Count"),
-			clEnumValN(Searcher::NURS_CPICnt, "nurs:cpicnt", "use NURS with CallPath-Instr-Count"),
-			clEnumValN(Searcher::NURS_QC, "nurs:qc", "use NURS with Query-Cost"),
-			clEnumValEnd));
+cl::list<Searcher::CoreSearchType> CoreSearch(
+    "search", cl::desc("Specify the search heuristic (default=random-path "
+                       "interleaved with nurs:covnew)"),
+    cl::values(
+        clEnumValN(Searcher::DFS, "dfs", "use Depth First Search (DFS)"),
+        clEnumValN(Searcher::BFS, "bfs", "use Breadth First Search (BFS)"),
+        clEnumValN(Searcher::ITERDEP, "IterDep",
+                   "use Iterative Deepening Search (IterDep)"),
+        clEnumValN(Searcher::RandomState, "random-state",
+                   "randomly select a state to explore"),
+        clEnumValN(Searcher::RandomPath, "random-path",
+                   "use Random Path Selection (see OSDI'08 paper)"),
+        clEnumValN(Searcher::NURS_CovNew, "nurs:covnew",
+                   "use Non Uniform Random Search (NURS) with Coverage-New"),
+        clEnumValN(Searcher::NURS_MD2U, "nurs:md2u",
+                   "use NURS with Min-Dist-to-Uncovered"),
+        clEnumValN(Searcher::NURS_Depth, "nurs:depth", "use NURS with 2^depth"),
+        clEnumValN(Searcher::NURS_ICnt, "nurs:icnt",
+                   "use NURS with Instr-Count"),
+        clEnumValN(Searcher::NURS_CPICnt, "nurs:cpicnt",
+                   "use NURS with CallPath-Instr-Count"),
+        clEnumValN(Searcher::NURS_QC, "nurs:qc", "use NURS with Query-Cost"),
+        clEnumValEnd));
 
   cl::opt<bool>
   UseIterativeDeepeningTimeSearch("use-iterative-deepening-time-search", 
@@ -78,6 +88,9 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
   switch (type) {
   case Searcher::DFS: searcher = new DFSSearcher(); break;
   case Searcher::BFS: searcher = new BFSSearcher(); break;
+  case Searcher::ITERDEP:
+    searcher = new ITERDEPSearcher();
+    break;
   case Searcher::RandomState: searcher = new RandomSearcher(); break;
   case Searcher::RandomPath: searcher = new RandomPathSearcher(executor); break;
   case Searcher::NURS_CovNew: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::CoveringNew); break;
