@@ -21,6 +21,7 @@
 #include <klee/ExprBuilder.h>
 #include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ArrayCache.h>
+#include "PartitionHelper.h"
 #include "TxDependency.h"
 #include "TxTree.h"
 #include <vector>
