@@ -143,9 +143,16 @@ public:
                           const std::vector<llvm::Instruction *> &callHistory,
                           std::vector<ref<Expr> > WPExpr);
 
+  ref<Expr>
+  instantiateSingleExpression(TxDependency *dependency,
+      const std::vector<llvm::Instruction *> &callHistory,
+      ref<Expr> singleWPExpr);
+
   // \brief Perform the intersection of two weakest precondition expression
   std::vector<ref<Expr> > intersectExpr(std::vector<ref<Expr> > expr1,
                                         std::vector<ref<Expr> > expr2);
+  std::vector<ref<Expr> > intersectExpr_aux(std::vector<ref<Expr> > expr1,
+                                          std::vector<ref<Expr> > expr2);
 
   // \brief Return the minimum of two constant expressions
   ref<ConstantExpr> getMinOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2);

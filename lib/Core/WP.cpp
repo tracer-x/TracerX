@@ -909,95 +909,107 @@ std::vector<ref<Expr> > WeakestPreCondition::instantiateWPExpression(
     const std::vector<llvm::Instruction *> &callHistory,
     std::vector<ref<Expr> > WPExpr) {
   // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO VECTOR<EXPR>
-  /*ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
-   switch (WPExpr->getKind()) {
-   case Expr::InvalidKind:
-   case Expr::Constant: {
-   return WPExpr;
-   }
+  std::vector<ref<Expr> > result;
+  for (std::vector<ref<Expr> >::const_iterator it = WPExpr.begin(), ie =
+      WPExpr.end(); it != ie; ++it) {
+    result.push_back(instantiateSingleExpression(dependency, callHistory, *it));
+  }
+  return result;
+}
 
-   case Expr::Read: {
-   llvm::Value *tempInstr = WPArrayStore::getValuePointer(WPExpr);
-   if (tempInstr == NULL)
-   klee_error(
-   "WeakestPreCondition::instantiateWPExpression Value ref is null");
-   ref<Expr> storeValue =
-   dependency->getLatestValueOfAddress(tempInstr, callHistory);
-   if (storeValue == dummy)
-   return WPExpr;
-   return storeValue;
-   }
+ref<Expr> WeakestPreCondition::instantiateSingleExpression(
+    TxDependency *dependency,
+    const std::vector<llvm::Instruction *> &callHistory,
+    ref<Expr> singleWPExpr) {
+  ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
+  switch (singleWPExpr->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return singleWPExpr;
+  }
 
-   case Expr::Concat: {
-   llvm::Value *tempInstr = WPArrayStore::getValuePointer(WPExpr);
-   if (tempInstr == NULL)
-   klee_error(
-   "WeakestPreCondition::instantiateWPExpression Value ref is null");
-   ref<Expr> storeValue =
-   dependency->getLatestValueOfAddress(tempInstr, callHistory);
-   if (storeValue == dummy)
-   return WPExpr;
-   return storeValue;
-   }
+  case Expr::Read: {
+    llvm::Value *tempInstr = WPArrayStore::getValuePointer(singleWPExpr);
+    if (tempInstr == NULL)
+      klee_error(
+          "WeakestPreCondition::instantiateWPExpression Value ref is null");
+    ref<Expr> storeValue = dependency->getLatestValueOfAddress(tempInstr,
+        callHistory);
+    if (storeValue == dummy)
+      return singleWPExpr;
+    return storeValue;
+  }
 
-   case Expr::NotOptimized:
-   case Expr::Not:
-   case Expr::Extract:
-   case Expr::ZExt:
-   case Expr::SExt: {
-   ref<Expr> kids[1];
-   kids[0] =
-   instantiateWPExpression(dependency, callHistory, WPExpr->getKid(0));
-   return WPExpr->rebuild(kids);
-   }
+  case Expr::Concat: {
+    llvm::Value *tempInstr = WPArrayStore::getValuePointer(singleWPExpr);
+    if (tempInstr == NULL)
+      klee_error(
+          "WeakestPreCondition::instantiateWPExpression Value ref is null");
+    ref<Expr> storeValue = dependency->getLatestValueOfAddress(tempInstr,
+        callHistory);
+    if (storeValue == dummy)
+      return singleWPExpr;
+    return storeValue;
+  }
 
-   case Expr::Eq:
-   case Expr::Ne:
-   case Expr::Ult:
-   case Expr::Ule:
-   case Expr::Ugt:
-   case Expr::Uge:
-   case Expr::Slt:
-   case Expr::Sle:
-   case Expr::Sgt:
-   case Expr::Sge:
-   case Expr::LastKind:
-   case Expr::Add:
-   case Expr::Sub:
-   case Expr::Mul:
-   case Expr::UDiv:
-   case Expr::SDiv:
-   case Expr::URem:
-   case Expr::SRem:
-   case Expr::And:
-   case Expr::Or:
-   case Expr::Xor:
-   case Expr::Shl:
-   case Expr::LShr:
-   case Expr::AShr: {
-   ref<Expr> kids[2];
-   kids[0] =
-   instantiateWPExpression(dependency, callHistory, WPExpr->getKid(0));
-   kids[1] =
-   instantiateWPExpression(dependency, callHistory, WPExpr->getKid(1));
-   return WPExpr->rebuild(kids);
-   }
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    ref<Expr> kids[1];
+    kids[0] = instantiateSingleExpression(dependency, callHistory,
+        singleWPExpr->getKid(0));
+    return singleWPExpr->rebuild(kids);
+  }
 
-   case Expr::Select: {
-   ref<Expr> kids[3];
-   kids[0] =
-   instantiateWPExpression(dependency, callHistory, WPExpr->getKid(0));
-   kids[1] =
-   instantiateWPExpression(dependency, callHistory, WPExpr->getKid(1));
-   kids[2] =
-   instantiateWPExpression(dependency, callHistory, WPExpr->getKid(2));
-   return WPExpr->rebuild(kids);
-   }
-   }
-   // Sanity check
-   klee_error("Control should not reach here in "
-   "WeakestPreCondition::instantiateWPExpression!");*/
-  return WPExpr;
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    ref<Expr> kids[2];
+    kids[0] = instantiateSingleExpression(dependency, callHistory,
+        singleWPExpr->getKid(0));
+    kids[1] = instantiateSingleExpression(dependency, callHistory,
+        singleWPExpr->getKid(1));
+    return singleWPExpr->rebuild(kids);
+  }
+
+  case Expr::Select: {
+    ref<Expr> kids[3];
+    kids[0] = instantiateSingleExpression(dependency, callHistory,
+        singleWPExpr->getKid(0));
+    kids[1] = instantiateSingleExpression(dependency, callHistory,
+        singleWPExpr->getKid(1));
+    kids[2] = instantiateSingleExpression(dependency, callHistory,
+        singleWPExpr->getKid(2));
+    return singleWPExpr->rebuild(kids);
+  }
+  }
+  // Sanity check
+  klee_error("Control should not reach here in "
+      "WeakestPreCondition::instantiateWPExpression!");
+  return singleWPExpr;
 }
 
 std::vector<ref<Expr> > WeakestPreCondition::intersectExpr(
@@ -1011,6 +1023,59 @@ std::vector<ref<Expr> > WeakestPreCondition::intersectExpr(
     result.push_back(PartitionHelper::createAnd(exprsVars.exprs));
   }
   return result;
+}
+
+std::vector<ref<Expr> >
+WeakestPreCondition::intersectExpr_aux(std::vector<ref<Expr> > expr1,
+                                   std::vector<ref<Expr> > expr2) {
+  return expr1;
+  // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO VECTOR<EXPR>
+  /*if(expr1->getKind() == Expr::Sle && expr2->getKind() == Expr::Sle) {
+          if (expr1->getKid(0) == expr2->getKid(0)){
+                  ref<Expr> kids[2];
+                  kids[0] = expr1->getKid(0);
+                        //sanity check
+                  assert(isa<ConstantExpr>(expr1->getKid(1)) &&
+  "expr1->getKid(1) should be constant expression");
+                  assert(isa<ConstantExpr>(expr2->getKid(1)) &&
+  "expr2->getKid(1) should be constant expression");
+                  kids[1] =
+  this->getMinOfConstExpr(dyn_cast<ConstantExpr>(expr1->getKid(1)),dyn_cast<ConstantExpr>(expr2->getKid(1)));
+                  return expr1->rebuild(kids);
+          }else{
+                  expr1->dump();
+                  expr2->dump();
+                  klee_error("WeakestPreCondition::intersectExpr left operands
+  are not the same.");
+                  return AndExpr::create(expr1,expr2);
+          }
+  } else if (expr1->getKind() == Expr::Slt && expr2->getKind() == Expr::Slt) {
+    if (expr1->getKid(0) == expr2->getKid(0)) {
+      ref<Expr> kids[2];
+      kids[0] = expr1->getKid(0);
+      // sanity check
+      assert(isa<ConstantExpr>(expr1->getKid(1)) &&
+             "expr1->getKid(1) should be constant expression");
+      assert(isa<ConstantExpr>(expr2->getKid(1)) &&
+             "expr2->getKid(1) should be constant expression");
+      kids[1] =
+          this->getMinOfConstExpr(dyn_cast<ConstantExpr>(expr1->getKid(1)),
+                                  dyn_cast<ConstantExpr>(expr2->getKid(1)));
+      return expr1->rebuild(kids);
+    } else {
+      expr1->dump();
+      expr2->dump();
+      klee_error(
+          "WeakestPreCondition::intersectExpr left operands are not the same.");
+      return AndExpr::create(expr1, expr2);
+    }
+  }else{
+          expr1->dump();
+          expr2->dump();
+          klee_error("WeakestPreCondition::intersectExpr for these expressions
+  is not implemented yet.");
+          return AndExpr::create(expr1,expr2);
+  }*/
 }
 
 ref<ConstantExpr> WeakestPreCondition::getMinOfConstExpr(
