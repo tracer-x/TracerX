@@ -24,6 +24,7 @@
 #include "PartitionHelper.h"
 #include "TxDependency.h"
 #include "TxTree.h"
+#include "WPHelper.h"
 #include <vector>
 
 namespace klee {
@@ -67,8 +68,6 @@ class WeakestPreCondition {
   ref<Expr> WPExpr;
   std::vector<ref<Expr> > WPExprs;
 
-  ExprBuilder *eb;
-
   // Respective interpolation tree node
   TxTreeNode *node;
 
@@ -83,10 +82,14 @@ public:
 
   ~WeakestPreCondition();
 
-  ref<Expr> True() { return eb->True(); };
-  ref<Expr> False() { return eb->False(); };
+  ref<Expr> True() {
+    return ConstantExpr::alloc(1, Expr::Bool);
+  };
+  ref<Expr> False() {
+    return ConstantExpr::alloc(0, Expr::Bool);
+  };
 
-  void resetWPExpr() { WPExpr = eb->False(); }
+  void resetWPExpr() { WPExpr = False(); }
 
   void setWPExpr(std::vector<ref<Expr> > expr) { WPExprs = expr; }
 
@@ -107,34 +110,6 @@ public:
 
   // \brief Return LHS of an instruction as a read expression
   ref<Expr> getLHS(llvm::Instruction *i);
-
-  // \brief Update the weakest precondition with a new condition
-  void updateWPExpr(ref<Expr> result);
-
-  // \brief Substitute the rhs of result with its lhs in the weakest
-  // precondition expression
-  void substituteExpr(ref<Expr> result);
-
-  // \brief Recursive substitute function
-  ref<Expr> substituteExpr(ref<Expr> Base, const ref<Expr> lhs,
-                           const ref<Expr> rhs);
-
-  // \brief Convert the weakest precondition expression to canonical form
-  void simplifyWPExpr();
-
-  // \brief Simplify terms in the weakest precondition expression to canonical
-  // form
-  std::map<ref<Expr>, uint64_t> *
-  simplifyWPTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
-                 ref<Expr> linearTerm);
-
-  // \brief Insert a variable with coefficient in newLinearTerm
-  void insertTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm, uint64_t coeff,
-                  ref<Expr> variable);
-
-  // \brief Convert newLinearTerm to an expression and store it at WPExpr(in
-  // canonical form)
-  void convertToExpr(std::map<ref<Expr>, uint64_t> *newLinearTerm);
 
   // \brief Instantiates the variables in WPExpr by their latest value for the
   // implication test.
@@ -197,6 +172,7 @@ public:
   // \brief Generate and return the weakest precondition expressions.
   std::vector<ref<Expr> > GenerateWP(
       std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
+  ref<Expr> getPrevExpr(ref<Expr> e, llvm::Instruction *i);
 
   private:
     ref<Expr> getCondition(llvm::Instruction *ins);
