@@ -634,7 +634,7 @@ ref<Expr> WeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
     int operand) {
   // Generating WP from Operand1
   ref<Expr> left;
-
+  // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO VECTOR<EXPR>
   llvm::Value *operand1 = i->getOperand(operand);
   if (isa<llvm::ConstantInt>(operand1)) {
     llvm::ConstantInt *CI = dyn_cast<llvm::ConstantInt>(operand1);
@@ -725,8 +725,10 @@ ref<Expr> WeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
     }
 
   } else {
-    left = dependency->getAddress(operand1, &WPArrayStore::ac,
-                                  WPArrayStore::array, this);
+    klee_error("WeakestPreCondition::generateExprFromOperand Remaining cases"
+               "not implemented...\n");
+    // left = dependency->getAddress(operand1, &WPArrayStore::ac,
+    //                              WPArrayStore::array, this);
   }
   return left;
 }
@@ -976,7 +978,6 @@ std::vector<ref<Expr> > WeakestPreCondition::instantiateWPExpression(
     TxDependency *dependency,
     const std::vector<llvm::Instruction *> &callHistory,
     std::vector<ref<Expr> > WPExpr) {
-  // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO VECTOR<EXPR>
   std::vector<ref<Expr> > result;
   for (std::vector<ref<Expr> >::const_iterator it = WPExpr.begin(), ie =
       WPExpr.end(); it != ie; ++it) {
@@ -1088,6 +1089,7 @@ std::vector<ref<Expr> > WeakestPreCondition::intersectExpr(
   for (std::vector<Partition>::const_iterator it = partitions.begin(), ie =
       partitions.end(); it != ie; ++it) {
     Partition exprsVars = (*it);
+    // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO VECTOR<EXPR>
     result.push_back(PartitionHelper::createAnd(exprsVars.exprs));
   }
   return result;
@@ -1803,15 +1805,6 @@ ref<Expr> WeakestPreCondition::replaceCallArguments(ref<Expr> interpolant,
 std::vector<ref<Expr> > WeakestPreCondition::GenerateWP(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
 
-  llvm::outs() << "--- begin instruction list ---\n";
-  for (std::vector<std::pair<KInstruction *, int> >::const_iterator
-           it = reverseInstructionList.begin(),
-           ie = reverseInstructionList.end();
-       it != ie; ++it) {
-    llvm::Instruction *i = (*it).first->inst;
-    i->dump();
-  }
-  llvm::outs() << "--- end instruction list ---\n";
   for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator it =
       reverseInstructionList.rbegin(), ie = reverseInstructionList.rend();
       it != ie; ++it) {
@@ -1848,15 +1841,12 @@ std::vector<ref<Expr> > WeakestPreCondition::GenerateWP(
                                                    ie = WPExprs.end();
            it != ie; ++it) {
         ref<Expr> te = getPrevExpr(*it, i);
-        llvm::outs() << "--- start 3 ---\n";
         i->dump();
         (*it)->dump();
         if (!te.isNull())
           te->dump();
-        llvm::outs() << "--- end 3 ---\n";
         tmp.push_back(getPrevExpr(*it, i));
       }
-      llvm::outs() << "--- end 4 ---\n";
       WPExprs = tmp;
     }
   }
@@ -1869,7 +1859,6 @@ std::vector<ref<Expr> > WeakestPreCondition::GenerateWP(
     }
   }
   klee_warning("End of printing the WP");
-  klee_warning("reached here");
   return WPExprs;
 }
 
@@ -1877,13 +1866,11 @@ ref<Expr> WeakestPreCondition::getPrevExpr(ref<Expr> e, llvm::Instruction *i) {
   ref<Expr> ret = e;
   switch (i->getOpcode()) {
   case llvm::Instruction::Store: {
-    klee_warning("1");
     e->dump();
     i->dump();
     if (!WPHelper::isTargetDependent(i->getOperand(1), e)) {
       break;
     }
-    klee_warning("2");
     ref<Expr> left = this->generateExprFromOperand(i, 0);
     left->dump();
     ref<Expr> right = this->generateExprFromOperand(i, 1);
