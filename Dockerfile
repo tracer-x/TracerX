@@ -25,7 +25,7 @@ RUN apt-get update && \
         libcap-dev \
         git \
         subversion \
-        cmake \
+        cmake3 \
         make \
         libboost-program-options-dev \
         python3 \
