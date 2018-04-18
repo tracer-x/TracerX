@@ -90,7 +90,7 @@ ref<Expr> WPArrayStore::createAndInsert(std::string arrayName,
     size =
         value->getType()->getArrayElementType()->getArrayElementType()->getIntegerBitWidth();
   } else {
-    value->getType()->dump();
+//    value->getType()->dump();
     klee_error(
         "WPArrayStore::createAndInsert getting size is not defined for this "
             "type yet");
@@ -164,22 +164,22 @@ std::string WPArrayStore::getFunctionName(llvm::Value *i) {
     // klee_error("WeakestPreCondition::getFunctionName");
     return "Constant";
   } else {
-    i->dump();
+//    i->dump();
     klee_error("WeakestPreCondition::getFunctionName LLVM Value is not an "
         "instruction");
   }
   llvm::BasicBlock *BB = inst->getParent();
   if (!BB) {
-    inst->dump();
+//    inst->dump();
     klee_error("WeakestPreCondition::getFunctionName Basic Block is Null");
   }
   llvm::Function *func = BB->getParent();
   if (!func) {
-    BB->dump();
+//    BB->dump();
     klee_error("WeakestPreCondition::getFunctionName Function is Null");
   }
   if (!func->hasName()) {
-    func->dump();
+//    func->dump();
     klee_error("WeakestPreCondition::getFunctionName Function has no name");
   }
   return func->getName();
@@ -725,10 +725,10 @@ ref<Expr> WeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
     }
 
   } else {
-    klee_error("WeakestPreCondition::generateExprFromOperand Remaining cases"
-               "not implemented...\n");
-    // left = dependency->getAddress(operand1, &WPArrayStore::ac,
-    //                              WPArrayStore::array, this);
+//    klee_error("WeakestPreCondition::generateExprFromOperand Remaining cases"
+//               "not implemented...\n");
+     left = dependency->getAddress(operand1, &WPArrayStore::ac,
+                                  WPArrayStore::array, this);
   }
   return left;
 }
@@ -1834,17 +1834,10 @@ std::vector<ref<Expr> > WeakestPreCondition::GenerateWP(
       WPExprs.push_back(negCond);
     } else if (i->getOpcode() == llvm::Instruction::Store) {
       // i is 0
-      // todo later on
-
       std::vector<ref<Expr> > tmp;
       for (std::vector<ref<Expr> >::const_iterator it = WPExprs.begin(),
                                                    ie = WPExprs.end();
            it != ie; ++it) {
-        ref<Expr> te = getPrevExpr(*it, i);
-        i->dump();
-        (*it)->dump();
-        if (!te.isNull())
-          te->dump();
         tmp.push_back(getPrevExpr(*it, i));
       }
       WPExprs = tmp;
@@ -1866,19 +1859,14 @@ ref<Expr> WeakestPreCondition::getPrevExpr(ref<Expr> e, llvm::Instruction *i) {
   ref<Expr> ret = e;
   switch (i->getOpcode()) {
   case llvm::Instruction::Store: {
-    e->dump();
-    i->dump();
     if (!WPHelper::isTargetDependent(i->getOperand(1), e)) {
       break;
     }
     ref<Expr> left = this->generateExprFromOperand(i, 0);
-    left->dump();
     ref<Expr> right = this->generateExprFromOperand(i, 1);
-    right->dump();
     ref<Expr> result = EqExpr::create(right, left);
     ref<Expr> result1 = WPHelper::substituteExpr(e, result);
     ret = WPHelper::simplifyWPExpr(WPHelper::substituteExpr(e, result));
-    ret->dump();
     break;
   }
 
