@@ -30,8 +30,7 @@
 namespace klee {
 
 /// \brief Implements the replacement mechanism for replacing variables in WP
-/// Expr, used in
-/// replacing free with bound variables.
+/// Expr, used in replacing free with bound variables.
 class TxWPArrayStore {
 
   static std::map<std::pair<std::string, llvm::Value *>,

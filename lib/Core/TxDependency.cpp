@@ -188,25 +188,25 @@ ref<Expr> TxDependency::getPointerAddress(llvm::ConstantExpr *gep,
   }
 }
 
-ref<Expr> TxDependency::getLatestValueOfAddress(
-    llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory) {
-    
-  bool allowInconsistency = true;
-  ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
-
-  ref<TxStateValue> addressValue =
-      this->getLatestValue(value, callHistory, dummy, allowInconsistency);
-
-  if (addressValue.isNull())
-    return dummy;
-  ref<TxStateAddress> address = addressValue->getPointerInfo();
-  if (address.isNull())
-    klee_error("Dependency::getLatestValueOfAddress Address is null");
-  ref<TxStoreEntry> entry = store->find(address);
-  if (entry.isNull())
-    klee_error("Dependency::getLatestValueOfAddress No entry found");
-  return entry->getContent()->getExpression();
-}
+// ref<Expr> TxDependency::getLatestValueOfAddress(
+//    llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory) {
+//
+//  bool allowInconsistency = true;
+//  ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
+//
+//  ref<TxStateValue> addressValue =
+//      this->getLatestValue(value, callHistory, dummy, allowInconsistency);
+//
+//  if (addressValue.isNull())
+//    return dummy;
+//  ref<TxStateAddress> address = addressValue->getPointerInfo();
+//  if (address.isNull())
+//    klee_error("Dependency::getLatestValueOfAddress Address is null");
+//  ref<TxStoreEntry> entry = store->find(address);
+//  if (entry.isNull())
+//    klee_error("Dependency::getLatestValueOfAddress No entry found");
+//  return entry->getContent()->getExpression();
+//}
 
 ref<TxStateValue> TxDependency::getLatestValue(
     llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,
