@@ -943,8 +943,8 @@ public:
   static void executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
                             std::vector<ref<Expr> > &args);
 
-  /// \brief Store instruction in a node for computing weakest precondition
-  /// interpolant
+  /// \brief Store instruction stores the list of instructions in a node
+  /// in reverse order for computing weakest precondition interpolant
   void storeInstruction(KInstruction *instr);
 
   /// \brief Mark an instruction in a node which contributes to computing
