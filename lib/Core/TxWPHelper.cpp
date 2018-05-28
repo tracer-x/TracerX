@@ -1,8 +1,8 @@
-#include "WPHelper.h"
+#include "TxWPHelper.h"
 
 namespace klee {
 
-ref<Expr> WPHelper::simplifyWPExpr(ref<Expr> e) {
+ref<Expr> TxWPHelper::simplifyWPExpr(ref<Expr> e) {
   ref<Expr> result = e;
   switch (e->getKind()) {
   case Expr::And: {
@@ -31,7 +31,7 @@ ref<Expr> WPHelper::simplifyWPExpr(ref<Expr> e) {
     if (isa<ConstantExpr>(kids[1])) {
       ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[1]);
       insertTerm(newLinearTerm, constant->getZExtValue(),
-                 WPArrayStore::constValues);
+                 TxWPArrayStore::constValues);
     } else {
       newLinearTerm = simplifyWPTerm(newLinearTerm, kids[1]);
     }
@@ -57,12 +57,12 @@ ref<Expr> WPHelper::simplifyWPExpr(ref<Expr> e) {
 }
 
 std::map<ref<Expr>, uint64_t> *
-WPHelper::simplifyWPTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
-                         ref<Expr> linearTerm) {
+TxWPHelper::simplifyWPTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
+                           ref<Expr> linearTerm) {
   if (isa<ConstantExpr>(linearTerm)) {
     ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(linearTerm);
     insertTerm(newLinearTerm, (-1) * constant->getZExtValue(),
-               WPArrayStore::constValues);
+               TxWPArrayStore::constValues);
   } else {
     switch (linearTerm->getKind()) {
     case Expr::Concat:
@@ -105,8 +105,8 @@ WPHelper::simplifyWPTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
   return newLinearTerm;
 }
 
-void WPHelper::insertTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
-                          uint64_t coeff, const ref<Expr> variable) {
+void TxWPHelper::insertTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
+                            uint64_t coeff, const ref<Expr> variable) {
   std::map<ref<Expr>, uint64_t>::iterator it = newLinearTerm->find(variable);
   if (it == newLinearTerm->end())
     newLinearTerm->insert(std::pair<ref<Expr>, uint64_t>(variable, coeff));
@@ -115,15 +115,15 @@ void WPHelper::insertTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
 }
 
 ref<Expr>
-WPHelper::convertToExpr(ref<Expr> e,
-                        std::map<ref<Expr>, uint64_t> *newLinearTerm) {
+TxWPHelper::convertToExpr(ref<Expr> e,
+                          std::map<ref<Expr>, uint64_t> *newLinearTerm) {
   ref<Expr> kids[2];
   ref<Expr> temp = ConstantExpr::alloc(0, Expr::Bool);
   for (std::map<ref<Expr>, uint64_t>::const_iterator
            it = newLinearTerm->begin(),
            ie = newLinearTerm->end();
        it != ie; ++it) {
-    if (it->first == WPArrayStore::constValues) {
+    if (it->first == TxWPArrayStore::constValues) {
       kids[1] = ConstantExpr::create(it->second, Expr::Int32);
     } else {
       ref<Expr> lhs;
@@ -144,7 +144,7 @@ WPHelper::convertToExpr(ref<Expr> e,
   return e->rebuild(kids);
 }
 
-bool WPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
+bool TxWPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
   //  llvm::outs() << "***********\n";
   //  expr->dump();
   //  llvm::outs() << expr->getKind() << "\n";
@@ -154,7 +154,7 @@ bool WPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
   case Expr::Constant: { return false; }
 
   case Expr::Read: {
-    if (inst == WPArrayStore::getValuePointer(expr)) {
+    if (inst == TxWPArrayStore::getValuePointer(expr)) {
       return true;
     }
     return false;
@@ -162,8 +162,8 @@ bool WPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
 
   case Expr::Concat: {
 
-    if (inst == WPArrayStore::getValuePointer(
-                    WPArrayStore::getFunctionName(inst), expr)) {
+    if (inst == TxWPArrayStore::getValuePointer(
+                    TxWPArrayStore::getFunctionName(inst), expr)) {
       return true;
     }
     return false;
@@ -224,11 +224,11 @@ bool WPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
   }
   // Sanity check
   klee_error("Control should not reach here in "
-             "WPHelper::isTargetDependent!");
+             "TxWPHelper::isTargetDependent!");
   return false;
 }
 
-ref<Expr> WPHelper::substituteExpr(ref<Expr> e, ref<Expr> eq) {
+ref<Expr> TxWPHelper::substituteExpr(ref<Expr> e, ref<Expr> eq) {
   ref<Expr> result;
   switch (eq->getKind()) {
   case Expr::Constant: {
@@ -255,8 +255,8 @@ ref<Expr> WPHelper::substituteExpr(ref<Expr> e, ref<Expr> eq) {
   return result;
 }
 
-ref<Expr> WPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
-                                   const ref<Expr> rhs) {
+ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
+                                     const ref<Expr> rhs) {
   if (base.compare(lhs) == 0)
     return rhs;
   else if (base.compare(rhs) == 0)
@@ -318,7 +318,7 @@ ref<Expr> WPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
     }
   }
   // Sanity check
-  klee_error("Control should not reach here in WPHelper::substituteExpr!");
+  klee_error("Control should not reach here in TxWPHelper::substituteExpr!");
   return base;
 }
 

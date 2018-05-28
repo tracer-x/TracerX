@@ -17,7 +17,7 @@
 #include "TxDependency.h"
 #include "TxShadowArray.h"
 #include "Context.h"
-#include "WP.h"
+#include "TxWP.h"
 #include <klee/util/ArrayCache.h>
 
 #include "Context.h"
@@ -69,8 +69,8 @@ TxDependency::registerNewTxStateValue(llvm::Value *value,
 }
 
 ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
-                                 const Array *tmpArray,
-                                 WeakestPreCondition *wp) {
+                                   const Array *tmpArray,
+                                   TxWeakestPreCondition *wp) {
   if (!value->hasName()) {
     value->dump();
     klee_error("Dependency::getAddress:Instruction has no name!\n");
@@ -98,18 +98,18 @@ ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
       Res = i ? ConcatExpr::create(Byte, Res) : Byte;
     }
     // Storing entry
-    WPArrayStore::insert(value, symArray, Res);
+    TxWPArrayStore::insert(value, symArray, Res);
     return Res;
   }
 
   // Symbolic array doesn't exist create one
-  ref<Expr> tmpExpr = WPArrayStore::createAndInsert(arrayName, value);
+  ref<Expr> tmpExpr = TxWPArrayStore::createAndInsert(arrayName, value);
   return tmpExpr;
 }
 
-ref<Expr> TxDependency::getPointerAddress(llvm::ConstantExpr *gep, ArrayCache *ac,
-                                        const Array *tmpArray,
-                                        WeakestPreCondition *wp) {
+ref<Expr> TxDependency::getPointerAddress(llvm::ConstantExpr *gep,
+                                          ArrayCache *ac, const Array *tmpArray,
+                                          TxWeakestPreCondition *wp) {
   std::string arrayName;
   const std::string ext(".addr");
   const Array *symArray;
@@ -175,7 +175,7 @@ ref<Expr> TxDependency::getPointerAddress(llvm::ConstantExpr *gep, ArrayCache *a
                            ConstantExpr::alloc(offset, symArray->getDomain()));
 
       // Storing entry
-      WPArrayStore::insert(gep, symArray, Res);
+      TxWPArrayStore::insert(gep, symArray, Res);
       return Res;
     } else {
       klee_error("Dependency::getPointerAddress Symbolic array not exists.");
@@ -188,25 +188,25 @@ ref<Expr> TxDependency::getPointerAddress(llvm::ConstantExpr *gep, ArrayCache *a
   }
 }
 
-ref<Expr> TxDependency::getLatestValueOfAddress(
-    llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory) {
-    
-  bool allowInconsistency = true;
-  ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
-
-  ref<TxStateValue> addressValue =
-      this->getLatestValue(value, callHistory, dummy, allowInconsistency);
-
-  if (addressValue.isNull())
-    return dummy;
-  ref<TxStateAddress> address = addressValue->getPointerInfo();
-  if (address.isNull())
-    klee_error("Dependency::getLatestValueOfAddress Address is null");
-  ref<TxStoreEntry> entry = store->find(address);
-  if (entry.isNull())
-    klee_error("Dependency::getLatestValueOfAddress No entry found");
-  return entry->getContent()->getExpression();
-}
+// ref<Expr> TxDependency::getLatestValueOfAddress(
+//    llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory) {
+//
+//  bool allowInconsistency = true;
+//  ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
+//
+//  ref<TxStateValue> addressValue =
+//      this->getLatestValue(value, callHistory, dummy, allowInconsistency);
+//
+//  if (addressValue.isNull())
+//    return dummy;
+//  ref<TxStateAddress> address = addressValue->getPointerInfo();
+//  if (address.isNull())
+//    klee_error("Dependency::getLatestValueOfAddress Address is null");
+//  ref<TxStoreEntry> entry = store->find(address);
+//  if (entry.isNull())
+//    klee_error("Dependency::getLatestValueOfAddress No entry found");
+//  return entry->getContent()->getExpression();
+//}
 
 ref<TxStateValue> TxDependency::getLatestValue(
     llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,

@@ -27,7 +27,7 @@
 #include "klee/util/TxTreeGraph.h"
 #include "llvm/Support/raw_ostream.h"
 #include "TxDependency.h"
-#include "WP.h"
+#include "TxWP.h"
 
 namespace klee {
 
@@ -411,10 +411,13 @@ class TxTreeNode {
 
   // \brief Instance of weakest precondition class used to generate WP
   // interpolant
-  WeakestPreCondition *wp;
+  TxWeakestPreCondition *wp;
 
-  /// \brief Value dependencies
+  /// \brief Child WP expressions
   std::vector<ref<Expr> > childWPInterpolant[2];
+
+  /// \brief An expressions representing branch condition (used in partitioning)
+  ref<Expr> branchCondition;
 
   TxTreeNode *parent, *left, *right;
 
@@ -521,13 +524,23 @@ public:
   std::vector<ref<Expr> > getWPInterpolant();
 
   /// \return Return the weakest precondition object
-  WeakestPreCondition *getWP() { return wp; }
+  TxWeakestPreCondition *getWP() { return wp; }
 
   /// \brief Store the child WP interpolants in the parent node
   void setChildWPInterpolant(std::vector<ref<Expr> > interpolant);
 
   /// \brief Get the stored child WP interpolants in the parent node
   std::vector<ref<Expr> > getChildWPInterpolant(int flag);
+
+  /// \brief Store the BranchCondition in the parent node (used for WP
+  /// intersection)
+  void setBranchCondition(ref<Expr> _branchCondition) {
+    branchCondition = _branchCondition;
+  }
+
+  /// \brief Get the stored BranchCondition from the parent node (used for WP
+  /// intersection)
+  ref<Expr> getBranchCondition() { return branchCondition; }
 
   /// \brief Check WP Interpolant holds at subsumption point
   bool checkWPAtSubsumption(
@@ -943,8 +956,8 @@ public:
   static void executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
                             std::vector<ref<Expr> > &args);
 
-  /// \brief Store instruction in a node for computing weakest precondition
-  /// interpolant
+  /// \brief Store instruction stores the list of instructions in a node
+  /// in reverse order for computing weakest precondition interpolant
   void storeInstruction(KInstruction *instr);
 
   /// \brief Mark an instruction in a node which contributes to computing
