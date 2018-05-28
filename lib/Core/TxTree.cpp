@@ -2096,8 +2096,8 @@ TxTree::TxTree(
   root = currentTxTreeNode;
 
   // Used by WP expression
-  WPArrayStore::array = WPArrayStore::ac.CreateArray("const", 128);
-  WPArrayStore::constValues = ConstantExpr::create(0, 32);
+  TxWPArrayStore::array = TxWPArrayStore::ac.CreateArray("const", 128);
+  TxWPArrayStore::constValues = ConstantExpr::create(0, 32);
 }
 
 bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
@@ -2416,10 +2416,11 @@ TxTreeNode::TxTreeNode(
   dependency = new TxDependency(_parent ? _parent->dependency : 0, _targetData,
                                 _globalAddresses);
 
-  // Set the child WP Interpolant to true
-  wp = new WeakestPreCondition(this, this->dependency);
+  // Set the child WP Interpolants to false
+  wp = new TxWeakestPreCondition(this, this->dependency);
   childWPInterpolant[0].push_back(wp->False());
   childWPInterpolant[1].push_back(wp->False());
+  branchCondition = wp->False();
 }
 
 TxTreeNode::~TxTreeNode() {
@@ -2448,16 +2449,14 @@ std::vector<ref<Expr> > TxTreeNode::getWPInterpolant() {
       std::find(childWPInterpolant[1].begin(), childWPInterpolant[1].end(),
                 wp->False()) != childWPInterpolant[1].end()) {
     wp->resetWPExpr();
-    // Preprocessing phase: marking the instructions that contribute
-    // to the target or an infeasible path.
-    // reverseInstructionList = wp->markVariables(reverseInstructionList);
 
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->GenerateWP(reverseInstructionList);
     if (parent)
       this->parent->setChildWPInterpolant(expr);
   } else {
-    expr = wp->intersectExpr(childWPInterpolant[0], childWPInterpolant[1]);
+    expr = wp->intersectExpr(branchCondition, childWPInterpolant[0],
+                             childWPInterpolant[1]);
 
     // Setting the intersection of child nodes as the target in the current node
     wp->setWPExpr(expr);
