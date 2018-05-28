@@ -1,4 +1,4 @@
-//===-- WP.h - Tracer-X symbolic execution tree -------------*- C++ -*-===//
+//===-- TXWP.h - Tracer-X symbolic execution tree -------------*- C++ -*-===//
 //
 //               The Tracer-X KLEE Symbolic Virtual Machine
 //
@@ -13,18 +13,18 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef WP_H_
-#define WP_H_
+#ifndef TXWP_H_
+#define TXWP_H_
 
 #include "klee/ExecutionState.h"
 #include <klee/Expr.h>
 #include <klee/ExprBuilder.h>
 #include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ArrayCache.h>
-#include "PartitionHelper.h"
+#include "TxPartitionHelper.h"
 #include "TxDependency.h"
 #include "TxTree.h"
-#include "WPHelper.h"
+#include "TxWPHelper.h"
 #include <vector>
 
 namespace klee {
@@ -32,11 +32,10 @@ namespace klee {
 /// \brief Implements the replacement mechanism for replacing variables in WP
 /// Expr, used in
 /// replacing free with bound variables.
-class WPArrayStore {
+class TxWPArrayStore {
 
   static std::map<std::pair<std::string, llvm::Value *>,
-                  std::pair<const Array *, ref<Expr> > >
-      arrayStore;
+                  std::pair<const Array *, ref<Expr> > > arrayStore;
 
 public:
   static ArrayCache ac;
@@ -57,7 +56,7 @@ public:
 };
 
 /// \brief The class that implements weakest precondition interpolant.
-class WeakestPreCondition {
+class TxWeakestPreCondition {
 
   friend class TxTree;
 
@@ -78,9 +77,9 @@ class WeakestPreCondition {
   int debugSubsumptionLevel;
 
 public:
-  WeakestPreCondition(TxTreeNode *_node, TxDependency *_dependency);
+  TxWeakestPreCondition(TxTreeNode *_node, TxDependency *_dependency);
 
-  ~WeakestPreCondition();
+  ~TxWeakestPreCondition();
 
   ref<Expr> True() {
     return ConstantExpr::alloc(1, Expr::Bool);
@@ -118,8 +117,8 @@ public:
                           const std::vector<llvm::Instruction *> &callHistory,
                           std::vector<ref<Expr> > WPExpr);
 
-  ref<Expr>
-  instantiateSingleExpression(TxDependency *dependency,
+  ref<Expr> instantiateSingleExpression(
+      TxDependency *dependency,
       const std::vector<llvm::Instruction *> &callHistory,
       ref<Expr> singleWPExpr);
 
@@ -127,13 +126,15 @@ public:
   std::vector<ref<Expr> > intersectExpr(std::vector<ref<Expr> > expr1,
                                         std::vector<ref<Expr> > expr2);
   std::vector<ref<Expr> > intersectExpr_aux(std::vector<ref<Expr> > expr1,
-                                          std::vector<ref<Expr> > expr2);
+                                            std::vector<ref<Expr> > expr2);
 
   // \brief Return the minimum of two constant expressions
-  ref<ConstantExpr> getMinOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2);
+  ref<ConstantExpr> getMinOfConstExpr(ref<ConstantExpr> expr1,
+                                      ref<ConstantExpr> expr2);
 
   // \brief Return the maximum of two constant expressions
-  ref<ConstantExpr> getMaxOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2);
+  ref<ConstantExpr> getMaxOfConstExpr(ref<ConstantExpr> expr1,
+                                      ref<ConstantExpr> expr2);
 
   // \brief Return true if the destination of the LLVM instruction appears in
   // the WP expression
@@ -174,8 +175,8 @@ public:
       std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
   ref<Expr> getPrevExpr(ref<Expr> e, llvm::Instruction *i);
 
-  private:
-    ref<Expr> getCondition(llvm::Instruction *ins);
+private:
+  ref<Expr> getCondition(llvm::Instruction *ins);
 };
 }
-#endif /* WP_H_ */
+#endif /* TXWP_H_ */

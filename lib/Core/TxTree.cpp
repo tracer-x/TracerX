@@ -2095,8 +2095,8 @@ TxTree::TxTree(
   root = currentTxTreeNode;
 
   // Used by WP expression
-  WPArrayStore::array = WPArrayStore::ac.CreateArray("const", 128);
-  WPArrayStore::constValues = ConstantExpr::create(0, 32);
+  TxWPArrayStore::array = TxWPArrayStore::ac.CreateArray("const", 128);
+  TxWPArrayStore::constValues = ConstantExpr::create(0, 32);
 }
 
 bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
@@ -2416,7 +2416,7 @@ TxTreeNode::TxTreeNode(
                                 _globalAddresses);
 
   // Set the child WP Interpolant to true
-  wp = new WeakestPreCondition(this, this->dependency);
+  wp = new TxWeakestPreCondition(this, this->dependency);
   childWPInterpolant[0].push_back(wp->False());
   childWPInterpolant[1].push_back(wp->False());
 }

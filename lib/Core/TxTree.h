@@ -27,7 +27,7 @@
 #include "klee/util/TxTreeGraph.h"
 #include "llvm/Support/raw_ostream.h"
 #include "TxDependency.h"
-#include "WP.h"
+#include "TxWP.h"
 
 namespace klee {
 
@@ -411,7 +411,7 @@ class TxTreeNode {
 
   // \brief Instance of weakest precondition class used to generate WP
   // interpolant
-  WeakestPreCondition *wp;
+  TxWeakestPreCondition *wp;
 
   /// \brief Value dependencies
   std::vector<ref<Expr> > childWPInterpolant[2];
@@ -521,7 +521,7 @@ public:
   std::vector<ref<Expr> > getWPInterpolant();
 
   /// \return Return the weakest precondition object
-  WeakestPreCondition *getWP() { return wp; }
+  TxWeakestPreCondition *getWP() { return wp; }
 
   /// \brief Store the child WP interpolants in the parent node
   void setChildWPInterpolant(std::vector<ref<Expr> > interpolant);

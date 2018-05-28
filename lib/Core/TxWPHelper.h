@@ -1,17 +1,17 @@
-#ifndef LIB_CORE_WPHELPER_H_
-#define LIB_CORE_WPHELPER_H_
+#ifndef LIB_CORE_TXWPHELPER_H_
+#define LIB_CORE_TXWPHELPER_H_
 
 #include "klee/ExecutionState.h"
 #include <klee/Expr.h>
 #include <klee/ExprBuilder.h>
 #include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ArrayCache.h>
-#include "WP.h"
+#include "TxWP.h"
 #include <vector>
 
 namespace klee {
 
-class WPHelper {
+class TxWPHelper {
 
 public:
   static ref<Expr> simplifyWPExpr(ref<Expr> e);
@@ -39,4 +39,4 @@ public:
 
 } /* namespace klee */
 
-#endif /* LIB_CORE_WPHELPER_H_ */
+#endif /* LIB_CORE_TXWPHELPER_H_ */
