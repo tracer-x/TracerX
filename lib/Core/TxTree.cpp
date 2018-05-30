@@ -2173,8 +2173,6 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 
       TxSubsumptionTableEntry *entry =
           new TxSubsumptionTableEntry(node, node->entryCallHistory);
-      TxSubsumptionTable::insert(node->getProgramPoint(),
-                                 node->entryCallHistory, entry);
 
       if (WPInterpolant) {
         // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO
@@ -2201,8 +2199,8 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         }*/
       }
 
-      TxSubsumptionTable::insert(node->getProgramPoint(), node->entryCallHistory,
-                               entry);
+      TxSubsumptionTable::insert(node->getProgramPoint(),
+                                 node->entryCallHistory, entry);
 
       TxTreeGraph::addTableEntryMapping(node, entry);
 
