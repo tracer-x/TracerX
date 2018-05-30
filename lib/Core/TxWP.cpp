@@ -1760,11 +1760,16 @@ std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
       //      llvm::outs() << "--- start 2 ---\n";
       //      getCondition(i)->dump();
       ref<Expr> negCond = NotExpr::create(getCondition(i));
-
       //      i->dump();
       //      negCond->dump();
       //      llvm::outs() << "--- end 2 ---\n";
       WPExprs.push_back(negCond);
+    } else if (i->getOpcode() == llvm::Instruction::Br) {
+      llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(i);
+      if (br->isConditional()) {
+        ref<Expr> cond = getCondition(i);
+        node->setBranchCondition(cond);
+      }
     } else if (i->getOpcode() == llvm::Instruction::Store) {
       // i is 0
       std::vector<ref<Expr> > tmp;
