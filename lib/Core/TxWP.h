@@ -121,9 +121,12 @@ public:
       const std::vector<llvm::Instruction *> &callHistory,
       ref<Expr> singleWPExpr);
 
-  // \brief Perform the intersection of two weakest precondition expression
-  std::vector<ref<Expr> > intersectExpr(std::vector<ref<Expr> > expr1,
+  /// \brief Perform the intersection of two weakest precondition expressions
+  /// with respect to the branchCondition
+  std::vector<ref<Expr> > intersectExpr(ref<Expr> branchCondition,
+                                        std::vector<ref<Expr> > expr1,
                                         std::vector<ref<Expr> > expr2);
+
   std::vector<ref<Expr> > intersectExpr_aux(std::vector<ref<Expr> > expr1,
                                             std::vector<ref<Expr> > expr2);
 

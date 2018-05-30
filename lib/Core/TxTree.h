@@ -413,8 +413,11 @@ class TxTreeNode {
   // interpolant
   TxWeakestPreCondition *wp;
 
-  /// \brief Value dependencies
+  /// \brief Child WP expressions
   std::vector<ref<Expr> > childWPInterpolant[2];
+
+  /// \brief An expressions representing branch condition (used in partitioning)
+  ref<Expr> branchCondition;
 
   TxTreeNode *parent, *left, *right;
 
@@ -528,6 +531,16 @@ public:
 
   /// \brief Get the stored child WP interpolants in the parent node
   std::vector<ref<Expr> > getChildWPInterpolant(int flag);
+
+  /// \brief Store the BranchCondition in the parent node (used for WP
+  /// intersection)
+  void setBranchCondition(ref<Expr> _branchCondition) {
+    branchCondition = _branchCondition;
+  }
+
+  /// \brief Get the stored BranchCondition from the parent node (used for WP
+  /// intersection)
+  ref<Expr> getBranchCondition() { return branchCondition; }
 
   /// \brief Check WP Interpolant holds at subsumption point
   bool checkWPAtSubsumption(

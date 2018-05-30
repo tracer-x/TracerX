@@ -2419,6 +2419,7 @@ TxTreeNode::TxTreeNode(
   wp = new TxWeakestPreCondition(this, this->dependency);
   childWPInterpolant[0].push_back(wp->False());
   childWPInterpolant[1].push_back(wp->False());
+  branchCondition = wp->False();
 }
 
 TxTreeNode::~TxTreeNode() {
@@ -2453,7 +2454,8 @@ std::vector<ref<Expr> > TxTreeNode::getWPInterpolant() {
     if (parent)
       this->parent->setChildWPInterpolant(expr);
   } else {
-    expr = wp->intersectExpr(childWPInterpolant[0], childWPInterpolant[1]);
+    expr = wp->intersectExpr(branchCondition, childWPInterpolant[0],
+                             childWPInterpolant[1]);
 
     // Setting the intersection of child nodes as the target in the current node
     wp->setWPExpr(expr);

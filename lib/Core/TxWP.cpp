@@ -995,7 +995,8 @@ TxWeakestPreCondition::~TxWeakestPreCondition() {}
 //}
 
 std::vector<ref<Expr> >
-TxWeakestPreCondition::intersectExpr(std::vector<ref<Expr> > expr1,
+TxWeakestPreCondition::intersectExpr(ref<Expr> branchCondition,
+                                     std::vector<ref<Expr> > expr1,
                                      std::vector<ref<Expr> > expr2) {
   expr1.insert(expr1.end(), expr2.begin(), expr2.end());
   std::vector<Partition> partitions = TxPartitionHelper::partition(expr1);
