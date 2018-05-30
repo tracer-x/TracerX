@@ -22,9 +22,11 @@
 #include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ArrayCache.h>
 #include "TxPartitionHelper.h"
+#include "TxPartitionHelper1.h"
 #include "TxDependency.h"
 #include "TxTree.h"
 #include "TxWPHelper.h"
+#include "TxExprHelper.h"
 #include <vector>
 
 namespace klee {
@@ -64,7 +66,6 @@ class TxWeakestPreCondition {
   std::set<llvm::Value *> markedVariables;
 
   ref<Expr> WPExpr;
-  std::vector<ref<Expr> > WPExprs;
 
   // Respective interpolation tree node
   TxTreeNode *node;
@@ -89,9 +90,9 @@ public:
 
   void resetWPExpr() { WPExpr = False(); }
 
-  void setWPExpr(std::vector<ref<Expr> > expr) { WPExprs = expr; }
+  void setWPExpr(ref<Expr> expr) { WPExpr = expr; }
 
-  std::vector<ref<Expr> > getWPExpr() { return WPExprs; }
+  ref<Expr> getWPExpr() { return WPExpr; }
 
   // \brief Preprocessing phase: marking the instructions that contribute
   // to the target or an infeasible path.
@@ -123,9 +124,16 @@ public:
 
   /// \brief Perform the intersection of two weakest precondition expressions
   /// with respect to the branchCondition
-  std::vector<ref<Expr> > intersectExpr(ref<Expr> branchCondition,
-                                        std::vector<ref<Expr> > expr1,
-                                        std::vector<ref<Expr> > expr2);
+  ref<Expr> intersectExpr(
+      ref<Expr> branchCondition, ref<Expr> expr1,
+      ref<Expr> expr2, ref<Expr> interpolant,
+      std::set<const Array *> existentials,
+      TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
+      TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore,
+      TxStore::TopInterpolantStore concretelyAddressedStore,
+      TxStore::TopInterpolantStore symbolicallyAddressedStore);
+
+  std::map<std::string, ref<Expr> > extractExprs(TxStore::TopInterpolantStore concretelyAddressedStore);
 
   std::vector<ref<Expr> > intersectExpr_aux(std::vector<ref<Expr> > expr1,
                                             std::vector<ref<Expr> > expr2);
@@ -144,13 +152,19 @@ public:
 
   // \brief Update subsumption table entry based on the WP Expr
   TxSubsumptionTableEntry *
-  updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry, ref<Expr> wp);
+  updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry,
+                              std::vector<ref<Expr> > wp);
+
+  // \brief Update subsumption table entry based on one Partition from WP Expr
+  TxSubsumptionTableEntry *
+  updateSubsumptionTableEntrySinglePartition(TxSubsumptionTableEntry *entry,
+                                             ref<Expr> wp);
 
   // \brief Update concretelyAddressedStore based on the WP Expr
   TxStore::TopInterpolantStore updateConcretelyAddressedStore(
       TxStore::TopInterpolantStore concretelyAddressedStore, ref<Expr> wp);
 
-  // \brief Get variable stored in the frame
+  // \brief Get variable stored in the Partition
   ref<Expr> getVarFromExpr(ref<Expr> wp);
 
   // \brief Update interpolant based on the WP Expr
@@ -173,12 +187,16 @@ public:
                                  llvm::Value *callArg);
 
   // \brief Generate and return the weakest precondition expressions.
-  std::vector<ref<Expr> > GenerateWP(
+  ref<Expr> GenerateWP(
       std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
   ref<Expr> getPrevExpr(ref<Expr> e, llvm::Instruction *i);
 
+  ref<Expr> getBrCondition(llvm::Instruction *ins);
 private:
-  ref<Expr> getCondition(llvm::Instruction *ins);
+
+  ref<Expr> getCondition(llvm::Value *value);
+  ref<Expr> getCmpCondition(llvm::CmpInst *cmp);
+  ref<Expr> getBinCondition(llvm::CmpInst *cmp);
 };
 }
 #endif /* TXWP_H_ */
