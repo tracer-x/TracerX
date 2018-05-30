@@ -20,9 +20,9 @@
 #include <klee/Expr.h>
 #include <klee/Internal/Support/ErrorHandling.h>
 
+#include "TimingSolver.h"
 #include "TxDependency.h"
 #include "TxShadowArray.h"
-#include "TimingSolver.h"
 
 #include <fstream>
 #include <klee/CommandLine.h>
@@ -35,12 +35,13 @@
 using namespace klee;
 
 typedef std::map<ref<TxVariable>, ref<TxInterpolantValue> >
-LowerInterpolantStore;
+    LowerInterpolantStore;
 typedef std::map<ref<TxAllocationContext>, LowerInterpolantStore>
-TopInterpolantStore;
+    TopInterpolantStore;
 
 std::map<std::pair<std::string, llvm::Value *>,
-         std::pair<const Array *, ref<Expr> > > TxWPArrayStore::arrayStore;
+         std::pair<const Array *, ref<Expr> > >
+    TxWPArrayStore::arrayStore;
 ArrayCache TxWPArrayStore::ac;
 const Array *TxWPArrayStore::array;
 ref<Expr> TxWPArrayStore::constValues;
@@ -181,22 +182,22 @@ std::string TxWPArrayStore::getFunctionName(llvm::Value *i) {
     // klee_error("TxWeTxWeakestPreConditiongetFunctionName");
     return "Constant";
   } else {
-    //    i->dump();
+    i->dump();
     klee_error("TxWeakestPreCondition::getFunctionName LLVM Value is not an "
                "instruction");
   }
   llvm::BasicBlock *BB = inst->getParent();
   if (!BB) {
-    //    inst->dump();
+    inst->dump();
     klee_error("TxWeakestPreCondition::getFunctionName Basic Block is Null");
   }
   llvm::Function *func = BB->getParent();
   if (!func) {
-    //    BB->dump();
+    BB->dump();
     klee_error("TxWeakestPreCondition::getFunctionName Function is Null");
   }
   if (!func->hasName()) {
-    //    func->dump();
+    func->dump();
     klee_error("TxWeakestPreCondition::getFunctionName Function has no name");
   }
   return func->getName();
@@ -646,6 +647,104 @@ TxWeakestPreCondition::~TxWeakestPreCondition() {}
 //  return WPExpr;
 //}
 
+// ref<Expr> TxWeakestPreCondition::replaceCallArguments(ref<Expr> interpolant,
+//                                                      llvm::Value *funcArg,
+//                                                      llvm::Value *callArg) {
+//  switch (interpolant->getKind()) {
+//  case Expr::InvalidKind:
+//  case Expr::Constant: { return interpolant; }
+//
+//  case Expr::Read:
+//  case Expr::Concat: {
+//    llvm::Value *array = TxWPArrayStore::getValuePointer(interpolant);
+//    if (array == funcArg) {
+//      std::string arrayName = callArg->getName();
+//      const std::string ext(".addr");
+//      if (arrayName.find(ext))
+//        arrayName = arrayName.substr(0, arrayName.size() - ext.size());
+//      const Array *symArray =
+// TxShadowArray::getSymbolicShadowArray(arrayName);
+//      llvm::errs() << symArray->getName();
+//
+//      if (symArray != NULL) {
+//        ref<Expr> Res(0);
+//        unsigned NumBytes = symArray->getDomain() / 8;
+//        assert(symArray->getDomain() == NumBytes * 8 && "Invalid read size!");
+//        for (unsigned i = 0; i != NumBytes; ++i) {
+//          unsigned idx =
+//              Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
+//          ref<Expr> Byte =
+//              ReadExpr::create(UpdateList(symArray, 0),
+//                               ConstantExpr::alloc(idx,
+// symArray->getDomain()));
+//          Res = i ? ConcatExpr::create(Byte, Res) : Byte;
+//        }
+//        klee_error(
+//            "TxWeakestPreCondition::replaceCallArguments Not tested yet");
+//        return Res;
+//      } else {
+//        interpolant->dump();
+//        klee_error("TxWeakestPreCondition::replaceCallArguments Shadow array "
+//                   "doesn't exist!");
+//      }
+//    }
+//    return interpolant;
+//  }
+//
+//  case Expr::NotOptimized:
+//  case Expr::Not:
+//  case Expr::Extract:
+//  case Expr::ZExt:
+//  case Expr::SExt: {
+//    ref<Expr> kids[1];
+//    kids[0] = replaceCallArguments(interpolant->getKid(0), funcArg, callArg);
+//    return interpolant->rebuild(kids);
+//  }
+//
+//  case Expr::Eq:
+//  case Expr::Ne:
+//  case Expr::Ult:
+//  case Expr::Ule:
+//  case Expr::Ugt:
+//  case Expr::Uge:
+//  case Expr::Slt:
+//  case Expr::Sle:
+//  case Expr::Sgt:
+//  case Expr::Sge:
+//  case Expr::LastKind:
+//  case Expr::Add:
+//  case Expr::Sub:
+//  case Expr::Mul:
+//  case Expr::UDiv:
+//  case Expr::SDiv:
+//  case Expr::URem:
+//  case Expr::SRem:
+//  case Expr::And:
+//  case Expr::Or:
+//  case Expr::Xor:
+//  case Expr::Shl:
+//  case Expr::LShr:
+//  case Expr::AShr: {
+//    ref<Expr> kids[2];
+//    kids[0] = replaceCallArguments(interpolant->getKid(0), funcArg, callArg);
+//    kids[1] = replaceCallArguments(interpolant->getKid(1), funcArg, callArg);
+//    return interpolant->rebuild(kids);
+//  }
+//
+//  case Expr::Select: {
+//    ref<Expr> kids[3];
+//    kids[0] = replaceCallArguments(interpolant->getKid(0), funcArg, callArg);
+//    kids[1] = replaceCallArguments(interpolant->getKid(1), funcArg, callArg);
+//    kids[2] = replaceCallArguments(interpolant->getKid(2), funcArg, callArg);
+//    return interpolant->rebuild(kids);
+//  }
+//  }
+//  // Sanity check
+//  klee_error("Control should not reach here in "
+//             "TxWeakestPreCondition::replaceCallArguments");
+//  return interpolant;
+//}
+
 // ref<Expr> TxWeakestPreCondition::getLHS(llvm::Instruction *i) {
 //  ref<Expr> lhs = dependency->getAddress(i, &TxWPArrayStore::ac,
 //                                         TxWPArrayStore::array, this);
@@ -887,134 +986,121 @@ TxWeakestPreCondition::~TxWeakestPreCondition() {}
 //  WPExpr = WPExpr->rebuild(kids);
 //}
 
-// std::vector<ref<Expr> > TxWeakestPreCondition::instantiateWPExpression(
-//    TxDependency *dependency,
-//    const std::vector<llvm::Instruction *> &callHistory,
-//    std::vector<ref<Expr> > WPExpr) {
-//  std::vector<ref<Expr> > result;
-//  for (std::vector<ref<Expr> >::const_iterator it = WPExpr.begin(),
-//                                               ie = WPExpr.end();
-//       it != ie; ++it) {
-//    result.push_back(instantiateSingleExpression(dependency, callHistory,
-// *it));
-//  }
-//  return result;
-//}
+ref<Expr> TxWeakestPreCondition::intersectExpr(
+    ref<Expr> branchCondition, ref<Expr> expr1, ref<Expr> expr2,
+    ref<Expr> interpolant, std::set<const Array *> existentials,
+    TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
+    TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore,
+    TxStore::TopInterpolantStore concretelyAddressedStore,
+    TxStore::TopInterpolantStore symbolicallyAddressedStore) {
 
-// ref<Expr> TxWeakestPreCondition::instantiateSingleExpression(
-//    TxDependency *dependency,
-//    const std::vector<llvm::Instruction *> &callHistory,
-//    ref<Expr> singleWPExpr) {
-//  ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
-//  switch (singleWPExpr->getKind()) {
-//  case Expr::InvalidKind:
-//  case Expr::Constant: { return singleWPExpr; }
-//
-//  case Expr::Read: {
-//    llvm::Value *tempInstr = TxWPArrayStore::getValuePointer(singleWPExpr);
-//    if (tempInstr == NULL)
-//      klee_error(
-//          "TxWeakestPreCondition::instantiateWPExpression Value ref is null");
-//    ref<Expr> storeValue =
-//        dependency->getLatestValueOfAddress(tempInstr, callHistory);
-//    if (storeValue == dummy)
-//      return singleWPExpr;
-//    return storeValue;
-//  }
-//
-//  case Expr::Concat: {
-//    llvm::Value *tempInstr = TxWPArrayStore::getValuePointer(singleWPExpr);
-//    if (tempInstr == NULL)
-//      klee_error(
-//          "TxWeakestPreCondition::instantiateWPExpression Value ref is null");
-//    ref<Expr> storeValue =
-//        dependency->getLatestValueOfAddress(tempInstr, callHistory);
-//    if (storeValue == dummy)
-//      return singleWPExpr;
-//    return storeValue;
-//  }
-//
-//  case Expr::NotOptimized:
-//  case Expr::Not:
-//  case Expr::Extract:
-//  case Expr::ZExt:
-//  case Expr::SExt: {
-//    ref<Expr> kids[1];
-//    kids[0] = instantiateSingleExpression(dependency, callHistory,
-//                                          singleWPExpr->getKid(0));
-//    return singleWPExpr->rebuild(kids);
-//  }
-//
-//  case Expr::Eq:
-//  case Expr::Ne:
-//  case Expr::Ult:
-//  case Expr::Ule:
-//  case Expr::Ugt:
-//  case Expr::Uge:
-//  case Expr::Slt:
-//  case Expr::Sle:
-//  case Expr::Sgt:
-//  case Expr::Sge:
-//  case Expr::LastKind:
-//  case Expr::Add:
-//  case Expr::Sub:
-//  case Expr::Mul:
-//  case Expr::UDiv:
-//  case Expr::SDiv:
-//  case Expr::URem:
-//  case Expr::SRem:
-//  case Expr::And:
-//  case Expr::Or:
-//  case Expr::Xor:
-//  case Expr::Shl:
-//  case Expr::LShr:
-//  case Expr::AShr: {
-//    ref<Expr> kids[2];
-//    kids[0] = instantiateSingleExpression(dependency, callHistory,
-//                                          singleWPExpr->getKid(0));
-//    kids[1] = instantiateSingleExpression(dependency, callHistory,
-//                                          singleWPExpr->getKid(1));
-//    return singleWPExpr->rebuild(kids);
-//  }
-//
-//  case Expr::Select: {
-//    ref<Expr> kids[3];
-//    kids[0] = instantiateSingleExpression(dependency, callHistory,
-//                                          singleWPExpr->getKid(0));
-//    kids[1] = instantiateSingleExpression(dependency, callHistory,
-//                                          singleWPExpr->getKid(1));
-//    kids[2] = instantiateSingleExpression(dependency, callHistory,
-//                                          singleWPExpr->getKid(2));
-//    return singleWPExpr->rebuild(kids);
-//  }
-//  }
-//  // Sanity check
-//  klee_error("Control should not reach here in "
-//             "TxWeakestPreCondition::instantiateWPExpression!");
-//  return singleWPExpr;
-//}
+  //  llvm::outs() << "\nbranchCondition - expr1 - expr2 - interpolant\n";
+  //  if (!branchCondition.isNull())
+  //    branchCondition->dump();
+  //  llvm::outs() << "\n--------------\n";
+  //  if (!expr1.isNull())
+  //    expr1->dump();
+  //  llvm::outs() << "\n--------------\n";
+  //  if (!expr2.isNull())
+  //    expr2->dump();
+  //  llvm::outs() << "\n--------------\n";
+  //  if (!interpolant.isNull())
+  //    interpolant->dump();
+  //  llvm::outs() << "\n===============\n";
 
-std::vector<ref<Expr> >
-TxWeakestPreCondition::intersectExpr(ref<Expr> branchCondition,
-                                     std::vector<ref<Expr> > expr1,
-                                     std::vector<ref<Expr> > expr2) {
-  expr1.insert(expr1.end(), expr2.begin(), expr2.end());
-  std::vector<Partition> partitions = TxPartitionHelper::partition(expr1);
-  std::vector<ref<Expr> > result;
-  for (std::vector<Partition>::const_iterator it = partitions.begin(),
-                                              ie = partitions.end();
-       it != ie; ++it) {
-    Partition exprsVars = (*it);
-    // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO VECTOR<EXPR>
-    result.push_back(TxPartitionHelper::createAnd(exprsVars.exprs));
+  std::vector<Partition<ref<TxAllocationContext> > > conAddStoreParts =
+      TxPartitionHelper::partitionConAddStoreOnCond(branchCondition,
+                                                    concretelyAddressedStore);
+  //  llvm::outs() << "\n------concrete address store partitions-------\n";
+  //  branchCondition->dump();
+  //  for (unsigned int i = 0; i < conAddStoreParts.size(); i++) {
+  //    conAddStoreParts.at(i).print();
+  //    llvm::outs() << "\n-------------\n";
+  //  }
+  //  llvm::outs() << "\n===============\n";
+  //  llvm::outs() << "\n------start deleting address store partitions size = "
+  //               << concretelyAddressedStore.size() << "\n";
+  for (TxStore::TopInterpolantStore::const_iterator
+           mapIt = concretelyAddressedStore.begin(),
+           mapIe = concretelyAddressedStore.end();
+       mapIt != mapIe; ++mapIt) {
+    if (!(conAddStoreParts[0].exprs.find(mapIt->first) ==
+          conAddStoreParts[0].exprs.end())) {
+      concretelyAddressedStore.erase(mapIt->first);
+    }
   }
-  return result;
+  //  llvm::outs() << "\n------end deleting address store partitions size = "
+  //               << concretelyAddressedStore.size() << "\n";
+
+  // partition interpolant based on branchCondition
+  std::vector<ref<Expr> > interpolantExprs;
+  TxPartitionHelper::getExprsFromAndExpr(interpolant, interpolantExprs);
+  std::vector<Partition<ref<Expr> > > interpolantParts =
+      TxPartitionHelper::partitionExprsOnCond(branchCondition,
+                                              interpolantExprs);
+
+  //    llvm::outs() << "\n------interpolant partitions-------\n";
+  //    for (unsigned int i = 0; i < interpolantParts.size(); i++) {
+  //      interpolantParts.at(i).print();
+  //      llvm::outs() << "\n-------------\n";
+  //    }
+  //    llvm::outs() << "\n===============\n";
+
+  // partition w1 based on branchCondition
+  std::vector<ref<Expr> > w1Exprs;
+  TxPartitionHelper::getExprsFromAndExpr(expr1, w1Exprs);
+  std::vector<Partition<ref<Expr> > > w1Parts =
+      TxPartitionHelper::partitionExprsOnCond(branchCondition, w1Exprs);
+
+  //    llvm::outs() << "\n------wp1 partitions-------\n";
+  //    for (unsigned int i = 0; i < w1Parts.size(); i++) {
+  //      w1Parts.at(i).print();
+  //      llvm::outs() << "\n-------------\n";
+  //    }
+  //    llvm::outs() << "\n===============\n";
+
+  // partition w2 based on branchCondition
+  std::vector<ref<Expr> > w2Exprs;
+  TxPartitionHelper::getExprsFromAndExpr(expr2, w2Exprs);
+  std::vector<Partition<ref<Expr> > > w2Parts =
+      TxPartitionHelper::partitionExprsOnCond(branchCondition, w2Exprs);
+
+  //    llvm::outs() << "\n------wp2 partitions-------\n";
+  //    for (unsigned int i = 0; i < w2Parts.size(); i++) {
+  //      w2Parts.at(i).print();
+  //      llvm::outs() << "\n-------------\n";
+  //    }
+  //    llvm::outs() << "\n===============\n";
+
+  // Keep related part from interpolant and non-related parts from WP1 & WP2
+  interpolantParts.at(1).exprs.insert(w1Parts.at(0).exprs.begin(),
+                                      w1Parts.at(0).exprs.end());
+  interpolantParts.at(1).exprs.insert(w2Parts.at(0).exprs.begin(),
+                                      w2Parts.at(0).exprs.end());
+  std::vector<ref<Expr> > tmpExprs =
+      TxExprHelper::rangeSimplifyFromExprs(interpolantParts.at(1).exprs);
+  //  std::set<ref<Expr> > tmpExprs = interpolantParts.at(1).exprs;
+  ref<Expr> res = TxPartitionHelper::createAnd(tmpExprs);
+  return res;
+}
+
+std::map<std::string, ref<Expr> > TxWeakestPreCondition::extractExprs(
+    TxStore::TopInterpolantStore concretelyAddressedStore) {
+  std::map<std::string, ref<Expr> > res;
+  for (TxStore::TopInterpolantStore::const_iterator
+           topIs = concretelyAddressedStore.begin(),
+           topIe = concretelyAddressedStore.end(), topIt = topIs;
+       topIt != topIe; ++topIt) {
+    std::string var(topIt->first->getValue()->getName().data());
+    ref<Expr> value = topIt->second.begin()->second->getExpression();
+    res.insert(std::pair<std::string, ref<Expr> >(var, value));
+  }
+  return res;
 }
 
 /*std::vector<ref<Expr> >
 TxWeakestPreCondition::intersectExpr_aux(std::vector<ref<Expr> > expr1,
                                          std::vector<ref<Expr> > expr2) {
-  // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO VECTOR<EXPR>
   if(expr1->getKind() == Expr::Sle && expr2->getKind() == Expr::Sle) {
    if (expr1->getKid(0) == expr2->getKid(0)){
    ref<Expr> kids[2];
@@ -1160,7 +1246,155 @@ TxWeakestPreCondition::intersectExpr_aux(std::vector<ref<Expr> > expr1,
 //  return false;
 //}
 
-/*TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
+// =========================================================================
+// Instantiating WP Expression at Subsumption Point
+// =========================================================================
+
+std::vector<ref<Expr> > TxWeakestPreCondition::instantiateWPExpression(
+    TxDependency *dependency,
+    const std::vector<llvm::Instruction *> &callHistory,
+    std::vector<ref<Expr> > WPExpr) {
+  std::vector<ref<Expr> > result;
+  for (std::vector<ref<Expr> >::const_iterator it = WPExpr.begin(),
+                                               ie = WPExpr.end();
+       it != ie; ++it) {
+    result.push_back(instantiateSingleExpression(dependency, callHistory, *it));
+  }
+  return result;
+}
+
+ref<Expr> TxWeakestPreCondition::instantiateSingleExpression(
+    TxDependency *dependency,
+    const std::vector<llvm::Instruction *> &callHistory,
+    ref<Expr> singleWPExpr) {
+  ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
+  switch (singleWPExpr->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return singleWPExpr;
+  }
+
+  case Expr::Read: {
+    // Todo: Are pointers supported too?
+    llvm::Value *tempInstr = TxWPArrayStore::getValuePointer(singleWPExpr);
+    if (tempInstr == NULL)
+      klee_error(
+          "TxWeakestPreCondition::instantiateWPExpression Value ref is null");
+    ref<Expr> storeValue =
+        dependency->getLatestValueOfAddress(tempInstr, callHistory);
+    if (storeValue == dummy)
+      return singleWPExpr;
+    return storeValue;
+  }
+
+  case Expr::Concat: {
+    llvm::Value *tempInstr = TxWPArrayStore::getValuePointer(singleWPExpr);
+    if (tempInstr == NULL)
+      klee_error(
+          "TxWeakestPreCondition::instantiateWPExpression Value ref is null");
+    ref<Expr> storeValue =
+        dependency->getLatestValueOfAddress(tempInstr, callHistory);
+    if (storeValue == dummy)
+      return singleWPExpr;
+    return storeValue;
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    ref<Expr> kids[1];
+    kids[0] = instantiateSingleExpression(dependency, callHistory,
+                                          singleWPExpr->getKid(0));
+    return singleWPExpr->rebuild(kids);
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    ref<Expr> kids[2];
+    kids[0] = instantiateSingleExpression(dependency, callHistory,
+                                          singleWPExpr->getKid(0));
+    kids[1] = instantiateSingleExpression(dependency, callHistory,
+                                          singleWPExpr->getKid(1));
+    return singleWPExpr->rebuild(kids);
+  }
+
+  case Expr::Select: {
+    ref<Expr> kids[3];
+    kids[0] = instantiateSingleExpression(dependency, callHistory,
+                                          singleWPExpr->getKid(0));
+    kids[1] = instantiateSingleExpression(dependency, callHistory,
+                                          singleWPExpr->getKid(1));
+    kids[2] = instantiateSingleExpression(dependency, callHistory,
+                                          singleWPExpr->getKid(2));
+    return singleWPExpr->rebuild(kids);
+  }
+  }
+  // Sanity check
+  klee_error("Control should not reach here in "
+             "TxWeakestPreCondition::instantiateWPExpression!");
+  return singleWPExpr;
+}
+
+// =========================================================================
+// Functions Updating the Subsumption Table Entry
+// =========================================================================
+
+TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
+    TxSubsumptionTableEntry *entry, std::vector<ref<Expr> > wp) {
+
+  if (wp.size() == 1) {
+    // The only Partition is not related to guard (only related to guard)
+    ref<Expr> notRelatedPartition = wp.at(0);
+    entry =
+        updateSubsumptionTableEntrySinglePartition(entry, notRelatedPartition);
+  } else if (wp.size() == 3) {
+    // The first Partition is the related to guard (which cannot be replaced)
+    // The second Partition is the not related to guard
+    ref<Expr> notRelatedPartition = wp.at(1);
+    entry =
+        updateSubsumptionTableEntrySinglePartition(entry, notRelatedPartition);
+  } else if (wp.size() == 2) {
+    // The first Partition is the related to guard (which can be replaced too)
+    // The second Partition is the non-related to guard
+    ref<Expr> relatedPartition = wp.at(0);
+    entry = updateSubsumptionTableEntrySinglePartition(entry, relatedPartition);
+    ref<Expr> notRelatedPartition = wp.at(1);
+    entry =
+        updateSubsumptionTableEntrySinglePartition(entry, notRelatedPartition);
+  } else {
+    llvm::errs() << "Number of partitions: " << wp.size() << "\n";
+    klee_error("TxWeakestPreCondition::updateSubsumptionTableEntry: More than "
+               "3 partitions are not supported yet!");
+  }
+  return entry;
+}
+
+TxSubsumptionTableEntry *
+TxWeakestPreCondition::updateSubsumptionTableEntrySinglePartition(
     TxSubsumptionTableEntry *entry, ref<Expr> wp) {
   ref<Expr> interpolant = entry->getInterpolant();
   TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore =
@@ -1173,23 +1407,29 @@ TxWeakestPreCondition::intersectExpr_aux(std::vector<ref<Expr> > expr1,
       entry->getSymbolicallyAddressedStore();
   std::set<const Array *> existentials = entry->getExistentials();
 
-  if (concretelyAddressedStore.size() == 0)
+  if (concretelyAddressedHistoricalStore.size() > 0 ||
+      symbolicallyAddressedStore.size() > 0 ||
+      symbolicallyAddressedHistoricalStore.size() > 0) {
+    llvm::errs() << "Size of concretelyAddressedHistoricalStore: "
+                 << concretelyAddressedStore.size() << "\n";
+    llvm::errs() << "Size of symbolicallyAddressedStore: "
+                 << concretelyAddressedStore.size() << "\n";
+    llvm::errs() << "Size of symbolicallyAddressedHistoricalStore: "
+                 << concretelyAddressedStore.size() << "\n";
     klee_error(
         "TxWeakestPreCondition::updateSubsumptionTableEntry for this case "
         "is not implemented yet.");
-  else {
-    // TODO: Assuming WP is one frame
+  } else {
+    // TODO: Should partition first
     TxStore::TopInterpolantStore newConcretelyAddressedStore =
         updateConcretelyAddressedStore(concretelyAddressedStore, wp);
     entry->setConcretelyAddressedStore(newConcretelyAddressedStore);
-    // TODO: Currently we don't need to update the interpolant & the
-    // existentials
-    // ref<Expr> newInterpolant =
-    //    updateInterpolant(interpolant, replaceArrayWithShadow(wp));
-    // std::set<const Array *> newExistentials =
-    //    updateExistentials(existentials, wp);
-    // entry->setInterpolant(newInterpolant);
-    // entry->setExistentials(newExistentials);
+    //    ref<Expr> newInterpolant =
+    //        updateInterpolant(interpolant, replaceArrayWithShadow(wp));
+    //    std::set<const Array *> newExistentials =
+    //        updateExistentials(existentials, wp);
+    //    entry->setInterpolant(newInterpolant);
+    //    entry->setExistentials(newExistentials);
   }
   if (debugSubsumptionLevel >= 4) {
     // For future reference
@@ -1241,501 +1481,416 @@ TxWeakestPreCondition::intersectExpr_aux(std::vector<ref<Expr> > expr1,
     }
   }
   return entry;
-}*/
+}
 
-// TxStore::TopInterpolantStore
-// TxWeakestPreCondition::updateConcretelyAddressedStore(
-//    TxStore::TopInterpolantStore concretelyAddressedStore, ref<Expr> wp) {
-//
-//  ref<Expr> var = getVarFromExpr(wp);
-//  llvm::Value *allocaVar = TxWPArrayStore::getValuePointer(var);
-//  TopInterpolantStore::iterator candidateForRemove =
-//      concretelyAddressedStore.end();
-//  for (TopInterpolantStore::iterator it = concretelyAddressedStore.begin(),
-//                                     ie = concretelyAddressedStore.end();
-//       it != ie; ++it) {
-//
-//    if ((*it).first->getValue() == allocaVar)
-//      candidateForRemove = it;
-//  }
-//
-//  if (candidateForRemove != concretelyAddressedStore.end()) {
-//    concretelyAddressedStore.erase(candidateForRemove);
-//  }
-//  return concretelyAddressedStore;
-//}
+TxStore::TopInterpolantStore
+TxWeakestPreCondition::updateConcretelyAddressedStore(
+    TxStore::TopInterpolantStore concretelyAddressedStore, ref<Expr> wp) {
 
-// ref<Expr> TxWeakestPreCondition::getVarFromExpr(ref<Expr> wp) {
-//  // TODO: Assuming frame has only one variable.
-//  switch (wp->getKind()) {
-//  case Expr::InvalidKind:
-//  case Expr::Read:
-//  case Expr::Concat:
-//  case Expr::Constant: { return wp; }
-//
-//  case Expr::NotOptimized:
-//  case Expr::Not:
-//  case Expr::Extract:
-//  case Expr::ZExt:
-//  case Expr::SExt: {
-//    ref<Expr> kids[1];
-//    kids[0] = getVarFromExpr(wp->getKid(0));
-//    return kids[0];
-//  }
-//
-//  case Expr::Eq:
-//  case Expr::Ne:
-//  case Expr::Ult:
-//  case Expr::Ule:
-//  case Expr::Ugt:
-//  case Expr::Uge:
-//  case Expr::Slt:
-//  case Expr::Sle:
-//  case Expr::Sgt:
-//  case Expr::Sge:
-//  case Expr::LastKind:
-//  case Expr::Add:
-//  case Expr::Sub:
-//  case Expr::Mul:
-//  case Expr::UDiv:
-//  case Expr::SDiv:
-//  case Expr::URem:
-//  case Expr::SRem:
-//  case Expr::And:
-//  case Expr::Or:
-//  case Expr::Xor:
-//  case Expr::Shl:
-//  case Expr::LShr:
-//  case Expr::AShr: {
-//    ref<Expr> kids[2];
-//    kids[0] = getVarFromExpr(wp->getKid(0));
-//    kids[1] = getVarFromExpr(wp->getKid(1));
-//    if (isa<ReadExpr>(kids[0]) || isa<ConcatExpr>(kids[0]))
-//      return kids[0];
-//    else
-//      return kids[1];
-//  }
-//
-//  case Expr::Select: {
-//    ref<Expr> kids[3];
-//    kids[0] = getVarFromExpr(wp->getKid(0));
-//    kids[1] = getVarFromExpr(wp->getKid(1));
-//    kids[2] = getVarFromExpr(wp->getKid(2));
-//    if (isa<ReadExpr>(kids[0]) || isa<ConcatExpr>(kids[0]))
-//      return kids[0];
-//    else if (isa<ReadExpr>(kids[1]) || isa<ConcatExpr>(kids[1]))
-//      return kids[1];
-//    else
-//      return kids[1];
-//  }
-//  }
-//  // Sanity check
-//  klee_error(
-//      "Control should not reach here in
-// TxWeakestPreCondition::getVarFromExpr");
-//  return wp;
-//}
+  ref<Expr> var = getVarFromExpr(wp);
+  llvm::Value *allocaVar = TxWPArrayStore::getValuePointer(var);
+  TopInterpolantStore::iterator candidateForRemove =
+      concretelyAddressedStore.end();
+  for (TopInterpolantStore::iterator it = concretelyAddressedStore.begin(),
+                                     ie = concretelyAddressedStore.end();
+       it != ie; ++it) {
 
-// ref<Expr> TxWeakestPreCondition::updateInterpolant(ref<Expr> interpolant,
-//                                                   ref<Expr> wp) {
-//  if (interpolant.isNull())
-//    return wp;
-//
-//  // At this point the WP has more than one frame. The algorithm to update is
-// as
-//  // follow:
-//  // 1- Partition the interpolant to frames related and unrelated to WCET
-//  // 2- Replace the frame related to WCET with the WP formula
-//
-//  ref<Expr> var = getVarFromExpr(wp);
-//  ref<Expr> unrelatedFrame = extractUnrelatedFrame(interpolant, var);
-//  if (unrelatedFrame == TxWPArrayStore::constValues)
-//    return wp;
-//  else
-//    return AndExpr::create(unrelatedFrame, wp);
-//}
-//
-// ref<Expr> TxWeakestPreCondition::extractUnrelatedFrame(ref<Expr> interpolant,
-//                                                       ref<Expr> var) {
-//  switch (interpolant->getKind()) {
-//  case Expr::InvalidKind:
-//  case Expr::Constant: { return interpolant; }
-//
-//  case Expr::Read:
-//  case Expr::Concat: {
-//    if (interpolant == var)
-//      return TxWPArrayStore::constValues;
-//    else
-//      return interpolant;
-//  }
-//
-//  case Expr::NotOptimized:
-//  case Expr::Not:
-//  case Expr::Extract:
-//  case Expr::ZExt:
-//  case Expr::SExt: {
-//    ref<Expr> kids[1];
-//    kids[0] = extractUnrelatedFrame(interpolant->getKid(0), var);
-//    if (kids[0] == TxWPArrayStore::constValues)
-//      return TxWPArrayStore::constValues;
-//    else
-//      return interpolant->rebuild(kids);
-//  }
-//
-//  case Expr::Eq:
-//  case Expr::Ne:
-//  case Expr::Ult:
-//  case Expr::Ule:
-//  case Expr::Ugt:
-//  case Expr::Uge:
-//  case Expr::Slt:
-//  case Expr::Sle:
-//  case Expr::Sgt:
-//  case Expr::Sge:
-//  case Expr::LastKind:
-//  case Expr::Add:
-//  case Expr::Sub:
-//  case Expr::Mul:
-//  case Expr::UDiv:
-//  case Expr::SDiv:
-//  case Expr::URem:
-//  case Expr::SRem:
-//  case Expr::Shl:
-//  case Expr::LShr:
-//  case Expr::AShr: {
-//    ref<Expr> kids[2];
-//    kids[0] = extractUnrelatedFrame(interpolant->getKid(0), var);
-//    kids[1] = extractUnrelatedFrame(interpolant->getKid(1), var);
-//    if (kids[0] == TxWPArrayStore::constValues ||
-//        kids[1] == TxWPArrayStore::constValues) {
-//      return TxWPArrayStore::constValues;
-//    } else {
-//      return interpolant->rebuild(kids);
-//    }
-//  }
-//
-//  // pass the other one as frame
-//  case Expr::Or:
-//  case Expr::Xor:
-//  case Expr::And: {
-//    ref<Expr> kids[2];
-//    kids[0] = extractUnrelatedFrame(interpolant->getKid(0), var);
-//    kids[1] = extractUnrelatedFrame(interpolant->getKid(1), var);
-//    if (kids[0] == TxWPArrayStore::constValues &&
-//        kids[1] == TxWPArrayStore::constValues)
-//      klee_error(
-//          "TxWeakestPreCondition::extractUnrelatedFrame This AND case is "
-//          "not implemented yet!");
-//    if (kids[0] == TxWPArrayStore::constValues &&
-//        !(kids[1] == TxWPArrayStore::constValues)) {
-//      return kids[1];
-//    } else if (!(kids[0] == TxWPArrayStore::constValues) &&
-//               kids[1] == TxWPArrayStore::constValues) {
-//      return kids[0];
-//    } else {
-//      return interpolant->rebuild(kids);
-//    }
-//  }
-//
-//  case Expr::Select: {
-//    ref<Expr> kids[3];
-//    kids[0] = extractUnrelatedFrame(interpolant->getKid(0), var);
-//    kids[1] = extractUnrelatedFrame(interpolant->getKid(1), var);
-//    kids[2] = extractUnrelatedFrame(interpolant->getKid(2), var);
-//    if (kids[0] == TxWPArrayStore::constValues ||
-//        kids[1] == TxWPArrayStore::constValues ||
-//        kids[2] == TxWPArrayStore::constValues)
-//      return TxWPArrayStore::constValues;
-//    else
-//      return interpolant->rebuild(kids);
-//  }
-//  }
-//  // Sanity check
-//  klee_error("Control should not reach here in "
-//             "TxWeakestPreCondition::extractUnrelatedFrame");
-//  return interpolant;
-//}
-//
-// ref<Expr> TxWeakestPreCondition::replaceArrayWithShadow(ref<Expr>
-// interpolant) {
-//  switch (interpolant->getKind()) {
-//  case Expr::InvalidKind:
-//  case Expr::Constant: { return interpolant; }
-//
-//  case Expr::Read:
-//  case Expr::Concat: {
-//    llvm::Value *array = TxWPArrayStore::getValuePointer(interpolant);
-//    std::string arrayName = array->getName();
-//    const std::string ext(".addr");
-//    if (arrayName.find(ext))
-//      arrayName = arrayName.substr(0, arrayName.size() - ext.size());
-//    const Array *symArray =
-//        TxShadowArray::getSymbolicShadowArray(array->getName());
-//    if (symArray != NULL) {
-//      ref<Expr> Res(0);
-//      unsigned NumBytes = symArray->getDomain() / 8;
-//      assert(symArray->getDomain() == NumBytes * 8 && "Invalid read size!");
-//      for (unsigned i = 0; i != NumBytes; ++i) {
-//        unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i -
-// 1);
-//        ref<Expr> Byte =
-//            ReadExpr::create(UpdateList(symArray, 0),
-//                             ConstantExpr::alloc(idx, symArray->getDomain()));
-//        Res = i ? ConcatExpr::create(Byte, Res) : Byte;
-//      }
-//      return Res;
-//    } else {
-//      interpolant->dump();
-//      klee_error("TxWeakestPreCondition::replaceArrayWithShadow Shadow array "
-//                 "doesn't exist!");
-//    }
-//  }
-//
-//  case Expr::NotOptimized:
-//  case Expr::Not:
-//  case Expr::Extract:
-//  case Expr::ZExt:
-//  case Expr::SExt: {
-//    ref<Expr> kids[1];
-//    kids[0] = replaceArrayWithShadow(interpolant->getKid(0));
-//    return interpolant->rebuild(kids);
-//  }
-//
-//  case Expr::Eq:
-//  case Expr::Ne:
-//  case Expr::Ult:
-//  case Expr::Ule:
-//  case Expr::Ugt:
-//  case Expr::Uge:
-//  case Expr::Slt:
-//  case Expr::Sle:
-//  case Expr::Sgt:
-//  case Expr::Sge:
-//  case Expr::LastKind:
-//  case Expr::Add:
-//  case Expr::Sub:
-//  case Expr::Mul:
-//  case Expr::UDiv:
-//  case Expr::SDiv:
-//  case Expr::URem:
-//  case Expr::SRem:
-//  case Expr::And:
-//  case Expr::Or:
-//  case Expr::Xor:
-//  case Expr::Shl:
-//  case Expr::LShr:
-//  case Expr::AShr: {
-//    ref<Expr> kids[2];
-//    kids[0] = replaceArrayWithShadow(interpolant->getKid(0));
-//    kids[1] = replaceArrayWithShadow(interpolant->getKid(1));
-//    return interpolant->rebuild(kids);
-//  }
-//
-//  case Expr::Select: {
-//    ref<Expr> kids[3];
-//    kids[0] = replaceArrayWithShadow(interpolant->getKid(0));
-//    kids[1] = replaceArrayWithShadow(interpolant->getKid(1));
-//    kids[2] = replaceArrayWithShadow(interpolant->getKid(2));
-//    return interpolant->rebuild(kids);
-//  }
-//  }
-//  // Sanity check
-//  klee_error(
-//      "Control should not reach here in
-// TxWeakestPreCondition::getVarFromExpr");
-//  return interpolant;
-//}
+    if ((*it).first->getValue() == allocaVar)
+      candidateForRemove = it;
+  }
 
-// std::set<const Array *>
-// TxWeakestPreCondition::updateExistentials(std::set<const Array *>
-// existentials,
-//                                          ref<Expr> wp) {
-//  switch (wp->getKind()) {
-//  case Expr::InvalidKind:
-//  case Expr::Constant: { return existentials; }
-//
-//  case Expr::Read:
-//  case Expr::Concat: {
-//    llvm::Value *array = TxWPArrayStore::getValuePointer(wp);
-//    std::string arrayName = array->getName();
-//    const std::string ext(".addr");
-//    if (arrayName.find(ext))
-//      arrayName = arrayName.substr(0, arrayName.size() - ext.size());
-//    const Array *symArray =
-//        TxShadowArray::getSymbolicShadowArray(array->getName());
-//    if (!symArray) {
-//      wp->dump();
-//      klee_error(
-//          "TxWeakestPreCondition::updateExistentials Shadow array doesn't "
-//          "exist!");
-//    }
-//    if (existentials.find(symArray) == existentials.end()) {
-//      existentials.insert(symArray);
-//    }
-//    return existentials;
-//  }
-//
-//  case Expr::NotOptimized:
-//  case Expr::Not:
-//  case Expr::Extract:
-//  case Expr::ZExt:
-//  case Expr::SExt: {
-//    std::set<const Array *> newExistentials =
-//        updateExistentials(existentials, wp->getKid(0));
-//    return newExistentials;
-//  }
-//
-//  case Expr::Eq:
-//  case Expr::Ne:
-//  case Expr::Ult:
-//  case Expr::Ule:
-//  case Expr::Ugt:
-//  case Expr::Uge:
-//  case Expr::Slt:
-//  case Expr::Sle:
-//  case Expr::Sgt:
-//  case Expr::Sge:
-//  case Expr::LastKind:
-//  case Expr::Add:
-//  case Expr::Sub:
-//  case Expr::Mul:
-//  case Expr::UDiv:
-//  case Expr::SDiv:
-//  case Expr::URem:
-//  case Expr::SRem:
-//  case Expr::And:
-//  case Expr::Or:
-//  case Expr::Xor:
-//  case Expr::Shl:
-//  case Expr::LShr:
-//  case Expr::AShr: {
-//    std::set<const Array *> newExistentials =
-//        updateExistentials(existentials, wp->getKid(0));
-//    std::set<const Array *> newExistentials2 =
-//        updateExistentials(newExistentials, wp->getKid(1));
-//    return newExistentials2;
-//  }
-//
-//  case Expr::Select: {
-//    std::set<const Array *> newExistentials =
-//        updateExistentials(existentials, wp->getKid(0));
-//    std::set<const Array *> newExistentials2 =
-//        updateExistentials(newExistentials, wp->getKid(1));
-//    std::set<const Array *> newExistentials3 =
-//        updateExistentials(newExistentials2, wp->getKid(2));
-//    return newExistentials3;
-//  }
-//  }
-//  // Sanity check
-//  klee_error(
-//      "Control should not reach here in
-// TxWeakestPreCondition::getVarFromExpr");
-//  return existentials;
-//}
+  if (candidateForRemove != concretelyAddressedStore.end()) {
+    concretelyAddressedStore.erase(candidateForRemove);
+  }
+  return concretelyAddressedStore;
+}
 
-// ref<Expr> TxWeakestPreCondition::replaceCallArguments(ref<Expr> interpolant,
-//                                                      llvm::Value *funcArg,
-//                                                      llvm::Value *callArg) {
-//  switch (interpolant->getKind()) {
-//  case Expr::InvalidKind:
-//  case Expr::Constant: { return interpolant; }
-//
-//  case Expr::Read:
-//  case Expr::Concat: {
-//    llvm::Value *array = TxWPArrayStore::getValuePointer(interpolant);
-//    if (array == funcArg) {
-//      std::string arrayName = callArg->getName();
-//      const std::string ext(".addr");
-//      if (arrayName.find(ext))
-//        arrayName = arrayName.substr(0, arrayName.size() - ext.size());
-//      const Array *symArray =
-// TxShadowArray::getSymbolicShadowArray(arrayName);
-//      llvm::errs() << symArray->getName();
-//
-//      if (symArray != NULL) {
-//        ref<Expr> Res(0);
-//        unsigned NumBytes = symArray->getDomain() / 8;
-//        assert(symArray->getDomain() == NumBytes * 8 && "Invalid read size!");
-//        for (unsigned i = 0; i != NumBytes; ++i) {
-//          unsigned idx =
-//              Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
-//          ref<Expr> Byte =
-//              ReadExpr::create(UpdateList(symArray, 0),
-//                               ConstantExpr::alloc(idx,
-// symArray->getDomain()));
-//          Res = i ? ConcatExpr::create(Byte, Res) : Byte;
-//        }
-//        klee_error(
-//            "TxWeakestPreCondition::replaceCallArguments Not tested yet");
-//        return Res;
-//      } else {
-//        interpolant->dump();
-//        klee_error("TxWeakestPreCondition::replaceCallArguments Shadow array "
-//                   "doesn't exist!");
-//      }
-//    }
-//    return interpolant;
-//  }
-//
-//  case Expr::NotOptimized:
-//  case Expr::Not:
-//  case Expr::Extract:
-//  case Expr::ZExt:
-//  case Expr::SExt: {
-//    ref<Expr> kids[1];
-//    kids[0] = replaceCallArguments(interpolant->getKid(0), funcArg, callArg);
-//    return interpolant->rebuild(kids);
-//  }
-//
-//  case Expr::Eq:
-//  case Expr::Ne:
-//  case Expr::Ult:
-//  case Expr::Ule:
-//  case Expr::Ugt:
-//  case Expr::Uge:
-//  case Expr::Slt:
-//  case Expr::Sle:
-//  case Expr::Sgt:
-//  case Expr::Sge:
-//  case Expr::LastKind:
-//  case Expr::Add:
-//  case Expr::Sub:
-//  case Expr::Mul:
-//  case Expr::UDiv:
-//  case Expr::SDiv:
-//  case Expr::URem:
-//  case Expr::SRem:
-//  case Expr::And:
-//  case Expr::Or:
-//  case Expr::Xor:
-//  case Expr::Shl:
-//  case Expr::LShr:
-//  case Expr::AShr: {
-//    ref<Expr> kids[2];
-//    kids[0] = replaceCallArguments(interpolant->getKid(0), funcArg, callArg);
-//    kids[1] = replaceCallArguments(interpolant->getKid(1), funcArg, callArg);
-//    return interpolant->rebuild(kids);
-//  }
-//
-//  case Expr::Select: {
-//    ref<Expr> kids[3];
-//    kids[0] = replaceCallArguments(interpolant->getKid(0), funcArg, callArg);
-//    kids[1] = replaceCallArguments(interpolant->getKid(1), funcArg, callArg);
-//    kids[2] = replaceCallArguments(interpolant->getKid(2), funcArg, callArg);
-//    return interpolant->rebuild(kids);
-//  }
-//  }
-//  // Sanity check
-//  klee_error("Control should not reach here in "
-//             "TxWeakestPreCondition::replaceCallArguments");
-//  return interpolant;
-//}
+ref<Expr> TxWeakestPreCondition::getVarFromExpr(ref<Expr> wp) {
+  // TODO: Assuming Partition has only one variable.
+  switch (wp->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Read:
+  case Expr::Concat:
+  case Expr::Constant: {
+    return wp;
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    ref<Expr> kids[1];
+    kids[0] = getVarFromExpr(wp->getKid(0));
+    return kids[0];
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    ref<Expr> kids[2];
+    kids[0] = getVarFromExpr(wp->getKid(0));
+    kids[1] = getVarFromExpr(wp->getKid(1));
+    if (isa<ReadExpr>(kids[0]) || isa<ConcatExpr>(kids[0]))
+      return kids[0];
+    else
+      return kids[1];
+  }
+
+  case Expr::Select: {
+    ref<Expr> kids[3];
+    kids[0] = getVarFromExpr(wp->getKid(0));
+    kids[1] = getVarFromExpr(wp->getKid(1));
+    kids[2] = getVarFromExpr(wp->getKid(2));
+    if (isa<ReadExpr>(kids[0]) || isa<ConcatExpr>(kids[0]))
+      return kids[0];
+    else if (isa<ReadExpr>(kids[1]) || isa<ConcatExpr>(kids[1]))
+      return kids[1];
+    else
+      return kids[1];
+  }
+  }
+  // Sanity check
+  klee_error("Control should not reach here in"
+             "TxWeakestPreCondition::getVarFromExpr");
+  return wp;
+}
+
+ref<Expr> TxWeakestPreCondition::updateInterpolant(ref<Expr> interpolant,
+                                                   ref<Expr> wp) {
+  if (interpolant.isNull())
+    return wp;
+
+  ref<Expr> var = getVarFromExpr(wp);
+  ref<Expr> unrelatedFrame = extractUnrelatedFrame(interpolant, var);
+  if (unrelatedFrame == TxWPArrayStore::constValues)
+    return wp;
+  else
+    return AndExpr::create(unrelatedFrame, wp);
+}
+
+ref<Expr> TxWeakestPreCondition::extractUnrelatedFrame(ref<Expr> interpolant,
+                                                       ref<Expr> var) {
+  switch (interpolant->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return interpolant;
+  }
+
+  case Expr::Read:
+  case Expr::Concat: {
+    if (interpolant == var)
+      return TxWPArrayStore::constValues;
+    else
+      return interpolant;
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    ref<Expr> kids[1];
+    kids[0] = extractUnrelatedFrame(interpolant->getKid(0), var);
+    if (kids[0] == TxWPArrayStore::constValues)
+      return TxWPArrayStore::constValues;
+    else
+      return interpolant->rebuild(kids);
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    ref<Expr> kids[2];
+    kids[0] = extractUnrelatedFrame(interpolant->getKid(0), var);
+    kids[1] = extractUnrelatedFrame(interpolant->getKid(1), var);
+    if (kids[0] == TxWPArrayStore::constValues ||
+        kids[1] == TxWPArrayStore::constValues) {
+      return TxWPArrayStore::constValues;
+    } else {
+      return interpolant->rebuild(kids);
+    }
+  }
+
+  // pass the other one as frame
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::And: {
+    ref<Expr> kids[2];
+    kids[0] = extractUnrelatedFrame(interpolant->getKid(0), var);
+    kids[1] = extractUnrelatedFrame(interpolant->getKid(1), var);
+    if (kids[0] == TxWPArrayStore::constValues &&
+        kids[1] == TxWPArrayStore::constValues)
+      klee_error(
+          "TxWeakestPreCondition::extractUnrelatedFrame This AND case is "
+          "not implemented yet!");
+    if (kids[0] == TxWPArrayStore::constValues &&
+        !(kids[1] == TxWPArrayStore::constValues)) {
+      return kids[1];
+    } else if (!(kids[0] == TxWPArrayStore::constValues) &&
+               kids[1] == TxWPArrayStore::constValues) {
+      return kids[0];
+    } else {
+      return interpolant->rebuild(kids);
+    }
+  }
+
+  case Expr::Select: {
+    ref<Expr> kids[3];
+    kids[0] = extractUnrelatedFrame(interpolant->getKid(0), var);
+    kids[1] = extractUnrelatedFrame(interpolant->getKid(1), var);
+    kids[2] = extractUnrelatedFrame(interpolant->getKid(2), var);
+    if (kids[0] == TxWPArrayStore::constValues ||
+        kids[1] == TxWPArrayStore::constValues ||
+        kids[2] == TxWPArrayStore::constValues)
+      return TxWPArrayStore::constValues;
+    else
+      return interpolant->rebuild(kids);
+  }
+  }
+  // Sanity check
+  klee_error("Control should not reach here in "
+             "TxWeakestPreCondition::extractUnrelatedFrame");
+  return interpolant;
+}
+
+ref<Expr> TxWeakestPreCondition::replaceArrayWithShadow(ref<Expr> interpolant) {
+  switch (interpolant->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return interpolant;
+  }
+
+  case Expr::Read:
+  case Expr::Concat: {
+    llvm::Value *array = TxWPArrayStore::getValuePointer(interpolant);
+    std::string arrayName = array->getName();
+    const std::string ext(".addr");
+    if (arrayName.find(ext))
+      arrayName = arrayName.substr(0, arrayName.size() - ext.size());
+    const Array *symArray =
+        TxShadowArray::getSymbolicShadowArray(array->getName());
+    if (symArray != NULL) {
+      ref<Expr> Res(0);
+      unsigned NumBytes = symArray->getDomain() / 8;
+      assert(symArray->getDomain() == NumBytes * 8 && "Invalid read size!");
+      for (unsigned i = 0; i != NumBytes; ++i) {
+        unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
+        ref<Expr> Byte =
+            ReadExpr::create(UpdateList(symArray, 0),
+                             ConstantExpr::alloc(idx, symArray->getDomain()));
+        Res = i ? ConcatExpr::create(Byte, Res) : Byte;
+      }
+      return Res;
+    } else {
+      interpolant->dump();
+      klee_error("TxWeakestPreCondition::replaceArrayWithShadow Shadow array "
+                 "doesn't exist!");
+    }
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    ref<Expr> kids[1];
+    kids[0] = replaceArrayWithShadow(interpolant->getKid(0));
+    return interpolant->rebuild(kids);
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    ref<Expr> kids[2];
+    kids[0] = replaceArrayWithShadow(interpolant->getKid(0));
+    kids[1] = replaceArrayWithShadow(interpolant->getKid(1));
+    return interpolant->rebuild(kids);
+  }
+
+  case Expr::Select: {
+    ref<Expr> kids[3];
+    kids[0] = replaceArrayWithShadow(interpolant->getKid(0));
+    kids[1] = replaceArrayWithShadow(interpolant->getKid(1));
+    kids[2] = replaceArrayWithShadow(interpolant->getKid(2));
+    return interpolant->rebuild(kids);
+  }
+  }
+  // Sanity check
+  klee_error(
+      "Control should not reach here in TxWeakestPreCondition::getVarFromExpr");
+  return interpolant;
+}
+
+std::set<const Array *>
+TxWeakestPreCondition::updateExistentials(std::set<const Array *> existentials,
+                                          ref<Expr> wp) {
+  switch (wp->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return existentials;
+  }
+
+  case Expr::Read:
+  case Expr::Concat: {
+    llvm::Value *array = TxWPArrayStore::getValuePointer(wp);
+    std::string arrayName = array->getName();
+    const std::string ext(".addr");
+    if (arrayName.find(ext))
+      arrayName = arrayName.substr(0, arrayName.size() - ext.size());
+    const Array *symArray =
+        TxShadowArray::getSymbolicShadowArray(array->getName());
+    if (!symArray) {
+      wp->dump();
+      klee_error(
+          "TxWeakestPreCondition::updateExistentials Shadow array doesn't "
+          "exist!");
+    }
+    if (existentials.find(symArray) == existentials.end()) {
+      existentials.insert(symArray);
+    }
+    return existentials;
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    std::set<const Array *> newExistentials =
+        updateExistentials(existentials, wp->getKid(0));
+    return newExistentials;
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::LastKind:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    std::set<const Array *> newExistentials =
+        updateExistentials(existentials, wp->getKid(0));
+    std::set<const Array *> newExistentials2 =
+        updateExistentials(newExistentials, wp->getKid(1));
+    return newExistentials2;
+  }
+
+  case Expr::Select: {
+    std::set<const Array *> newExistentials =
+        updateExistentials(existentials, wp->getKid(0));
+    std::set<const Array *> newExistentials2 =
+        updateExistentials(newExistentials, wp->getKid(1));
+    std::set<const Array *> newExistentials3 =
+        updateExistentials(newExistentials2, wp->getKid(2));
+    return newExistentials3;
+  }
+  }
+  // Sanity check
+  klee_error(
+      "Control should not reach here in TxWeakestPreCondition::getVarFromExpr");
+  return existentials;
+}
 
 // =========================================================================
 // Updated Version of Weakest PreCondition
 // =========================================================================
-std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
+
+/**
+ * Push up expression to top of BB
+ */
+ref<Expr> TxWeakestPreCondition::GenerateWP(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
+
+  //  llvm::outs() << "--- Begin printing instruction list ---\n";
+  //  for (std::vector<std::pair<KInstruction *, int> >::const_iterator
+  //           it = reverseInstructionList.begin(),
+  //           ie = reverseInstructionList.end();
+  //       it != ie; ++it) {
+  //    llvm::Instruction *i = (*it).first->inst;
+  //    int flag = (*it).second;
+  //    // instruction list
+  //    i->dump();
+  //    llvm::outs() << flag << "\n";
+  //  }
+  //  llvm::outs() << "--- End of printing instruction list ---\n";
 
   for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
@@ -1747,46 +1902,47 @@ std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
     if (flag == 1) {
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- create and expression from the condition and this->WPExpr
-      ref<Expr> cond = getCondition(i);
+      ref<Expr> cond = TxExprHelper::simplifyNot(getBrCondition(i));
+      if (False() == WPExpr) {
+        WPExpr = cond;
+      } else {
+        WPExpr = AndExpr::create(WPExpr, cond);
+      }
+
       //      llvm::outs() << "--- start 1 ---\n";
       //      i->dump();
       //      cond->dump();
+      //      WPExpr->dump();
       //      llvm::outs() << "--- end 1 ---\n";
-      WPExprs.push_back(cond);
     } else if (flag == 2) {
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- generate not(condition): expr::not(condition)
       // 3- create and expression from the condition and this->WPExpr
-      //      llvm::outs() << "--- start 2 ---\n";
-      //      getCondition(i)->dump();
-      ref<Expr> negCond = NotExpr::create(getCondition(i));
 
-      //      i->dump();
-      //      negCond->dump();
-      //      llvm::outs() << "--- end 2 ---\n";
-      WPExprs.push_back(negCond);
-    } else if (i->getOpcode() == llvm::Instruction::Store) {
-      // i is 0
-      std::vector<ref<Expr> > tmp;
-      for (std::vector<ref<Expr> >::const_iterator it = WPExprs.begin(),
-                                                   ie = WPExprs.end();
-           it != ie; ++it) {
-        tmp.push_back(getPrevExpr(*it, i));
+      ref<Expr> negCond =
+          TxExprHelper::simplifyNot(NotExpr::create(getBrCondition(i)));
+      if (False() == WPExpr) {
+        WPExpr = negCond;
+      } else {
+        WPExpr = AndExpr::create(WPExpr, negCond);
       }
-      WPExprs = tmp;
-    }
-  }
 
-  klee_warning("Start printing the WP");
-  if (WPExprs.size() > 0) {
-    for (std::vector<ref<Expr> >::const_reverse_iterator it = WPExprs.rbegin(),
-                                                         ie = WPExprs.rend();
-         it != ie; ++it) {
-      (*it)->dump();
+      //      llvm::outs() << "--- start 2 ---\n";
+      //      i->dump();
+      //      getCondition(i)->dump();
+      //      negCond->dump();
+      //      WPExpr->dump();
+      //      llvm::outs() << "--- end 2 ---\n";
+    } else if (i->getOpcode() == llvm::Instruction::Store) {
+      WPExpr = getPrevExpr(WPExpr, i);
+      //      llvm::outs() << "--- start 4 ---\n";
+      //      i->dump();
+      //      WPExpr->dump();
+      //      llvm::outs() << "--- end 4 ---\n";
     }
   }
-  klee_warning("End of printing the WP");
-  return WPExprs;
+  WPExpr = TxExprHelper::simplifyLinear(WPExpr);
+  return WPExpr;
 }
 
 ref<Expr> TxWeakestPreCondition::getPrevExpr(ref<Expr> e,
@@ -1799,9 +1955,25 @@ ref<Expr> TxWeakestPreCondition::getPrevExpr(ref<Expr> e,
     }
     ref<Expr> left = this->generateExprFromOperand(i, 0);
     ref<Expr> right = this->generateExprFromOperand(i, 1);
-    ref<Expr> result = EqExpr::create(right, left);
-    ref<Expr> result1 = TxWPHelper::substituteExpr(e, result);
-    ret = TxWPHelper::simplifyWPExpr(TxWPHelper::substituteExpr(e, result));
+    ref<Expr> eqExpr = EqExpr::create(right, left);
+
+    //    llvm::outs() << "--- Begin substitution ---\n";
+    //    //    llvm::outs() << "[i]----\n";
+    //    //    i->dump();
+    //    llvm::outs() << "[e]----\n";
+    //    e->dump();
+    //    llvm::outs() << "[left]----\n";
+    //    left->dump();
+    //    llvm::outs() << "[right]----\n";
+    //    right->dump();
+
+    ref<Expr> result = TxWPHelper::substituteExpr(e, right, left);
+
+    //    llvm::outs() << "[result]----\n";
+    //    result->dump();
+    //    llvm::outs() << "--- End substitution ---\n";
+
+    ret = result;
     break;
   }
 
@@ -1815,17 +1987,46 @@ ref<Expr> TxWeakestPreCondition::getPrevExpr(ref<Expr> e,
   return ret;
 }
 
-ref<Expr> TxWeakestPreCondition::getCondition(llvm::Instruction *ins) {
-  if (!llvm::isa<llvm::BranchInst>(ins))
+ref<Expr> TxWeakestPreCondition::getBrCondition(llvm::Instruction *ins) {
+  if (!llvm::isa<llvm::BranchInst>(ins)) {
+    klee_error(
+        "TxWeakestPreCondition::getBrCondition: not a Branch instruction!");
     return True();
-
+  }
   llvm::BranchInst *br = llvm::dyn_cast<llvm::BranchInst>(ins);
+  return getCondition(br->getCondition());
+}
 
-  if (!llvm::isa<llvm::CmpInst>(br->getCondition()))
-    return True();
+ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
+  ref<Expr> result;
+  if (llvm::isa<llvm::CmpInst>(value)) {
+    llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(value);
+    result = getCmpCondition(cmp);
+  } else if (llvm::isa<llvm::BinaryOperator>(value)) {
+    llvm::Instruction *binOp = dyn_cast<llvm::Instruction>(value);
+    ref<Expr> left = this->generateExprFromOperand(binOp, 0);
+    ref<Expr> right = this->generateExprFromOperand(binOp, 1);
+    switch (binOp->getOpcode()) {
+    case llvm::Instruction::And: {
+      result = AndExpr::create(left, right);
+      break;
+    }
+    case llvm::Instruction::Or: {
+      result = OrExpr::create(left, right);
+      break;
+    }
+    default:
+      klee_error("TxWeakestPreCondition::getCondition: Binary operator is not "
+                 "implemented yet!");
+    }
+  } else {
+    klee_error("TxWeakestPreCondition::getCondition: Binary operator is not "
+               "implemented yet!");
+  }
+  return result;
+}
 
-  llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(br->getCondition());
-
+ref<Expr> TxWeakestPreCondition::getCmpCondition(llvm::CmpInst *cmp) {
   // Getting the expressions from the left and right operand
   ref<Expr> left = this->generateExprFromOperand(cmp, 0);
   ref<Expr> right = this->generateExprFromOperand(cmp, 1);
@@ -1925,7 +2126,6 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
                                                          int operand) {
   // Generating WP from Operand1
   ref<Expr> left;
-  // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO VECTOR<EXPR>
   llvm::Value *operand1 = i->getOperand(operand);
   if (isa<llvm::ConstantInt>(operand1)) {
     llvm::ConstantInt *CI = dyn_cast<llvm::ConstantInt>(operand1);
@@ -2015,11 +2215,69 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
           "not implemented...\n");
     }
     }
+  } else if (isa<llvm::CastInst>(operand1)) {
+    llvm::CastInst *op1 = dyn_cast<llvm::CastInst>(operand1);
+    ref<Expr> arg1 = generateExprFromOperand(op1, 0);
 
+    Expr::Width width = Expr::InvalidWidth;
+    if (op1->getDestTy()->isEmptyTy())
+      width = Expr::InvalidWidth;
+    else if (op1->getDestTy()->isIntegerTy(1))
+      width = Expr::Bool;
+    else if (op1->getDestTy()->isIntegerTy(8))
+      width = Expr::Int8;
+    else if (op1->getDestTy()->isHalfTy())
+      width = Expr::Int16;
+    else if (op1->getDestTy()->isIntegerTy())
+      width = Expr::Int32;
+    else if (op1->getDestTy()->isDoubleTy())
+      width = Expr::Int64;
+    else if (op1->getDestTy()->isFloatTy())
+      width = Expr::Fl80;
+
+    switch (op1->getOpcode()) {
+    case llvm::Instruction::SExt: {
+      left = SExtExpr::create(arg1, width);
+      break;
+    }
+
+    case llvm::Instruction::ZExt: {
+      left = ZExtExpr::create(arg1, width);
+      break;
+    }
+    case llvm::Instruction::AddrSpaceCast:
+    case llvm::Instruction::BitCast:
+    case llvm::Instruction::FPExt:
+    case llvm::Instruction::FPToSI:
+    case llvm::Instruction::FPToUI:
+    case llvm::Instruction::FPTrunc:
+    case llvm::Instruction::IntToPtr:
+    case llvm::Instruction::PtrToInt:
+    case llvm::Instruction::SIToFP:
+    case llvm::Instruction::Trunc:
+    case llvm::Instruction::UIToFP:
+    default: {
+      klee_error("TxWeakestPreCondition::generateExprFromOperand Unary Operand "
+                 "not implemented...\n");
+    }
+    }
+  } else if (isa<llvm::AllocaInst>(operand1)) {
+    left = dependency->getAddress(operand1, &TxWPArrayStore::ac,
+                                  TxWPArrayStore::array, this);
+  } else if (llvm::isa<llvm::CmpInst>(operand1)) {
+    llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(operand1);
+    left = getCmpCondition(cmp);
+  } else if (llvm::isa<llvm::GlobalVariable>(operand1)) {
+    left = dependency->getAddress(operand1, &TxWPArrayStore::ac,
+                                  TxWPArrayStore::array, this);
+  } else if (llvm::isa<llvm::Argument>(operand1)) {
+    //    llvm::Argument arg = dyn_cast<llvm::Argument>(operand1);
+    left = dependency->getAddress(operand1, &TxWPArrayStore::ac,
+                                  TxWPArrayStore::array, this);
   } else {
-    //    klee_error("TxWeakestPreCondition::generateExprFromOperand Remaining
-    // cases"
-    //               "not implemented...\n");
+    operand1->dump();
+    klee_error("TxWeakestPreCondition::generateExprFromOperand Remaining"
+               " cases not implemented yet\n");
     left = dependency->getAddress(operand1, &TxWPArrayStore::ac,
                                   TxWPArrayStore::array, this);
   }

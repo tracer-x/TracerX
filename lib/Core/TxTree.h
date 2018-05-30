@@ -175,7 +175,7 @@ class TxSubsumptionTableEntry {
 
   TxStore::TopInterpolantStore symbolicallyAddressedStore;
 
-  std::vector<ref<Expr> > wpInterpolant;
+  ref<Expr> wpInterpolant;
 
   std::set<const Array *> existentials;
 
@@ -321,7 +321,7 @@ public:
 
   ref<Expr> getInterpolant() const;
 
-  std::vector<ref<Expr> > getWPInterpolant() const;
+  ref<Expr> getWPInterpolant() const;
 
   TxStore::LowerInterpolantStore getConcretelyAddressedHistoricalStore() const;
 
@@ -414,7 +414,7 @@ class TxTreeNode {
   TxWeakestPreCondition *wp;
 
   /// \brief Child WP expressions
-  std::vector<ref<Expr> > childWPInterpolant[2];
+  ref<Expr> childWPInterpolant[2];
 
   /// \brief An expressions representing branch condition (used in partitioning)
   ref<Expr> branchCondition;
@@ -521,16 +521,22 @@ public:
   /// expression. The WP expression is stored in a vector of expressions
   /// where the WP expression is the conjunction of the expressions in
   /// the vector
-  std::vector<ref<Expr> > getWPInterpolant();
+  /// The input arguments are needed to do partitioning on WP Expression
+  ref<Expr> getWPInterpolant(
+      ref<Expr> interpolant, std::set<const Array *> existentials,
+      TxStore::TopInterpolantStore concretelyAddressedStore,
+      TxStore::TopInterpolantStore symbolicallyAddressedStore,
+      TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
+      TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore);
 
   /// \return Return the weakest precondition object
   TxWeakestPreCondition *getWP() { return wp; }
 
   /// \brief Store the child WP interpolants in the parent node
-  void setChildWPInterpolant(std::vector<ref<Expr> > interpolant);
+  void setChildWPInterpolant(ref<Expr> interpolant);
 
   /// \brief Get the stored child WP interpolants in the parent node
-  std::vector<ref<Expr> > getChildWPInterpolant(int flag);
+  ref<Expr> getChildWPInterpolant(int flag);
 
   /// \brief Store the BranchCondition in the parent node (used for WP
   /// intersection)
@@ -544,13 +550,13 @@ public:
 
   /// \brief Check WP Interpolant holds at subsumption point
   bool checkWPAtSubsumption(
-      std::vector<ref<Expr> > wpInterpolant, ExecutionState &state,
+      ref<Expr> wpInterpolant, ExecutionState &state,
       TxStore::LowerStateStore &concretelyAddressedHistoricalStore,
       TxStore::LowerStateStore &symbolicallyAddressedHistoricalStore,
       double timeout, int debugSubsumptionLevel);
 
   /// \brief Copy WP to the parent node at subsumption point
-  void setWPAtSubsumption(std::vector<ref<Expr> > _wpInterpolant);
+  void setWPAtSubsumption(ref<Expr> _wpInterpolant);
 
   /// \brief Extend the path condition with another constraint
   ///
