@@ -1,3 +1,19 @@
+//===-- TxWPHelper.h - Tracer-X symbolic execution tree -------------*- C++ -*-===//
+//
+//               The Tracer-X KLEE Symbolic Virtual Machine
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains declarations of the classes that support for generating
+/// weakest precondition interpolation.
+///
+//===----------------------------------------------------------------------===//
+
+
 #ifndef LIB_CORE_TXWPHELPER_H_
 #define LIB_CORE_TXWPHELPER_H_
 

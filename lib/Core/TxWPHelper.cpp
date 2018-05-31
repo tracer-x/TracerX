@@ -1,3 +1,19 @@
+//===-- TxWPHelper.cpp - Interpolation tree -------------------------*- C++ -*-===//
+//
+//               The Tracer-X KLEE Symbolic Virtual Machine
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the implementations of helper function for generating weakest
+/// precondition.
+///
+//===----------------------------------------------------------------------===//
+
+
 #include "TxWPHelper.h"
 
 namespace klee {
