@@ -35,7 +35,10 @@ public:
                                       ref<Expr> e);
   static std::vector<Partition> partition(ConstraintManager constraints);
   static std::vector<Partition> partition(std::vector<ref<Expr> > exprs);
+  static std::vector<Partition> getUnrelatedPartition(ref<Expr> cond, std::vector<ref<Expr> > exprs);
+  static std::vector<Partition> get3Partitions(ref<Expr> cond, std::vector<ref<Expr> > exprs1, std::vector<ref<Expr> > exprs2);
   static ref<Expr> createAnd(std::vector<ref<Expr> > exprs);
+
   // printing functions
   static void printInfo(ExecutionState &state);
 

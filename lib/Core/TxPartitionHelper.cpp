@@ -159,6 +159,78 @@ TxPartitionHelper::partition(std::vector<ref<Expr> > exprs) {
   return partitions;
 }
 
+std::vector<Partition> TxPartitionHelper::getUnrelatedPartition(ref<Expr> cond,
+		std::vector<ref<Expr> > exprs) {
+	std::vector<Partition> partitions = partition(exprs);
+	std::set<std::string> condVars;
+	getExprVars(cond, condVars);
+	std::vector<Partition> unrelated;
+	for (std::vector<Partition>::const_iterator it = partitions.begin(), ie =
+			partitions.end(); it != ie; ++it) {
+		Partition p = (*it);
+		if (!isShared(condVars, p.vars)) {
+			unrelated.push_back(p);
+		}
+	}
+	return unrelated;
+}
+
+/**
+ * This function return 3 partitions:
+ * 1. Partition including expressions in @exprs1 and @exprs1 that are not related to cond
+ * 2. Partition including expressions in @exprs1 that are related to cond AND cond
+ * 3. Partition including expressions in @exprs2 that are related to cond AND cond
+ */
+std::vector<Partition> TxPartitionHelper::get3Partitions(ref<Expr> cond, std::vector<ref<Expr> > exprs1, std::vector<ref<Expr> > exprs2) {
+	// get all partitions in exprs1 and exprs2
+	std::set<std::string> condVars;
+	getExprVars(cond, condVars);
+
+	std::vector<Partition> partitions1 = partition(exprs1);
+	std::vector<Partition> partitions2 = partition(exprs2);
+
+	Partition p1, p2, p3;
+	// process partitions1
+	for (std::vector<Partition>::const_iterator it = partitions1.begin(), ie =
+			partitions1.end(); it != ie; ++it) {
+		Partition tmp = (*it);
+		if (!isShared(condVars, tmp.vars)) {
+			// add all expression and vars in tmp to p1
+			p1.exprs.insert(p1.exprs.end(), tmp.exprs.begin(), tmp.exprs.end());
+			p1.vars.insert(tmp.vars.begin(), tmp.vars.end());
+		} else {
+			// add to p2
+			p2.exprs.insert(p2.exprs.end(), tmp.exprs.begin(), tmp.exprs.end());
+			p2.vars.insert(tmp.vars.begin(), tmp.vars.end());
+		}
+	}
+	// process partitions2
+	for (std::vector<Partition>::const_iterator it = partitions2.begin(), ie =
+			partitions2.end(); it != ie; ++it) {
+		Partition tmp = (*it);
+		if (!isShared(condVars, tmp.vars)) {
+			// add all expression and vars in tmp to p1
+			p1.exprs.insert(p1.exprs.end(), tmp.exprs.begin(), tmp.exprs.end());
+			p1.vars.insert(tmp.vars.begin(), tmp.vars.end());
+		} else {
+			// add to p3
+			p3.exprs.insert(p3.exprs.end(), tmp.exprs.begin(), tmp.exprs.end());
+			p3.vars.insert(tmp.vars.begin(), tmp.vars.end());
+		}
+	}
+	// add @cond to @p2 and @!cond to @p3
+	p2.exprs.push_back(cond);
+	p3.exprs.push_back(NotExpr::create(cond));
+
+	// return
+	std::vector<Partition> res;
+	res.push_back(p1);
+	res.push_back(p2);
+	res.push_back(p3);
+	return res;
+}
+
+
 ref<Expr> TxPartitionHelper::createAnd(std::vector<ref<Expr> > exprs) {
   std::vector<ref<Expr> >::const_iterator it = exprs.begin();
   ref<Expr> result = *(it);

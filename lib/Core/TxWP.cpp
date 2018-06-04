@@ -994,21 +994,13 @@ TxWeakestPreCondition::~TxWeakestPreCondition() {}
 //  return singleWPExpr;
 //}
 
-std::vector<ref<Expr> >
-TxWeakestPreCondition::intersectExpr(ref<Expr> branchCondition,
-                                     std::vector<ref<Expr> > expr1,
-                                     std::vector<ref<Expr> > expr2) {
-  expr1.insert(expr1.end(), expr2.begin(), expr2.end());
-  std::vector<Partition> partitions = TxPartitionHelper::partition(expr1);
-  std::vector<ref<Expr> > result;
-  for (std::vector<Partition>::const_iterator it = partitions.begin(),
-                                              ie = partitions.end();
-       it != ie; ++it) {
-    Partition exprsVars = (*it);
-    // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO VECTOR<EXPR>
-    result.push_back(TxPartitionHelper::createAnd(exprsVars.exprs));
-  }
-  return result;
+
+std::vector<ref<Expr> > TxWeakestPreCondition::intersectExpr(
+		ref<Expr> branchCondition, std::vector<ref<Expr> > expr1,
+		std::vector<ref<Expr> > expr2) {
+	std::vector<Partition> ps = TxPartitionHelper::get3Partitions(
+			branchCondition, expr1, expr2);
+	return ps[0].exprs;
 }
 
 /*std::vector<ref<Expr> >
