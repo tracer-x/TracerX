@@ -144,13 +144,19 @@ public:
 
   // \brief Update subsumption table entry based on the WP Expr
   TxSubsumptionTableEntry *
-  updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry, ref<Expr> wp);
+  updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry,
+                              std::vector<ref<Expr> > wp);
+
+  // \brief Update subsumption table entry based on one Partition from WP Expr
+  TxSubsumptionTableEntry *
+  updateSubsumptionTableEntrySinglePartition(TxSubsumptionTableEntry *entry,
+                                             ref<Expr> wp);
 
   // \brief Update concretelyAddressedStore based on the WP Expr
   TxStore::TopInterpolantStore updateConcretelyAddressedStore(
       TxStore::TopInterpolantStore concretelyAddressedStore, ref<Expr> wp);
 
-  // \brief Get variable stored in the frame
+  // \brief Get variable stored in the Partition
   ref<Expr> getVarFromExpr(ref<Expr> wp);
 
   // \brief Update interpolant based on the WP Expr

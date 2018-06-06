@@ -2177,26 +2177,31 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       if (WPInterpolant) {
         // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO
         // VECTOR<EXPR>
-        /*std::vector<ref<Expr> > WPExpr = entry->getWPInterpolant();
+        std::vector<ref<Expr> > WPExpr = entry->getWPInterpolant();
         Solver::Validity result;
         std::vector<ref<Expr> > unsatCore;
-        std::vector<ref<Expr> > WPExprInstantiated;;
-        if (node->parent)
-          WPExprInstantiated = node->wp->instantiateWPExpression(
-              node->parent->dependency, node->parent->callHistory, WPExpr);
+
+        ref<Expr> WPExprConjunction = node->wp->True();
+        for (std::vector<ref<Expr> >::const_iterator it = WPExpr.begin(),
+                                                     ie = WPExpr.end();
+             it != ie; ++it) {
+          WPExprConjunction = AndExpr::create(WPExprConjunction, (*it));
+        }
+
         bool success =
-            solver->evaluate(*state, WPExprInstantiated, result, unsatCore);
+            solver->evaluate(*state, WPExprConjunction, result, unsatCore);
         if (success != true)
           klee_error("TxTree::remove: Implication test failed");
         if (result == Solver::True) {
           entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
         } else {
+          klee_warning("TxTree::remove: Implication test unknown");
           // If the result of implication is Solver::False and/or
           // Solver::Unknown the chance that the WP interpolant
           // improves the interpolant from the deletion algorithm
           // is slim. As a result, in such cases the interpolant
           // from deletion is not changed.
-        }*/
+        }
       }
 
       TxSubsumptionTable::insert(node->getProgramPoint(),
@@ -2455,6 +2460,7 @@ std::vector<ref<Expr> > TxTreeNode::getWPInterpolant() {
     expr = wp->intersectExpr(branchCondition, childWPInterpolant[0],
                              childWPInterpolant[1]);
 
+    llvm::errs() << "WP size: " << expr.size() << "\n";
     // Setting the intersection of child nodes as the target in the current node
     wp->setWPExpr(expr);
 
@@ -2487,20 +2493,23 @@ bool TxTreeNode::checkWPAtSubsumption(
     TxStore::LowerStateStore &concretelyAddressedHistoricalStore,
     TxStore::LowerStateStore &symbolicallyAddressedHistoricalStore,
     double timeout, int debugSubsumptionLevel) {
-  // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO VECTOR<EXPR>
-  /*ref<Expr> wpInstantiatedInterpolant =
-      wp->instantiateWPExpression(dependency, callHistory, wpInterpolant);
-
-  if (wpInstantiatedInterpolant->isTrue())
-    return true;
-  else if (wpInstantiatedInterpolant->isFalse())
-    return false;
-  else {
-    wpInstantiatedInterpolant->dump();
-    klee_error("TxTreeNode::checkWPAtSubsumption non constant WCET is not "
-               "handled yet");
-  }*/
-  return false;
+  for (std::vector<ref<Expr> >::const_iterator it = wpInterpolant.begin(),
+                                               ie = wpInterpolant.end();
+       it != ie; ++it) {
+    ref<Expr> wpPartition = (*it);
+    ref<Expr> wpInstantiatedInterpolant =
+        wp->instantiateSingleExpression(dependency, callHistory, wpPartition);
+    if (wpInstantiatedInterpolant->isTrue())
+      continue;
+    else if (wpInstantiatedInterpolant->isFalse())
+      return false;
+    else {
+      wpInstantiatedInterpolant->dump();
+      klee_error("TxTreeNode::checkWPAtSubsumption non constant value is not "
+                 "handled yet");
+    }
+  }
+  return true;
 }
 
 void TxTreeNode::setWPAtSubsumption(std::vector<ref<Expr> > _wpInterpolant) {
