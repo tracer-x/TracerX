@@ -998,9 +998,15 @@ TxWeakestPreCondition::~TxWeakestPreCondition() {}
 std::vector<ref<Expr> > TxWeakestPreCondition::intersectExpr(
 		ref<Expr> branchCondition, std::vector<ref<Expr> > expr1,
 		std::vector<ref<Expr> > expr2) {
-	std::vector<Partition> ps = TxPartitionHelper::get3Partitions(
+	std::vector<Partition> ps = TxPartitionHelper::get2Or3Partitions(
 			branchCondition, expr1, expr2);
-	return ps[0].exprs;
+	std::vector<ref<Expr> > res;
+	for (std::vector<Partition>::const_iterator it = ps.begin(), ie =
+				ps.end(); it != ie; ++it) {
+		ref<Expr> tmpExpr = TxPartitionHelper::createAnd((*it).exprs);
+		res.push_back(tmpExpr);
+	}
+	return res;
 }
 
 /*std::vector<ref<Expr> >

@@ -18,6 +18,7 @@
 
 #include "klee/ExecutionState.h"
 #include "Memory.h"
+//#include <klee/Expr.h>
 
 namespace klee {
 
@@ -36,15 +37,21 @@ public:
   static std::vector<Partition> partition(ConstraintManager constraints);
   static std::vector<Partition> partition(std::vector<ref<Expr> > exprs);
   static std::vector<Partition> getUnrelatedPartition(ref<Expr> cond, std::vector<ref<Expr> > exprs);
-  static std::vector<Partition> get3Partitions(ref<Expr> cond, std::vector<ref<Expr> > exprs1, std::vector<ref<Expr> > exprs2);
+  static std::vector<Partition> get2Or3Partitions(ref<Expr> cond, std::vector<ref<Expr> > exprs1, std::vector<ref<Expr> > exprs2);
   static ref<Expr> createAnd(std::vector<ref<Expr> > exprs);
 
   // printing functions
   static void printInfo(ExecutionState &state);
-
+  static ref<Expr> True() {
+    return ConstantExpr::alloc(1, Expr::Bool);
+  };
+  static ref<Expr> False() {
+    return ConstantExpr::alloc(0, Expr::Bool);
+  };
 private:
   static bool isShared(std::set<std::string> ss1, std::set<std::string> ss2);
   static void getExprVars(ref<Expr> e, std::set<std::string> &vars);
+
 
   // printing functions
   static void printExprInfo(ref<Expr> expr);

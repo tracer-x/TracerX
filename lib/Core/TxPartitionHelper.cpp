@@ -181,7 +181,8 @@ std::vector<Partition> TxPartitionHelper::getUnrelatedPartition(ref<Expr> cond,
  * 2. Partition including expressions in @exprs1 that are related to cond AND cond
  * 3. Partition including expressions in @exprs2 that are related to cond AND cond
  */
-std::vector<Partition> TxPartitionHelper::get3Partitions(ref<Expr> cond, std::vector<ref<Expr> > exprs1, std::vector<ref<Expr> > exprs2) {
+std::vector<Partition> TxPartitionHelper::get2Or3Partitions(ref<Expr> cond,
+		std::vector<ref<Expr> > exprs1, std::vector<ref<Expr> > exprs2) {
 	// get all partitions in exprs1 and exprs2
 	std::set<std::string> condVars;
 	getExprVars(cond, condVars);
@@ -218,15 +219,45 @@ std::vector<Partition> TxPartitionHelper::get3Partitions(ref<Expr> cond, std::ve
 			p3.vars.insert(tmp.vars.begin(), tmp.vars.end());
 		}
 	}
-	// add @cond to @p2 and @!cond to @p3
-	p2.exprs.push_back(cond);
-	p3.exprs.push_back(NotExpr::create(cond));
-
-	// return
+	// return result
 	std::vector<Partition> res;
 	res.push_back(p1);
-	res.push_back(p2);
-	res.push_back(p3);
+
+	// simplify p2 and p3
+	bool p2IsTrue = true;
+	for (std::vector<ref<Expr> >::const_iterator it = p2.exprs.begin(), ie =
+			p2.exprs.end(); it != ie; ++it) {
+		if (True() != *it) {
+			p2IsTrue = false;
+			break;
+		}
+	}
+	// if w1b is True then take w2b ^ !b
+	if (p2IsTrue) {
+		p3.exprs.push_back(NotExpr::create(cond));
+		res.push_back(p3);
+		return res;
+	}
+	bool p3IsTrue = true;
+	for (std::vector<ref<Expr> >::iterator it = p3.exprs.begin(), ie =
+			p3.exprs.end(); it != ie; ++it) {
+		if (True() != *it) {
+			p3IsTrue = false;
+			break;
+		}
+	}
+	// if w2b is True then take w1b ^ b
+	if (p3IsTrue) {
+		p2.exprs.push_back(cond);
+		res.push_back(p2);
+		return res;
+	}
+	// simplify the case that p2 and p3 has one common variable
+	if (p2.vars.size() == 1 && p3.vars.size() == 1) {
+		if (p2.vars.begin() == p3.vars.begin()) {
+			// TODO: merge 2 ranges
+		}
+	}
 	return res;
 }
 
