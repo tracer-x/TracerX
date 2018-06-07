@@ -2188,12 +2188,15 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
           WPExprConjunction = AndExpr::create(WPExprConjunction, (*it));
         }
 
+        entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
+
+        // TODO: Is this needed? Can we remove this part?
         bool success =
             solver->evaluate(*state, WPExprConjunction, result, unsatCore);
         if (success != true)
           klee_error("TxTree::remove: Implication test failed");
         if (result == Solver::True) {
-          entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
+          continue;
         } else {
           klee_warning("TxTree::remove: Implication test unknown");
           // If the result of implication is Solver::False and/or
@@ -2457,8 +2460,9 @@ std::vector<ref<Expr> > TxTreeNode::getWPInterpolant() {
     if (parent)
       this->parent->setChildWPInterpolant(expr);
   } else {
-    expr = wp->intersectExpr(branchCondition, childWPInterpolant[0],
-                             childWPInterpolant[1]);
+    expr = wp->intersectExpr(
+        branchCondition, childWPInterpolant[0], childWPInterpolant[1],
+        this->dependency->getPathCondition(), this->dependency->getStore());
 
     llvm::errs() << "WP size: " << expr.size() << "\n";
     // Setting the intersection of child nodes as the target in the current node

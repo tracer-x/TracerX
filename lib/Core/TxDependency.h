@@ -565,6 +565,8 @@ public:
 
   TxStore *getStore() const { return store; }
 
+  TxPathCondition *getPathCondition() const { return pathCondition; }
+
   /// \brief Print the content of the object to the LLVM error stream
   void dump() const {
     this->print(llvm::errs());

@@ -125,7 +125,9 @@ public:
   /// with respect to the branchCondition
   std::vector<ref<Expr> > intersectExpr(ref<Expr> branchCondition,
                                         std::vector<ref<Expr> > expr1,
-                                        std::vector<ref<Expr> > expr2);
+                                        std::vector<ref<Expr> > expr2,
+                                        TxPathCondition *pathCondition,
+                                        TxStore *store);
 
   std::vector<ref<Expr> > intersectExpr_aux(std::vector<ref<Expr> > expr1,
                                             std::vector<ref<Expr> > expr2);

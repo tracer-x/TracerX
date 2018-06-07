@@ -986,17 +986,18 @@ TxWeakestPreCondition::~TxWeakestPreCondition() {}
 //}
 
 std::vector<ref<Expr> > TxWeakestPreCondition::intersectExpr(
-		ref<Expr> branchCondition, std::vector<ref<Expr> > expr1,
-		std::vector<ref<Expr> > expr2) {
-	std::vector<Partition> ps = TxPartitionHelper::get2Or3Partitions(
-			branchCondition, expr1, expr2);
-	std::vector<ref<Expr> > res;
-	for (std::vector<Partition>::const_iterator it = ps.begin(), ie =
-				ps.end(); it != ie; ++it) {
-		ref<Expr> tmpExpr = TxPartitionHelper::createAnd((*it).exprs);
-		res.push_back(tmpExpr);
-	}
-	return res;
+    ref<Expr> branchCondition, std::vector<ref<Expr> > expr1,
+    std::vector<ref<Expr> > expr2, TxPathCondition *pathCondition,
+    TxStore *store) {
+  std::vector<Partition> ps =
+      TxPartitionHelper::get2Or3Partitions(branchCondition, expr1, expr2);
+  std::vector<ref<Expr> > res;
+  for (std::vector<Partition>::const_iterator it = ps.begin(), ie = ps.end();
+       it != ie; ++it) {
+    ref<Expr> tmpExpr = TxPartitionHelper::createAnd((*it).exprs);
+    res.push_back(tmpExpr);
+  }
+  return res;
 }
 
 /*std::vector<ref<Expr> >
@@ -1265,13 +1266,18 @@ ref<Expr> TxWeakestPreCondition::instantiateSingleExpression(
 TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
     TxSubsumptionTableEntry *entry, std::vector<ref<Expr> > wp) {
 
-  if (wp.size() == 3) {
+  if (wp.size() == 1) {
+    // The only Partition is not related to guard (only related to guard)
+    ref<Expr> notRelatedPartition = wp.at(0);
+    entry =
+        updateSubsumptionTableEntrySinglePartition(entry, notRelatedPartition);
+  } else if (wp.size() == 3) {
     // The first Partition is the related to guard (which cannot be replaced)
     // The second Partition is the not related to guard
     ref<Expr> notRelatedPartition = wp.at(1);
     entry =
         updateSubsumptionTableEntrySinglePartition(entry, notRelatedPartition);
-  } else if (wp.size() == 2 || wp.size() == 4) {
+  } else if (wp.size() == 2) {
     // The first Partition is the related to guard (which can be replaced too)
     // The second Partition is the non-related to guard
     ref<Expr> relatedPartition = wp.at(0);
@@ -1281,8 +1287,8 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
         updateSubsumptionTableEntrySinglePartition(entry, notRelatedPartition);
   } else {
     llvm::errs() << "Number of partitions: " << wp.size() << "\n";
-    klee_error("TxWeakestPreCondition::updateSubsumptionTableEntry: other than "
-               "2 or 3 partition cases are not implemented yet!");
+    klee_error("TxWeakestPreCondition::updateSubsumptionTableEntry: More than "
+               "3 partitions are not supported yet!");
   }
   return entry;
 }
@@ -1314,15 +1320,16 @@ TxWeakestPreCondition::updateSubsumptionTableEntrySinglePartition(
         "TxWeakestPreCondition::updateSubsumptionTableEntry for this case "
         "is not implemented yet.");
   } else {
+    // TODO: Should partition first
     TxStore::TopInterpolantStore newConcretelyAddressedStore =
         updateConcretelyAddressedStore(concretelyAddressedStore, wp);
     entry->setConcretelyAddressedStore(newConcretelyAddressedStore);
-    ref<Expr> newInterpolant =
-        updateInterpolant(interpolant, replaceArrayWithShadow(wp));
-    std::set<const Array *> newExistentials =
-        updateExistentials(existentials, wp);
-    entry->setInterpolant(newInterpolant);
-    entry->setExistentials(newExistentials);
+    //    ref<Expr> newInterpolant =
+    //        updateInterpolant(interpolant, replaceArrayWithShadow(wp));
+    //    std::set<const Array *> newExistentials =
+    //        updateExistentials(existentials, wp);
+    //    entry->setInterpolant(newInterpolant);
+    //    entry->setExistentials(newExistentials);
   }
   if (debugSubsumptionLevel >= 4) {
     // For future reference
