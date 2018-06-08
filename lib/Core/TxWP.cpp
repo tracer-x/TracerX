@@ -993,6 +993,8 @@ std::vector<ref<Expr> > TxWeakestPreCondition::intersectExpr(
     TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore,
     TxStore::TopInterpolantStore concretelyAddressedStore,
     TxStore::TopInterpolantStore symbolicallyAddressedStore) {
+
+  // partition on w1 and w2
   std::vector<Partition> ps =
       TxPartitionHelper::get2Or3Partitions(branchCondition, expr1, expr2);
   std::vector<ref<Expr> > res;
@@ -1001,6 +1003,15 @@ std::vector<ref<Expr> > TxWeakestPreCondition::intersectExpr(
     ref<Expr> tmpExpr = TxPartitionHelper::createAnd((*it).exprs);
     res.push_back(tmpExpr);
   }
+
+  // partition on interpolant
+  std::vector<Partition> ps1 = TxPartitionHelper::partitionOnCond(
+			branchCondition, interpolant);
+
+  // partition on concretelyAddressedStore
+  std::vector<Partition> ps2 = TxPartitionHelper::partitionOnCond(
+  			branchCondition, interpolant);
+
   return res;
 }
 

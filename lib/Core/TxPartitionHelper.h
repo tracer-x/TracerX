@@ -18,7 +18,8 @@
 
 #include "klee/ExecutionState.h"
 #include "Memory.h"
-//#include <klee/Expr.h>
+#include "TxPathCondition.h"
+#include "TxStore.h"
 
 namespace klee {
 
@@ -32,13 +33,21 @@ class TxPartitionHelper {
 public:
   static void test(ExecutionState &state, ref<Expr> e);
   static void test1(ExecutionState &state);
+
   static Partition getNeededPartition(ConstraintManager constraints,
                                       ref<Expr> e);
   static std::vector<Partition> partition(ConstraintManager constraints);
   static std::vector<Partition> partition(std::vector<ref<Expr> > exprs);
-  static std::vector<Partition> getUnrelatedPartition(ref<Expr> cond, std::vector<ref<Expr> > exprs);
+  static std::vector<Partition> partition(ref<Expr> expr);
+
+  static std::vector<Partition> partitionOnCond(ref<Expr> cond, std::vector<ref<Expr> > exprs);
+  static std::vector<Partition> partitionOnCond(ref<Expr> cond, TxStore::TopInterpolantStore addressStore);
+  static std::vector<Partition> partitionOnCond(ref<Expr> cond, ref<Expr> expr);
+  static std::vector<Partition> partitionStoreOnCond(ref<Expr> cond, TxStore::TopInterpolantStore store);
   static std::vector<Partition> get2Or3Partitions(ref<Expr> cond, std::vector<ref<Expr> > exprs1, std::vector<ref<Expr> > exprs2);
+
   static ref<Expr> createAnd(std::vector<ref<Expr> > exprs);
+  static void getExprsFromAndExpr(ref<Expr> e, std::vector<ref<Expr> >& exprs);
 
   // printing functions
   static void printInfo(ExecutionState &state);

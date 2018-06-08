@@ -124,6 +124,15 @@ TxPartitionHelper::partition(ConstraintManager constraints) {
 }
 
 std::vector<Partition>
+TxPartitionHelper::partition(ref<Expr> expr) {
+  // collect sub-expression
+  std::vector<ref<Expr> > exprs;
+  getExprsFromAndExpr(expr, exprs);
+  return partition(exprs);
+}
+
+
+std::vector<Partition>
 TxPartitionHelper::partition(std::vector<ref<Expr> > exprs) {
   // empty partition
   std::vector<Partition> partitions;
@@ -159,20 +168,42 @@ TxPartitionHelper::partition(std::vector<ref<Expr> > exprs) {
   return partitions;
 }
 
-std::vector<Partition> TxPartitionHelper::getUnrelatedPartition(ref<Expr> cond,
-		std::vector<ref<Expr> > exprs) {
+std::vector<Partition> TxPartitionHelper::partitionOnCond(
+		ref<Expr> cond, std::vector<ref<Expr> > exprs) {
 	std::vector<Partition> partitions = partition(exprs);
 	std::set<std::string> condVars;
 	getExprVars(cond, condVars);
-	std::vector<Partition> unrelated;
+
+	Partition p1, p2; // p1 is unrelated, p2 is related
 	for (std::vector<Partition>::const_iterator it = partitions.begin(), ie =
 			partitions.end(); it != ie; ++it) {
-		Partition p = (*it);
-		if (!isShared(condVars, p.vars)) {
-			unrelated.push_back(p);
+		Partition tmp = (*it);
+		if (!isShared(condVars, tmp.vars)) {
+			// add all expression and vars in tmp to p1
+			p1.exprs.insert(p1.exprs.end(), tmp.exprs.begin(), tmp.exprs.end());
+			p1.vars.insert(tmp.vars.begin(), tmp.vars.end());
+		} else {
+			// add to p2
+			p2.exprs.insert(p2.exprs.end(), tmp.exprs.begin(), tmp.exprs.end());
+			p2.vars.insert(tmp.vars.begin(), tmp.vars.end());
 		}
 	}
-	return unrelated;
+	std::vector<Partition> res;
+	res.push_back(p1);
+	res.push_back(p2);
+	return res;
+}
+
+std::vector<Partition> TxPartitionHelper::partitionOnCond(ref<Expr> cond,
+		ref<Expr> expr) {
+	std::vector<ref<Expr> > exprs;
+	getExprsFromAndExpr(expr, exprs);
+	return partitionOnCond(cond, exprs);
+}
+
+std::vector<Partition> TxPartitionHelper::partitionStoreOnCond(ref<Expr> cond, TxStore::TopInterpolantStore store) {
+	std::vector<Partition> res;
+	return res;
 }
 
 /**
@@ -273,6 +304,16 @@ ref<Expr> TxPartitionHelper::createAnd(std::vector<ref<Expr> > exprs) {
     }
   }
   return result;
+}
+
+void TxPartitionHelper::getExprsFromAndExpr(ref<Expr> e,
+		std::vector<ref<Expr> >& exprs) {
+	if (e->getKind() == Expr::And) {
+		getExprsFromAndExpr(e->getKid(0), exprs);
+		getExprsFromAndExpr(e->getKid(1), exprs);
+	} else {
+		exprs.push_back(e);
+	}
 }
 
 bool TxPartitionHelper::isShared(std::set<std::string> ss1,

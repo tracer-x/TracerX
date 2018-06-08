@@ -37,13 +37,15 @@ public:
 
   class MiddleStateStore {
   private:
-    LowerStateStore concretelyAddressedStore;
+
 
     LowerStateStore symbolicallyAddressedStore;
 
     ref<TxAllocationInfo> allocInfo;
 
   public:
+    LowerStateStore concretelyAddressedStore;
+
     MiddleStateStore() {}
 
     MiddleStateStore(ref<TxAllocationInfo> _allocInfo)
