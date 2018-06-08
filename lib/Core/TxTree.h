@@ -521,7 +521,13 @@ public:
   /// expression. The WP expression is stored in a vector of expressions
   /// where the WP expression is the conjunction of the expressions in
   /// the vector
-  std::vector<ref<Expr> > getWPInterpolant();
+  /// The input arguments are needed to do partitioning on WP Expression
+  std::vector<ref<Expr> > getWPInterpolant(
+      ref<Expr> interpolant, std::set<const Array *> existentials,
+      TxStore::TopInterpolantStore concretelyAddressedStore,
+      TxStore::TopInterpolantStore symbolicallyAddressedStore,
+      TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
+      TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore);
 
   /// \return Return the weakest precondition object
   TxWeakestPreCondition *getWP() { return wp; }

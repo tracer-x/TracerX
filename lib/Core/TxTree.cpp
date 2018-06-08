@@ -56,13 +56,16 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
 
-  if (WPInterpolant)
-    wpInterpolant = node->getWPInterpolant();
-
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
       symbolicallyAddressedHistoricalStore);
+
+  if (WPInterpolant)
+    wpInterpolant = node->getWPInterpolant(
+        interpolant, existentials, concretelyAddressedStore,
+        symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
+        symbolicallyAddressedHistoricalStore);
 }
 
 TxSubsumptionTableEntry::~TxSubsumptionTableEntry() {}
@@ -2444,7 +2447,12 @@ ref<Expr> TxTreeNode::getInterpolant(
   return expr;
 }
 
-std::vector<ref<Expr> > TxTreeNode::getWPInterpolant() {
+std::vector<ref<Expr> > TxTreeNode::getWPInterpolant(
+    ref<Expr> interpolant, std::set<const Array *> existentials,
+    TxStore::TopInterpolantStore concretelyAddressedStore,
+    TxStore::TopInterpolantStore symbolicallyAddressedStore,
+    TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
+    TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore) {
   TimerStatIncrementer t(getWPInterpolantTime);
 
   std::vector<ref<Expr> > expr;
@@ -2462,7 +2470,9 @@ std::vector<ref<Expr> > TxTreeNode::getWPInterpolant() {
   } else {
     expr = wp->intersectExpr(
         branchCondition, childWPInterpolant[0], childWPInterpolant[1],
-        this->dependency->getPathCondition(), this->dependency->getStore());
+        interpolant, existentials, concretelyAddressedHistoricalStore,
+        symbolicallyAddressedHistoricalStore, concretelyAddressedStore,
+        symbolicallyAddressedStore);
 
     llvm::errs() << "WP size: " << expr.size() << "\n";
     // Setting the intersection of child nodes as the target in the current node
