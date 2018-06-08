@@ -123,11 +123,14 @@ public:
 
   /// \brief Perform the intersection of two weakest precondition expressions
   /// with respect to the branchCondition
-  std::vector<ref<Expr> > intersectExpr(ref<Expr> branchCondition,
-                                        std::vector<ref<Expr> > expr1,
-                                        std::vector<ref<Expr> > expr2,
-                                        TxPathCondition *pathCondition,
-                                        TxStore *store);
+  std::vector<ref<Expr> > intersectExpr(
+      ref<Expr> branchCondition, std::vector<ref<Expr> > expr1,
+      std::vector<ref<Expr> > expr2, ref<Expr> interpolant,
+      std::set<const Array *> existentials,
+      TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
+      TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore,
+      TxStore::TopInterpolantStore concretelyAddressedStore,
+      TxStore::TopInterpolantStore symbolicallyAddressedStore);
 
   std::vector<ref<Expr> > intersectExpr_aux(std::vector<ref<Expr> > expr1,
                                             std::vector<ref<Expr> > expr2);
