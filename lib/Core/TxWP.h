@@ -132,6 +132,8 @@ public:
       TxStore::TopInterpolantStore concretelyAddressedStore,
       TxStore::TopInterpolantStore symbolicallyAddressedStore);
 
+  std::map<std::string, ref<Expr> > extractExprs(TxStore::TopInterpolantStore concretelyAddressedStore);
+
   std::vector<ref<Expr> > intersectExpr_aux(std::vector<ref<Expr> > expr1,
                                             std::vector<ref<Expr> > expr2);
 

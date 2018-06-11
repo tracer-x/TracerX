@@ -1012,8 +1012,24 @@ std::vector<ref<Expr> > TxWeakestPreCondition::intersectExpr(
   std::vector<Partition> ps2 = TxPartitionHelper::partitionOnCond(
   			branchCondition, interpolant);
 
+  // generate partitions from miu
+
   return res;
 }
+
+std::map<std::string, ref<Expr> > TxWeakestPreCondition::extractExprs(TxStore::TopInterpolantStore concretelyAddressedStore) {
+	std::map<std::string, ref<Expr> > res;
+	for (TxStore::TopInterpolantStore::const_iterator topIs =
+			concretelyAddressedStore.begin(), topIe =
+			concretelyAddressedStore.end(), topIt = topIs; topIt != topIe;
+			++topIt) {
+		std::string var(topIt->first->getValue()->getName().data());
+		ref<Expr> value = topIt->second.begin()->second->expr;
+		res.insert(std::pair<std::string,ref<Expr> >(var, value));
+	}
+	return res;
+}
+
 
 /*std::vector<ref<Expr> >
 TxWeakestPreCondition::intersectExpr_aux(std::vector<ref<Expr> > expr1,

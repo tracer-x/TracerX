@@ -131,6 +131,13 @@ TxPartitionHelper::partition(ref<Expr> expr) {
   return partition(exprs);
 }
 
+std::vector<StorePartition>
+TxPartitionHelper::partitionStore(std::map<std::string, ref<Expr> >) {
+	std::vector<StorePartition> res;
+	// TODO:
+	return res;
+}
+
 
 std::vector<Partition>
 TxPartitionHelper::partition(std::vector<ref<Expr> > exprs) {
@@ -308,11 +315,13 @@ ref<Expr> TxPartitionHelper::createAnd(std::vector<ref<Expr> > exprs) {
 
 void TxPartitionHelper::getExprsFromAndExpr(ref<Expr> e,
 		std::vector<ref<Expr> >& exprs) {
-	if (e->getKind() == Expr::And) {
-		getExprsFromAndExpr(e->getKid(0), exprs);
-		getExprsFromAndExpr(e->getKid(1), exprs);
-	} else {
-		exprs.push_back(e);
+	if (!e.isNull()) {
+		if (e->getKind() == Expr::And) {
+			getExprsFromAndExpr(e->getKid(0), exprs);
+			getExprsFromAndExpr(e->getKid(1), exprs);
+		} else {
+			exprs.push_back(e);
+		}
 	}
 }
 

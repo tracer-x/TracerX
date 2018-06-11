@@ -29,6 +29,12 @@ public:
   std::set<std::string> vars;
 };
 
+class StorePartition {
+public:
+  std::vector<std::pair<std::string, ref<Expr> > > entries;
+  std::set<std::string> vars;
+};
+
 class TxPartitionHelper {
 public:
   static void test(ExecutionState &state, ref<Expr> e);
@@ -39,6 +45,7 @@ public:
   static std::vector<Partition> partition(ConstraintManager constraints);
   static std::vector<Partition> partition(std::vector<ref<Expr> > exprs);
   static std::vector<Partition> partition(ref<Expr> expr);
+  static std::vector<StorePartition> partitionStore(std::map<std::string, ref<Expr> > entries);
 
   static std::vector<Partition> partitionOnCond(ref<Expr> cond, std::vector<ref<Expr> > exprs);
   static std::vector<Partition> partitionOnCond(ref<Expr> cond, TxStore::TopInterpolantStore addressStore);
