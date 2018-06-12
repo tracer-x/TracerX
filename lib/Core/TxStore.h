@@ -19,6 +19,7 @@
 
 #include "klee/Internal/Module/TxValues.h"
 #include "klee/util/Ref.h"
+#include "TxPartitionHelper1.h"
 
 #include <map>
 

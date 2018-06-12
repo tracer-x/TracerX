@@ -22,6 +22,7 @@
 #include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ArrayCache.h>
 #include "TxPartitionHelper.h"
+#include "TxPartitionHelper1.h"
 #include "TxDependency.h"
 #include "TxTree.h"
 #include "TxWPHelper.h"

@@ -986,35 +986,31 @@ TxWeakestPreCondition::~TxWeakestPreCondition() {}
 //}
 
 std::vector<ref<Expr> > TxWeakestPreCondition::intersectExpr(
-    ref<Expr> branchCondition, std::vector<ref<Expr> > expr1,
-    std::vector<ref<Expr> > expr2, ref<Expr> interpolant,
-    std::set<const Array *> existentials,
-    TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
-    TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore,
-    TxStore::TopInterpolantStore concretelyAddressedStore,
-    TxStore::TopInterpolantStore symbolicallyAddressedStore) {
+		ref<Expr> branchCondition, std::vector<ref<Expr> > expr1,
+		std::vector<ref<Expr> > expr2, ref<Expr> interpolant,
+		std::set<const Array *> existentials,
+		TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
+		TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore,
+		TxStore::TopInterpolantStore concretelyAddressedStore,
+		TxStore::TopInterpolantStore symbolicallyAddressedStore) {
+	std::map<std::string, ref<Expr> > entries = extractExprs(
+			concretelyAddressedStore);
+	std::vector<ref<Expr> > pcs;
+	TxPartitionHelper1::getExprsFromAndExpr(interpolant, pcs);
+	std::vector<Partition1> partitions = TxPartitionHelper1::paritionOnCond(
+			branchCondition, expr1, expr2, pcs, entries);
 
-  // partition on w1 and w2
-  std::vector<Partition> ps =
-      TxPartitionHelper::get2Or3Partitions(branchCondition, expr1, expr2);
-  std::vector<ref<Expr> > res;
-  for (std::vector<Partition>::const_iterator it = ps.begin(), ie = ps.end();
-       it != ie; ++it) {
-    ref<Expr> tmpExpr = TxPartitionHelper::createAnd((*it).exprs);
-    res.push_back(tmpExpr);
-  }
+	llvm::outs() << "\n-------------\n";
+	llvm::errs() << "cond:";
+	branchCondition->dump();
+	for (unsigned int i = 0; i < partitions.size(); i++) {
+		partitions.at(i).print();
+	}
+	llvm::outs() << "\n-------------\n";
 
-  // partition on interpolant
-  std::vector<Partition> ps1 = TxPartitionHelper::partitionOnCond(
-			branchCondition, interpolant);
 
-  // partition on concretelyAddressedStore
-  std::vector<Partition> ps2 = TxPartitionHelper::partitionOnCond(
-  			branchCondition, interpolant);
-
-  // generate partitions from miu
-
-  return res;
+	std::vector<ref<Expr> > res;
+	return res;
 }
 
 std::map<std::string, ref<Expr> > TxWeakestPreCondition::extractExprs(TxStore::TopInterpolantStore concretelyAddressedStore) {
@@ -1024,7 +1020,7 @@ std::map<std::string, ref<Expr> > TxWeakestPreCondition::extractExprs(TxStore::T
 			concretelyAddressedStore.end(), topIt = topIs; topIt != topIe;
 			++topIt) {
 		std::string var(topIt->first->getValue()->getName().data());
-		ref<Expr> value = topIt->second.begin()->second->expr;
+		ref<Expr> value = topIt->second.begin()->second->getExpression();
 		res.insert(std::pair<std::string,ref<Expr> >(var, value));
 	}
 	return res;
