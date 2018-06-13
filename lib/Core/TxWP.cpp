@@ -1000,9 +1000,11 @@ std::vector<ref<Expr> > TxWeakestPreCondition::intersectExpr(
 	std::vector<Partition1> partitions = TxPartitionHelper1::paritionOnCond(
 			branchCondition, expr1, expr2, pcs, entries);
 
-	llvm::outs() << "\n-------------\n";
+
+	llvm::outs() << "\n------from upper intersectExpr-------\n";
 	llvm::errs() << "cond:";
 	branchCondition->dump();
+	llvm::errs() << "\npartitions size=" << partitions.size() << "\n";
 	for (unsigned int i = 0; i < partitions.size(); i++) {
 		partitions.at(i).print();
 	}
@@ -1010,6 +1012,68 @@ std::vector<ref<Expr> > TxWeakestPreCondition::intersectExpr(
 
 
 	std::vector<ref<Expr> > res;
+	// and non-related wp1r ^ wp2r
+	ref<Expr> and1 = TxPartitionHelper1::createAnd(partitions.at(0).wp1);
+	ref<Expr> and2 = TxPartitionHelper1::createAnd(partitions.at(0).wp2);
+	ref<Expr> nonrelated;
+	if (and1.isNull()) {
+		if (and2.isNull()) {
+			res.push_back(nonrelated);
+		} else {
+			res.push_back(and2);
+		}
+	} else {
+		if (and2.isNull()) {
+			res.push_back(and1);
+		} else {
+			res.push_back(AndExpr::create(and1, and2));
+		}
+	}
+
+	// merge related wp1b, wp2b
+	bool isWp1bTrue = true;
+	for (std::vector<ref<Expr> >::const_iterator it =
+			partitions.at(1).wp1.begin(), ie = partitions.at(1).wp1.end();
+			it != ie; ++it) {
+		if (True() != *it) {
+			isWp1bTrue = false;
+			break;
+		}
+	}
+	bool isWp2bTrue = true;
+	for (std::vector<ref<Expr> >::const_iterator it =
+			partitions.at(1).wp2.begin(), ie = partitions.at(1).wp2.end();
+			it != ie; ++it) {
+		if (True() != *it) {
+			isWp2bTrue = false;
+			break;
+		}
+	}
+
+	if (isWp1bTrue && isWp2bTrue) {
+		res.push_back(True());
+	} else if (isWp1bTrue && !isWp2bTrue) {
+		res.push_back(
+				AndExpr::create(
+						TxPartitionHelper1::createAnd(partitions.at(1).wp1),
+						NotExpr::create(branchCondition)));
+	} else if (!isWp1bTrue && isWp2bTrue) {
+		res.push_back(
+				AndExpr::create(
+						TxPartitionHelper1::createAnd(partitions.at(1).wp2),
+						branchCondition));
+	} else if (!isWp1bTrue && !isWp2bTrue) {
+		res.push_back(TxPartitionHelper1::createAnd(partitions.at(1).wp1));
+		res.push_back(TxPartitionHelper1::createAnd(partitions.at(1).wp2));
+	}
+
+	llvm::outs() << "\n-----from lower intersectExpr--------\n";
+	llvm::errs() << "Expression vector:\n Size=" << res.size() << "\n";
+	for (unsigned int i = 0; i < res.size(); i++) {
+		res.at(i)->dump();
+	}
+	llvm::outs() << "\n-------------\n";
+
 	return res;
 }
 

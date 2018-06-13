@@ -20,6 +20,7 @@
 #include "llvm/IR/Value.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include <iostream>
+#include <algorithm>
 
 namespace klee {
 

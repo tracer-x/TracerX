@@ -116,6 +116,10 @@ bool TxPartitionHelper1::isShared(std::set<std::string> ss1,
 }
 
 ref<Expr> TxPartitionHelper1::createAnd(std::vector<ref<Expr> > exprs) {
+	if (exprs.size() == 0) {
+		ref<Expr> res;
+		return res;
+	}
 	std::vector<ref<Expr> >::const_iterator it = exprs.begin();
 	ref<Expr> result = *(it);
 	std::advance(it, 1);
@@ -144,14 +148,16 @@ std::vector<Partition1> TxPartitionHelper1::partition(
 		std::vector<ref<Expr> > wp1, std::vector<ref<Expr> > wp2,
 		std::vector<ref<Expr> > pcs,
 		std::map<std::string, ref<Expr> > entries) {
+
 	std::vector<Partition1> partitions;
+
 	// process wp1
 	for (std::vector<ref<Expr> >::const_iterator it = wp1.begin(), ie =
 			wp1.end(); it != ie; ++it) {
 		std::set<std::string> eVars;
 		getExprVars(*it, eVars);
 
-		// find all partitions sharing variables
+		// collect all partitions that share variables
 		std::vector<int> idxs;
 		for (unsigned int i = 0; i < partitions.size(); i++) {
 			if (isShared(eVars, partitions.at(i).vars)) {
@@ -166,7 +172,7 @@ std::vector<Partition1> TxPartitionHelper1::partition(
 			partitions.push_back(p);
 
 		} else {
-			// combine sharing partitions and add current expression to the combined one
+			// combine sharing partitions to the last element and add current expression to the last
 			combine(partitions, idxs);
 			partitions.at(partitions.size() - 1).wp1.push_back(*it);
 			partitions.at(partitions.size() - 1).vars.insert(eVars.begin(),
@@ -263,19 +269,24 @@ std::vector<Partition1> TxPartitionHelper1::partition(
 
 void TxPartitionHelper1::combine(std::vector<Partition1>& partitions,
 		std::vector<int> indexs) {
-
-	Partition1 np;
-	for (unsigned int i = 0; i < indexs.size(); i++) {
-		Partition1 tmp = partitions.at(indexs.at(i));
-		np.wp1.insert(np.wp1.end(), tmp.wp1.begin(), tmp.wp1.end());
-		np.wp2.insert(np.wp2.end(), tmp.wp2.begin(), tmp.wp2.end());
-		np.pcs.insert(np.pcs.end(), tmp.pcs.begin(), tmp.pcs.end());
-		np.entries.insert(tmp.entries.begin(), tmp.entries.end());
-		np.vars.insert(tmp.vars.begin(), tmp.vars.end());
-		partitions.erase(partitions.begin() + indexs.at(i));
-
+	std::vector<Partition1> res;
+	Partition1 comb;
+	for (unsigned int i = 0; i < partitions.size(); i++) {
+		// partition not in indexes list then just copy to res
+		if (std::find(indexs.begin(), indexs.end(), i) == indexs.end()) {
+			res.push_back(partitions.at(i));
+		} else {
+			Partition1 tmp = partitions.at(i);
+			comb.wp1.insert(comb.wp1.end(), tmp.wp1.begin(), tmp.wp1.end());
+			comb.wp2.insert(comb.wp2.end(), tmp.wp2.begin(), tmp.wp2.end());
+			comb.pcs.insert(comb.pcs.end(), tmp.pcs.begin(), tmp.pcs.end());
+			comb.entries.insert(tmp.entries.begin(), tmp.entries.end());
+			comb.vars.insert(tmp.vars.begin(), tmp.vars.end());
+		}
 	}
-	partitions.push_back(np);
+	res.push_back(comb);
+	partitions.clear();
+	partitions = res;
 }
 
 std::vector<Partition1> TxPartitionHelper1::paritionOnCond(ref<Expr> cond,
@@ -283,20 +294,40 @@ std::vector<Partition1> TxPartitionHelper1::paritionOnCond(ref<Expr> cond,
 		std::vector<ref<Expr> > pcs,
 		std::map<std::string, ref<Expr> > entries) {
 	std::vector<Partition1> ps = partition(wp1, wp2, pcs, entries);
+//	llvm::outs() << "\nps size = " << ps.size() << "\n";
 	std::set<std::string> condVars;
 	getExprVars(cond, condVars);
 
-	// find sharing and independent partitions
-	std::vector<int> sharingIdxs;
+	// combine independent partitions to the last
 	std::vector<int> independentIdxs;
 	for (unsigned int i = 0; i < ps.size(); i++) {
-		if (isShared(condVars, ps.at(i).vars)) {
-			sharingIdxs.push_back(i);
-		} else {
+		if (!isShared(condVars, ps.at(i).vars)) {
 			independentIdxs.push_back(i);
 		}
 	}
-	combine(ps, independentIdxs);
-	combine(ps, sharingIdxs);
+	if (independentIdxs.size() == 0) {
+		Partition1 tmp;
+		ps.push_back(tmp);
+	} else {
+		combine(ps, independentIdxs);
+	}
+//	llvm::outs() << "\nps size after combining independent = " << ps.size()
+//			<< "\n";
+
+	// combine sharing partitions to the last
+	std::vector<int> sharingIdxs;
+	for (unsigned int i = 0; i < ps.size(); i++) {
+		if (isShared(condVars, ps.at(i).vars)) {
+			sharingIdxs.push_back(i);
+		}
+	}
+	if (sharingIdxs.size() == 0) {
+		Partition1 tmp;
+		ps.push_back(tmp);
+	} else {
+		combine(ps, sharingIdxs);
+	}
+//	llvm::outs() << "\nps size after combining sharing = " << ps.size() << "\n";
+
 	return ps;
 }
