@@ -2181,7 +2181,7 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO
         // VECTOR<EXPR>
         std::vector<ref<Expr> > WPExpr = entry->getWPInterpolant();
-        Solver::Validity result;
+//        Solver::Validity result;
         std::vector<ref<Expr> > unsatCore;
 
         ref<Expr> WPExprConjunction = node->wp->True();
@@ -2194,20 +2194,20 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
 
         // TODO: Is this needed? Can we remove this part?
-        bool success =
-            solver->evaluate(*state, WPExprConjunction, result, unsatCore);
-        if (success != true)
-          klee_error("TxTree::remove: Implication test failed");
-        if (result == Solver::True) {
-          continue;
-        } else {
-          klee_warning("TxTree::remove: Implication test unknown");
-          // If the result of implication is Solver::False and/or
-          // Solver::Unknown the chance that the WP interpolant
-          // improves the interpolant from the deletion algorithm
-          // is slim. As a result, in such cases the interpolant
-          // from deletion is not changed.
-        }
+//        bool success =
+//            solver->evaluate(*state, WPExprConjunction, result, unsatCore);
+//        if (success != true)
+//          klee_error("TxTree::remove: Implication test failed");
+//        if (result == Solver::True) {
+//          continue;
+//        } else {
+//          klee_warning("TxTree::remove: Implication test unknown");
+//          // If the result of implication is Solver::False and/or
+//          // Solver::Unknown the chance that the WP interpolant
+//          // improves the interpolant from the deletion algorithm
+//          // is slim. As a result, in such cases the interpolant
+//          // from deletion is not changed.
+//        }
       }
 
       TxSubsumptionTable::insert(node->getProgramPoint(),

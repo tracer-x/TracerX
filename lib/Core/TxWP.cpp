@@ -181,22 +181,22 @@ std::string TxWPArrayStore::getFunctionName(llvm::Value *i) {
     // klee_error("TxWeTxWeakestPreConditiongetFunctionName");
     return "Constant";
   } else {
-    //    i->dump();
+    i->dump();
     klee_error("TxWeakestPreCondition::getFunctionName LLVM Value is not an "
                "instruction");
   }
   llvm::BasicBlock *BB = inst->getParent();
   if (!BB) {
-    //    inst->dump();
+    inst->dump();
     klee_error("TxWeakestPreCondition::getFunctionName Basic Block is Null");
   }
   llvm::Function *func = BB->getParent();
   if (!func) {
-    //    BB->dump();
+    BB->dump();
     klee_error("TxWeakestPreCondition::getFunctionName Function is Null");
   }
   if (!func->hasName()) {
-    //    func->dump();
+    func->dump();
     klee_error("TxWeakestPreCondition::getFunctionName Function has no name");
   }
   return func->getName();
@@ -1001,10 +1001,10 @@ std::vector<ref<Expr> > TxWeakestPreCondition::intersectExpr(
 			branchCondition, expr1, expr2, pcs, entries);
 
 
-	llvm::outs() << "\n------from upper intersectExpr-------\n";
-	llvm::errs() << "cond:";
-	branchCondition->dump();
-	llvm::errs() << "\npartitions size=" << partitions.size() << "\n";
+	//llvm::outs() << "\n------from upper intersectExpr-------\n";
+	//llvm::errs() << "cond:";
+	//branchCondition->dump();
+	//llvm::errs() << "\npartitions size=" << partitions.size() << "\n";
 	for (unsigned int i = 0; i < partitions.size(); i++) {
 		partitions.at(i).print();
 	}
@@ -1067,12 +1067,12 @@ std::vector<ref<Expr> > TxWeakestPreCondition::intersectExpr(
 		res.push_back(TxPartitionHelper1::createAnd(partitions.at(1).wp2));
 	}
 
-	llvm::outs() << "\n-----from lower intersectExpr--------\n";
-	llvm::errs() << "Expression vector:\n Size=" << res.size() << "\n";
-	for (unsigned int i = 0; i < res.size(); i++) {
-		res.at(i)->dump();
-	}
-	llvm::outs() << "\n-------------\n";
+	//llvm::outs() << "\n-----from lower intersectExpr--------\n";
+	//llvm::errs() << "Expression vector:\n Size=" << res.size() << "\n";
+	//for (unsigned int i = 0; i < res.size(); i++) {
+	//	res.at(i)->dump();
+	//}
+	//llvm::outs() << "\n-------------\n";
 
 	return res;
 }
@@ -1870,10 +1870,10 @@ std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- create and expression from the condition and this->WPExpr
       ref<Expr> cond = getCondition(i);
-      //      llvm::outs() << "--- start 1 ---\n";
-      //      i->dump();
-      //      cond->dump();
-      //      llvm::outs() << "--- end 1 ---\n";
+      //llvm::outs() << "--- start 1 ---\n";
+      //i->dump();
+      //cond->dump();
+      //llvm::outs() << "--- end 1 ---\n";
       WPExprs.push_back(cond);
     } else if (flag == 2) {
       // 1- call getCondition on the cond argument of the branch instruction
@@ -1882,9 +1882,9 @@ std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
       //      llvm::outs() << "--- start 2 ---\n";
       //      getCondition(i)->dump();
       ref<Expr> negCond = NotExpr::create(getCondition(i));
-      //      i->dump();
-      //      negCond->dump();
-      //      llvm::outs() << "--- end 2 ---\n";
+      //i->dump();
+      //negCond->dump();
+      //llvm::outs() << "--- end 2 ---\n";
       WPExprs.push_back(negCond);
     } else if (i->getOpcode() == llvm::Instruction::Br) {
       llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(i);
@@ -1910,6 +1910,7 @@ std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
                                                          ie = WPExprs.rend();
          it != ie; ++it) {
       (*it)->dump();
+      klee_warning("next partition");
     }
   }
   klee_warning("End of printing the WP");
@@ -1928,7 +1929,9 @@ ref<Expr> TxWeakestPreCondition::getPrevExpr(ref<Expr> e,
     ref<Expr> right = this->generateExprFromOperand(i, 1);
     ref<Expr> result = EqExpr::create(right, left);
     ref<Expr> result1 = TxWPHelper::substituteExpr(e, result);
-    ret = TxWPHelper::simplifyWPExpr(TxWPHelper::substituteExpr(e, result));
+    // Turning off simplification for now
+    //ret = TxWPHelper::simplifyWPExpr(TxWPHelper::substituteExpr(e, result));
+    ret = result1;
     break;
   }
 
@@ -2052,7 +2055,6 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
                                                          int operand) {
   // Generating WP from Operand1
   ref<Expr> left;
-  // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO VECTOR<EXPR>
   llvm::Value *operand1 = i->getOperand(operand);
   if (isa<llvm::ConstantInt>(operand1)) {
     llvm::ConstantInt *CI = dyn_cast<llvm::ConstantInt>(operand1);
@@ -2142,11 +2144,53 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
           "not implemented...\n");
     }
     }
+  } else if (isa<llvm::CastInst>(operand1)) {
+    llvm::CastInst *op1 = dyn_cast<llvm::CastInst>(operand1);
+    ref<Expr> arg1 = generateExprFromOperand(op1, 0);
 
+    Expr::Width width = Expr::InvalidWidth;
+    if (op1->getDestTy()->isEmptyTy()) width = Expr::InvalidWidth;
+    else if (op1->getDestTy()->isIntegerTy(1)) width = Expr::Bool;
+    else if (op1->getDestTy()->isIntegerTy(8)) width = Expr::Int8;
+    else if (op1->getDestTy()->isHalfTy()) width = Expr::Int16;
+    else if (op1->getDestTy()->isIntegerTy()) width = Expr::Int32;
+    else if (op1->getDestTy()->isDoubleTy()) width = Expr::Int64;
+    else if (op1->getDestTy()->isFloatTy()) width = Expr::Fl80;
+
+    switch (op1->getOpcode()) {
+	case llvm::Instruction::SExt:{
+      left = SExtExpr::create(arg1,width);
+      break;
+    }
+
+    case llvm::Instruction::ZExt: {
+      left = ZExtExpr::create(arg1,width);
+      break;
+    }
+    case llvm::Instruction::AddrSpaceCast:
+    case llvm::Instruction::BitCast:
+    case llvm::Instruction::FPExt:
+    case llvm::Instruction::FPToSI:
+    case llvm::Instruction::FPToUI:
+    case llvm::Instruction::FPTrunc:
+    case llvm::Instruction::IntToPtr:
+    case llvm::Instruction::PtrToInt:
+    case llvm::Instruction::SIToFP:
+    case llvm::Instruction::Trunc:
+    case llvm::Instruction::UIToFP:
+    default: {
+      klee_error(
+      "TxWeakestPreCondition::generateExprFromOperand Unary Operand "
+      "not implemented...\n");
+    }
+    }
+  } else if (isa<llvm::AllocaInst>(operand1)) {
+    left = dependency->getAddress(operand1, &TxWPArrayStore::ac,
+                                  TxWPArrayStore::array, this);
   } else {
-    //    klee_error("TxWeakestPreCondition::generateExprFromOperand Remaining
-    // cases"
-    //               "not implemented...\n");
+	operand1->dump();
+    klee_error("TxWeakestPreCondition::generateExprFromOperand Remaining"
+    " cases not implemented yet\n");
     left = dependency->getAddress(operand1, &TxWPArrayStore::ac,
                                   TxWPArrayStore::array, this);
   }
