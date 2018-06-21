@@ -192,7 +192,10 @@ public:
   ref<Expr> getPrevExpr(ref<Expr> e, llvm::Instruction *i);
 
 private:
-  ref<Expr> getCondition(llvm::Instruction *ins);
+  ref<Expr> getBrCondition(llvm::Instruction *ins);
+  ref<Expr> getCondition(llvm::Value *value);
+  ref<Expr> getCmpCondition(llvm::CmpInst *cmp);
+  ref<Expr> getBinCondition(llvm::CmpInst *cmp);
 };
 }
 #endif /* TXWP_H_ */

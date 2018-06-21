@@ -1869,11 +1869,11 @@ std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
     if (flag == 1) {
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- create and expression from the condition and this->WPExpr
-      ref<Expr> cond = getCondition(i);
-      //llvm::outs() << "--- start 1 ---\n";
-      //i->dump();
-      //cond->dump();
-      //llvm::outs() << "--- end 1 ---\n";
+//      llvm::outs() << "--- start 1 ---\n";
+      ref<Expr> cond = getBrCondition(i);
+//      i->dump();
+//      cond->dump();
+//      llvm::outs() << "--- end 1 ---\n";
       WPExprs.push_back(cond);
     } else if (flag == 2) {
       // 1- call getCondition on the cond argument of the branch instruction
@@ -1881,7 +1881,7 @@ std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
       // 3- create and expression from the condition and this->WPExpr
       //      llvm::outs() << "--- start 2 ---\n";
       //      getCondition(i)->dump();
-      ref<Expr> negCond = NotExpr::create(getCondition(i));
+      ref<Expr> negCond = NotExpr::create(getBrCondition(i));
       //i->dump();
       //negCond->dump();
       //llvm::outs() << "--- end 2 ---\n";
@@ -1889,7 +1889,7 @@ std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
     } else if (i->getOpcode() == llvm::Instruction::Br) {
       llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(i);
       if (br->isConditional()) {
-        ref<Expr> cond = getCondition(i);
+        ref<Expr> cond = getBrCondition(i);
         node->setBranchCondition(cond);
       }
     } else if (i->getOpcode() == llvm::Instruction::Store) {
@@ -1945,111 +1945,143 @@ ref<Expr> TxWeakestPreCondition::getPrevExpr(ref<Expr> e,
   return ret;
 }
 
-ref<Expr> TxWeakestPreCondition::getCondition(llvm::Instruction *ins) {
-  if (!llvm::isa<llvm::BranchInst>(ins))
-    return True();
-
-  llvm::BranchInst *br = llvm::dyn_cast<llvm::BranchInst>(ins);
-
-  if (!llvm::isa<llvm::CmpInst>(br->getCondition()))
-    return True();
-
-  llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(br->getCondition());
-
-  // Getting the expressions from the left and right operand
-  ref<Expr> left = this->generateExprFromOperand(cmp, 0);
-  ref<Expr> right = this->generateExprFromOperand(cmp, 1);
-  ref<Expr> result;
-  // second step is to Storing the updated WP expression
-  switch (cmp->getPredicate()) {
-  case llvm::CmpInst::ICMP_EQ:
-    result = EqExpr::create(left, right);
-    break;
-  case llvm::CmpInst::ICMP_NE:
-    result = NeExpr::create(left, right);
-    break;
-  case llvm::CmpInst::ICMP_UGT:
-    result = UgtExpr::create(left, right);
-    break;
-  case llvm::CmpInst::ICMP_UGE:
-    result = UgeExpr::create(left, right);
-    break;
-  case llvm::CmpInst::ICMP_ULT:
-    result = UltExpr::create(left, right);
-    break;
-  case llvm::CmpInst::ICMP_ULE:
-    result = UleExpr::create(left, right);
-    break;
-  case llvm::CmpInst::ICMP_SGT:
-    result = SgtExpr::create(left, right);
-    break;
-  case llvm::CmpInst::ICMP_SGE:
-    result = SgeExpr::create(left, right);
-    break;
-  case llvm::CmpInst::ICMP_SLT:
-    result = SltExpr::create(left, right);
-    break;
-  case llvm::CmpInst::ICMP_SLE:
-    result = SleExpr::create(left, right);
-    break;
-  // todo Handle Floating Point
-  case llvm::CmpInst::FCMP_FALSE:
-    klee_error("FCMP_FALSE not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_OEQ:
-    klee_error("FCMP_OEQ not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_OGT:
-    klee_error("FCMP_OGT not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_OGE:
-    klee_error("FCMP_OGE not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_OLT:
-    klee_error("FCMP_OLT not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_OLE:
-    klee_error("FCMP_OLE not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_ONE:
-    klee_error("FCMP_ONE not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_ORD:
-    klee_error("FCMP_ORD not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_UNO:
-    klee_error("FCMP_UNO not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_UEQ:
-    klee_error("FCMP_UEQ not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_UGT:
-    klee_error("FCMP_UGT not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_UGE:
-    klee_error("FCMP_UGE not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_ULT:
-    klee_error("FCMP_ULT not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_ULE:
-    klee_error("FCMP_ULE not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_UNE:
-    klee_error("FCMP_UNE not implemented yet!");
-    break;
-  case llvm::CmpInst::FCMP_TRUE:
-    klee_error("FCMP_TRUE not implemented yet!");
-    break;
-  case llvm::CmpInst::BAD_FCMP_PREDICATE:
-    klee_error("BAD_FCMP_PREDICATE not implemented yet!");
-    break;
-  case llvm::CmpInst::BAD_ICMP_PREDICATE:
-    klee_error("BAD_ICMP_PREDICATE not implemented yet!");
-    break;
-  }
-  return result;
+ref<Expr> TxWeakestPreCondition::getBrCondition(llvm::Instruction *ins) {
+	if (!llvm::isa<llvm::BranchInst>(ins)) {
+		klee_error(
+				"TxWeakestPreCondition::getBrCondition: not a Branch instruction!");
+		return True();
+	}
+	llvm::BranchInst *br = llvm::dyn_cast<llvm::BranchInst>(ins);
+	return getCondition(br->getCondition());
 }
+
+ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
+	ref<Expr> result;
+	if (llvm::isa<llvm::CmpInst>(value)) {
+		llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(value);
+		result = getCmpCondition(cmp);
+	} else if (llvm::isa<llvm::BinaryOperator>(value)) {
+		llvm::Instruction *binOp = dyn_cast<llvm::Instruction>(value);
+		ref<Expr> left = this->generateExprFromOperand(binOp, 0);
+		ref<Expr> right = this->generateExprFromOperand(binOp, 1);
+		switch (binOp->getOpcode()) {
+		case llvm::Instruction::And: {
+			result = AndExpr::create(left, right);
+			break;
+		}
+		case llvm::Instruction::Or: {
+			result = OrExpr::create(left, right);
+			break;
+		}
+		default:
+			klee_error(
+					"TxWeakestPreCondition::getCondition: Binary operator is not implemented yet!");
+		}
+	} else {
+		klee_error(
+				"TxWeakestPreCondition::getCondition: Binary operator is not implemented yet!");
+	}
+	return result;
+}
+
+ref<Expr> TxWeakestPreCondition::getCmpCondition(llvm::CmpInst *cmp) {
+	// Getting the expressions from the left and right operand
+	  ref<Expr> left = this->generateExprFromOperand(cmp, 0);
+	  ref<Expr> right = this->generateExprFromOperand(cmp, 1);
+	  ref<Expr> result;
+	  // second step is to Storing the updated WP expression
+	  switch (cmp->getPredicate()) {
+	  case llvm::CmpInst::ICMP_EQ:
+	    result = EqExpr::create(left, right);
+	    break;
+	  case llvm::CmpInst::ICMP_NE:
+	    result = NeExpr::create(left, right);
+	    break;
+	  case llvm::CmpInst::ICMP_UGT:
+	    result = UgtExpr::create(left, right);
+	    break;
+	  case llvm::CmpInst::ICMP_UGE:
+	    result = UgeExpr::create(left, right);
+	    break;
+	  case llvm::CmpInst::ICMP_ULT:
+	    result = UltExpr::create(left, right);
+	    break;
+	  case llvm::CmpInst::ICMP_ULE:
+	    result = UleExpr::create(left, right);
+	    break;
+	  case llvm::CmpInst::ICMP_SGT:
+	    result = SgtExpr::create(left, right);
+	    break;
+	  case llvm::CmpInst::ICMP_SGE:
+	    result = SgeExpr::create(left, right);
+	    break;
+	  case llvm::CmpInst::ICMP_SLT:
+	    result = SltExpr::create(left, right);
+	    break;
+	  case llvm::CmpInst::ICMP_SLE:
+	    result = SleExpr::create(left, right);
+	    break;
+	  // todo Handle Floating Point
+	  case llvm::CmpInst::FCMP_FALSE:
+	    klee_error("FCMP_FALSE not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_OEQ:
+	    klee_error("FCMP_OEQ not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_OGT:
+	    klee_error("FCMP_OGT not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_OGE:
+	    klee_error("FCMP_OGE not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_OLT:
+	    klee_error("FCMP_OLT not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_OLE:
+	    klee_error("FCMP_OLE not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_ONE:
+	    klee_error("FCMP_ONE not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_ORD:
+	    klee_error("FCMP_ORD not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_UNO:
+	    klee_error("FCMP_UNO not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_UEQ:
+	    klee_error("FCMP_UEQ not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_UGT:
+	    klee_error("FCMP_UGT not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_UGE:
+	    klee_error("FCMP_UGE not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_ULT:
+	    klee_error("FCMP_ULT not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_ULE:
+	    klee_error("FCMP_ULE not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_UNE:
+	    klee_error("FCMP_UNE not implemented yet!");
+	    break;
+	  case llvm::CmpInst::FCMP_TRUE:
+	    klee_error("FCMP_TRUE not implemented yet!");
+	    break;
+	  case llvm::CmpInst::BAD_FCMP_PREDICATE:
+	    klee_error("BAD_FCMP_PREDICATE not implemented yet!");
+	    break;
+	  case llvm::CmpInst::BAD_ICMP_PREDICATE:
+	    klee_error("BAD_ICMP_PREDICATE not implemented yet!");
+	    break;
+	  }
+	  return result;
+}
+
+
+
 
 ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
                                                          int operand) {
@@ -2187,7 +2219,11 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
   } else if (isa<llvm::AllocaInst>(operand1)) {
     left = dependency->getAddress(operand1, &TxWPArrayStore::ac,
                                   TxWPArrayStore::array, this);
-  } else {
+  } else if (llvm::isa<llvm::CmpInst>(operand1)) {
+    llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(operand1);
+    left = getCmpCondition(cmp);
+  }
+  else {
 	operand1->dump();
     klee_error("TxWeakestPreCondition::generateExprFromOperand Remaining"
     " cases not implemented yet\n");
