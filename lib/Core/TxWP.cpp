@@ -1859,6 +1859,18 @@ TxWeakestPreCondition::updateExistentials(std::set<const Array *> existentials,
 std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
 
+	llvm::outs() << "--- Begin printing instruction list ---\n";
+	for (std::vector<std::pair<KInstruction *, int> >::const_iterator it =
+			reverseInstructionList.begin(), ie = reverseInstructionList.end();
+			it != ie; ++it) {
+		llvm::Instruction *i = (*it).first->inst;
+		int flag = (*it).second;
+		// instruction list
+		i->dump();
+		llvm::outs() << flag << "\n";
+	}
+	llvm::outs() << "--- End of printing instruction list ---\n";
+
   for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
