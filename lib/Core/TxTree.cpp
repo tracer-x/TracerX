@@ -2166,8 +2166,6 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 
       TxSubsumptionTableEntry *entry =
           new TxSubsumptionTableEntry(node, node->entryCallHistory);
-      TxSubsumptionTable::insert(node->getProgramPoint(),
-                                 node->entryCallHistory, entry);
 
       if (WPInterpolant) {
         ref<Expr> WPExpr = entry->getWPInterpolant();
