@@ -796,7 +796,7 @@ public:
          std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
              _globalAddresses);
 
-  ~TxTree() { TxSubsumptionTable::clear(); }
+  ~TxTree() {} // TxSubsumptionTable::clear(); }
 
   /// \brief Set the reference to the KLEE state in the current interpolation
   /// data holder (Tracer-X tree node) that is currently being processed.

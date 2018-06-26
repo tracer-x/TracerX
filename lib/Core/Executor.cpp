@@ -2901,12 +2901,12 @@ void Executor::bindModuleConstants() {
     for (unsigned i=0; i<kf->numInstructions; ++i)
       bindInstructionConstants(kf->instructions[i]);
   }
-
   kmodule->constantTable = new Cell[kmodule->constants.size()];
   for (unsigned i=0; i<kmodule->constants.size(); ++i) {
     Cell &c = kmodule->constantTable[i];
     c.value = evalConstant(kmodule->constants[i]);
   }
+  return;
 }
 
 void Executor::checkMemoryUsage() {
@@ -2970,7 +2970,7 @@ void Executor::run(ExecutionState &initialState) {
 
   if (usingSeeds) {
     std::vector<SeedInfo> &v = seedMap[&initialState];
-    
+
     for (std::vector<KTest*>::const_iterator it = usingSeeds->begin(), 
            ie = usingSeeds->end(); it != ie; ++it)
       v.push_back(SeedInfo(*it));
@@ -4072,6 +4072,124 @@ void Executor::runFunctionAsMain(Function *f,
 
   if (statsTracker)
     statsTracker->done();
+
+  int i = 0;
+
+  while (i++ < 10) {
+    llvm::errs() << "Run: " << i << "\n";
+
+    argvMO = 0;
+
+    // In order to make uclibc happy and be closer to what the system is
+    // doing we lay out the environments at the end of the argv array
+    // (both are terminated by a null). There is also a final terminating
+    // null that uclibc seems to expect, possibly the ELF header?
+
+    for (envc = 0; envp[envc]; ++envc)
+      ;
+    NumPtrBytes = Context::get().getPointerWidth() / 8;
+    kf = kmodule->functionMap[f];
+    assert(kf);
+    ai = f->arg_begin(), ae = f->arg_end();
+    if (ai != ae) {
+      arguments.push_back(ConstantExpr::alloc(argc, Expr::Int32));
+
+      if (++ai != ae) {
+        argvMO = memory->allocate((argc + 1 + envc + 1 + 1) * NumPtrBytes,
+                                  false, true, f->begin()->begin());
+
+        if (!argvMO)
+          klee_error("Could not allocate memory for function arguments");
+
+        arguments.push_back(argvMO->getBaseExpr());
+
+        if (++ai != ae) {
+          uint64_t envp_start = argvMO->address + (argc + 1) * NumPtrBytes;
+          arguments.push_back(Expr::createPointer(envp_start));
+
+          if (++ai != ae)
+            klee_error("invalid main function (expect 0-3 arguments)");
+        }
+      }
+    }
+    state = new ExecutionState(kmodule->functionMap[f]);
+
+    if (pathWriter)
+      state->pathOS = pathWriter->open();
+    if (symPathWriter)
+      state->symPathOS = symPathWriter->open();
+
+    if (statsTracker)
+      statsTracker->framePushed(*state, 0);
+    // assert(arguments.size() == f->arg_size() && "wrong number of arguments");
+    // for (unsigned i = 0, e = f->arg_size(); i != e; ++i)
+    //  bindArgument(kf, i, *state, arguments[i]);
+
+    if (argvMO) {
+      ObjectState *argvOS = bindObjectInState(*state, argvMO, false);
+
+      for (int i = 0; i < argc + 1 + envc + 1 + 1; i++) {
+        if (i == argc || i >= argc + 1 + envc) {
+          // Write NULL pointer
+          argvOS->write(i * NumPtrBytes, Expr::createPointer(0));
+        } else {
+          char *s = i < argc ? argv[i] : envp[i - (argc + 1)];
+          int j, len = strlen(s);
+
+          MemoryObject *arg =
+              memory->allocate(len + 1, false, true, state->pc->inst);
+          if (!arg)
+            klee_error("Could not allocate memory for function arguments");
+          ObjectState *os = bindObjectInState(*state, arg, false);
+          for (j = 0; j < len + 1; j++)
+            os->write8(j, s[j]);
+
+          // Write pointer to newly allocated and initialised argv/envp c-string
+          argvOS->write(i * NumPtrBytes, arg->getBaseExpr());
+        }
+      }
+    }
+
+    initializeGlobals(*state);
+
+    processTree = new PTree(state);
+    state->ptreeNode = processTree->root;
+
+    if (INTERPOLATION_ENABLED) {
+      txTree = new TxTree(state, kmodule->targetData, &globalAddresses);
+      state->txTreeNode = txTree->root;
+      TxTreeGraph::initialize(txTree->root);
+    }
+
+    run(*state);
+
+    delete processTree;
+    processTree = 0;
+
+    if (INTERPOLATION_ENABLED) {
+      // TxTreeGraph::save(interpreterHandler->getOutputFilename("tree.dot"));
+      // TxTreeGraph::deallocate();
+
+      delete txTree;
+      txTree = 0;
+
+#ifdef ENABLE_Z3
+      // Print interpolation time statistics
+      interpreterHandler->assignSubsumptionStats(
+          TxTree::getInterpolationStat());
+#endif
+    }
+
+    // hack to clear memory objects
+    delete memory;
+    memory = new MemoryManager(NULL);
+
+    globalObjects.clear();
+    globalAddresses.clear();
+
+    if (statsTracker)
+      statsTracker->done();
+  }
 }
 
 unsigned Executor::getPathStreamID(const ExecutionState &state) {
