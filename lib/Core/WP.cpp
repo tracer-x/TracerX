@@ -682,8 +682,19 @@ void WeakestPreCondition::updateWPExpr(ref<Expr> result) {
   if (WPExpr == eb->False()) {
     WPExpr = result;
   } else {
+	 klee_warning("sajjad5");
     this->substituteExpr(result);
-    this->simplifyWPExpr();
+    klee_warning("sajjad6");
+    WPExpr->dump();
+    std::map<ref<Expr>, uint64_t> *linearTerm = new std::map<ref<Expr>, uint64_t>;
+    // sign = 1 means positive
+    // sign = -1 means negative
+    int sign = 1;
+    std::map<ref<Expr>, uint64_t> *newLinearTerm = this->simplifyWPExpr(WPExpr,newLinearTerm,1);
+    klee_error("sajjad7");
+    WPExpr->dump();
+    klee_warning("sajjad7.1");
+
   }
 }
 
@@ -783,9 +794,47 @@ ref<Expr> WeakestPreCondition::substituteExpr(ref<Expr> base,
   return base;
 }
 
-void WeakestPreCondition::simplifyWPExpr() {
+std::map<ref<Expr>, uint64_t>* WeakestPreCondition::simplifyWPExpr(ref<Expr> wpExpr,std::map<ref<Expr>, uint64_t> *newLinearTerm, int sign) {
 
   switch (WPExpr->getKind()) {
+  case Expr::Constant:{
+    ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(wpExpr);
+    insertTerm(newLinearTerm, sign * constant->getZExtValue(), WPArrayStore::constValues);
+    return newLinearTerm;
+	break;
+  }
+  case Expr::Concat:
+  case Expr::Read: {
+    insertTerm(newLinearTerm, sign, wpExpr);
+    return newLinearTerm;
+    break;
+  }
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:{
+	ref<Expr> kids[2];
+	kids[0] = WPExpr->getKid(0);
+	kids[1] = WPExpr->getKid(1);
+	if(isa<ConstantExpr>(kids[0])){
+		ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[0]);
+	    insertTerm(newLinearTerm, sign * constant->getZExtValue(), kids[1]);
+	    return newLinearTerm;
+	}else
+		klee_error("WeakestPreCondition::simplifyWPExpr Coeff is not constant!");
+	break;
+  }
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::URem:
+  case Expr::SRem: {
+    ref<Expr> kids[2];
+    kids[0] = WPExpr->getKid(0);
+    kids[1] = WPExpr->getKid(1);
+    newLinearTerm = simplifyWPExpr(kids[0],newLinearTerm,sign);
+    newLinearTerm = simplifyWPExpr(kids[1],newLinearTerm,sign);
+    return newLinearTerm;
+  }
+
   case Expr::Eq:
   case Expr::Ne:
   case Expr::Ult:
@@ -799,31 +848,58 @@ void WeakestPreCondition::simplifyWPExpr() {
     ref<Expr> kids[2];
     kids[0] = WPExpr->getKid(0);
     kids[1] = WPExpr->getKid(1);
-    std::map<ref<Expr>, uint64_t> *newLinearTerm =
-        new std::map<ref<Expr>, uint64_t>;
-    if (isa<ConstantExpr>(kids[1])) {
-      ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[1]);
+    newLinearTerm = simplifyWPExpr(kids[0],newLinearTerm,sign);
+    newLinearTerm = simplifyWPExpr(kids[1],newLinearTerm,-1*sign);
+    return newLinearTerm;
+
+
+   /*for(int i=0;i<WPExpr->getNumKids();i++){
+	   if (isa<ConstantExpr>(kids[i])) {
+	         ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[i]);
+//	         insertTerm(newLinearTerm, constant->getZExtValue(),WPArrayStore::constValues);
+	   } else if (isa<ReadExpr>(kids[i]) || isa<ConcatExpr>(kids[i])){
+//		     newLinearTerm = this->simplifyWPTerm(newLinearTerm, kids[i]);
+	   } else if (isa<AddExpr>(kids[i]) || isa<SubExpr>(kids[i]) ||
+			   	  isa<MulExpr>(kids[i]) || isa<UDivExpr>(kids[i]) ||
+				  isa<SDivExpr>(kids[i]) || isa<URemExpr>(kids[i]) ||
+				  isa<SRemExpr>(kids[i]) || isa<AndExpr>(kids[i]) ||
+				  isa<OrExpr>(kids[i]) || isa<XorExpr>(kids[i]) ||
+				  isa<ShlExpr>(kids[i]) || isa<LShrExpr>(kids[i]) ||
+				  isa<AShrExpr>(kids[i])){
+
+	   } else {
+		   kids[i]->dump();
+		   klee_error("WeakestPreCondition::simplifyWPExpr expression type not simplifiable yet!");
+	   }
+
+   }*/
+
+    /*if (isa<ConstantExpr>(kids[0])) {
+      ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[0]);
       insertTerm(newLinearTerm, constant->getZExtValue(),
                  WPArrayStore::constValues);
+    } else if (isa<ConstantExpr>(kids[1])){
+        ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[1]);
+        insertTerm(newLinearTerm, constant->getZExtValue(),
+                   WPArrayStore::constValues);
     } else {
       newLinearTerm = this->simplifyWPTerm(newLinearTerm, kids[1]);
     }
+    klee_warning("sajjad11");
+
     newLinearTerm = this->simplifyWPTerm(newLinearTerm, kids[0]);
+    klee_warning("sajjad12");
+
     convertToExpr(newLinearTerm);
 
-    delete newLinearTerm;
-    break;
-  }
-  case Expr::Constant: {
-    // Do nothing. The expression is in the form of True or False
+    delete newLinearTerm;*/
     break;
   }
 
   default: {
     klee_message("Error while parsing WP Expression:");
     WPExpr->dump();
-    klee_error("All WP Expressions should be in the form LinearTerm CMP "
-               "Constant. Ex. X + 2Y < 5");
+    klee_error("Expression type  can not be simplified!");
   }
   }
 }
@@ -894,9 +970,26 @@ void WeakestPreCondition::convertToExpr(
            it = newLinearTerm->begin(),
            ie = newLinearTerm->end();
        it != ie; ++it) {
+	klee_warning("sajjad13");
+	it->first->dump();
+	klee_warning("sajjad14");
+	llvm::errs() <<it->second << "\n";
+	klee_warning("sajjad15");
+  }
+  for (std::map<ref<Expr>, uint64_t>::const_iterator
+           it = newLinearTerm->begin(),
+           ie = newLinearTerm->end();
+       it != ie; ++it) {
+	klee_warning("sajjad13");
+	it->first->dump();
+	klee_warning("sajjad14");
+	llvm::errs() <<it->second << "\n";
+	klee_warning("sajjad15");
     if (it->first == WPArrayStore::constValues) {
+      klee_warning("sajjad16");
       kids[1] = ConstantExpr::create(it->second, Expr::Int32);
     } else {
+      klee_warning("sajjad17");
       ref<Expr> lhs;
       if (it->second == 1) {
         lhs = it->first;
@@ -912,7 +1005,15 @@ void WeakestPreCondition::convertToExpr(
     }
   }
   kids[0] = temp;
+  if (kids[1].isNull())
+	  kids[1] = ConstantExpr::create(0, Expr::Int32);
+  klee_warning("sajjad");
+  WPExpr->dump();
+  klee_warning("sajjad1");
   WPExpr = WPExpr->rebuild(kids);
+  klee_warning("sajjad2");
+  WPExpr->dump();
+  klee_warning("sajjad3");
 }
 
 ref<Expr> WeakestPreCondition::instantiateWPExpression(
@@ -1012,6 +1113,11 @@ ref<Expr> WeakestPreCondition::instantiateWPExpression(
 
 
 ref<Expr> WeakestPreCondition::intersectExpr(ref<Expr> expr1,ref<Expr> expr2){
+
+  return AndExpr::create(expr1,expr2);
+
+  expr1->dump();
+  expr2->dump();
   if(expr1->getKind() == Expr::Sle && expr2->getKind() == Expr::Sle) {
 	  if (expr1->getKid(0) == expr2->getKid(0)){
 		  ref<Expr> kids[2];
@@ -1162,10 +1268,18 @@ WeakestPreCondition::updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry,
       entry->getSymbolicallyAddressedStore();
   std::set<const Array *> existentials = entry->getExistentials();
 
-  if (concretelyAddressedStore.size() == 0)
-    klee_error("WeakestPreCondition::updateSubsumptionTableEntry for this case "
+  if (concretelyAddressedStore.size() == 0 ){
+	if (concretelyAddressedHistoricalStore.size()== 0 &&
+		symbolicallyAddressedHistoricalStore.size()== 0 &&
+		symbolicallyAddressedStore.size()== 0){
+		//empty interpolant
+		return entry;
+	}else{
+	  wp->dump();
+      klee_error("WeakestPreCondition::updateSubsumptionTableEntry for this case "
                "is not implemented yet.");
-  else {
+	}
+  }else {
     // TODO: Assuming WP is one frame
     TxStore::TopInterpolantStore newConcretelyAddressedStore =
         updateConcretelyAddressedStore(concretelyAddressedStore, wp);

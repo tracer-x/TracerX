@@ -3027,7 +3027,6 @@ void Executor::run(ExecutionState &initialState) {
         }
       }
     }
-
     klee_message("seeding done (%d states remain)", (int) states.size());
 
     // XXX total hack, just because I like non uniform better but want
@@ -4037,6 +4036,27 @@ void Executor::runFunctionAsMain(Function *f,
   
   initializeGlobals(*state);
 
+  /*for (std::map<const llvm::GlobalValue*, MemoryObject* >::iterator i = globalObjects.begin(),
+		  ie = globalObjects.end(); i != ie; ++i) {
+	  klee_warning("sajjad");
+	  const llvm::GlobalValue* g = ((*i).first);
+	  if (g->getName() == "B"){
+		  g->dump();
+		  MemoryObject* mo = ((*i).second);
+	      const ObjectState *os = state->addressSpace.findObject(mo);
+	      klee_warning("sajjad1");
+	      ref<Expr> B = ConstantExpr::create(5, Expr::Int32);
+	      ObjectState *wos = state->addressSpace.getWriteable(mo,os);
+          wos->write(0,B);
+	      llvm::errs() << os->read(0,32) << "\n";
+	      llvm::errs() << wos->read(0,32) << "\n";
+		  klee_warning("sajjad2");
+	  }
+  }*/
+
+
+
+
   processTree = new PTree(state);
   state->ptreeNode = processTree->root;
 
@@ -4072,6 +4092,16 @@ void Executor::runFunctionAsMain(Function *f,
 
   if (statsTracker)
     statsTracker->done();
+
+
+
+
+
+
+
+
+
+
 
   int i = 0;
 

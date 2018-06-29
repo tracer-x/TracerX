@@ -116,7 +116,7 @@ public:
                            const ref<Expr> rhs);
 
   // \brief Convert the weakest precondition expression to canonical form
-  void simplifyWPExpr();
+  std::map<ref<Expr>, uint64_t>* simplifyWPExpr(ref<Expr> WPExpr,std::map<ref<Expr>, uint64_t> *newLinearTerm, int sign);
 
   // \brief Simplify terms in the weakest precondition expression to canonical
   // form

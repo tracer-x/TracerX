@@ -190,10 +190,9 @@ ref<Expr> TxDependency::getPointerAddress(llvm::ConstantExpr *gep, ArrayCache *a
 
 ref<Expr> TxDependency::getLatestValueOfAddress(
     llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory) {
-    
+
   bool allowInconsistency = true;
   ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
-
   ref<TxStateValue> addressValue =
       this->getLatestValue(value, callHistory, dummy, allowInconsistency);
 
@@ -201,10 +200,48 @@ ref<Expr> TxDependency::getLatestValueOfAddress(
     return dummy;
   ref<TxStateAddress> address = addressValue->getPointerInfo();
   if (address.isNull())
-    klee_error("Dependency::getLatestValueOfAddress Address is null");
+  klee_error("Dependency::getLatestValueOfAddress Address is null");
+  //klee_warning("123");
+  /*if(llvm::isa<llvm::GlobalValue>(value)){
+	  llvm::GlobalValue* gv = llvm::dyn_cast<llvm::GlobalValue>(value);
+	  llvm::errs() <<  globalAddresses->find(gv)->first << "\n";
+  }*/
+  /*for(std::map<const llvm::GlobalValue *, ref<ConstantExpr> >::const_iterator it = globalAddresses->begin();
+      it != globalAddresses->end(); ++it)
+  {
+	  //llvm::errs() << it->first << " " << it->second << "\n";
+      const llvm::GlobalValue* gv = llvm::dyn_cast<llvm::GlobalValue>(it->first);
+	  if (gv->getName() == "B"){
+    	  // Build the loaded value
+
+		  //ref<ConstantExpr> exp = (it->second);
+		  //gv->dump();
+		  //exp->dump();
+	  }
+  }*/
+
+  /*for(std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::const_iterator it = valuesMap.begin();
+        it != valuesMap.end(); ++it){
+  	  //llvm::errs() << it->first << " " << it->second << "\n";
+	  if (it->first->getName() == "B"){
+		  klee_warning("1241");
+		  it->first->dump();
+		  klee_warning("1251");
+		  ref<TxStateValue> val = it->second.back();
+		  val->getExpression()->dump();
+		  val->dump();
+		  klee_warning("1261");
+	  }
+   }
+   klee_warning("124");*/
+
+
+
+
   ref<TxStoreEntry> entry = store->find(address);
   if (entry.isNull())
     klee_error("Dependency::getLatestValueOfAddress No entry found");
+  //entry->getContent()->getExpression()->dump();
   return entry->getContent()->getExpression();
 }
 
