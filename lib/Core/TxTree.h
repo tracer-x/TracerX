@@ -446,6 +446,11 @@ class TxTreeNode {
   /// is just a pointer to the one in klee::Executor.
   std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
 
+  /// Map of globals to their representative memory object.
+  std::map<const llvm::GlobalValue *, MemoryObject *> *globalObjects;
+
+  AddressSpace *addressSpace;
+
   /// \brief Indicates that a generic error was encountered in this node
   bool genericEarlyTermination;
 
@@ -467,26 +472,33 @@ class TxTreeNode {
 
   void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
 
-  TxTreeNode(TxTreeNode *_parent, llvm::DataLayout *_targetData,
-             std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
-                 _globalAddresses);
+  TxTreeNode(
+      TxTreeNode *_parent, llvm::DataLayout *_targetData,
+      std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses,
+      std::map<const llvm::GlobalValue *, MemoryObject *> *globalObjects,
+      AddressSpace *_addressSpace);
 
   ~TxTreeNode();
 
-  static TxTreeNode *createRoot(llvm::DataLayout *targetData,
-                                std::map<const llvm::GlobalValue *,
-                                         ref<ConstantExpr> > *globalAddresses) {
-    return new TxTreeNode(0, targetData, globalAddresses);
+  static TxTreeNode *createRoot(
+      llvm::DataLayout *targetData,
+      std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses,
+      std::map<const llvm::GlobalValue *, MemoryObject *> *globalObjects,
+      AddressSpace *addressSpace) {
+    return new TxTreeNode(0, targetData, globalAddresses, globalObjects,
+                          addressSpace);
   }
 
   TxTreeNode *createLeftChild() {
-    left = new TxTreeNode(this, targetData, globalAddresses);
+    left = new TxTreeNode(this, targetData, globalAddresses, globalObjects,
+                          addressSpace);
     dependency->setLeftChild(left->dependency);
     return left;
   }
 
   TxTreeNode *createRightChild() {
-    right = new TxTreeNode(this, targetData, globalAddresses);
+    right = new TxTreeNode(this, targetData, globalAddresses, globalObjects,
+                           addressSpace);
     dependency->setRightChild(right->dependency);
     return right;
   }
@@ -751,6 +763,11 @@ class TxTree {
   /// variable is just a pointer to the one in klee::Executor.
   std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
 
+  /// Map of globals to their representative memory object.
+  std::map<const llvm::GlobalValue *, MemoryObject *> *globalObjects;
+
+  AddressSpace *addressSpace;
+
   void printNode(llvm::raw_ostream &stream, TxTreeNode *n,
                  std::string edges) const;
 
@@ -792,9 +809,11 @@ public:
   /// may not have been computed.
   static bool symbolicExecutionError;
 
-  TxTree(ExecutionState *_root, llvm::DataLayout *_targetData,
-         std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
-             _globalAddresses);
+  TxTree(
+      ExecutionState *_root, llvm::DataLayout *_targetData,
+      std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses,
+      std::map<const llvm::GlobalValue *, MemoryObject *> *_globalObjects,
+      AddressSpace *_addressSpace);
 
   ~TxTree() {} // TxSubsumptionTable::clear(); }
 

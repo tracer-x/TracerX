@@ -4061,7 +4061,8 @@ void Executor::runFunctionAsMain(Function *f,
   state->ptreeNode = processTree->root;
 
   if (INTERPOLATION_ENABLED) {
-    txTree = new TxTree(state, kmodule->targetData, &globalAddresses);
+    txTree = new TxTree(state, kmodule->targetData, &globalAddresses,
+                        &globalObjects, &state->addressSpace);
     state->txTreeNode = txTree->root;
     TxTreeGraph::initialize(txTree->root);
   }
@@ -4186,7 +4187,8 @@ void Executor::runFunctionAsMain(Function *f,
     state->ptreeNode = processTree->root;
 
     if (INTERPOLATION_ENABLED) {
-      txTree = new TxTree(state, kmodule->targetData, &globalAddresses);
+      txTree = new TxTree(state, kmodule->targetData, &globalAddresses,
+                          &globalObjects, &state->addressSpace);
       state->txTreeNode = txTree->root;
       TxTreeGraph::initialize(txTree->root);
     }

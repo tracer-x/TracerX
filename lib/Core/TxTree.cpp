@@ -2078,12 +2078,16 @@ std::string TxTree::getInterpolationStat() {
 
 TxTree::TxTree(
     ExecutionState *_root, llvm::DataLayout *_targetData,
-    std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses)
-    : targetData(_targetData), globalAddresses(_globalAddresses) {
+    std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses,
+    std::map<const llvm::GlobalValue *, MemoryObject *> *_globalObjects,
+    AddressSpace *_addressSpace)
+    : targetData(_targetData), globalAddresses(_globalAddresses),
+      globalObjects(_globalObjects), addressSpace(_addressSpace) {
   currentTxTreeNode = 0;
   assert(_targetData && "target data layout not provided");
   if (!_root->txTreeNode) {
-    currentTxTreeNode = TxTreeNode::createRoot(_targetData, _globalAddresses);
+    currentTxTreeNode = TxTreeNode::createRoot(_targetData, _globalAddresses,
+                                               _globalObjects, _addressSpace);
   }
   root = currentTxTreeNode;
 
@@ -2169,25 +2173,27 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 
       if (WPInterpolant) {
         ref<Expr> WPExpr = entry->getWPInterpolant();
-        Solver::Validity result;
-        std::vector<ref<Expr> > unsatCore;
-        ref<Expr> WPExprInstantiated = ConstantExpr::create(0, 32);
-        if (node->parent)
-          WPExprInstantiated = node->wp->instantiateWPExpression(
-              node->parent->dependency, node->parent->callHistory, WPExpr);
-        bool success =
-            solver->evaluate(*state, WPExprInstantiated, result, unsatCore);
-        if (success != true)
-          klee_error("TxTree::remove: Implication test failed");
-        if (result == Solver::True) {
-          entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
-        } else {
+        //        Solver::Validity result;
+        //        std::vector<ref<Expr> > unsatCore;
+        //        ref<Expr> WPExprInstantiated = ConstantExpr::create(0, 32);
+        //        if (node->parent)
+        //          WPExprInstantiated = node->wp->instantiateWPExpression(
+        //              node->parent->dependency, node->parent->callHistory,
+        // WPExpr);
+        //        bool success =
+        //            solver->evaluate(*state, WPExprInstantiated, result,
+        // unsatCore);
+        //        if (success != true)
+        //          klee_error("TxTree::remove: Implication test failed");
+        //        if (result == Solver::True) {
+        entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
+        //        } else {
           // If the result of implication is Solver::False and/or
           // Solver::Unknown the chance that the WP interpolant
           // improves the interpolant from the deletion algorithm
           // is slim. As a result, in such cases the interpolant
           // from deletion is not changed.
-        }
+        //        }
       }
 
       TxSubsumptionTable::insert(node->getProgramPoint(), node->entryCallHistory,
@@ -2391,12 +2397,15 @@ void TxTreeNode::printTimeStat(std::stringstream &stream) {
 
 TxTreeNode::TxTreeNode(
     TxTreeNode *_parent, llvm::DataLayout *_targetData,
-    std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses)
+    std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses,
+    std::map<const llvm::GlobalValue *, MemoryObject *> *_globalObjects,
+    AddressSpace *_addressSpace)
     : parent(_parent), left(0), right(0), programPoint(0),
       nodeSequenceNumber(0), storable(true),
       graph(_parent ? _parent->graph : 0),
       instructionsDepth(_parent ? _parent->instructionsDepth : 0),
       targetData(_targetData), globalAddresses(_globalAddresses),
+      globalObjects(_globalObjects), addressSpace(_addressSpace),
       genericEarlyTermination(false), isSubsumed(false) {
   if (_parent) {
     entryCallHistory = _parent->callHistory;
@@ -2404,8 +2413,9 @@ TxTreeNode::TxTreeNode(
   }
 
   // Inherit the abstract dependency or NULL
-  dependency = new TxDependency(_parent ? _parent->dependency : 0, _targetData,
-                                _globalAddresses);
+  dependency =
+      new TxDependency(_parent ? _parent->dependency : 0, _targetData,
+                       _globalAddresses, _globalObjects, _addressSpace);
 
   // Set the child WP Interpolant to true
   wp = new WeakestPreCondition(this, this->dependency);
@@ -2448,7 +2458,6 @@ ref<Expr> TxTreeNode::getWPInterpolant() {
       this->parent->setChildWPInterpolant(expr);
   } else {
     expr = wp->intersectExpr(childWPInterpolant[0], childWPInterpolant[1]);
-
     // Setting the intersection of child nodes as the target in the current node
     wp->setWPExpr(expr);
 

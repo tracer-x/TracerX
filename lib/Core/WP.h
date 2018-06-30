@@ -116,13 +116,19 @@ public:
                            const ref<Expr> rhs);
 
   // \brief Convert the weakest precondition expression to canonical form
-  std::map<ref<Expr>, uint64_t>* simplifyWPExpr(ref<Expr> WPExpr,std::map<ref<Expr>, uint64_t> *newLinearTerm, int sign);
+  void simplifyWPExpr();
 
   // \brief Simplify terms in the weakest precondition expression to canonical
   // form
   std::map<ref<Expr>, uint64_t> *
-  simplifyWPTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
-                 ref<Expr> linearTerm);
+  simplifyWPTerm(ref<Expr> WPExpr, std::map<ref<Expr>, uint64_t> *newLinearTerm,
+                 int sign);
+
+  // \brief Simplify terms in the weakest precondition expression to canonical
+  // form
+  //  std::map<ref<Expr>, uint64_t> *
+  //  simplifyWPTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
+  //                 ref<Expr> linearTerm);
 
   // \brief Insert a variable with coefficient in newLinearTerm
   void insertTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm, uint64_t coeff,
@@ -160,8 +166,8 @@ public:
   TxStore::TopInterpolantStore updateConcretelyAddressedStore(
       TxStore::TopInterpolantStore concretelyAddressedStore, ref<Expr> wp);
 
-  // \brief Get variable stored in the frame
-  ref<Expr> getVarFromExpr(ref<Expr> wp);
+  // \brief Get variables stored in the frame
+  std::vector<ref<Expr> > getVarFromExpr(ref<Expr> wp);
 
   // \brief Update interpolant based on the WP Expr
   ref<Expr> updateInterpolant(ref<Expr> interpolant, ref<Expr> wp);

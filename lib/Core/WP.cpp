@@ -310,7 +310,6 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         i->dump();
         klee_message("---------------------------------------------");
       }
-
       switch (i->getOpcode()) {
 
       case llvm::Instruction::Br: {
@@ -332,7 +331,6 @@ ref<Expr> WeakestPreCondition::GenerateWP(
         if (markAllFlag == true && !isTargetDependent(i, this->WPExpr)) {
           break;
         }
-
         // Getting the expressions from the left and right operand
         ref<Expr> left = this->generateExprFromOperand(i, 0);
         ref<Expr> right = this->generateExprFromOperand(i, 1);
@@ -682,19 +680,8 @@ void WeakestPreCondition::updateWPExpr(ref<Expr> result) {
   if (WPExpr == eb->False()) {
     WPExpr = result;
   } else {
-	 klee_warning("sajjad5");
     this->substituteExpr(result);
-    klee_warning("sajjad6");
-    WPExpr->dump();
-    std::map<ref<Expr>, uint64_t> *linearTerm = new std::map<ref<Expr>, uint64_t>;
-    // sign = 1 means positive
-    // sign = -1 means negative
-    int sign = 1;
-    std::map<ref<Expr>, uint64_t> *newLinearTerm = this->simplifyWPExpr(WPExpr,newLinearTerm,1);
-    klee_error("sajjad7");
-    WPExpr->dump();
-    klee_warning("sajjad7.1");
-
+    this->simplifyWPExpr();
   }
 }
 
@@ -737,8 +724,17 @@ ref<Expr> WeakestPreCondition::substituteExpr(ref<Expr> base,
       return base;
     }
 
-    case Expr::NotOptimized:
     case Expr::Read:
+    case Expr::Concat: {
+      if (base.compare(lhs) == 0)
+        return rhs;
+      else if (base.compare(rhs) == 0)
+        return lhs;
+      else
+        return base;
+    }
+
+    case Expr::NotOptimized:
     case Expr::Not:
     case Expr::Extract:
     case Expr::ZExt:
@@ -748,7 +744,6 @@ ref<Expr> WeakestPreCondition::substituteExpr(ref<Expr> base,
       return base->rebuild(kids);
     }
 
-    case Expr::Concat:
     case Expr::Eq:
     case Expr::Ne:
     case Expr::Ult:
@@ -794,47 +789,16 @@ ref<Expr> WeakestPreCondition::substituteExpr(ref<Expr> base,
   return base;
 }
 
-std::map<ref<Expr>, uint64_t>* WeakestPreCondition::simplifyWPExpr(ref<Expr> wpExpr,std::map<ref<Expr>, uint64_t> *newLinearTerm, int sign) {
+void WeakestPreCondition::simplifyWPExpr() {
+  // we assume expr is only one equation.
+
+  std::map<ref<Expr>, uint64_t> *newLinearTerm =
+      new std::map<ref<Expr>, uint64_t>;
+  // sign = 1 means positive
+  // sign = -1 means negative
+  int sign = 1;
 
   switch (WPExpr->getKind()) {
-  case Expr::Constant:{
-    ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(wpExpr);
-    insertTerm(newLinearTerm, sign * constant->getZExtValue(), WPArrayStore::constValues);
-    return newLinearTerm;
-	break;
-  }
-  case Expr::Concat:
-  case Expr::Read: {
-    insertTerm(newLinearTerm, sign, wpExpr);
-    return newLinearTerm;
-    break;
-  }
-  case Expr::Mul:
-  case Expr::UDiv:
-  case Expr::SDiv:{
-	ref<Expr> kids[2];
-	kids[0] = WPExpr->getKid(0);
-	kids[1] = WPExpr->getKid(1);
-	if(isa<ConstantExpr>(kids[0])){
-		ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[0]);
-	    insertTerm(newLinearTerm, sign * constant->getZExtValue(), kids[1]);
-	    return newLinearTerm;
-	}else
-		klee_error("WeakestPreCondition::simplifyWPExpr Coeff is not constant!");
-	break;
-  }
-  case Expr::Add:
-  case Expr::Sub:
-  case Expr::URem:
-  case Expr::SRem: {
-    ref<Expr> kids[2];
-    kids[0] = WPExpr->getKid(0);
-    kids[1] = WPExpr->getKid(1);
-    newLinearTerm = simplifyWPExpr(kids[0],newLinearTerm,sign);
-    newLinearTerm = simplifyWPExpr(kids[1],newLinearTerm,sign);
-    return newLinearTerm;
-  }
-
   case Expr::Eq:
   case Expr::Ne:
   case Expr::Ult:
@@ -848,10 +812,65 @@ std::map<ref<Expr>, uint64_t>* WeakestPreCondition::simplifyWPExpr(ref<Expr> wpE
     ref<Expr> kids[2];
     kids[0] = WPExpr->getKid(0);
     kids[1] = WPExpr->getKid(1);
-    newLinearTerm = simplifyWPExpr(kids[0],newLinearTerm,sign);
-    newLinearTerm = simplifyWPExpr(kids[1],newLinearTerm,-1*sign);
-    return newLinearTerm;
 
+    newLinearTerm = simplifyWPTerm(kids[0], newLinearTerm, sign);
+    newLinearTerm = simplifyWPTerm(kids[1], newLinearTerm, sign);
+
+    convertToExpr(newLinearTerm);
+    delete newLinearTerm;
+    break;
+  }
+
+  default: {
+    klee_message("Error while parsing WP Expression:");
+    WPExpr->dump();
+    klee_error("Expression type  can not be simplified!");
+  }
+  }
+}
+
+std::map<ref<Expr>, uint64_t> *WeakestPreCondition::simplifyWPTerm(
+    ref<Expr> expr, std::map<ref<Expr>, uint64_t> *newLinearTerm, int sign) {
+  // we assume expr is only one equation.
+  switch (expr->getKind()) {
+  case Expr::Constant:{
+    ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(expr);
+    insertTerm(newLinearTerm, sign * constant->getZExtValue(), WPArrayStore::constValues);
+    return newLinearTerm;
+	break;
+  }
+  case Expr::Concat:
+  case Expr::Read: {
+    insertTerm(newLinearTerm, sign, expr);
+    return newLinearTerm;
+    break;
+  }
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:{
+	ref<Expr> kids[2];
+        kids[0] = expr->getKid(0);
+        kids[1] = expr->getKid(1);
+        if (isa<ConstantExpr>(kids[0])) {
+          ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[0]);
+          insertTerm(newLinearTerm, sign * constant->getZExtValue(), kids[1]);
+          return newLinearTerm;
+        } else
+          klee_error(
+              "WeakestPreCondition::simplifyWPExpr Coeff is not constant!");
+        break;
+  }
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::URem:
+  case Expr::SRem: {
+    ref<Expr> kids[2];
+    kids[0] = expr->getKid(0);
+    kids[1] = expr->getKid(1);
+    newLinearTerm = simplifyWPTerm(kids[0], newLinearTerm, sign);
+    newLinearTerm = simplifyWPTerm(kids[1], newLinearTerm, sign);
+    return newLinearTerm;
+  }
 
    /*for(int i=0;i<WPExpr->getNumKids();i++){
 	   if (isa<ConstantExpr>(kids[i])) {
@@ -893,18 +912,16 @@ std::map<ref<Expr>, uint64_t>* WeakestPreCondition::simplifyWPExpr(ref<Expr> wpE
     convertToExpr(newLinearTerm);
 
     delete newLinearTerm;*/
-    break;
-  }
 
   default: {
     klee_message("Error while parsing WP Expression:");
-    WPExpr->dump();
+    expr->dump();
     klee_error("Expression type  can not be simplified!");
   }
   }
 }
 
-std::map<ref<Expr>, uint64_t> *WeakestPreCondition::simplifyWPTerm(
+/*std::map<ref<Expr>, uint64_t> *WeakestPreCondition::simplifyWPTerm(
     std::map<ref<Expr>, uint64_t> *newLinearTerm, ref<Expr> linearTerm) {
   if (isa<ConstantExpr>(linearTerm)) {
     ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(linearTerm);
@@ -950,7 +967,7 @@ std::map<ref<Expr>, uint64_t> *WeakestPreCondition::simplifyWPTerm(
     }
   }
   return newLinearTerm;
-}
+}*/
 
 void WeakestPreCondition::insertTerm(
     std::map<ref<Expr>, uint64_t> *newLinearTerm, uint64_t coeff,
@@ -970,26 +987,9 @@ void WeakestPreCondition::convertToExpr(
            it = newLinearTerm->begin(),
            ie = newLinearTerm->end();
        it != ie; ++it) {
-	klee_warning("sajjad13");
-	it->first->dump();
-	klee_warning("sajjad14");
-	llvm::errs() <<it->second << "\n";
-	klee_warning("sajjad15");
-  }
-  for (std::map<ref<Expr>, uint64_t>::const_iterator
-           it = newLinearTerm->begin(),
-           ie = newLinearTerm->end();
-       it != ie; ++it) {
-	klee_warning("sajjad13");
-	it->first->dump();
-	klee_warning("sajjad14");
-	llvm::errs() <<it->second << "\n";
-	klee_warning("sajjad15");
     if (it->first == WPArrayStore::constValues) {
-      klee_warning("sajjad16");
       kids[1] = ConstantExpr::create(it->second, Expr::Int32);
     } else {
-      klee_warning("sajjad17");
       ref<Expr> lhs;
       if (it->second == 1) {
         lhs = it->first;
@@ -1007,13 +1007,7 @@ void WeakestPreCondition::convertToExpr(
   kids[0] = temp;
   if (kids[1].isNull())
 	  kids[1] = ConstantExpr::create(0, Expr::Int32);
-  klee_warning("sajjad");
-  WPExpr->dump();
-  klee_warning("sajjad1");
   WPExpr = WPExpr->rebuild(kids);
-  klee_warning("sajjad2");
-  WPExpr->dump();
-  klee_warning("sajjad3");
 }
 
 ref<Expr> WeakestPreCondition::instantiateWPExpression(
@@ -1114,10 +1108,6 @@ ref<Expr> WeakestPreCondition::instantiateWPExpression(
 
 ref<Expr> WeakestPreCondition::intersectExpr(ref<Expr> expr1,ref<Expr> expr2){
 
-  return AndExpr::create(expr1,expr2);
-
-  expr1->dump();
-  expr2->dump();
   if(expr1->getKind() == Expr::Sle && expr2->getKind() == Expr::Sle) {
 	  if (expr1->getKid(0) == expr2->getKid(0)){
 		  ref<Expr> kids[2];
@@ -1231,18 +1221,19 @@ bool WeakestPreCondition::isTargetDependent(llvm::Value *inst, ref<Expr> wp) {
   case Expr::Shl:
   case Expr::LShr:
   case Expr::AShr: {
+
     ref<Expr> kids[2];
-    kids[0] = WPExpr->getKid(0);
-    kids[1] = WPExpr->getKid(1);
+    kids[0] = wp->getKid(0);
+    kids[1] = wp->getKid(1);
     return (isTargetDependent(inst, kids[0]) ||
             isTargetDependent(inst, kids[1]));
   }
 
   case Expr::Select: {
     ref<Expr> kids[3];
-    kids[0] = WPExpr->getKid(0);
-    kids[1] = WPExpr->getKid(1);
-    kids[2] = WPExpr->getKid(2);
+    kids[0] = wp->getKid(0);
+    kids[1] = wp->getKid(1);
+    kids[2] = wp->getKid(2);
     return (isTargetDependent(inst, kids[0]) ||
             isTargetDependent(inst, kids[1]) ||
             isTargetDependent(inst, kids[2]));
@@ -1349,32 +1340,49 @@ TxStore::TopInterpolantStore
 WeakestPreCondition::updateConcretelyAddressedStore(
     TxStore::TopInterpolantStore concretelyAddressedStore, ref<Expr> wp) {
 
-  ref<Expr> var = getVarFromExpr(wp);
-  llvm::Value *allocaVar = WPArrayStore::getValuePointer(var);
-  TopInterpolantStore::iterator candidateForRemove =
-      concretelyAddressedStore.end();
-  for (TopInterpolantStore::iterator it = concretelyAddressedStore.begin(),
-                                     ie = concretelyAddressedStore.end();
+  std::vector<llvm::Value *> allocaVars;
+  std::vector<ref<Expr> > vars = getVarFromExpr(wp);
+
+  for (std::vector<ref<Expr> >::iterator it = vars.begin(), ie = vars.end();
        it != ie; ++it) {
-
-    if ((*it).first->getValue() == allocaVar)
-      candidateForRemove = it;
+    ref<Expr> var = (*it);
+    allocaVars.push_back(WPArrayStore::getValuePointer(var));
   }
 
-  if (candidateForRemove != concretelyAddressedStore.end()) {
-    concretelyAddressedStore.erase(candidateForRemove);
+  std::vector<TopInterpolantStore::iterator> candidatesForRemove;
+
+  for (std::vector<llvm::Value *>::iterator it = allocaVars.begin(),
+                                            ie = allocaVars.end();
+       it != ie; ++it) {
+    for (TopInterpolantStore::iterator it1 = concretelyAddressedStore.begin(),
+                                       ie1 = concretelyAddressedStore.end();
+         it1 != ie1; ++it1) {
+
+      if ((*it1).first->getValue() == (*it))
+        candidatesForRemove.push_back(it1);
+    }
   }
+
+  for (std::vector<TopInterpolantStore::iterator>::iterator
+           it = candidatesForRemove.begin(),
+           ie = candidatesForRemove.end();
+       it != ie; ++it) {
+    concretelyAddressedStore.erase((*it));
+  }
+
   return concretelyAddressedStore;
 }
 
-ref<Expr> WeakestPreCondition::getVarFromExpr(ref<Expr> wp) {
+std::vector<ref<Expr> > WeakestPreCondition::getVarFromExpr(ref<Expr> wp) {
   // TODO: Assuming frame has only one variable.
+  std::vector<ref<Expr> > vars1, vars2, vars3, vars4;
   switch (wp->getKind()) {
   case Expr::InvalidKind:
+  case Expr::Constant: { return vars1; }
   case Expr::Read:
-  case Expr::Concat:
-  case Expr::Constant: {
-    return wp;
+  case Expr::Concat: {
+    vars1.push_back(wp);
+    return vars1;
   }
 
   case Expr::NotOptimized:
@@ -1382,9 +1390,8 @@ ref<Expr> WeakestPreCondition::getVarFromExpr(ref<Expr> wp) {
   case Expr::Extract:
   case Expr::ZExt:
   case Expr::SExt: {
-    ref<Expr> kids[1];
-    kids[0] = getVarFromExpr(wp->getKid(0));
-    return kids[0];
+    vars1 = getVarFromExpr(wp->getKid(0));
+    return vars1;
   }
 
   case Expr::Eq:
@@ -1411,35 +1418,32 @@ ref<Expr> WeakestPreCondition::getVarFromExpr(ref<Expr> wp) {
   case Expr::Shl:
   case Expr::LShr:
   case Expr::AShr: {
-    ref<Expr> kids[2];
-    kids[0] = getVarFromExpr(wp->getKid(0));
-    kids[1] = getVarFromExpr(wp->getKid(1));
-    if (isa<ReadExpr>(kids[0]) || isa<ConcatExpr>(kids[0]))
-      return kids[0];
-    else
-      return kids[1];
+    vars1 = getVarFromExpr(wp->getKid(0));
+    vars2 = getVarFromExpr(wp->getKid(1));
+    vars3.reserve(vars1.size() + vars2.size());
+    vars3.insert(vars3.end(), vars1.begin(), vars1.end());
+    vars3.insert(vars3.end(), vars2.begin(), vars2.end());
+    return vars3;
   }
 
   case Expr::Select: {
-    ref<Expr> kids[3];
-    kids[0] = getVarFromExpr(wp->getKid(0));
-    kids[1] = getVarFromExpr(wp->getKid(1));
-    kids[2] = getVarFromExpr(wp->getKid(2));
-    if (isa<ReadExpr>(kids[0]) || isa<ConcatExpr>(kids[0]))
-      return kids[0];
-    else if (isa<ReadExpr>(kids[1]) || isa<ConcatExpr>(kids[1]))
-      return kids[1];
-    else
-      return kids[1];
+    vars1 = getVarFromExpr(wp->getKid(0));
+    vars2 = getVarFromExpr(wp->getKid(1));
+    vars3 = getVarFromExpr(wp->getKid(2));
+    vars4.reserve(vars1.size() + vars2.size() + vars3.size());
+    vars4.insert(vars4.end(), vars1.begin(), vars1.end());
+    vars4.insert(vars4.end(), vars2.begin(), vars2.end());
+    vars4.insert(vars4.end(), vars3.begin(), vars3.end());
+    return vars4;
   }
   }
   // Sanity check
   klee_error(
       "Control should not reach here in WeakestPreCondition::getVarFromExpr");
-  return wp;
+  return vars1;
 }
 
-ref<Expr> WeakestPreCondition::updateInterpolant(ref<Expr> interpolant,
+/*ref<Expr> WeakestPreCondition::updateInterpolant(ref<Expr> interpolant,
                                                  ref<Expr> wp) {
   if (interpolant.isNull())
     return wp;
@@ -1455,7 +1459,7 @@ ref<Expr> WeakestPreCondition::updateInterpolant(ref<Expr> interpolant,
     return wp;
   else
     return AndExpr::create(unrelatedFrame, wp);
-}
+}*/
 
 ref<Expr> WeakestPreCondition::extractUnrelatedFrame(ref<Expr> interpolant,
                                                      ref<Expr> var) {

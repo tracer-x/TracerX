@@ -22,6 +22,8 @@
 
 #include "klee/Config/Version.h"
 #include "klee/Internal/Module/TxValues.h"
+#include "Memory.h"
+#include "AddressSpace.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include <llvm/IR/Constants.h>
@@ -193,6 +195,12 @@ class TxDependency {
   /// variable is just a pointer to the one in klee::Executor.
   std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
 
+  /// Map of globals to their representative memory object.
+  std::map<const llvm::GlobalValue *, MemoryObject *> *globalObjects;
+
+  /// @brief Address space used by this state (e.g. Global and Heap)
+  AddressSpace *addressSpace;
+
   /// \brief Tests if a pointer points to a main function's argument
   static bool isMainArgument(const llvm::Value *loc);
 
@@ -326,9 +334,11 @@ public:
   /// \brief Flag to display debug information on the state.
   uint64_t debugStateLevel;
 
-  TxDependency(TxDependency *parent, llvm::DataLayout *_targetData,
-               std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
-                   _globalAddresses);
+  TxDependency(
+      TxDependency *parent, llvm::DataLayout *_targetData,
+      std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses,
+      std::map<const llvm::GlobalValue *, MemoryObject *> *_globalObjects,
+      AddressSpace *_addressSpace);
 
   ~TxDependency();
 
