@@ -792,8 +792,8 @@ ref<Expr> WeakestPreCondition::substituteExpr(ref<Expr> base,
 void WeakestPreCondition::simplifyWPExpr() {
   // we assume expr is only one equation.
 
-  std::map<ref<Expr>, uint64_t> *newLinearTerm =
-      new std::map<ref<Expr>, uint64_t>;
+  std::map<ref<Expr>, int> *newLinearTerm1 = new std::map<ref<Expr>, int>;
+  std::map<ref<Expr>, int> *newLinearTerm2 = new std::map<ref<Expr>, int>;
   // sign = 1 means positive
   // sign = -1 means negative
   int sign = 1;
@@ -812,12 +812,24 @@ void WeakestPreCondition::simplifyWPExpr() {
     ref<Expr> kids[2];
     kids[0] = WPExpr->getKid(0);
     kids[1] = WPExpr->getKid(1);
-
-    newLinearTerm = simplifyWPTerm(kids[0], newLinearTerm, sign);
-    newLinearTerm = simplifyWPTerm(kids[1], newLinearTerm, sign);
-
-    convertToExpr(newLinearTerm);
-    delete newLinearTerm;
+    newLinearTerm1 = simplifyWPTerm(kids[0], newLinearTerm1, sign);
+    //    klee_warning("sajjad1");
+    //    kids[0]->dump();
+    //    klee_warning("sajjad2");
+    //    kids[1]->dump();
+    //    klee_warning("sajjad3");
+    newLinearTerm2 = simplifyWPTerm(kids[1], newLinearTerm2, sign);
+    //    klee_warning("sajjad6");
+    kids[0] = convertToExpr(newLinearTerm1);
+    kids[1] = convertToExpr(newLinearTerm2);
+    //    kids[0]->dump();
+    //    kids[1]->dump();
+    //    klee_warning("sajjad9");
+    WPExpr = WPExpr->rebuild(kids);
+    //    WPExpr->dump();
+    //    klee_message("sajjad10");
+    delete newLinearTerm1;
+    delete newLinearTerm2;
     break;
   }
 
@@ -829,8 +841,8 @@ void WeakestPreCondition::simplifyWPExpr() {
   }
 }
 
-std::map<ref<Expr>, uint64_t> *WeakestPreCondition::simplifyWPTerm(
-    ref<Expr> expr, std::map<ref<Expr>, uint64_t> *newLinearTerm, int sign) {
+std::map<ref<Expr>, int> *WeakestPreCondition::simplifyWPTerm(
+    ref<Expr> expr, std::map<ref<Expr>, int> *newLinearTerm, int sign) {
   // we assume expr is only one equation.
   switch (expr->getKind()) {
   case Expr::Constant:{
@@ -841,6 +853,10 @@ std::map<ref<Expr>, uint64_t> *WeakestPreCondition::simplifyWPTerm(
   }
   case Expr::Concat:
   case Expr::Read: {
+    //	klee_warning("sajjad4");
+    //	expr->dump();
+    //	llvm::errs() << "sign: " <<sign << "\n";
+    //	klee_warning("sajjad5");
     insertTerm(newLinearTerm, sign, expr);
     return newLinearTerm;
     break;
@@ -969,33 +985,39 @@ std::map<ref<Expr>, uint64_t> *WeakestPreCondition::simplifyWPTerm(
   return newLinearTerm;
 }*/
 
-void WeakestPreCondition::insertTerm(
-    std::map<ref<Expr>, uint64_t> *newLinearTerm, uint64_t coeff,
-    const ref<Expr> variable) {
-  std::map<ref<Expr>, uint64_t>::iterator it = newLinearTerm->find(variable);
+void WeakestPreCondition::insertTerm(std::map<ref<Expr>, int> *newLinearTerm,
+                                     int coeff, const ref<Expr> variable) {
+  std::map<ref<Expr>, int>::iterator it = newLinearTerm->find(variable);
   if (it == newLinearTerm->end())
-    newLinearTerm->insert(std::pair<ref<Expr>, uint64_t>(variable, coeff));
+    newLinearTerm->insert(std::pair<ref<Expr>, int>(variable, coeff));
   else
     it->second = it->second + coeff;
 }
 
-void WeakestPreCondition::convertToExpr(
-    std::map<ref<Expr>, uint64_t> *newLinearTerm) {
-  ref<Expr> kids[2];
+ref<Expr>
+WeakestPreCondition::convertToExpr(std::map<ref<Expr>, int> *newLinearTerm) {
+  ref<Expr> lhs;
   ref<Expr> temp = eb->False();
-  for (std::map<ref<Expr>, uint64_t>::const_iterator
-           it = newLinearTerm->begin(),
-           ie = newLinearTerm->end();
+  for (std::map<ref<Expr>, int>::const_iterator it = newLinearTerm->begin(),
+                                                ie = newLinearTerm->end();
        it != ie; ++it) {
+    //    klee_warning("sajjad7");
+    //    it->first->dump();
+    //    llvm::errs() << "const:" << it->second << "\n";
     if (it->first == WPArrayStore::constValues) {
-      kids[1] = ConstantExpr::create(it->second, Expr::Int32);
+      lhs = ConstantExpr::create(it->second, Expr::Int32);
+      if (temp == eb->False()) {
+        temp = lhs;
+      } else {
+        temp = AddExpr::create(lhs, temp);
+      }
     } else {
-      ref<Expr> lhs;
       if (it->second == 1) {
         lhs = it->first;
       } else {
         lhs = MulExpr::create(ConstantExpr::create(it->second, Expr::Int32),
                               it->first);
+        //        klee_warning("sajjad7.1");
       }
       if (temp == eb->False()) {
         temp = lhs;
@@ -1003,11 +1025,9 @@ void WeakestPreCondition::convertToExpr(
         temp = AddExpr::create(lhs, temp);
       }
     }
+    //    klee_warning("sajjad8");
   }
-  kids[0] = temp;
-  if (kids[1].isNull())
-	  kids[1] = ConstantExpr::create(0, Expr::Int32);
-  WPExpr = WPExpr->rebuild(kids);
+  return temp;
 }
 
 ref<Expr> WeakestPreCondition::instantiateWPExpression(
@@ -1109,22 +1129,65 @@ ref<Expr> WeakestPreCondition::instantiateWPExpression(
 ref<Expr> WeakestPreCondition::intersectExpr(ref<Expr> expr1,ref<Expr> expr2){
 
   if(expr1->getKind() == Expr::Sle && expr2->getKind() == Expr::Sle) {
-	  if (expr1->getKid(0) == expr2->getKid(0)){
-		  ref<Expr> kids[2];
-		  kids[0] = expr1->getKid(0);
-			//sanity check
-		  assert(isa<ConstantExpr>(expr1->getKid(1)) && "expr1->getKid(1) should be constant expression");
-		  assert(isa<ConstantExpr>(expr2->getKid(1)) && "expr2->getKid(1) should be constant expression");
-		  kids[1] = this->getMinOfConstExpr(dyn_cast<ConstantExpr>(expr1->getKid(1)),dyn_cast<ConstantExpr>(expr2->getKid(1)));
-		  return expr1->rebuild(kids);
-	  }else{
-		  expr1->dump();
-		  expr2->dump();
-		  klee_error("WeakestPreCondition::intersectExpr left operands are not the same.");
-		  return AndExpr::create(expr1,expr2);
-	  }
+    if (expr1->getKid(1) == expr2->getKid(1)) {
+      ref<Expr> kids[2];
+      kids[1] = expr1->getKid(1);
+      // sanity check
+      // assert(isa<ConstantExpr>(expr1->getKid(0)) &&
+      // "expr1->getKid(1) should be constant expression");
+      // assert(isa<ConstantExpr>(expr2->getKid(0)) &&
+      // "expr2->getKid(1) should be constant expression");
+      kids[0] = this->getMinExpr(expr1->getKid(0), expr2->getKid(0));
+      return expr1->rebuild(kids);
+    } else {
+      expr1->dump();
+      expr2->dump();
+      klee_error("WeakestPreCondition::intersectExpr right "
+                 "operands are not the same.");
+      return AndExpr::create(expr1, expr2);
+    }
   } else if (expr1->getKind() == Expr::Slt && expr2->getKind() == Expr::Slt) {
-    if (expr1->getKid(0) == expr2->getKid(0)) {
+    if (expr1->getKid(1) == expr2->getKid(1)) {
+      ref<Expr> kids[2];
+      kids[1] = expr1->getKid(1);
+      // sanity check
+      // assert(isa<ConstantExpr>(expr1->getKid(1)) &&
+      //       "expr1->getKid(1) should be constant expression");
+      // assert(isa<ConstantExpr>(expr2->getKid(1)) &&
+      //       "expr2->getKid(1) should be constant expression");
+      kids[0] = this->getMinExpr(expr1->getKid(0), expr2->getKid(0));
+      return expr1->rebuild(kids);
+    } else {
+      expr1->dump();
+      expr2->dump();
+      klee_error(
+          "WeakestPreCondition::intersectExpr left operands are not the same.");
+      return AndExpr::create(expr1, expr2);
+    }
+  } else {
+    expr1->dump();
+    expr2->dump();
+    klee_error("WeakestPreCondition::intersectExpr for these expressions is "
+               "not implemented yet.");
+    return AndExpr::create(expr1, expr2);
+  }
+}
+
+ref<Expr> WeakestPreCondition::getMinExpr(ref<Expr> expr1, ref<Expr> expr2) {
+  if (expr1->getKind() == Expr::Add && expr2->getKind() == Expr::Add) {
+    if (expr1->getKid(1) == expr2->getKid(1)) {
+      ref<Expr> kids[2];
+      kids[1] = expr1->getKid(1);
+      // sanity check
+      assert(isa<ConstantExpr>(expr1->getKid(0)) &&
+             "expr1->getKid(0) should be constant expression");
+      assert(isa<ConstantExpr>(expr2->getKid(0)) &&
+             "expr2->getKid(0) should be constant expression");
+      kids[0] =
+          this->getMinOfConstExpr(dyn_cast<ConstantExpr>(expr1->getKid(0)),
+                                  dyn_cast<ConstantExpr>(expr2->getKid(0)));
+      return expr1->rebuild(kids);
+    } else if (expr1->getKid(0) == expr2->getKid(0)) {
       ref<Expr> kids[2];
       kids[0] = expr1->getKid(0);
       // sanity check
@@ -1139,15 +1202,15 @@ ref<Expr> WeakestPreCondition::intersectExpr(ref<Expr> expr1,ref<Expr> expr2){
     } else {
       expr1->dump();
       expr2->dump();
-      klee_error(
-          "WeakestPreCondition::intersectExpr left operands are not the same.");
+      klee_error("WeakestPreCondition::getMinExpr operands are not the same.");
       return AndExpr::create(expr1, expr2);
     }
-  }else{
-	  expr1->dump();
-	  expr2->dump();
-	  klee_error("WeakestPreCondition::intersectExpr for these expressions is not implemented yet.");
-	  return AndExpr::create(expr1,expr2);
+  } else {
+    expr1->dump();
+    expr2->dump();
+    klee_error("WeakestPreCondition::getMinExpr for these expressions is not "
+               "implemented yet.");
+    return AndExpr::create(expr1, expr2);
   }
 }
 

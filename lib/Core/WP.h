@@ -120,23 +120,23 @@ public:
 
   // \brief Simplify terms in the weakest precondition expression to canonical
   // form
-  std::map<ref<Expr>, uint64_t> *
-  simplifyWPTerm(ref<Expr> WPExpr, std::map<ref<Expr>, uint64_t> *newLinearTerm,
+  std::map<ref<Expr>, int> *
+  simplifyWPTerm(ref<Expr> WPExpr, std::map<ref<Expr>, int> *newLinearTerm,
                  int sign);
 
   // \brief Simplify terms in the weakest precondition expression to canonical
   // form
-  //  std::map<ref<Expr>, uint64_t> *
-  //  simplifyWPTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
+  //  std::map<ref<Expr>, int> *
+  //  simplifyWPTerm(std::map<ref<Expr>, int> *newLinearTerm,
   //                 ref<Expr> linearTerm);
 
   // \brief Insert a variable with coefficient in newLinearTerm
-  void insertTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm, uint64_t coeff,
+  void insertTerm(std::map<ref<Expr>, int> *newLinearTerm, int coeff,
                   ref<Expr> variable);
 
   // \brief Convert newLinearTerm to an expression and store it at WPExpr(in
   // canonical form)
-  void convertToExpr(std::map<ref<Expr>, uint64_t> *newLinearTerm);
+  ref<Expr> convertToExpr(std::map<ref<Expr>, int> *newLinearTerm);
 
   // \brief Instantiates the variables in WPExpr by their latest value for the
   // implication test.
@@ -147,6 +147,8 @@ public:
 
   // \brief Perform the intersection of two weakest precondition expression
   ref<Expr> intersectExpr(ref<Expr> expr1,ref<Expr> expr2);
+
+  ref<Expr> getMinExpr(ref<Expr> expr1, ref<Expr> expr2);
 
   // \brief Return the minimum of two constant expressions
   ref<ConstantExpr> getMinOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2);
