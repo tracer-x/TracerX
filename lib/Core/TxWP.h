@@ -65,7 +65,6 @@ class TxWeakestPreCondition {
   std::set<llvm::Value *> markedVariables;
 
   ref<Expr> WPExpr;
-  std::vector<ref<Expr> > WPExprs;
 
   // Respective interpolation tree node
   TxTreeNode *node;
@@ -90,9 +89,9 @@ public:
 
   void resetWPExpr() { WPExpr = False(); }
 
-  void setWPExpr(std::vector<ref<Expr> > expr) { WPExprs = expr; }
+  void setWPExpr(ref<Expr> expr) { WPExpr = expr; }
 
-  std::vector<ref<Expr> > getWPExpr() { return WPExprs; }
+  ref<Expr> getWPExpr() { return WPExpr; }
 
   // \brief Preprocessing phase: marking the instructions that contribute
   // to the target or an infeasible path.
@@ -124,9 +123,9 @@ public:
 
   /// \brief Perform the intersection of two weakest precondition expressions
   /// with respect to the branchCondition
-  std::vector<ref<Expr> > intersectExpr(
-      ref<Expr> branchCondition, std::vector<ref<Expr> > expr1,
-      std::vector<ref<Expr> > expr2, ref<Expr> interpolant,
+  ref<Expr> intersectExpr(
+      ref<Expr> branchCondition, ref<Expr> expr1,
+      ref<Expr> expr2, ref<Expr> interpolant,
       std::set<const Array *> existentials,
       TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
       TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore,
@@ -187,7 +186,7 @@ public:
                                  llvm::Value *callArg);
 
   // \brief Generate and return the weakest precondition expressions.
-  std::vector<ref<Expr> > GenerateWP(
+  ref<Expr> GenerateWP(
       std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
   ref<Expr> getPrevExpr(ref<Expr> e, llvm::Instruction *i);
 

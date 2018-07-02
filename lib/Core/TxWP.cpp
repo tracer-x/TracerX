@@ -985,14 +985,15 @@ TxWeakestPreCondition::~TxWeakestPreCondition() {}
 //  WPExpr = WPExpr->rebuild(kids);
 //}
 
-std::vector<ref<Expr> > TxWeakestPreCondition::intersectExpr(
-		ref<Expr> branchCondition, std::vector<ref<Expr> > expr1,
-		std::vector<ref<Expr> > expr2, ref<Expr> interpolant,
+ref<Expr> TxWeakestPreCondition::intersectExpr(
+		ref<Expr> branchCondition, ref<Expr> expr1,
+		ref<Expr> expr2, ref<Expr> interpolant,
 		std::set<const Array *> existentials,
 		TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
 		TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore,
 		TxStore::TopInterpolantStore concretelyAddressedStore,
 		TxStore::TopInterpolantStore symbolicallyAddressedStore) {
+	/*
 	std::map<std::string, ref<Expr> > entries = extractExprs(
 			concretelyAddressedStore);
 	std::vector<ref<Expr> > pcs;
@@ -1073,7 +1074,8 @@ std::vector<ref<Expr> > TxWeakestPreCondition::intersectExpr(
 	//	res.at(i)->dump();
 	//}
 	//llvm::outs() << "\n-------------\n";
-
+	*/
+	ref<Expr> res;
 	return res;
 }
 
@@ -1856,7 +1858,7 @@ TxWeakestPreCondition::updateExistentials(std::set<const Array *> existentials,
 // Updated Version of Weakest PreCondition
 // =========================================================================
 
-std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
+ref<Expr> TxWeakestPreCondition::GenerateWP(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
 
 //	llvm::outs() << "--- Begin printing instruction list ---\n";
@@ -1886,7 +1888,7 @@ std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
 //      i->dump();
 //      cond->dump();
 //      llvm::outs() << "--- end 1 ---\n";
-      WPExprs.push_back(cond);
+      WPExpr = AndExpr::create(WPExpr, cond);
     } else if (flag == 2) {
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- generate not(condition): expr::not(condition)
@@ -1897,7 +1899,7 @@ std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
       //i->dump();
       //negCond->dump();
       //llvm::outs() << "--- end 2 ---\n";
-      WPExprs.push_back(negCond);
+      WPExpr = AndExpr::create(WPExpr, negCond);
     } else if (i->getOpcode() == llvm::Instruction::Br) {
       llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(i);
       if (br->isConditional()) {
@@ -1905,27 +1907,14 @@ std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
         node->setBranchCondition(cond);
       }
     } else if (i->getOpcode() == llvm::Instruction::Store) {
-      // i is 0
-      std::vector<ref<Expr> > tmp;
-      for (std::vector<ref<Expr> >::const_iterator it = WPExprs.begin(),
-                                                   ie = WPExprs.end();
-           it != ie; ++it) {
-        tmp.push_back(getPrevExpr(*it, i));
-      }
-      WPExprs = tmp;
+      WPExpr = getPrevExpr(WPExpr, i);
     }
   }
 
   klee_warning("Start printing the WP");
-  if (WPExprs.size() > 0) {
-    for (std::vector<ref<Expr> >::const_reverse_iterator it = WPExprs.rbegin(),
-                                                         ie = WPExprs.rend();
-         it != ie; ++it) {
-      (*it)->dump();
-    }
-  }
+  WPExpr->dump();
   klee_warning("End of printing the WP");
-  return WPExprs;
+  return WPExpr;
 }
 
 ref<Expr> TxWeakestPreCondition::getPrevExpr(ref<Expr> e,
