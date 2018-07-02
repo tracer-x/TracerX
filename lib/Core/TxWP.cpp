@@ -1001,14 +1001,14 @@ std::vector<ref<Expr> > TxWeakestPreCondition::intersectExpr(
 			branchCondition, expr1, expr2, pcs, entries);
 
 
-	//llvm::outs() << "\n------from upper intersectExpr-------\n";
-	//llvm::errs() << "cond:";
-	//branchCondition->dump();
-	//llvm::errs() << "\npartitions size=" << partitions.size() << "\n";
-	for (unsigned int i = 0; i < partitions.size(); i++) {
-		partitions.at(i).print();
-	}
-	llvm::outs() << "\n-------------\n";
+//	llvm::outs() << "\n------from upper intersectExpr-------\n";
+//	llvm::errs() << "cond:";
+//	branchCondition->dump();
+//	llvm::errs() << "\npartitions size=" << partitions.size() << "\n";
+//	for (unsigned int i = 0; i < partitions.size(); i++) {
+//		partitions.at(i).print();
+//	}
+//	llvm::outs() << "\n-------------\n";
 
 
 	std::vector<ref<Expr> > res;
@@ -1859,17 +1859,17 @@ TxWeakestPreCondition::updateExistentials(std::set<const Array *> existentials,
 std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
 
-	llvm::outs() << "--- Begin printing instruction list ---\n";
-	for (std::vector<std::pair<KInstruction *, int> >::const_iterator it =
-			reverseInstructionList.begin(), ie = reverseInstructionList.end();
-			it != ie; ++it) {
-		llvm::Instruction *i = (*it).first->inst;
-		int flag = (*it).second;
-		// instruction list
-		i->dump();
-		llvm::outs() << flag << "\n";
-	}
-	llvm::outs() << "--- End of printing instruction list ---\n";
+//	llvm::outs() << "--- Begin printing instruction list ---\n";
+//	for (std::vector<std::pair<KInstruction *, int> >::const_iterator it =
+//			reverseInstructionList.begin(), ie = reverseInstructionList.end();
+//			it != ie; ++it) {
+//		llvm::Instruction *i = (*it).first->inst;
+//		int flag = (*it).second;
+//		// instruction list
+//		i->dump();
+//		llvm::outs() << flag << "\n";
+//	}
+//	llvm::outs() << "--- End of printing instruction list ---\n";
 
   for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
@@ -1922,7 +1922,6 @@ std::vector<ref<Expr> > TxWeakestPreCondition::GenerateWP(
                                                          ie = WPExprs.rend();
          it != ie; ++it) {
       (*it)->dump();
-      klee_warning("next partition");
     }
   }
   klee_warning("End of printing the WP");
