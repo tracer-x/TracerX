@@ -799,6 +799,7 @@ void WeakestPreCondition::simplifyWPExpr() {
   int sign = 1;
 
   switch (WPExpr->getKind()) {
+  case Expr::Constant: { break; }
   case Expr::Eq:
   case Expr::Ne:
   case Expr::Ult:
