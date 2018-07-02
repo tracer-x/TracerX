@@ -150,6 +150,8 @@ public:
 
   ref<Expr> getMinExpr(ref<Expr> expr1, ref<Expr> expr2);
 
+  ref<Expr> getMaxExpr(ref<Expr> expr1, ref<Expr> expr2);
+
   // \brief Return the minimum of two constant expressions
   ref<ConstantExpr> getMinOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2);
 

@@ -1061,6 +1061,9 @@ ref<Expr> WeakestPreCondition::instantiateWPExpression(
           "WeakestPreCondition::instantiateWPExpression Value ref is null");
     ref<Expr> storeValue =
         dependency->getLatestValueOfAddress(tempInstr, callHistory);
+    klee_warning("sajjad3");
+    storeValue->dump();
+    klee_warning("sajjad4");
     if (storeValue == dummy)
       return WPExpr;
     return storeValue;
@@ -1129,7 +1132,9 @@ ref<Expr> WeakestPreCondition::instantiateWPExpression(
 
 ref<Expr> WeakestPreCondition::intersectExpr(ref<Expr> expr1,ref<Expr> expr2){
 
-  if(expr1->getKind() == Expr::Sle && expr2->getKind() == Expr::Sle) {
+  if (expr1 == eb->False() && expr2 == eb->False()) {
+    return eb->False();
+  } else if (expr1->getKind() == Expr::Sle && expr2->getKind() == Expr::Sle) {
     if (expr1->getKid(1) == expr2->getKid(1)) {
       ref<Expr> kids[2];
       kids[1] = expr1->getKid(1);
@@ -1138,7 +1143,7 @@ ref<Expr> WeakestPreCondition::intersectExpr(ref<Expr> expr1,ref<Expr> expr2){
       // "expr1->getKid(1) should be constant expression");
       // assert(isa<ConstantExpr>(expr2->getKid(0)) &&
       // "expr2->getKid(1) should be constant expression");
-      kids[0] = this->getMinExpr(expr1->getKid(0), expr2->getKid(0));
+      kids[0] = this->getMaxExpr(expr1->getKid(0), expr2->getKid(0));
       return expr1->rebuild(kids);
     } else {
       expr1->dump();
@@ -1156,7 +1161,7 @@ ref<Expr> WeakestPreCondition::intersectExpr(ref<Expr> expr1,ref<Expr> expr2){
       //       "expr1->getKid(1) should be constant expression");
       // assert(isa<ConstantExpr>(expr2->getKid(1)) &&
       //       "expr2->getKid(1) should be constant expression");
-      kids[0] = this->getMinExpr(expr1->getKid(0), expr2->getKid(0));
+      kids[0] = this->getMaxExpr(expr1->getKid(0), expr2->getKid(0));
       return expr1->rebuild(kids);
     } else {
       expr1->dump();
@@ -1215,6 +1220,47 @@ ref<Expr> WeakestPreCondition::getMinExpr(ref<Expr> expr1, ref<Expr> expr2) {
   }
 }
 
+ref<Expr> WeakestPreCondition::getMaxExpr(ref<Expr> expr1, ref<Expr> expr2) {
+  if (expr1->getKind() == Expr::Add && expr2->getKind() == Expr::Add) {
+    if (expr1->getKid(1) == expr2->getKid(1)) {
+      ref<Expr> kids[2];
+      kids[1] = expr1->getKid(1);
+      // sanity check
+      assert(isa<ConstantExpr>(expr1->getKid(0)) &&
+             "expr1->getKid(0) should be constant expression");
+      assert(isa<ConstantExpr>(expr2->getKid(0)) &&
+             "expr2->getKid(0) should be constant expression");
+      kids[0] =
+          this->getMaxOfConstExpr(dyn_cast<ConstantExpr>(expr1->getKid(0)),
+                                  dyn_cast<ConstantExpr>(expr2->getKid(0)));
+      return expr1->rebuild(kids);
+    } else if (expr1->getKid(0) == expr2->getKid(0)) {
+      ref<Expr> kids[2];
+      kids[0] = expr1->getKid(0);
+      // sanity check
+      assert(isa<ConstantExpr>(expr1->getKid(1)) &&
+             "expr1->getKid(1) should be constant expression");
+      assert(isa<ConstantExpr>(expr2->getKid(1)) &&
+             "expr2->getKid(1) should be constant expression");
+      kids[1] =
+          this->getMaxOfConstExpr(dyn_cast<ConstantExpr>(expr1->getKid(1)),
+                                  dyn_cast<ConstantExpr>(expr2->getKid(1)));
+      return expr1->rebuild(kids);
+    } else {
+      expr1->dump();
+      expr2->dump();
+      klee_error("WeakestPreCondition::getMinExpr operands are not the same.");
+      return AndExpr::create(expr1, expr2);
+    }
+  } else {
+    expr1->dump();
+    expr2->dump();
+    klee_error("WeakestPreCondition::getMinExpr for these expressions is not "
+               "implemented yet.");
+    return AndExpr::create(expr1, expr2);
+  }
+}
+
 ref<ConstantExpr> WeakestPreCondition::getMinOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2){
 	if((expr1->getAPValue().getSExtValue() < expr2->getAPValue().getSExtValue()))
 		return expr1;
@@ -1223,10 +1269,10 @@ ref<ConstantExpr> WeakestPreCondition::getMinOfConstExpr(ref<ConstantExpr> expr1
 }
 
 ref<ConstantExpr> WeakestPreCondition::getMaxOfConstExpr(ref<ConstantExpr> expr1,ref<ConstantExpr> expr2){
-	if(expr1.compare(expr2) <= 0)
-		return expr1;
-	else
-		return expr2;
+  if (expr1->getAPValue().getSExtValue() >= expr2->getAPValue().getSExtValue())
+    return expr1;
+  else
+    return expr2;
 }
 
 bool WeakestPreCondition::isTargetDependent(llvm::Value *inst, ref<Expr> wp) {
