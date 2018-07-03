@@ -553,12 +553,12 @@ void KleeHandler::processTestCase(const ExecutionState &state,
                                   const char *errorSuffix) {
   if (errorMessage && ExitOnError) {
     llvm::errs() << "EXITING ON ERROR:\n" << errorMessage << "\n";
-    if (INTERPOLATION_ENABLED) {
-      TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
-      TxTreeGraph::save(getOutputFilename("tree.dot"));
-      TxTreeGraph::deallocate();
-    }
-    exit(1);
+    //    if (INTERPOLATION_ENABLED) {
+    //      TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
+    //      TxTreeGraph::save(getOutputFilename("tree.dot"));
+    //      TxTreeGraph::deallocate();
+    //    }
+    //    exit(1);
   }
 
   if (!NoOutput) {

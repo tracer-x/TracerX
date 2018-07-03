@@ -1132,7 +1132,7 @@ ref<Expr> WeakestPreCondition::instantiateWPExpression(
 
 ref<Expr> WeakestPreCondition::intersectExpr(ref<Expr> expr1,ref<Expr> expr2){
 
-  if (expr1 == eb->False() && expr2 == eb->False()) {
+  if (expr1 == eb->False() || expr2 == eb->False()) {
     return eb->False();
   } else if (expr1->getKind() == Expr::Sle && expr2->getKind() == Expr::Sle) {
     if (expr1->getKid(1) == expr2->getKid(1)) {

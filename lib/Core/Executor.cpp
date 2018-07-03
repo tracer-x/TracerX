@@ -10,6 +10,7 @@
 #include "Executor.h"
 #include "Context.h"
 #include "CoreStats.h"
+#include "ExecutorTimerInfo.h"
 #include "ExternalDispatcher.h"
 #include "ImpliedValue.h"
 #include "Memory.h"
@@ -21,7 +22,8 @@
 #include "StatsTracker.h"
 #include "TimingSolver.h"
 #include "UserSearcher.h"
-#include "ExecutorTimerInfo.h"
+#include <experimental/filesystem>
+#include <iostream>
 
 #include "klee/ExecutionState.h"
 #include "klee/Expr.h"
@@ -114,9 +116,8 @@
 using namespace llvm;
 using namespace klee;
 
-
-
 namespace {
+
   cl::opt<bool>
   DumpStatesOnHalt("dump-states-on-halt",
                    cl::init(true),
@@ -4070,23 +4071,118 @@ void Executor::runFunctionAsMain(Function *f,
   globalObjects.clear();
   globalAddresses.clear();
 
-  if (statsTracker)
+  if (statsTracker) {
     statsTracker->done();
+    std::string statsFile = interpreterHandler->getOutputFilename("run.stats");
+    std::string newStatsFile;
+    /*try {
+      std::filesystem::rename(statsFile, newStatsFile);
+    } catch (std::filesystem::filesystem_error& e) {
+      std::cout << e.what() << '\n';
+    }*/
+  }
+  //  llvm::errs() << stats::instructions << " " << util::getUserTime() <<"\n";
+  //  klee_error("sajjad1");
 
+  bool useColors = llvm::errs().is_displayed();
+  if (useColors)
+    llvm::errs().changeColor(llvm::raw_ostream::GREEN,
+                             /*bold=*/true,
+                             /*bg=*/false);
 
+  uint64_t instructions =
+      *theStatisticManager->getStatisticByName("Instructions");
+  uint64_t forks = *theStatisticManager->getStatisticByName("Forks");
 
+  llvm::errs() << "KLEE: done: total instructions = " << instructions << "\n";
 
+  llvm::errs() << "KLEE: done: explored paths = " << 1 + forks << "\n";
 
+  /*  std::stringstream stats;
+    if (INTERPOLATION_ENABLED) {
+      stats << handler->getSubsumptionStats();
+    }
 
+    if (INTERPOLATION_ENABLED) {
+      stats << "KLEE: done:     average instructions of completed paths = "
+            << (double)(handler->getTotalInstructionsDepthOnExitTermination() +
+                        handler->getTotalInstructionsDepthOnEarlyTermination() +
+                        handler->getTotalInstructionsDepthOnErrorTermination())
+  /
+                   (double)(handler->getExitTermination() +
+                            handler->getEarlyTermination() +
+                            handler->getErrorTermination()) << "\n";
+      if (handler->getSubsumptionTermination() == 0.0) {
+        stats << "KLEE: done:     average instructions of subsumed paths = " <<
+  0
+              << "\n";
+      } else {
+        stats << "KLEE: done:     average instructions of subsumed paths = "
+              << (double)
+                     handler->getTotalInstructionPathsExploredOnSubsumption() /
+                     (double)handler->getSubsumptionTermination() << "\n";
+      }
+    }
 
+    if (INTERPOLATION_ENABLED)
+      stats << "KLEE: done:     subsumed paths = "
+            << handler->getSubsumptionTermination() << "\n";
+    stats << "KLEE: done:     error paths = "
+          << handler->getErrorTermination() << "\n";
+    stats << "KLEE: done:     program exit paths = "
+          << handler->getExitTermination() << "\n";
+    stats << "KLEE: done: generated tests = "
+          << handler->getNumTestCases() << ", among which\n";
+    stats << "KLEE: done:     early-terminating tests (instruction time limit,
+  solver timeout, max-depth reached) = "
+          << handler->getEarlyTerminationTest() << "\n";
+  #ifdef ENABLE_Z3
+    if (SubsumedTest)
+      stats << "KLEE: done:     subsumed tests = "
+            << handler->getSubsumptionTerminationTest() << "\n";
+  #endif
+    stats << "KLEE: done:     error tests = "
+          << handler->getErrorTerminationTest() << "\n";
+    stats << "KLEE: done:     program exit tests = "
+          << handler->getExitTerminationTest() << "\n";*/
 
+  if (INTERPOLATION_ENABLED) {
+    llvm::errs() << "\n";
+    llvm::errs() << "KLEE: done: NOTE:\n";
+    llvm::errs() << "KLEE: done:     Subsumed paths / tests counts are "
+                    "nondeterministic for\n";
+    llvm::errs()
+        << "KLEE: done:     programs with dynamically-allocated memory such "
+           "as those\n";
+    llvm::errs()
+        << "KLEE: done:     using malloc, since KLEE may reuse the address "
+           "of the\n";
+    llvm::errs()
+        << "KLEE: done:     same malloc calls in different paths. This "
+           "nondeterminism\n";
+    llvm::errs() << "KLEE: done:     does not cause loss of error reports.\n";
+  }
 
+  /*bool useColors = llvm::errs().is_displayed();
+  if (useColors)
+    llvm::errs().changeColor(llvm::raw_ostream::GREEN,
+                             true,
+                             false);
 
+  llvm::errs() << stats.str();
+
+  if (useColors)
+    llvm::errs().resetColor();*/
+
+  //  handler->getInfoStream() << stats.str();
+
+  if (useColors)
+    llvm::errs().resetColor();
 
   int i = 0;
-
   while (i++ < 1) {
     llvm::errs() << "Run: " << i << "\n";
+    ref<Expr> B = ConstantExpr::create(10, Expr::Int32);
 
     argvMO = 0;
 
@@ -4162,22 +4258,17 @@ void Executor::runFunctionAsMain(Function *f,
 
     initializeGlobals(*state);
 
+    // Updating the bound variable B
     for (std::map<const llvm::GlobalValue *, MemoryObject *>::iterator
              i = globalObjects.begin(),
              ie = globalObjects.end();
          i != ie; ++i) {
       const llvm::GlobalValue *g = ((*i).first);
       if (g->getName() == "B") {
-        g->dump();
         MemoryObject *mo = ((*i).second);
         const ObjectState *os = state->addressSpace.findObject(mo);
-        klee_warning("sajjad1");
-        ref<Expr> B = ConstantExpr::create(3, Expr::Int32);
         ObjectState *wos = state->addressSpace.getWriteable(mo, os);
         wos->write(0, B);
-        llvm::errs() << os->read(0, 32) << "\n";
-        llvm::errs() << wos->read(0, 32) << "\n";
-        klee_warning("sajjad2");
       }
     }
 
@@ -4220,6 +4311,8 @@ void Executor::runFunctionAsMain(Function *f,
     if (statsTracker)
       statsTracker->done();
   }
+  llvm::errs() << stats::instructions << " " << util::getUserTime() << "\n";
+  klee_warning("sajjad1");
 }
 
 unsigned Executor::getPathStreamID(const ExecutionState &state) {
