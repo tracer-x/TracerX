@@ -20,9 +20,9 @@
 #include <klee/Expr.h>
 #include <klee/Internal/Support/ErrorHandling.h>
 
+#include "TimingSolver.h"
 #include "TxDependency.h"
 #include "TxShadowArray.h"
-#include "TimingSolver.h"
 
 #include <fstream>
 #include <klee/CommandLine.h>
@@ -35,12 +35,13 @@
 using namespace klee;
 
 typedef std::map<ref<TxVariable>, ref<TxInterpolantValue> >
-LowerInterpolantStore;
+    LowerInterpolantStore;
 typedef std::map<ref<TxAllocationContext>, LowerInterpolantStore>
-TopInterpolantStore;
+    TopInterpolantStore;
 
 std::map<std::pair<std::string, llvm::Value *>,
-         std::pair<const Array *, ref<Expr> > > TxWPArrayStore::arrayStore;
+         std::pair<const Array *, ref<Expr> > >
+    TxWPArrayStore::arrayStore;
 ArrayCache TxWPArrayStore::ac;
 const Array *TxWPArrayStore::array;
 ref<Expr> TxWPArrayStore::constValues;
@@ -986,20 +987,41 @@ TxWeakestPreCondition::~TxWeakestPreCondition() {}
 //}
 
 ref<Expr> TxWeakestPreCondition::intersectExpr(
-		ref<Expr> branchCondition, ref<Expr> expr1,
-		ref<Expr> expr2, ref<Expr> interpolant,
-		std::set<const Array *> existentials,
-		TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
-		TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore,
-		TxStore::TopInterpolantStore concretelyAddressedStore,
-		TxStore::TopInterpolantStore symbolicallyAddressedStore) {
-	/*
-	std::map<std::string, ref<Expr> > entries = extractExprs(
-			concretelyAddressedStore);
-	std::vector<ref<Expr> > pcs;
-	TxPartitionHelper1::getExprsFromAndExpr(interpolant, pcs);
-	std::vector<Partition1> partitions = TxPartitionHelper1::paritionOnCond(
-			branchCondition, expr1, expr2, pcs, entries);
+    ref<Expr> branchCondition, ref<Expr> expr1, ref<Expr> expr2,
+    ref<Expr> interpolant, std::set<const Array *> existentials,
+    TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
+    TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore,
+    TxStore::TopInterpolantStore concretelyAddressedStore,
+    TxStore::TopInterpolantStore symbolicallyAddressedStore) {
+
+  std::map<std::string, ref<Expr> > entries =
+      extractExprs(concretelyAddressedStore);
+
+  // partition interpolant based on branchCondition
+  std::vector<ref<Expr> > interpolantExprs;
+  TxPartitionHelper::getExprsFromAndExpr(interpolant, interpolantExprs);
+  std::vector<Partition> interpolantParts =
+      TxPartitionHelper::partitionOnCond(branchCondition, interpolantExprs);
+
+  // partition w1 based on branchCondition
+  std::vector<ref<Expr> > w1Exprs;
+  TxPartitionHelper::getExprsFromAndExpr(interpolant, w1Exprs);
+  std::vector<Partition> w1Parts =
+      TxPartitionHelper::partitionOnCond(branchCondition, w1Exprs);
+
+  // partition w2 based on branchCondition
+  std::vector<ref<Expr> > w2Exprs;
+  TxPartitionHelper::getExprsFromAndExpr(interpolant, w2Exprs);
+  std::vector<Partition> w2Parts =
+      TxPartitionHelper::partitionOnCond(branchCondition, w2Exprs);
+
+  /*
+  std::map<std::string, ref<Expr> > entries = extractExprs(
+                  concretelyAddressedStore);
+  std::vector<ref<Expr> > pcs;
+  TxPartitionHelper1::getExprsFromAndExpr(interpolant, pcs);
+  std::vector<Partition1> partitions = TxPartitionHelper1::paritionOnCond(
+                  branchCondition, expr1, expr2, pcs, entries);
 
 
 //	llvm::outs() << "\n------from upper intersectExpr-------\n";
@@ -1012,86 +1034,86 @@ ref<Expr> TxWeakestPreCondition::intersectExpr(
 //	llvm::outs() << "\n-------------\n";
 
 
-	std::vector<ref<Expr> > res;
-	// and non-related wp1r ^ wp2r
-	ref<Expr> and1 = TxPartitionHelper1::createAnd(partitions.at(0).wp1);
-	ref<Expr> and2 = TxPartitionHelper1::createAnd(partitions.at(0).wp2);
-	ref<Expr> nonrelated;
-	if (and1.isNull()) {
-		if (and2.isNull()) {
-			res.push_back(nonrelated);
-		} else {
-			res.push_back(and2);
-		}
-	} else {
-		if (and2.isNull()) {
-			res.push_back(and1);
-		} else {
-			res.push_back(AndExpr::create(and1, and2));
-		}
-	}
+  std::vector<ref<Expr> > res;
+  // and non-related wp1r ^ wp2r
+  ref<Expr> and1 = TxPartitionHelper1::createAnd(partitions.at(0).wp1);
+  ref<Expr> and2 = TxPartitionHelper1::createAnd(partitions.at(0).wp2);
+  ref<Expr> nonrelated;
+  if (and1.isNull()) {
+          if (and2.isNull()) {
+                  res.push_back(nonrelated);
+          } else {
+                  res.push_back(and2);
+          }
+  } else {
+          if (and2.isNull()) {
+                  res.push_back(and1);
+          } else {
+                  res.push_back(AndExpr::create(and1, and2));
+          }
+  }
 
-	// merge related wp1b, wp2b
-	bool isWp1bTrue = true;
-	for (std::vector<ref<Expr> >::const_iterator it =
-			partitions.at(1).wp1.begin(), ie = partitions.at(1).wp1.end();
-			it != ie; ++it) {
-		if (True() != *it) {
-			isWp1bTrue = false;
-			break;
-		}
-	}
-	bool isWp2bTrue = true;
-	for (std::vector<ref<Expr> >::const_iterator it =
-			partitions.at(1).wp2.begin(), ie = partitions.at(1).wp2.end();
-			it != ie; ++it) {
-		if (True() != *it) {
-			isWp2bTrue = false;
-			break;
-		}
-	}
+  // merge related wp1b, wp2b
+  bool isWp1bTrue = true;
+  for (std::vector<ref<Expr> >::const_iterator it =
+                  partitions.at(1).wp1.begin(), ie = partitions.at(1).wp1.end();
+                  it != ie; ++it) {
+          if (True() != *it) {
+                  isWp1bTrue = false;
+                  break;
+          }
+  }
+  bool isWp2bTrue = true;
+  for (std::vector<ref<Expr> >::const_iterator it =
+                  partitions.at(1).wp2.begin(), ie = partitions.at(1).wp2.end();
+                  it != ie; ++it) {
+          if (True() != *it) {
+                  isWp2bTrue = false;
+                  break;
+          }
+  }
 
-	if (isWp1bTrue && isWp2bTrue) {
-		res.push_back(True());
-	} else if (isWp1bTrue && !isWp2bTrue) {
-		res.push_back(
-				AndExpr::create(
-						TxPartitionHelper1::createAnd(partitions.at(1).wp1),
-						NotExpr::create(branchCondition)));
-	} else if (!isWp1bTrue && isWp2bTrue) {
-		res.push_back(
-				AndExpr::create(
-						TxPartitionHelper1::createAnd(partitions.at(1).wp2),
-						branchCondition));
-	} else if (!isWp1bTrue && !isWp2bTrue) {
-		res.push_back(TxPartitionHelper1::createAnd(partitions.at(1).wp1));
-		res.push_back(TxPartitionHelper1::createAnd(partitions.at(1).wp2));
-	}
+  if (isWp1bTrue && isWp2bTrue) {
+          res.push_back(True());
+  } else if (isWp1bTrue && !isWp2bTrue) {
+          res.push_back(
+                          AndExpr::create(
+                                          TxPartitionHelper1::createAnd(partitions.at(1).wp1),
+                                          NotExpr::create(branchCondition)));
+  } else if (!isWp1bTrue && isWp2bTrue) {
+          res.push_back(
+                          AndExpr::create(
+                                          TxPartitionHelper1::createAnd(partitions.at(1).wp2),
+                                          branchCondition));
+  } else if (!isWp1bTrue && !isWp2bTrue) {
+          res.push_back(TxPartitionHelper1::createAnd(partitions.at(1).wp1));
+          res.push_back(TxPartitionHelper1::createAnd(partitions.at(1).wp2));
+  }
 
-	//llvm::outs() << "\n-----from lower intersectExpr--------\n";
-	//llvm::errs() << "Expression vector:\n Size=" << res.size() << "\n";
-	//for (unsigned int i = 0; i < res.size(); i++) {
-	//	res.at(i)->dump();
-	//}
-	//llvm::outs() << "\n-------------\n";
-	*/
-	ref<Expr> res;
-	return res;
+  //llvm::outs() << "\n-----from lower intersectExpr--------\n";
+  //llvm::errs() << "Expression vector:\n Size=" << res.size() << "\n";
+  //for (unsigned int i = 0; i < res.size(); i++) {
+  //	res.at(i)->dump();
+  //}
+  //llvm::outs() << "\n-------------\n";
+  */
+  ref<Expr> res;
+  return res;
 }
 
-std::map<std::string, ref<Expr> > TxWeakestPreCondition::extractExprs(TxStore::TopInterpolantStore concretelyAddressedStore) {
-	std::map<std::string, ref<Expr> > res;
-	for (TxStore::TopInterpolantStore::const_iterator topIs =
-			concretelyAddressedStore.begin(), topIe =
-			concretelyAddressedStore.end(), topIt = topIs; topIt != topIe;
-			++topIt) {
-		std::string var(topIt->first->getValue()->getName().data());
-		ref<Expr> value = topIt->second.begin()->second->getExpression();
-		res.insert(std::pair<std::string,ref<Expr> >(var, value));
-	}
-	return res;
+std::map<std::string, ref<Expr> > TxWeakestPreCondition::extractExprs(
+    TxStore::TopInterpolantStore concretelyAddressedStore) {
+  std::map<std::string, ref<Expr> > res;
+  for (TxStore::TopInterpolantStore::const_iterator
+           topIs = concretelyAddressedStore.begin(),
+           topIe = concretelyAddressedStore.end(), topIt = topIs;
+       topIt != topIe; ++topIt) {
+    std::string var(topIt->first->getValue()->getName().data());
+    ref<Expr> value = topIt->second.begin()->second->getExpression();
+    res.insert(std::pair<std::string, ref<Expr> >(var, value));
+  }
+  return res;
 }
-
 
 /*std::vector<ref<Expr> >
 TxWeakestPreCondition::intersectExpr_aux(std::vector<ref<Expr> > expr1,
@@ -1265,7 +1287,9 @@ ref<Expr> TxWeakestPreCondition::instantiateSingleExpression(
   ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
   switch (singleWPExpr->getKind()) {
   case Expr::InvalidKind:
-  case Expr::Constant: { return singleWPExpr; }
+  case Expr::Constant: {
+    return singleWPExpr;
+  }
 
   case Expr::Read: {
     // Todo: Are pointers supported too?
@@ -1504,7 +1528,9 @@ ref<Expr> TxWeakestPreCondition::getVarFromExpr(ref<Expr> wp) {
   case Expr::InvalidKind:
   case Expr::Read:
   case Expr::Concat:
-  case Expr::Constant: { return wp; }
+  case Expr::Constant: {
+    return wp;
+  }
 
   case Expr::NotOptimized:
   case Expr::Not:
@@ -1585,7 +1611,9 @@ ref<Expr> TxWeakestPreCondition::extractUnrelatedFrame(ref<Expr> interpolant,
                                                        ref<Expr> var) {
   switch (interpolant->getKind()) {
   case Expr::InvalidKind:
-  case Expr::Constant: { return interpolant; }
+  case Expr::Constant: {
+    return interpolant;
+  }
 
   case Expr::Read:
   case Expr::Concat: {
@@ -1685,7 +1713,9 @@ ref<Expr> TxWeakestPreCondition::extractUnrelatedFrame(ref<Expr> interpolant,
 ref<Expr> TxWeakestPreCondition::replaceArrayWithShadow(ref<Expr> interpolant) {
   switch (interpolant->getKind()) {
   case Expr::InvalidKind:
-  case Expr::Constant: { return interpolant; }
+  case Expr::Constant: {
+    return interpolant;
+  }
 
   case Expr::Read:
   case Expr::Concat: {
@@ -1774,7 +1804,9 @@ TxWeakestPreCondition::updateExistentials(std::set<const Array *> existentials,
                                           ref<Expr> wp) {
   switch (wp->getKind()) {
   case Expr::InvalidKind:
-  case Expr::Constant: { return existentials; }
+  case Expr::Constant: {
+    return existentials;
+  }
 
   case Expr::Read:
   case Expr::Concat: {
@@ -1861,17 +1893,18 @@ TxWeakestPreCondition::updateExistentials(std::set<const Array *> existentials,
 ref<Expr> TxWeakestPreCondition::GenerateWP(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
 
-//	llvm::outs() << "--- Begin printing instruction list ---\n";
-//	for (std::vector<std::pair<KInstruction *, int> >::const_iterator it =
-//			reverseInstructionList.begin(), ie = reverseInstructionList.end();
-//			it != ie; ++it) {
-//		llvm::Instruction *i = (*it).first->inst;
-//		int flag = (*it).second;
-//		// instruction list
-//		i->dump();
-//		llvm::outs() << flag << "\n";
-//	}
-//	llvm::outs() << "--- End of printing instruction list ---\n";
+  //	llvm::outs() << "--- Begin printing instruction list ---\n";
+  //	for (std::vector<std::pair<KInstruction *, int> >::const_iterator it =
+  //			reverseInstructionList.begin(), ie =
+  // reverseInstructionList.end();
+  //			it != ie; ++it) {
+  //		llvm::Instruction *i = (*it).first->inst;
+  //		int flag = (*it).second;
+  //		// instruction list
+  //		i->dump();
+  //		llvm::outs() << flag << "\n";
+  //	}
+  //	llvm::outs() << "--- End of printing instruction list ---\n";
 
   for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
@@ -1883,11 +1916,11 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
     if (flag == 1) {
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- create and expression from the condition and this->WPExpr
-//      llvm::outs() << "--- start 1 ---\n";
+      //      llvm::outs() << "--- start 1 ---\n";
       ref<Expr> cond = getBrCondition(i);
-//      i->dump();
-//      cond->dump();
-//      llvm::outs() << "--- end 1 ---\n";
+      //      i->dump();
+      //      cond->dump();
+      //      llvm::outs() << "--- end 1 ---\n";
       WPExpr = AndExpr::create(WPExpr, cond);
     } else if (flag == 2) {
       // 1- call getCondition on the cond argument of the branch instruction
@@ -1896,9 +1929,9 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
       //      llvm::outs() << "--- start 2 ---\n";
       //      getCondition(i)->dump();
       ref<Expr> negCond = NotExpr::create(getBrCondition(i));
-      //i->dump();
-      //negCond->dump();
-      //llvm::outs() << "--- end 2 ---\n";
+      // i->dump();
+      // negCond->dump();
+      // llvm::outs() << "--- end 2 ---\n";
       WPExpr = AndExpr::create(WPExpr, negCond);
     } else if (i->getOpcode() == llvm::Instruction::Br) {
       llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(i);
@@ -1930,7 +1963,7 @@ ref<Expr> TxWeakestPreCondition::getPrevExpr(ref<Expr> e,
     ref<Expr> result = EqExpr::create(right, left);
     ref<Expr> result1 = TxWPHelper::substituteExpr(e, result);
     // Turning off simplification for now
-    //ret = TxWPHelper::simplifyWPExpr(TxWPHelper::substituteExpr(e, result));
+    // ret = TxWPHelper::simplifyWPExpr(TxWPHelper::substituteExpr(e, result));
     ret = result1;
     break;
   }
@@ -1946,142 +1979,139 @@ ref<Expr> TxWeakestPreCondition::getPrevExpr(ref<Expr> e,
 }
 
 ref<Expr> TxWeakestPreCondition::getBrCondition(llvm::Instruction *ins) {
-	if (!llvm::isa<llvm::BranchInst>(ins)) {
-		klee_error(
-				"TxWeakestPreCondition::getBrCondition: not a Branch instruction!");
-		return True();
-	}
-	llvm::BranchInst *br = llvm::dyn_cast<llvm::BranchInst>(ins);
-	return getCondition(br->getCondition());
+  if (!llvm::isa<llvm::BranchInst>(ins)) {
+    klee_error(
+        "TxWeakestPreCondition::getBrCondition: not a Branch instruction!");
+    return True();
+  }
+  llvm::BranchInst *br = llvm::dyn_cast<llvm::BranchInst>(ins);
+  return getCondition(br->getCondition());
 }
 
 ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
-	ref<Expr> result;
-	if (llvm::isa<llvm::CmpInst>(value)) {
-		llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(value);
-		result = getCmpCondition(cmp);
-	} else if (llvm::isa<llvm::BinaryOperator>(value)) {
-		llvm::Instruction *binOp = dyn_cast<llvm::Instruction>(value);
-		ref<Expr> left = this->generateExprFromOperand(binOp, 0);
-		ref<Expr> right = this->generateExprFromOperand(binOp, 1);
-		switch (binOp->getOpcode()) {
-		case llvm::Instruction::And: {
-			result = AndExpr::create(left, right);
-			break;
-		}
-		case llvm::Instruction::Or: {
-			result = OrExpr::create(left, right);
-			break;
-		}
-		default:
-			klee_error(
-					"TxWeakestPreCondition::getCondition: Binary operator is not implemented yet!");
-		}
-	} else {
-		klee_error(
-				"TxWeakestPreCondition::getCondition: Binary operator is not implemented yet!");
-	}
-	return result;
+  ref<Expr> result;
+  if (llvm::isa<llvm::CmpInst>(value)) {
+    llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(value);
+    result = getCmpCondition(cmp);
+  } else if (llvm::isa<llvm::BinaryOperator>(value)) {
+    llvm::Instruction *binOp = dyn_cast<llvm::Instruction>(value);
+    ref<Expr> left = this->generateExprFromOperand(binOp, 0);
+    ref<Expr> right = this->generateExprFromOperand(binOp, 1);
+    switch (binOp->getOpcode()) {
+    case llvm::Instruction::And: {
+      result = AndExpr::create(left, right);
+      break;
+    }
+    case llvm::Instruction::Or: {
+      result = OrExpr::create(left, right);
+      break;
+    }
+    default:
+      klee_error("TxWeakestPreCondition::getCondition: Binary operator is not "
+                 "implemented yet!");
+    }
+  } else {
+    klee_error("TxWeakestPreCondition::getCondition: Binary operator is not "
+               "implemented yet!");
+  }
+  return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getCmpCondition(llvm::CmpInst *cmp) {
-	// Getting the expressions from the left and right operand
-	  ref<Expr> left = this->generateExprFromOperand(cmp, 0);
-	  ref<Expr> right = this->generateExprFromOperand(cmp, 1);
-	  ref<Expr> result;
-	  // second step is to Storing the updated WP expression
-	  switch (cmp->getPredicate()) {
-	  case llvm::CmpInst::ICMP_EQ:
-	    result = EqExpr::create(left, right);
-	    break;
-	  case llvm::CmpInst::ICMP_NE:
-	    result = NeExpr::create(left, right);
-	    break;
-	  case llvm::CmpInst::ICMP_UGT:
-	    result = UgtExpr::create(left, right);
-	    break;
-	  case llvm::CmpInst::ICMP_UGE:
-	    result = UgeExpr::create(left, right);
-	    break;
-	  case llvm::CmpInst::ICMP_ULT:
-	    result = UltExpr::create(left, right);
-	    break;
-	  case llvm::CmpInst::ICMP_ULE:
-	    result = UleExpr::create(left, right);
-	    break;
-	  case llvm::CmpInst::ICMP_SGT:
-	    result = SgtExpr::create(left, right);
-	    break;
-	  case llvm::CmpInst::ICMP_SGE:
-	    result = SgeExpr::create(left, right);
-	    break;
-	  case llvm::CmpInst::ICMP_SLT:
-	    result = SltExpr::create(left, right);
-	    break;
-	  case llvm::CmpInst::ICMP_SLE:
-	    result = SleExpr::create(left, right);
-	    break;
-	  // todo Handle Floating Point
-	  case llvm::CmpInst::FCMP_FALSE:
-	    klee_error("FCMP_FALSE not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_OEQ:
-	    klee_error("FCMP_OEQ not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_OGT:
-	    klee_error("FCMP_OGT not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_OGE:
-	    klee_error("FCMP_OGE not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_OLT:
-	    klee_error("FCMP_OLT not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_OLE:
-	    klee_error("FCMP_OLE not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_ONE:
-	    klee_error("FCMP_ONE not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_ORD:
-	    klee_error("FCMP_ORD not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_UNO:
-	    klee_error("FCMP_UNO not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_UEQ:
-	    klee_error("FCMP_UEQ not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_UGT:
-	    klee_error("FCMP_UGT not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_UGE:
-	    klee_error("FCMP_UGE not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_ULT:
-	    klee_error("FCMP_ULT not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_ULE:
-	    klee_error("FCMP_ULE not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_UNE:
-	    klee_error("FCMP_UNE not implemented yet!");
-	    break;
-	  case llvm::CmpInst::FCMP_TRUE:
-	    klee_error("FCMP_TRUE not implemented yet!");
-	    break;
-	  case llvm::CmpInst::BAD_FCMP_PREDICATE:
-	    klee_error("BAD_FCMP_PREDICATE not implemented yet!");
-	    break;
-	  case llvm::CmpInst::BAD_ICMP_PREDICATE:
-	    klee_error("BAD_ICMP_PREDICATE not implemented yet!");
-	    break;
-	  }
-	  return result;
+  // Getting the expressions from the left and right operand
+  ref<Expr> left = this->generateExprFromOperand(cmp, 0);
+  ref<Expr> right = this->generateExprFromOperand(cmp, 1);
+  ref<Expr> result;
+  // second step is to Storing the updated WP expression
+  switch (cmp->getPredicate()) {
+  case llvm::CmpInst::ICMP_EQ:
+    result = EqExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_NE:
+    result = NeExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_UGT:
+    result = UgtExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_UGE:
+    result = UgeExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_ULT:
+    result = UltExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_ULE:
+    result = UleExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_SGT:
+    result = SgtExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_SGE:
+    result = SgeExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_SLT:
+    result = SltExpr::create(left, right);
+    break;
+  case llvm::CmpInst::ICMP_SLE:
+    result = SleExpr::create(left, right);
+    break;
+  // todo Handle Floating Point
+  case llvm::CmpInst::FCMP_FALSE:
+    klee_error("FCMP_FALSE not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_OEQ:
+    klee_error("FCMP_OEQ not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_OGT:
+    klee_error("FCMP_OGT not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_OGE:
+    klee_error("FCMP_OGE not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_OLT:
+    klee_error("FCMP_OLT not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_OLE:
+    klee_error("FCMP_OLE not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_ONE:
+    klee_error("FCMP_ONE not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_ORD:
+    klee_error("FCMP_ORD not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_UNO:
+    klee_error("FCMP_UNO not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_UEQ:
+    klee_error("FCMP_UEQ not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_UGT:
+    klee_error("FCMP_UGT not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_UGE:
+    klee_error("FCMP_UGE not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_ULT:
+    klee_error("FCMP_ULT not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_ULE:
+    klee_error("FCMP_ULE not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_UNE:
+    klee_error("FCMP_UNE not implemented yet!");
+    break;
+  case llvm::CmpInst::FCMP_TRUE:
+    klee_error("FCMP_TRUE not implemented yet!");
+    break;
+  case llvm::CmpInst::BAD_FCMP_PREDICATE:
+    klee_error("BAD_FCMP_PREDICATE not implemented yet!");
+    break;
+  case llvm::CmpInst::BAD_ICMP_PREDICATE:
+    klee_error("BAD_ICMP_PREDICATE not implemented yet!");
+    break;
+  }
+  return result;
 }
-
-
-
 
 ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
                                                          int operand) {
@@ -2181,22 +2211,29 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
     ref<Expr> arg1 = generateExprFromOperand(op1, 0);
 
     Expr::Width width = Expr::InvalidWidth;
-    if (op1->getDestTy()->isEmptyTy()) width = Expr::InvalidWidth;
-    else if (op1->getDestTy()->isIntegerTy(1)) width = Expr::Bool;
-    else if (op1->getDestTy()->isIntegerTy(8)) width = Expr::Int8;
-    else if (op1->getDestTy()->isHalfTy()) width = Expr::Int16;
-    else if (op1->getDestTy()->isIntegerTy()) width = Expr::Int32;
-    else if (op1->getDestTy()->isDoubleTy()) width = Expr::Int64;
-    else if (op1->getDestTy()->isFloatTy()) width = Expr::Fl80;
+    if (op1->getDestTy()->isEmptyTy())
+      width = Expr::InvalidWidth;
+    else if (op1->getDestTy()->isIntegerTy(1))
+      width = Expr::Bool;
+    else if (op1->getDestTy()->isIntegerTy(8))
+      width = Expr::Int8;
+    else if (op1->getDestTy()->isHalfTy())
+      width = Expr::Int16;
+    else if (op1->getDestTy()->isIntegerTy())
+      width = Expr::Int32;
+    else if (op1->getDestTy()->isDoubleTy())
+      width = Expr::Int64;
+    else if (op1->getDestTy()->isFloatTy())
+      width = Expr::Fl80;
 
     switch (op1->getOpcode()) {
-	case llvm::Instruction::SExt:{
-      left = SExtExpr::create(arg1,width);
+    case llvm::Instruction::SExt: {
+      left = SExtExpr::create(arg1, width);
       break;
     }
 
     case llvm::Instruction::ZExt: {
-      left = ZExtExpr::create(arg1,width);
+      left = ZExtExpr::create(arg1, width);
       break;
     }
     case llvm::Instruction::AddrSpaceCast:
@@ -2211,9 +2248,8 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
     case llvm::Instruction::Trunc:
     case llvm::Instruction::UIToFP:
     default: {
-      klee_error(
-      "TxWeakestPreCondition::generateExprFromOperand Unary Operand "
-      "not implemented...\n");
+      klee_error("TxWeakestPreCondition::generateExprFromOperand Unary Operand "
+                 "not implemented...\n");
     }
     }
   } else if (isa<llvm::AllocaInst>(operand1)) {
@@ -2222,11 +2258,10 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
   } else if (llvm::isa<llvm::CmpInst>(operand1)) {
     llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(operand1);
     left = getCmpCondition(cmp);
-  }
-  else {
-	operand1->dump();
+  } else {
+    operand1->dump();
     klee_error("TxWeakestPreCondition::generateExprFromOperand Remaining"
-    " cases not implemented yet\n");
+               " cases not implemented yet\n");
     left = dependency->getAddress(operand1, &TxWPArrayStore::ac,
                                   TxWPArrayStore::array, this);
   }

@@ -1,4 +1,5 @@
-//===-- TxPartitionHelper.h - Tracer-X symbolic execution tree -------------*- C++ -*-===//
+//===-- TxPartitionHelper.h - Tracer-X symbolic execution tree -------------*-
+// C++ -*-===//
 //
 //               The Tracer-X KLEE Symbolic Virtual Machine
 //
@@ -12,65 +13,42 @@
 ///
 //===----------------------------------------------------------------------===//
 
-
 #ifndef LIB_CORE_TXPARTITIONHELPER_H_
 #define LIB_CORE_TXPARTITIONHELPER_H_
 
-#include "klee/ExecutionState.h"
-#include "Memory.h"
-#include "TxPathCondition.h"
 #include "TxStore.h"
+#include "klee/Internal/Support/ErrorHandling.h"
+#include "llvm/IR/Value.h"
+#include <iostream>
+#include <map>
+#include <string>
 
 namespace klee {
 
 class Partition {
 public:
-  std::vector<ref<Expr> > exprs;
-  std::set<std::string> vars;
-};
-
-class StorePartition {
-public:
-  std::vector<std::pair<std::string, ref<Expr> > > entries;
+  std::set<ref<Expr> > exprs;
   std::set<std::string> vars;
 };
 
 class TxPartitionHelper {
 public:
-  static void test(ExecutionState &state, ref<Expr> e);
-  static void test1(ExecutionState &state);
-
-  static Partition getNeededPartition(ConstraintManager constraints,
-                                      ref<Expr> e);
-  static std::vector<Partition> partition(ConstraintManager constraints);
+  static std::vector<Partition> partitionOnCond(ref<Expr> cond,
+                                                std::vector<ref<Expr> > exprs);
   static std::vector<Partition> partition(std::vector<ref<Expr> > exprs);
-  static std::vector<Partition> partition(ref<Expr> expr);
-  static std::vector<StorePartition> partitionStore(std::map<std::string, ref<Expr> > entries);
-
-  static std::vector<Partition> partitionOnCond(ref<Expr> cond, std::vector<ref<Expr> > exprs);
-  static std::vector<Partition> partitionOnCond(ref<Expr> cond, TxStore::TopInterpolantStore addressStore);
-  static std::vector<Partition> partitionOnCond(ref<Expr> cond, ref<Expr> expr);
-  static std::vector<Partition> partitionStoreOnCond(ref<Expr> cond, TxStore::TopInterpolantStore store);
-  static std::vector<Partition> get2Or3Partitions(ref<Expr> cond, std::vector<ref<Expr> > exprs1, std::vector<ref<Expr> > exprs2);
 
   static ref<Expr> createAnd(std::vector<ref<Expr> > exprs);
-  static void getExprsFromAndExpr(ref<Expr> e, std::vector<ref<Expr> >& exprs);
+  static void getExprsFromAndExpr(ref<Expr> e, std::vector<ref<Expr> > &exprs);
 
-  // printing functions
-  static void printInfo(ExecutionState &state);
-  static ref<Expr> True() {
-    return ConstantExpr::alloc(1, Expr::Bool);
-  };
-  static ref<Expr> False() {
-    return ConstantExpr::alloc(0, Expr::Bool);
-  };
+  static ref<Expr> True() { return ConstantExpr::alloc(1, Expr::Bool); };
+  static ref<Expr> False() { return ConstantExpr::alloc(0, Expr::Bool); };
+
 private:
-  static bool isShared(std::set<std::string> ss1, std::set<std::string> ss2);
   static void getExprVars(ref<Expr> e, std::set<std::string> &vars);
-
-
-  // printing functions
-  static void printExprInfo(ref<Expr> expr);
+  static void visit(ref<Expr> node, std::set<ref<Expr> > &currentComp,
+                    std::map<ref<Expr>, std::set<ref<Expr> > > &ref2ref,
+                    std::set<ref<Expr> > &marked);
+  static bool isShared(std::set<std::string> ss1, std::set<std::string> ss2);
 };
 }
 #endif /* TXLIB_CORE_PARTITIONHELPER_H_ */
