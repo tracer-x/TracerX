@@ -95,7 +95,24 @@ ref<Expr> WPArrayStore::createAndInsert(std::string arrayName,
                ->getArrayElementType()
                ->getArrayElementType()
                ->getIntegerBitWidth();
-  } else {
+  } /*else if (value->getType()->isPointerTy() &&
+          value->getType()->getArrayElementType()->isPointerTy() &&
+          value->getType()->getArrayElementType()->getArrayElementType()->isArrayTy() &&
+		  value->getType()->getArrayElementType()->getArrayElementType()->getArrayElementType()->
+		  isIntegerTy()){
+	size = value->getType()
+	            ->getArrayElementType()
+	            ->getArrayElementType()
+				->getArrayElementType()
+				->getIntegerBitWidth();
+//	size = size * value->getType()
+//	    	            ->getArrayElementType()
+//	    	            ->getArrayElementType()
+//						->getArrayNumElements();
+//	size = size * value->getType()
+//		    	            ->getArrayElementType()
+//							->getArrayNumElements();
+  } */ else {
     value->getType()->dump();
     klee_error(
         "WPArrayStore::createAndInsert getting size is not defined for this "
@@ -214,7 +231,7 @@ WeakestPreCondition::~WeakestPreCondition() {}
 std::vector<std::pair<KInstruction *, int> > WeakestPreCondition::markVariables(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
 
-  for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
+  for (std::vector<std::pair<KInstruction *, int> >::reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
        it != ie; ++it) {
@@ -222,33 +239,55 @@ std::vector<std::pair<KInstruction *, int> > WeakestPreCondition::markVariables(
     // Retrieve the instruction
     KInstruction *i = (*it).first;
 
-    std::vector<std::pair<KInstruction *, int> >::iterator iter =
-        std::find(reverseInstructionList.begin(), reverseInstructionList.end(),
-                  std::pair<KInstruction *, int>(i, 0));
-
     // Mark the instructions
     if (markedVariables.find(i->inst) != markedVariables.end()) {
-      iter->second = 1;
+      (*it).second = 1;
+      //      klee_warning("===MARKED INST1");
     } else if (dyn_cast<llvm::StoreInst>(i->inst) &&
                markedVariables.find(i->inst->getOperand(1)) !=
                    markedVariables.end()) {
-      iter->second = 1;
+      (*it).second = 1;
+      //      klee_warning("===MARKED INST2");
     }
+    //    klee_warning("Sajjad1");
+    //    (*it).first->inst->dump();
+    //    klee_warning("Sajjad2");
+    /*for (std::set<llvm::Value *>::const_iterator
+             it1 = markedVariables.begin(),
+             ie1 = markedVariables.end();
+         it1 != ie1; ++it1) {
+          (*it1)->dump();
+    }*/
 
     // Add the variables in the RHS of marked instructions to markedVariables
     // set
-    if ((*it).second == 1) {
-      if (dyn_cast<llvm::BinaryOperator>(i->inst) ||
-          dyn_cast<llvm::LoadInst>(i->inst) ||
-          dyn_cast<llvm::UnaryInstruction>(i->inst) ||
-          dyn_cast<llvm::StoreInst>(i->inst) ||
-          dyn_cast<llvm::CmpInst>(i->inst)) {
+    if (i->inst->getOpcode() == llvm::Instruction::Store) {
+      llvm::Value *operand1 = i->inst->getOperand(1);
+      llvm::Value *operand0 = i->inst->getOperand(0);
+      //		klee_warning("Sajjad4");
+      //		operand1->dump();
+      //		klee_warning("Sajjad5");
+      if ((isa<llvm::GlobalValue>(operand0) ||
+           !isa<llvm::Constant>(operand0)) &&
+          markedVariables.find(operand1) != markedVariables.end()) {
+        markedVariables.insert(operand0);
+        //			operand0->dump();
+        (*it).second = 1;
+        //			klee_warning("Sajjad6");
+      }
+    } else if ((*it).second == 1) {
+      if (isa<llvm::BinaryOperator>(i->inst) || isa<llvm::LoadInst>(i->inst) ||
+          isa<llvm::UnaryInstruction>(i->inst) || isa<llvm::CmpInst>(i->inst)) {
         unsigned int j = 0;
         while (j < i->inst->getNumOperands()) {
           llvm::Value *operand = i->inst->getOperand(j);
-          if ((!isa<llvm::Constant>(operand) ||
-               isa<llvm::GlobalValue>(operand)) &&
+          //          klee_message("Sajjad4");
+          //          operand->dump();
+          //    	  klee_message("Sajjad5");
+          if ((isa<llvm::GlobalValue>(operand) ||
+               !isa<llvm::Constant>(operand)) &&
               markedVariables.find(operand) == markedVariables.end()) {
+            //        	  klee_message("MARKED VAR");
             markedVariables.insert(operand);
           }
           j++;
@@ -279,6 +318,8 @@ std::vector<std::pair<KInstruction *, int> > WeakestPreCondition::markVariables(
       // Marking not implemented for false dependency in instruction yet!
       // At the current moment it is not needed.
     }
+    //    llvm::errs() << "(*it).second" << (*it).second << "\n";
+    //    llvm::errs() << "\n\n\n";
   }
 
   // Printing reverseInstructionList will be omitted in the final commit
@@ -562,11 +603,11 @@ ref<Expr> WeakestPreCondition::GenerateWP(
       case llvm::Instruction::Trunc:
       case llvm::Instruction::BitCast: {
         // Getting the expressions from the operand
-        ref<Expr> operand = this->generateExprFromOperand(i, 0);
         if (markAllFlag == true && !isTargetDependent(i, this->WPExpr)) {
           break;
         }
         ref<Expr> lhs = this->getLHS(i);
+        ref<Expr> operand = this->generateExprFromOperand(i, 0);
         ref<Expr> result = EqExpr::create(lhs, operand);
         this->updateWPExpr(result);
         break;
@@ -637,7 +678,6 @@ ref<Expr> WeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
                                                        int operand) {
   // Generating WP from Operand1
   ref<Expr> left;
-
   llvm::Value *operand1 = i->getOperand(operand);
   if (isa<llvm::ConstantInt>(operand1)) {
     llvm::ConstantInt *CI = dyn_cast<llvm::ConstantInt>(operand1);
@@ -1034,7 +1074,6 @@ WeakestPreCondition::convertToExpr(std::map<ref<Expr>, int> *newLinearTerm) {
 ref<Expr> WeakestPreCondition::instantiateWPExpression(
     TxDependency *dependency, const std::vector<llvm::Instruction *> &callHistory,
     ref<Expr> WPExpr) {
-
   ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
   switch (WPExpr->getKind()) {
   case Expr::InvalidKind:
@@ -1061,9 +1100,9 @@ ref<Expr> WeakestPreCondition::instantiateWPExpression(
           "WeakestPreCondition::instantiateWPExpression Value ref is null");
     ref<Expr> storeValue =
         dependency->getLatestValueOfAddress(tempInstr, callHistory);
-    klee_warning("sajjad3");
-    storeValue->dump();
-    klee_warning("sajjad4");
+    //    klee_warning("sajjad3");
+    //    storeValue->dump();
+    //    klee_warning("sajjad4");
     if (storeValue == dummy)
       return WPExpr;
     return storeValue;
@@ -1180,7 +1219,19 @@ ref<Expr> WeakestPreCondition::intersectExpr(ref<Expr> expr1,ref<Expr> expr2){
 }
 
 ref<Expr> WeakestPreCondition::getMinExpr(ref<Expr> expr1, ref<Expr> expr2) {
-  if (expr1->getKind() == Expr::Add && expr2->getKind() == Expr::Add) {
+  // Since the constant is on the right hand side, max expr will generate the
+  // min slack and vice versa
+  if (expr1.compare(expr2) == 0) {
+    return expr1;
+  } else if ((expr1->getKind() == Expr::Concat ||
+              expr1->getKind() == Expr::Read) &&
+             expr2->getKind() == Expr::Add) {
+    return expr2;
+  } else if (expr1->getKind() == Expr::Add &&
+             (expr2->getKind() == Expr::Concat ||
+              expr2->getKind() == Expr::Read)) {
+    return expr2;
+  } else if (expr1->getKind() == Expr::Add && expr2->getKind() == Expr::Add) {
     if (expr1->getKid(1) == expr2->getKid(1)) {
       ref<Expr> kids[2];
       kids[1] = expr1->getKid(1);
@@ -1221,7 +1272,19 @@ ref<Expr> WeakestPreCondition::getMinExpr(ref<Expr> expr1, ref<Expr> expr2) {
 }
 
 ref<Expr> WeakestPreCondition::getMaxExpr(ref<Expr> expr1, ref<Expr> expr2) {
-  if (expr1->getKind() == Expr::Add && expr2->getKind() == Expr::Add) {
+  // Since the constant is on the right hand side, max expr will generate the
+  // min slack and vice versa
+  if (expr1.compare(expr2) == 0) {
+    return expr1;
+  } else if ((expr1->getKind() == Expr::Concat ||
+              expr1->getKind() == Expr::Read) &&
+             expr2->getKind() == Expr::Add) {
+    return expr2;
+  } else if (expr1->getKind() == Expr::Add &&
+             (expr2->getKind() == Expr::Concat ||
+              expr2->getKind() == Expr::Read)) {
+    return expr2;
+  } else if (expr1->getKind() == Expr::Add && expr2->getKind() == Expr::Add) {
     if (expr1->getKid(1) == expr2->getKid(1)) {
       ref<Expr> kids[2];
       kids[1] = expr1->getKid(1);
@@ -1249,13 +1312,13 @@ ref<Expr> WeakestPreCondition::getMaxExpr(ref<Expr> expr1, ref<Expr> expr2) {
     } else {
       expr1->dump();
       expr2->dump();
-      klee_error("WeakestPreCondition::getMinExpr operands are not the same.");
+      klee_error("WeakestPreCondition::getMaxExpr operands are not the same.");
       return AndExpr::create(expr1, expr2);
     }
   } else {
     expr1->dump();
     expr2->dump();
-    klee_error("WeakestPreCondition::getMinExpr for these expressions is not "
+    klee_error("WeakestPreCondition::getMaxExpr for these expressions is not "
                "implemented yet.");
     return AndExpr::create(expr1, expr2);
   }

@@ -137,6 +137,9 @@ public:
   /// @brief Disables forking for this state. Set by user code
   bool forkDisabled;
 
+  /// @brief Counter example is found,
+  bool counterExampleFound;
+
   /// @brief Set containing which lines in which files are covered by this state
   std::map<const std::string *, std::set<unsigned> > coveredLines;
 

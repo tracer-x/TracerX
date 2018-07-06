@@ -2490,10 +2490,8 @@ bool TxTreeNode::checkWPAtSubsumption(
     TxStore::LowerStateStore &concretelyAddressedHistoricalStore,
     TxStore::LowerStateStore &symbolicallyAddressedHistoricalStore,
     double timeout, int debugSubsumptionLevel) {
-  wpInterpolant->dump();
   ref<Expr> wpInstantiatedInterpolant =
       wp->instantiateWPExpression(dependency, callHistory, wpInterpolant);
-
   if (wpInstantiatedInterpolant->isTrue())
     return true;
   else if (wpInstantiatedInterpolant->isFalse())

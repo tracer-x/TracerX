@@ -192,7 +192,13 @@ private:
 
   /// Signals the executor to halt execution at the next instruction
   /// step.
-  bool haltExecution;  
+  bool haltExecution;
+
+  /// @brief Counter example is found,
+  bool counterExampleFound;
+
+  /// @brief Counter example is value,
+  ref<Expr> counterExampleValue;
 
   /// Whether implied-value concretization is enabled. Currently
   /// false, it is buggy (it needs to validate its writes).
@@ -482,7 +488,17 @@ public:
                                  char **envp);
 
   /*** Runtime options ***/
-  
+
+  virtual void resetCounterExampleFound() { counterExampleFound = false; }
+
+  virtual void setCounterExampleFound() { counterExampleFound = true; }
+
+  virtual bool getCounterExampleFound() { return counterExampleFound; }
+
+  void setCounterExampleValue(ExecutionState &state);
+
+  virtual ref<Expr> getCounterExampleValue() { return counterExampleValue; }
+
   virtual void setHaltExecution(bool value) {
     haltExecution = value;
   }

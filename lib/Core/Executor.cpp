@@ -22,8 +22,6 @@
 #include "StatsTracker.h"
 #include "TimingSolver.h"
 #include "UserSearcher.h"
-#include <experimental/filesystem>
-#include <iostream>
 
 #include "klee/ExecutionState.h"
 #include "klee/Expr.h"
@@ -73,6 +71,7 @@
 #include "llvm/IntrinsicInst.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Module.h"
+#include "include/llvm/Support/Format.h"
 
 #if LLVM_VERSION_CODE <= LLVM_VERSION(3, 1)
 #include "llvm/Target/TargetData.h"
@@ -107,11 +106,13 @@
 #include <sstream>
 #include <vector>
 #include <string>
+#include <math.h>
 
 #include <sys/mman.h>
 
 #include <errno.h>
 #include <cxxabi.h>
+#include <math.h>
 
 using namespace llvm;
 using namespace klee;
@@ -337,6 +338,9 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
                             ? std::min(MaxCoreSolverTime, MaxInstructionTime)
                             : std::max(MaxCoreSolverTime, MaxInstructionTime)),
       debugInstFile(0), debugLogBuffer(debugBufferString) {
+
+  // Resetting CounterExample Found Flag
+  counterExampleFound = false;
 
   if (coreSolverTimeout) UseForkedCoreSolver = true;
   Solver *coreSolver = klee::createCoreSolver(CoreSolverToUse);
@@ -2962,12 +2966,15 @@ void Executor::doDumpStates() {
 void Executor::run(ExecutionState &initialState) {
 
   bindModuleConstants();
+  //  klee_warning("sajjad10");
 
   // Delay init till now so that ticks don't accrue during
   // optimization and such.
   initTimers();
+  //  klee_warning("sajjad11");
 
   states.insert(&initialState);
+  //  klee_warning("sajjad12");
 
   if (usingSeeds) {
     std::vector<SeedInfo> &v = seedMap[&initialState];
@@ -3029,6 +3036,7 @@ void Executor::run(ExecutionState &initialState) {
       }
     }
     klee_message("seeding done (%d states remain)", (int) states.size());
+    //    klee_warning("sajjad13");
 
     // XXX total hack, just because I like non uniform better but want
     // seed results to be equally weighted.
@@ -3037,12 +3045,14 @@ void Executor::run(ExecutionState &initialState) {
          it != ie; ++it) {
       (*it)->weight = 1.;
     }
+    //    klee_warning("sajjad14");
 
     if (OnlySeed) {
       doDumpStates();
       return;
     }
   }
+  //  klee_warning("sajjad15");
 
   searcher = constructUserSearcher(*this);
 
@@ -3051,52 +3061,53 @@ void Executor::run(ExecutionState &initialState) {
 
   while (!states.empty() && !haltExecution) {
     ExecutionState &state = searcher->selectState();
-
+    if (this->getCounterExampleFound() == true) {
+      break;
+    } else {
 #ifdef ENABLE_Z3
-    if (INTERPOLATION_ENABLED) {
-      // We synchronize the node id to that of the state. The node id
-      // is set only when it was the address of the first instruction
-      // in the node.
-      txTree->setCurrentINode(state);
+      if (INTERPOLATION_ENABLED) {
+        // We synchronize the node id to that of the state. The node id
+        // is set only when it was the address of the first instruction
+        // in the node.
+        txTree->setCurrentINode(state);
 
-      uint64_t debugLevel = txTree->getDebugState();
+        uint64_t debugLevel = txTree->getDebugState();
 
-      if (debugLevel > 0) {
-        std::string debugMessage;
-        llvm::raw_string_ostream stream(debugMessage);
-        if (debugLevel > 1) {
-          stream << "\nCurrent state:\n";
-          processTree->print(stream);
+        if (debugLevel > 0) {
+          std::string debugMessage;
+          llvm::raw_string_ostream stream(debugMessage);
+          if (debugLevel > 1) {
+            stream << "\nCurrent state:\n";
+            processTree->print(stream);
+            stream << "\n";
+            txTree->print(stream);
+            stream << "\n";
+            stream << "--------------------------- Current Node "
+                      "----------------------------\n";
+            state.txTreeNode->print(stream);
+            stream << "\n";
+          }
+          stream << "------------------- Executing New Instruction "
+                    "-----------------------\n";
+          if (outputFunctionName(state.pc->inst, stream))
+            stream << ":";
+          state.pc->inst->print(stream);
           stream << "\n";
-          txTree->print(stream);
-          stream << "\n";
-          stream << "--------------------------- Current Node "
-                    "----------------------------\n";
-          state.txTreeNode->print(stream);
-          stream << "\n";
+          stream.flush();
+
+          klee_message("%s", debugMessage.c_str());
         }
-        stream << "------------------- Executing New Instruction "
-                  "-----------------------\n";
-        if (outputFunctionName(state.pc->inst, stream))
-          stream << ":";
-        state.pc->inst->print(stream);
-        stream << "\n";
-        stream.flush();
-
-        klee_message("%s", debugMessage.c_str());
       }
-    }
 #endif
 
-    if (INTERPOLATION_ENABLED &&
-        txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
-      terminateStateOnSubsumption(state);
-    } else
-      {
-	KInstruction *ki = state.pc;
-	stepInstruction(state);
+      if (INTERPOLATION_ENABLED &&
+          txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
+        terminateStateOnSubsumption(state);
+      } else {
+        KInstruction *ki = state.pc;
+        stepInstruction(state);
 
-	executeInstruction(state, ki);
+        executeInstruction(state, ki);
         if (INTERPOLATION_ENABLED) {
           state.txTreeNode->incInstructionsDepth();
         }
@@ -3104,7 +3115,8 @@ void Executor::run(ExecutionState &initialState) {
 
         checkMemoryUsage();
       }
-    updateStates(&state);
+      updateStates(&state);
+    }
   }
 
   delete searcher;
@@ -3364,11 +3376,32 @@ void Executor::terminateStateOnError(ExecutionState &state,
     interpreterHandler->incErrorTerminationTest();
     interpreterHandler->processTestCase(state, msg.str().c_str(), suffix);
   }
-    
+
+  // Setting Counterexample Found
+  this->setCounterExampleFound();
+  this->setCounterExampleValue(state);
+
   terminateState(state);
 
   if (shouldExitOn(termReason))
     haltExecution = true;
+}
+
+void Executor::setCounterExampleValue(ExecutionState &state) {
+  // Reading WCET from the program itself
+  for (std::map<const llvm::GlobalValue *, MemoryObject *>::iterator
+           i = globalObjects.begin(),
+           ie = globalObjects.end();
+       i != ie; ++i) {
+    const llvm::GlobalValue *g = ((*i).first);
+    //	g->dump();
+    //	llvm::errs() << "g->getName():" << g->getName() << "\n";
+    if (g->getName() == "wcet") {
+      MemoryObject *mo = ((*i).second);
+      const ObjectState *os = state.addressSpace.findObject(mo);
+      counterExampleValue = os->read(0, 32);
+    }
+  }
 }
 
 // XXX shoot me
@@ -3959,7 +3992,25 @@ void Executor::runFunctionAsMain(Function *f,
   // force deterministic initialization of memory objects
   srand(1);
   srandom(1);
-  
+
+  // Setting Upper bount to INF and Lower Bound to 0
+  ref<Expr> UB = ConstantExpr::create(100000, Expr::Int32);
+  ref<Expr> LB = ConstantExpr::create(0, Expr::Int32);
+  ref<Expr> B = UB;
+  uint64_t totalInstructions = 0, totalForks = 0, totalTime = 0;
+  llvm::raw_fd_ostream *iterationFile =
+      interpreterHandler->openOutputFile("iteration.csv");
+  assert(iterationFile && "unable to open iteration trace file");
+  *iterationFile << "Known Lower/Upper Bound,"
+                 << "Tested Bound,"
+                 << "Result,"
+                 << "Precision,"
+                 << "Analysis Time (sec),"
+                 << "Instruction Count"
+                 << "\n";
+  iterationFile->flush();
+  llvm::errs() << "Run: 1\n";
+
   MemoryObject *argvMO = 0;
 
   // In order to make uclibc happy and be closer to what the system is
@@ -3997,7 +4048,10 @@ void Executor::runFunctionAsMain(Function *f,
   }
 
   ExecutionState *state = new ExecutionState(kmodule->functionMap[f]);
-  
+
+  // Setting CounterExample Found as false
+  state->counterExampleFound = false;
+
   if (pathWriter) 
     state->pathOS = pathWriter->open();
   if (symPathWriter) 
@@ -4037,6 +4091,39 @@ void Executor::runFunctionAsMain(Function *f,
   
   initializeGlobals(*state);
 
+  // Reading Upper Bound and Lower Bound from the program itself
+  for (std::map<const llvm::GlobalValue *, MemoryObject *>::iterator
+           i = globalObjects.begin(),
+           ie = globalObjects.end();
+       i != ie; ++i) {
+    const llvm::GlobalValue *g = ((*i).first);
+    if (g->getName() == "UB") {
+      MemoryObject *mo = ((*i).second);
+      const ObjectState *os = state->addressSpace.findObject(mo);
+      UB = os->read(0, 32);
+    }
+    if (g->getName() == "LB") {
+      MemoryObject *mo = ((*i).second);
+      const ObjectState *os = state->addressSpace.findObject(mo);
+      LB = os->read(0, 32);
+    }
+    if (g->getName() == "B") {
+      MemoryObject *mo = ((*i).second);
+      const ObjectState *os = state->addressSpace.findObject(mo);
+      B = os->read(0, 32);
+
+      bool useColors = llvm::errs().is_displayed();
+      if (useColors)
+        llvm::errs().changeColor(llvm::raw_ostream::BLUE,
+                                 /*bold=*/true,
+                                 /*bg=*/false);
+      llvm::errs() << "The First Bound is ";
+      B->dump();
+      if (useColors)
+        llvm::errs().resetColor();
+    }
+  }
+
   processTree = new PTree(state);
   state->ptreeNode = processTree->root;
 
@@ -4073,119 +4160,109 @@ void Executor::runFunctionAsMain(Function *f,
 
   if (statsTracker) {
     statsTracker->done();
-    std::string statsFile = interpreterHandler->getOutputFilename("run.stats");
-    std::string newStatsFile;
-    /*try {
-      std::filesystem::rename(statsFile, newStatsFile);
-    } catch (std::filesystem::filesystem_error& e) {
-      std::cout << e.what() << '\n';
-    }*/
   }
-  //  llvm::errs() << stats::instructions << " " << util::getUserTime() <<"\n";
-  //  klee_error("sajjad1");
+  //###################################################################
+  //####################### END OF ROUND ONE ##########################
+  //###################################################################
+  //######################## PRINTING STATS ###########################
+  //###################################################################
 
   bool useColors = llvm::errs().is_displayed();
   if (useColors)
     llvm::errs().changeColor(llvm::raw_ostream::GREEN,
                              /*bold=*/true,
                              /*bg=*/false);
+  //  for(int i = 0 ; i< theStatisticManager->getNumStatistics();i++){
+  //	  Statistic A = theStatisticManager->getStatistic(i);
+  //	  llvm::errs() << A.getName() <<"\n";
+  //  }
 
   uint64_t instructions =
       *theStatisticManager->getStatisticByName("Instructions");
-  uint64_t forks = *theStatisticManager->getStatisticByName("Forks");
+  totalInstructions = totalInstructions + instructions;
 
   llvm::errs() << "KLEE: done: total instructions = " << instructions << "\n";
 
+  uint64_t forks = *theStatisticManager->getStatisticByName("Forks");
+  totalForks = totalForks + forks;
+
   llvm::errs() << "KLEE: done: explored paths = " << 1 + forks << "\n";
 
-  /*  std::stringstream stats;
-    if (INTERPOLATION_ENABLED) {
-      stats << handler->getSubsumptionStats();
-    }
+  uint64_t time = util::getUserTime();
+  totalTime = totalTime + time;
 
-    if (INTERPOLATION_ENABLED) {
-      stats << "KLEE: done:     average instructions of completed paths = "
-            << (double)(handler->getTotalInstructionsDepthOnExitTermination() +
-                        handler->getTotalInstructionsDepthOnEarlyTermination() +
-                        handler->getTotalInstructionsDepthOnErrorTermination())
-  /
-                   (double)(handler->getExitTermination() +
-                            handler->getEarlyTermination() +
-                            handler->getErrorTermination()) << "\n";
-      if (handler->getSubsumptionTermination() == 0.0) {
-        stats << "KLEE: done:     average instructions of subsumed paths = " <<
-  0
-              << "\n";
-      } else {
-        stats << "KLEE: done:     average instructions of subsumed paths = "
-              << (double)
-                     handler->getTotalInstructionPathsExploredOnSubsumption() /
-                     (double)handler->getSubsumptionTermination() << "\n";
-      }
-    }
-
-    if (INTERPOLATION_ENABLED)
-      stats << "KLEE: done:     subsumed paths = "
-            << handler->getSubsumptionTermination() << "\n";
-    stats << "KLEE: done:     error paths = "
-          << handler->getErrorTermination() << "\n";
-    stats << "KLEE: done:     program exit paths = "
-          << handler->getExitTermination() << "\n";
-    stats << "KLEE: done: generated tests = "
-          << handler->getNumTestCases() << ", among which\n";
-    stats << "KLEE: done:     early-terminating tests (instruction time limit,
-  solver timeout, max-depth reached) = "
-          << handler->getEarlyTerminationTest() << "\n";
-  #ifdef ENABLE_Z3
-    if (SubsumedTest)
-      stats << "KLEE: done:     subsumed tests = "
-            << handler->getSubsumptionTerminationTest() << "\n";
-  #endif
-    stats << "KLEE: done:     error tests = "
-          << handler->getErrorTerminationTest() << "\n";
-    stats << "KLEE: done:     program exit tests = "
-          << handler->getExitTerminationTest() << "\n";*/
-
-  if (INTERPOLATION_ENABLED) {
-    llvm::errs() << "\n";
-    llvm::errs() << "KLEE: done: NOTE:\n";
-    llvm::errs() << "KLEE: done:     Subsumed paths / tests counts are "
-                    "nondeterministic for\n";
-    llvm::errs()
-        << "KLEE: done:     programs with dynamically-allocated memory such "
-           "as those\n";
-    llvm::errs()
-        << "KLEE: done:     using malloc, since KLEE may reuse the address "
-           "of the\n";
-    llvm::errs()
-        << "KLEE: done:     same malloc calls in different paths. This "
-           "nondeterminism\n";
-    llvm::errs() << "KLEE: done:     does not cause loss of error reports.\n";
-  }
-
-  /*bool useColors = llvm::errs().is_displayed();
-  if (useColors)
-    llvm::errs().changeColor(llvm::raw_ostream::GREEN,
-                             true,
-                             false);
-
-  llvm::errs() << stats.str();
-
-  if (useColors)
-    llvm::errs().resetColor();*/
-
-  //  handler->getInfoStream() << stats.str();
+  llvm::errs() << "KLEE: done: user time = " << time << "\n";
 
   if (useColors)
     llvm::errs().resetColor();
 
-  int i = 0;
-  while (i++ < 1) {
-    llvm::errs() << "Run: " << i << "\n";
-    ref<Expr> B = ConstantExpr::create(10, Expr::Int32);
+  //###################################################################
+  //#################### END OF PRINTING STATS ########################
+  //###################################################################
+
+  // It is always the case that UB and LB are ConstantExpr
+  APInt UBAPInt = dyn_cast<ConstantExpr>(UB)->getAPValue();
+  double UBDbl = UBAPInt.roundToDouble(false);
+  APInt LBAPInt = dyn_cast<ConstantExpr>(LB)->getAPValue();
+  double LBDbl = LBAPInt.roundToDouble(false);
+
+  // Computing the Accuracy
+  double accuracyDbl = (UBDbl - LBDbl) / sqrt((pow(UBDbl, 2) + pow(LBDbl, 2)));
+  llvm::errs() << "The Accuracy is " << (int)(100 * (1 - accuracyDbl)) << "\n";
+  //  llvm::errs() << "The Accuracy check is " << (accuracyDbl <= 0.02) <<"\n";
+
+  std::string safe = "safe";
+  if (this->getCounterExampleFound() == true) {
+    APInt counterInt =
+        dyn_cast<ConstantExpr>(this->getCounterExampleValue())->getAPValue();
+    double counterDbl = counterInt.roundToDouble(false);
+    std::ostringstream s;
+    s << int(counterDbl);
+    const std::string counter_as_string(s.str());
+    safe = "no(" + counter_as_string + ")";
+  }
+
+  *iterationFile << (int)LBDbl << "-" << (int)UBDbl << ","
+                 << dyn_cast<ConstantExpr>(B)->getAPValue() << "," << safe
+                 << "," << (int)(100 * (1 - accuracyDbl)) << "," << time << ","
+                 << instructions << ""
+                 << "\n";
+  iterationFile->flush();
+
+  // Computing the new Bound and Printing it
+  if (this->getCounterExampleFound() == false) {
+    B = ConstantExpr::create((UBDbl + LBDbl) / 2., Expr::Int32);
+  } else {
+    klee_error("this->getCounterExampleFound() == true in first round is not "
+               "implemented yet!");
+    //	  UBAPInt = dyn_cast<ConstantExpr>(UB)->getAPValue();
+    //	  UBDbl = UBAPInt.roundToDouble(false);
+    //  	  LB =
+    // AddExpr::create(this->getCounterExampleValue(),ConstantExpr::create(1,Expr::Int32));
+    //	  LBAPInt = dyn_cast<ConstantExpr>(LB)->getAPValue();
+    //	  LBDbl = LBAPInt.roundToDouble(false);
+    //	  B = ConstantExpr::create((UBDbl+LBDbl)/2., Expr::Int32);
+  }
+  useColors = llvm::errs().is_displayed();
+  if (useColors)
+    llvm::errs().changeColor(llvm::raw_ostream::BLUE,
+                             /*bold=*/true,
+                             /*bg=*/false);
+  llvm::errs() << "The new Bound is ";
+  B->dump();
+  if (useColors)
+    llvm::errs().resetColor();
+
+  //###################################################################
+  //####################### ROUND 2 ONWARDS ###########################
+  //###################################################################
+
+  int runCounter = 2;
+  while (accuracyDbl > 0.02) {
+    llvm::errs() << "Run: " << runCounter++ << "\n";
 
     argvMO = 0;
-
+    //    klee_warning("sajjad1");
     // In order to make uclibc happy and be closer to what the system is
     // doing we lay out the environments at the end of the argv array
     // (both are terminated by a null). There is also a final terminating
@@ -4218,8 +4295,12 @@ void Executor::runFunctionAsMain(Function *f,
         }
       }
     }
+    //    klee_warning("sajjad2");
     state = new ExecutionState(kmodule->functionMap[f]);
-
+    //    klee_warning("sajjad3");
+    // Setting CounterExample Found as false
+    state->counterExampleFound = false;
+    //    klee_warning("sajjad4");
     if (pathWriter)
       state->pathOS = pathWriter->open();
     if (symPathWriter)
@@ -4230,7 +4311,7 @@ void Executor::runFunctionAsMain(Function *f,
     // assert(arguments.size() == f->arg_size() && "wrong number of arguments");
     // for (unsigned i = 0, e = f->arg_size(); i != e; ++i)
     //  bindArgument(kf, i, *state, arguments[i]);
-
+    //    klee_warning("sajjad5");
     if (argvMO) {
       ObjectState *argvOS = bindObjectInState(*state, argvMO, false);
 
@@ -4255,9 +4336,9 @@ void Executor::runFunctionAsMain(Function *f,
         }
       }
     }
-
+    //    klee_warning("sajjad6");
     initializeGlobals(*state);
-
+    //    klee_warning("sajjad7");
     // Updating the bound variable B
     for (std::map<const llvm::GlobalValue *, MemoryObject *>::iterator
              i = globalObjects.begin(),
@@ -4271,7 +4352,7 @@ void Executor::runFunctionAsMain(Function *f,
         wos->write(0, B);
       }
     }
-
+    //    klee_warning("sajjad8");
     processTree = new PTree(state);
     state->ptreeNode = processTree->root;
 
@@ -4281,9 +4362,9 @@ void Executor::runFunctionAsMain(Function *f,
       state->txTreeNode = txTree->root;
       TxTreeGraph::initialize(txTree->root);
     }
-
+    //    klee_warning("sajjad9");
     run(*state);
-
+    //    klee_warning("sajjad10");
     delete processTree;
     processTree = 0;
 
@@ -4310,9 +4391,107 @@ void Executor::runFunctionAsMain(Function *f,
 
     if (statsTracker)
       statsTracker->done();
+
+    //###################################################################
+    //######################## END OF ROUND i ###########################
+    //###################################################################
+    //######################## PRINTING STATS ###########################
+    //###################################################################
+
+    bool useColors = llvm::errs().is_displayed();
+    if (useColors)
+      llvm::errs().changeColor(llvm::raw_ostream::GREEN,
+                               /*bold=*/true,
+                               /*bg=*/false);
+
+    instructions = *theStatisticManager->getStatisticByName("Instructions") -
+                   totalInstructions;
+
+    llvm::errs() << "KLEE: done: total instructions = " << instructions << "\n";
+
+    forks = *theStatisticManager->getStatisticByName("Forks") - totalForks;
+
+    llvm::errs() << "KLEE: done: explored paths = " << 1 + forks << "\n";
+
+    time = util::getUserTime() - totalTime;
+
+    llvm::errs() << "KLEE: done: user time = " << time << "\n";
+
+    if (useColors)
+      llvm::errs().resetColor();
+
+    //###################################################################
+    //###################### Computing Accuracy #########################
+    //###################################################################
+
+    // Computing the new Accuracy
+    APInt BAPInt = dyn_cast<ConstantExpr>(B)->getAPValue();
+    double BDbl = BAPInt.roundToDouble(false);
+    accuracyDbl = (BDbl - LBDbl) / sqrt((pow(BDbl, 2) + pow(LBDbl, 2)));
+    //    llvm::errs() << "UBDbl " << UBDbl <<"\n";
+    //    llvm::errs() << "LBDbl " << LBDbl <<"\n";
+    llvm::errs() << "The Accuracy is " << (int)(100 * (1 - accuracyDbl))
+                 << "\n";
+    //    llvm::errs() << "The Accuracy check is " << (accuracyDbl <= 0.02)
+    // <<"\n";
+
+    std::string safe = "safe";
+    if (this->getCounterExampleFound() == true) {
+      APInt counterInt =
+          dyn_cast<ConstantExpr>(this->getCounterExampleValue())->getAPValue();
+      double counterDbl = counterInt.roundToDouble(false);
+      std::ostringstream s;
+      s << int(counterDbl);
+      const std::string counter_as_string(s.str());
+      safe = "no(" + counter_as_string + ")";
+    }
+
+    *iterationFile << (int)LBDbl << "-" << (int)UBDbl << ","
+                   << dyn_cast<ConstantExpr>(B)->getAPValue() << "," << safe
+                   << "," << (int)(100 * (1 - accuracyDbl)) << "," << time
+                   << "," << instructions << ""
+                   << "\n";
+    iterationFile->flush();
+
+    // Computing the new Bound and Printing it
+    if (this->getCounterExampleFound() == false) {
+      // It is always the case that UB and LB are ConstantExpr
+      UB = B;
+      UBAPInt = dyn_cast<ConstantExpr>(UB)->getAPValue();
+      UBDbl = UBAPInt.roundToDouble(false);
+      LBAPInt = dyn_cast<ConstantExpr>(LB)->getAPValue();
+      LBDbl = LBAPInt.roundToDouble(false);
+      B = ConstantExpr::create((UBDbl + LBDbl) / 2., Expr::Int32);
+    } else {
+      UBAPInt = dyn_cast<ConstantExpr>(UB)->getAPValue();
+      UBDbl = UBAPInt.roundToDouble(false);
+      LB = AddExpr::create(this->getCounterExampleValue(),
+                           ConstantExpr::create(1, Expr::Int32));
+      LBAPInt = dyn_cast<ConstantExpr>(LB)->getAPValue();
+      LBDbl = LBAPInt.roundToDouble(false);
+      B = ConstantExpr::create((UBDbl + LBDbl) / 2., Expr::Int32);
+      this->resetCounterExampleFound();
+      while (!states.empty() && !haltExecution) {
+        llvm::errs() << "states.size():" << states.size() << "\n";
+        ExecutionState &state = searcher->selectState();
+        terminateStateEarly(state, "Counter example found");
+        updateStates(&state);
+      }
+    }
+
+    useColors = llvm::errs().is_displayed();
+    if (useColors)
+      llvm::errs().changeColor(llvm::raw_ostream::BLUE,
+                               /*bold=*/true,
+                               /*bg=*/false);
+    llvm::errs() << "The new Bound is ";
+    B->dump();
+    if (useColors)
+      llvm::errs().resetColor();
   }
-  llvm::errs() << stats::instructions << " " << util::getUserTime() << "\n";
-  klee_warning("sajjad1");
+  llvm::errs() << "Runs Finished!\n";
+  if (iterationFile)
+    delete iterationFile;
 }
 
 unsigned Executor::getPathStreamID(const ExecutionState &state) {

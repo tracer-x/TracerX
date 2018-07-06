@@ -101,7 +101,6 @@ ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
     WPArrayStore::insert(value, symArray, Res);
     return Res;
   }
-
   // Symbolic array doesn't exist create one
   ref<Expr> tmpExpr = WPArrayStore::createAndInsert(arrayName, value);
   return tmpExpr;
@@ -202,23 +201,23 @@ ref<Expr> TxDependency::getLatestValueOfAddress(
   if (address.isNull())
     klee_error("Dependency::getLatestValueOfAddress Address is null");
 
-  if (llvm::isa<llvm::GlobalValue>(value)) {
-    for (std::map<const llvm::GlobalValue *, MemoryObject *>::iterator
-             i = globalObjects->begin(),
-             ie = globalObjects->end();
-         i != ie; ++i) {
-      if (((*i).first) == value) {
-        MemoryObject *mo = ((*i).second);
-        const ObjectState *os = addressSpace->findObject(mo);
-        ref<Expr> val = os->read(0, 32);
-        return val;
+  ref<TxStoreEntry> entry = store->find(address);
+  if (entry.isNull()) {
+    if (llvm::isa<llvm::GlobalValue>(value)) {
+      for (std::map<const llvm::GlobalValue *, MemoryObject *>::iterator
+               i = globalObjects->begin(),
+               ie = globalObjects->end();
+           i != ie; ++i) {
+        if (((*i).first) == value) {
+          MemoryObject *mo = ((*i).second);
+          const ObjectState *os = addressSpace->findObject(mo);
+          ref<Expr> val = os->read(0, 32);
+          return val;
+        }
       }
     }
-  }
-
-  ref<TxStoreEntry> entry = store->find(address);
-  if (entry.isNull())
     klee_error("Dependency::getLatestValueOfAddress No entry found");
+  }
   //entry->getContent()->getExpression()->dump();
   return entry->getContent()->getExpression();
 }
