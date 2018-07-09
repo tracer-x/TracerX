@@ -3997,7 +3997,7 @@ void Executor::runFunctionAsMain(Function *f,
   ref<Expr> UB = ConstantExpr::create(100000, Expr::Int32);
   ref<Expr> LB = ConstantExpr::create(0, Expr::Int32);
   ref<Expr> B = UB;
-  uint64_t totalInstructions = 0, totalForks = 0, totalTime = 0;
+  uint64_t totalInstructions = 0, totalForks = 0, totalTime = 0, totalSubsumption = 0;
   llvm::raw_fd_ostream *iterationFile =
       interpreterHandler->openOutputFile("iteration.csv");
   assert(iterationFile && "unable to open iteration trace file");
@@ -4172,10 +4172,10 @@ void Executor::runFunctionAsMain(Function *f,
     llvm::errs().changeColor(llvm::raw_ostream::GREEN,
                              /*bold=*/true,
                              /*bg=*/false);
-  //  for(int i = 0 ; i< theStatisticManager->getNumStatistics();i++){
-  //	  Statistic A = theStatisticManager->getStatistic(i);
-  //	  llvm::errs() << A.getName() <<"\n";
-  //  }
+//    for(int i = 0 ; i< theStatisticManager->getNumStatistics();i++){
+//  	  Statistic A = theStatisticManager->getStatistic(i);
+//  	  llvm::errs() << A.getName() <<"\n";
+//    }
 
   uint64_t instructions =
       *theStatisticManager->getStatisticByName("Instructions");
@@ -4192,6 +4192,10 @@ void Executor::runFunctionAsMain(Function *f,
   totalTime = totalTime + time;
 
   llvm::errs() << "KLEE: done: user time = " << time << "\n";
+
+  //uint64_t subsumption = *theStatisticManager->getStatisticByName("Forks");
+
+  //totalSubsumption
 
   if (useColors)
     llvm::errs().resetColor();

@@ -1042,11 +1042,13 @@ WeakestPreCondition::convertToExpr(std::map<ref<Expr>, int> *newLinearTerm) {
   for (std::map<ref<Expr>, int>::const_iterator it = newLinearTerm->begin(),
                                                 ie = newLinearTerm->end();
        it != ie; ++it) {
-    //    klee_warning("sajjad7");
-    //    it->first->dump();
-    //    llvm::errs() << "const:" << it->second << "\n";
+//        klee_warning("sajjad7");
+//        it->first->dump();
+//        llvm::errs() << "const:" << it->second << "\n";
     if (it->first == WPArrayStore::constValues) {
-      lhs = ConstantExpr::create(it->second, Expr::Int32);
+
+      if (it->second < 0) lhs = SubExpr::create(ConstantExpr::create(0, Expr::Int32), ConstantExpr::create(-1*it->second, Expr::Int32));
+      else lhs = ConstantExpr::create(it->second, Expr::Int32);
       if (temp == eb->False()) {
         temp = lhs;
       } else {
@@ -1055,10 +1057,12 @@ WeakestPreCondition::convertToExpr(std::map<ref<Expr>, int> *newLinearTerm) {
     } else {
       if (it->second == 1) {
         lhs = it->first;
+      } else if (it->second < 0) {
+              lhs = MulExpr::create(SubExpr::create(ConstantExpr::create(0, Expr::Int32), ConstantExpr::create(-1*it->second, Expr::Int32)),
+                                    it->first);
       } else {
         lhs = MulExpr::create(ConstantExpr::create(it->second, Expr::Int32),
                               it->first);
-        //        klee_warning("sajjad7.1");
       }
       if (temp == eb->False()) {
         temp = lhs;
@@ -1066,7 +1070,6 @@ WeakestPreCondition::convertToExpr(std::map<ref<Expr>, int> *newLinearTerm) {
         temp = AddExpr::create(lhs, temp);
       }
     }
-    //    klee_warning("sajjad8");
   }
   return temp;
 }
