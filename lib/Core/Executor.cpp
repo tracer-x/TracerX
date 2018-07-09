@@ -3319,6 +3319,8 @@ void Executor::terminateStateOnError(ExecutionState &state,
                                      enum TerminateReason termReason,
                                      const char *suffix,
                                      const llvm::Twine &info) {
+  terminateState(state);
+  return;
   interpreterHandler->incErrorTermination();
   if (INTERPOLATION_ENABLED) {
     interpreterHandler->incBranchingDepthOnErrorTermination(state.depth);
