@@ -3319,8 +3319,6 @@ void Executor::terminateStateOnError(ExecutionState &state,
                                      enum TerminateReason termReason,
                                      const char *suffix,
                                      const llvm::Twine &info) {
-  terminateState(state);
-  return;
   interpreterHandler->incErrorTermination();
   if (INTERPOLATION_ENABLED) {
     interpreterHandler->incBranchingDepthOnErrorTermination(state.depth);
@@ -4409,15 +4407,21 @@ void Executor::runFunctionAsMain(Function *f,
     instructions = *theStatisticManager->getStatisticByName("Instructions") -
                    totalInstructions;
 
+    totalInstructions = totalInstructions + instructions;
+
     llvm::errs() << "KLEE: done: total instructions = " << instructions << "\n";
 
     forks = *theStatisticManager->getStatisticByName("Forks") - totalForks;
 
     llvm::errs() << "KLEE: done: explored paths = " << 1 + forks << "\n";
 
+    totalForks = totalForks + forks;
+
     time = util::getUserTime() - totalTime;
 
     llvm::errs() << "KLEE: done: user time = " << time << "\n";
+
+    totalTime = totalTime + time;
 
     if (useColors)
       llvm::errs().resetColor();
@@ -4492,6 +4496,9 @@ void Executor::runFunctionAsMain(Function *f,
       llvm::errs().resetColor();
   }
   llvm::errs() << "Runs Finished!\n";
+  llvm::errs() << "The bound is between " << (int)(LBDbl) << " and "
+               << (int)(UBDbl) << ".\n";
+
   if (iterationFile)
     delete iterationFile;
 }
