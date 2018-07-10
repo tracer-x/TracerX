@@ -1163,8 +1163,17 @@ WeakestPreCondition::updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry,
   std::set<const Array *> existentials = entry->getExistentials();
 
   if (concretelyAddressedStore.size() == 0)
-    klee_error("WeakestPreCondition::updateSubsumptionTableEntry for this case "
-               "is not implemented yet.");
+    if (concretelyAddressedHistoricalStore.size() == 0 &&
+        symbolicallyAddressedHistoricalStore.size() == 0 &&
+        symbolicallyAddressedStore.size() == 0) {
+      // empty interpolant
+      return entry;
+    } else {
+      wp->dump();
+      klee_error(
+          "WeakestPreCondition::updateSubsumptionTableEntry for this case "
+          "is not implemented yet.");
+    }
   else {
     // TODO: Assuming WP is one frame
     TxStore::TopInterpolantStore newConcretelyAddressedStore =
