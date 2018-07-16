@@ -1917,7 +1917,11 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- create and expression from the condition and this->WPExpr
       ref<Expr> cond = getBrCondition(i);
-      WPExpr = AndExpr::create(WPExpr, cond);
+      if (False() == WPExpr) {
+        WPExpr = cond;
+      } else {
+        WPExpr = AndExpr::create(WPExpr, cond);
+      }
 
       llvm::outs() << "--- start 1 ---\n";
       i->dump();
@@ -1930,7 +1934,11 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
       // 3- create and expression from the condition and this->WPExpr
 
       ref<Expr> negCond = NotExpr::create(getBrCondition(i));
-      WPExpr = AndExpr::create(WPExpr, negCond);
+      if (False() == WPExpr) {
+        WPExpr = negCond;
+      } else {
+        WPExpr = AndExpr::create(WPExpr, negCond);
+      }
 
       llvm::outs() << "--- start 2 ---\n";
       i->dump();
