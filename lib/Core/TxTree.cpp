@@ -2474,6 +2474,12 @@ ref<Expr> TxTreeNode::getWPInterpolant(
     if (parent)
       this->parent->setChildWPInterpolant(expr);
   }
+
+  //-----------
+//  llvm::outs() << "\n======= WP =====\n";
+//  expr->dump();
+//  llvm::outs() << "\n================\n";
+  //-----------
   return expr;
 }
 

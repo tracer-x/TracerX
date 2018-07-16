@@ -1893,18 +1893,18 @@ TxWeakestPreCondition::updateExistentials(std::set<const Array *> existentials,
 ref<Expr> TxWeakestPreCondition::GenerateWP(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
 
-  //	llvm::outs() << "--- Begin printing instruction list ---\n";
-  //	for (std::vector<std::pair<KInstruction *, int> >::const_iterator it =
-  //			reverseInstructionList.begin(), ie =
-  // reverseInstructionList.end();
-  //			it != ie; ++it) {
-  //		llvm::Instruction *i = (*it).first->inst;
-  //		int flag = (*it).second;
-  //		// instruction list
-  //		i->dump();
-  //		llvm::outs() << flag << "\n";
-  //	}
-  //	llvm::outs() << "--- End of printing instruction list ---\n";
+//  llvm::outs() << "--- Begin printing instruction list ---\n";
+//  for (std::vector<std::pair<KInstruction *, int> >::const_iterator
+//           it = reverseInstructionList.begin(),
+//           ie = reverseInstructionList.end();
+//       it != ie; ++it) {
+//    llvm::Instruction *i = (*it).first->inst;
+//    int flag = (*it).second;
+//    // instruction list
+//    i->dump();
+//    llvm::outs() << flag << "\n";
+//  }
+//  llvm::outs() << "--- End of printing instruction list ---\n";
 
   for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
@@ -1916,23 +1916,28 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
     if (flag == 1) {
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- create and expression from the condition and this->WPExpr
-      //      llvm::outs() << "--- start 1 ---\n";
       ref<Expr> cond = getBrCondition(i);
-      //      i->dump();
-      //      cond->dump();
-      //      llvm::outs() << "--- end 1 ---\n";
       WPExpr = AndExpr::create(WPExpr, cond);
+
+      llvm::outs() << "--- start 1 ---\n";
+      i->dump();
+      cond->dump();
+      WPExpr->dump();
+      llvm::outs() << "--- end 1 ---\n";
     } else if (flag == 2) {
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- generate not(condition): expr::not(condition)
       // 3- create and expression from the condition and this->WPExpr
-      //      llvm::outs() << "--- start 2 ---\n";
-      //      getCondition(i)->dump();
+
       ref<Expr> negCond = NotExpr::create(getBrCondition(i));
-      // i->dump();
-      // negCond->dump();
-      // llvm::outs() << "--- end 2 ---\n";
       WPExpr = AndExpr::create(WPExpr, negCond);
+
+      llvm::outs() << "--- start 2 ---\n";
+      i->dump();
+      getCondition(i)->dump();
+      negCond->dump();
+      WPExpr->dump();
+      llvm::outs() << "--- end 2 ---\n";
     } else if (i->getOpcode() == llvm::Instruction::Br) {
       llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(i);
       if (br->isConditional()) {
@@ -1941,6 +1946,10 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
       }
     } else if (i->getOpcode() == llvm::Instruction::Store) {
       WPExpr = getPrevExpr(WPExpr, i);
+      llvm::outs() << "--- start 3 ---\n";
+      i->dump();
+      WPExpr->dump();
+      llvm::outs() << "--- end 3 ---\n";
     }
   }
 
