@@ -29,6 +29,18 @@ class Partition {
 public:
   std::set<ref<Expr> > exprs;
   std::set<std::string> vars;
+  void print() {
+    for (std::set<ref<Expr> >::const_iterator it = exprs.begin(),
+                                              ie = exprs.end();
+         it != ie; ++it) {
+      (*it)->dump();
+    }
+    for (std::set<std::string>::const_iterator it = vars.begin(),
+                                               ie = vars.end();
+         it != ie; ++it) {
+      llvm::outs() << (*it) << " ";
+    }
+  }
 };
 
 class TxPartitionHelper {
