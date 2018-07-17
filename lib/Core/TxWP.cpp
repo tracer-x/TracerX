@@ -995,13 +995,17 @@ ref<Expr> TxWeakestPreCondition::intersectExpr(
     TxStore::TopInterpolantStore symbolicallyAddressedStore) {
 
   //  llvm::outs() << "\nbranchCondition - expr1 - expr2 - interpolant\n";
-  //  branchCondition->dump();
+  //  if (!branchCondition.isNull())
+  //    branchCondition->dump();
   //  llvm::outs() << "\n--------------\n";
-  //  expr1->dump();
+  //  if (!expr1.isNull())
+  //    expr1->dump();
   //  llvm::outs() << "\n--------------\n";
-  //  expr2->dump();
+  //  if (!expr2.isNull())
+  //    expr2->dump();
   //  llvm::outs() << "\n--------------\n";
-  //  interpolant->dump();
+  //  if (!interpolant.isNull())
+  //    interpolant->dump();
   //  llvm::outs() << "\n===============\n";
 
   std::map<std::string, ref<Expr> > entries =
@@ -1013,12 +1017,12 @@ ref<Expr> TxWeakestPreCondition::intersectExpr(
   std::vector<Partition> interpolantParts =
       TxPartitionHelper::partitionOnCond(branchCondition, interpolantExprs);
 
-  //  llvm::outs() << "\n------interpolant partitions-------\n";
-  //  for (unsigned int i = 0; i < interpolantParts.size(); i++) {
-  //    interpolantParts.at(i).print();
-  //    llvm::outs() << "\n-------------\n";
-  //  }
-  //  llvm::outs() << "\n===============\n";
+  //    llvm::outs() << "\n------interpolant partitions-------\n";
+  //    for (unsigned int i = 0; i < interpolantParts.size(); i++) {
+  //      interpolantParts.at(i).print();
+  //      llvm::outs() << "\n-------------\n";
+  //    }
+  //    llvm::outs() << "\n===============\n";
 
   // partition w1 based on branchCondition
   std::vector<ref<Expr> > w1Exprs;
@@ -1026,12 +1030,12 @@ ref<Expr> TxWeakestPreCondition::intersectExpr(
   std::vector<Partition> w1Parts =
       TxPartitionHelper::partitionOnCond(branchCondition, w1Exprs);
 
-  //  llvm::outs() << "\n------wp1 partitions-------\n";
-  //  for (unsigned int i = 0; i < w1Parts.size(); i++) {
-  //    w1Parts.at(i).print();
-  //    llvm::outs() << "\n-------------\n";
-  //  }
-  //  llvm::outs() << "\n===============\n";
+  //    llvm::outs() << "\n------wp1 partitions-------\n";
+  //    for (unsigned int i = 0; i < w1Parts.size(); i++) {
+  //      w1Parts.at(i).print();
+  //      llvm::outs() << "\n-------------\n";
+  //    }
+  //    llvm::outs() << "\n===============\n";
 
   // partition w2 based on branchCondition
   std::vector<ref<Expr> > w2Exprs;
@@ -1039,12 +1043,12 @@ ref<Expr> TxWeakestPreCondition::intersectExpr(
   std::vector<Partition> w2Parts =
       TxPartitionHelper::partitionOnCond(branchCondition, w2Exprs);
 
-  //  llvm::outs() << "\n------wp2 partitions-------\n";
-  //  for (unsigned int i = 0; i < w2Parts.size(); i++) {
-  //    w2Parts.at(i).print();
-  //    llvm::outs() << "\n-------------\n";
-  //  }
-  //  llvm::outs() << "\n===============\n";
+  //    llvm::outs() << "\n------wp2 partitions-------\n";
+  //    for (unsigned int i = 0; i < w2Parts.size(); i++) {
+  //      w2Parts.at(i).print();
+  //      llvm::outs() << "\n-------------\n";
+  //    }
+  //    llvm::outs() << "\n===============\n";
 
   // Keep related part from interpolant and non-related parts from WP1 & WP2
   interpolantParts.at(1).exprs.insert(w1Parts.at(0).exprs.begin(),
@@ -1054,89 +1058,6 @@ ref<Expr> TxWeakestPreCondition::intersectExpr(
   ref<Expr> res = TxPartitionHelper::createAnd(interpolantParts.at(1).exprs);
 
   return res;
-
-  /*
-  std::map<std::string, ref<Expr> > entries = extractExprs(
-                  concretelyAddressedStore);
-  std::vector<ref<Expr> > pcs;
-  TxPartitionHelper1::getExprsFromAndExpr(interpolant, pcs);
-  std::vector<Partition1> partitions = TxPartitionHelper1::paritionOnCond(
-                  branchCondition, expr1, expr2, pcs, entries);
-
-
-//	llvm::outs() << "\n------from upper intersectExpr-------\n";
-//	llvm::errs() << "cond:";
-//	branchCondition->dump();
-//	llvm::errs() << "\npartitions size=" << partitions.size() << "\n";
-//	for (unsigned int i = 0; i < partitions.size(); i++) {
-//		partitions.at(i).print();
-//	}
-//	llvm::outs() << "\n-------------\n";
-
-
-  std::vector<ref<Expr> > res;
-  // and non-related wp1r ^ wp2r
-  ref<Expr> and1 = TxPartitionHelper1::createAnd(partitions.at(0).wp1);
-  ref<Expr> and2 = TxPartitionHelper1::createAnd(partitions.at(0).wp2);
-  ref<Expr> nonrelated;
-  if (and1.isNull()) {
-          if (and2.isNull()) {
-                  res.push_back(nonrelated);
-          } else {
-                  res.push_back(and2);
-          }
-  } else {
-          if (and2.isNull()) {
-                  res.push_back(and1);
-          } else {
-                  res.push_back(AndExpr::create(and1, and2));
-          }
-  }
-
-  // merge related wp1b, wp2b
-  bool isWp1bTrue = true;
-  for (std::vector<ref<Expr> >::const_iterator it =
-                  partitions.at(1).wp1.begin(), ie = partitions.at(1).wp1.end();
-                  it != ie; ++it) {
-          if (True() != *it) {
-                  isWp1bTrue = false;
-                  break;
-          }
-  }
-  bool isWp2bTrue = true;
-  for (std::vector<ref<Expr> >::const_iterator it =
-                  partitions.at(1).wp2.begin(), ie = partitions.at(1).wp2.end();
-                  it != ie; ++it) {
-          if (True() != *it) {
-                  isWp2bTrue = false;
-                  break;
-          }
-  }
-
-  if (isWp1bTrue && isWp2bTrue) {
-          res.push_back(True());
-  } else if (isWp1bTrue && !isWp2bTrue) {
-          res.push_back(
-                          AndExpr::create(
-                                          TxPartitionHelper1::createAnd(partitions.at(1).wp1),
-                                          NotExpr::create(branchCondition)));
-  } else if (!isWp1bTrue && isWp2bTrue) {
-          res.push_back(
-                          AndExpr::create(
-                                          TxPartitionHelper1::createAnd(partitions.at(1).wp2),
-                                          branchCondition));
-  } else if (!isWp1bTrue && !isWp2bTrue) {
-          res.push_back(TxPartitionHelper1::createAnd(partitions.at(1).wp1));
-          res.push_back(TxPartitionHelper1::createAnd(partitions.at(1).wp2));
-  }
-
-  //llvm::outs() << "\n-----from lower intersectExpr--------\n";
-  //llvm::errs() << "Expression vector:\n Size=" << res.size() << "\n";
-  //for (unsigned int i = 0; i < res.size(); i++) {
-  //	res.at(i)->dump();
-  //}
-  //llvm::outs() << "\n-------------\n";
-  */
 }
 
 std::map<std::string, ref<Expr> > TxWeakestPreCondition::extractExprs(
@@ -1961,11 +1882,11 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
         WPExpr = AndExpr::create(WPExpr, cond);
       }
 
-      llvm::outs() << "--- start 1 ---\n";
-      i->dump();
-      cond->dump();
-      WPExpr->dump();
-      llvm::outs() << "--- end 1 ---\n";
+      //      llvm::outs() << "--- start 1 ---\n";
+      //      i->dump();
+      //      cond->dump();
+      //      WPExpr->dump();
+      //      llvm::outs() << "--- end 1 ---\n";
     } else if (flag == 2) {
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- generate not(condition): expr::not(condition)
@@ -1978,30 +1899,30 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
         WPExpr = AndExpr::create(WPExpr, negCond);
       }
 
-      llvm::outs() << "--- start 2 ---\n";
-      i->dump();
-      getCondition(i)->dump();
-      negCond->dump();
-      WPExpr->dump();
-      llvm::outs() << "--- end 2 ---\n";
+      //      llvm::outs() << "--- start 2 ---\n";
+      //      i->dump();
+      //      getCondition(i)->dump();
+      //      negCond->dump();
+      //      WPExpr->dump();
+      //      llvm::outs() << "--- end 2 ---\n";
     } else if (i->getOpcode() == llvm::Instruction::Br) {
       llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(i);
       if (br->isConditional()) {
 
         ref<Expr> cond = getBrCondition(i);
         node->setBranchCondition(cond);
-        llvm::outs() << "--- start 3 ---\n";
-        i->dump();
-        node->getBranchCondition()->dump();
-        llvm::outs() << "--- end 3 ---\n";
+        //        llvm::outs() << "--- start 3 ---\n";
+        //        i->dump();
+        //        node->getBranchCondition()->dump();
+        //        llvm::outs() << "--- end 3 ---\n";
       }
 
     } else if (i->getOpcode() == llvm::Instruction::Store) {
       WPExpr = getPrevExpr(WPExpr, i);
-      llvm::outs() << "--- start 4 ---\n";
-      i->dump();
-      WPExpr->dump();
-      llvm::outs() << "--- end 4 ---\n";
+      //      llvm::outs() << "--- start 4 ---\n";
+      //      i->dump();
+      //      WPExpr->dump();
+      //      llvm::outs() << "--- end 4 ---\n";
     }
   }
 
@@ -2020,6 +1941,17 @@ ref<Expr> TxWeakestPreCondition::getPrevExpr(ref<Expr> e,
     ref<Expr> right = this->generateExprFromOperand(i, 1);
     ref<Expr> result = EqExpr::create(right, left);
     ref<Expr> result1 = TxWPHelper::substituteExpr(e, result);
+
+    //    llvm::outs() << "--- Begin substitution ---\n";
+    //    i->dump();
+    //    llvm::outs() << "--------------------------\n";
+    //    e->dump();
+    //    llvm::outs() << "--------------------------\n";
+    //    result->dump();
+    //    llvm::outs() << "--------------------------\n";
+    //    result1->dump();
+    //    llvm::outs() << "--- End substitution ---\n";
+
     // Turning off simplification for now
     // ret = TxWPHelper::simplifyWPExpr(TxWPHelper::substituteExpr(e, result));
     ret = result1;

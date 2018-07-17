@@ -2474,16 +2474,6 @@ ref<Expr> TxTreeNode::getWPInterpolant(
       }
     }
 
-    //    llvm::outs() << "--- start intersection ---\n";
-    //    branchCondition->dump();
-    //    llvm::outs() << "-----------\n";
-    //    childWPInterpolant[0]->dump();
-    //    llvm::outs() << "-----------\n";
-    //    childWPInterpolant[1]->dump();
-    //    llvm::outs() << "-----------\n";
-    //    branchCondition->dump();
-    //    llvm::outs() << "--- end intersection ---\n";
-
     // remove unrelated part from interpolant, concretely addressed store and
     // return And(w1r, w2r)
     expr = wp->intersectExpr(
@@ -2498,12 +2488,16 @@ ref<Expr> TxTreeNode::getWPInterpolant(
     // Generate weakest precondition fot the current node
     // All instructions are marked
 
-    llvm::outs() << "\n------ Right after intersection -------\n";
-    wp->getWPExpr()->dump();
-    llvm::outs() << "\n---------------------------------------\n";
+//    llvm::outs() << "\n------ WP after intersection -------\n";
+//    wp->getWPExpr()->dump();
+//    llvm::outs() << "\n---------------------------------------\n";
 
     reverseInstructionList.pop_back();
     expr = wp->GenerateWP(reverseInstructionList);
+
+//    llvm::outs() << "\n------ WP after pushing up -------\n";
+//    wp->getWPExpr()->dump();
+//    llvm::outs() << "\n---------------------------------------\n";
 
     if (parent)
       this->parent->setChildWPInterpolant(expr);

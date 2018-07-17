@@ -1,4 +1,5 @@
-//===-- TxWPHelper.cpp - Interpolation tree -------------------------*- C++ -*-===//
+//===-- TxWPHelper.cpp - Interpolation tree -------------------------*- C++
+//-*-===//
 //
 //               The Tracer-X KLEE Symbolic Virtual Machine
 //
@@ -8,11 +9,11 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file contains the implementations of helper function for generating weakest
+/// This file contains the implementations of helper function for generating
+/// weakest
 /// precondition.
 ///
 //===----------------------------------------------------------------------===//
-
 
 #include "TxWPHelper.h"
 
@@ -167,7 +168,9 @@ bool TxWPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
   //  llvm::outs() << "***********\n";
   switch (expr->getKind()) {
   case Expr::InvalidKind:
-  case Expr::Constant: { return false; }
+  case Expr::Constant: {
+    return false;
+  }
 
   case Expr::Read: {
     if (inst == TxWPArrayStore::getValuePointer(expr)) {
@@ -245,6 +248,7 @@ bool TxWPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
 }
 
 ref<Expr> TxWPHelper::substituteExpr(ref<Expr> e, ref<Expr> eq) {
+
   ref<Expr> result;
   switch (eq->getKind()) {
   case Expr::Constant: {
@@ -268,19 +272,23 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> e, ref<Expr> eq) {
     klee_error("Substitution for this expressions is not defined yet!");
   }
   }
+
   return result;
 }
 
 ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
                                      const ref<Expr> rhs) {
+
   if (base.compare(lhs) == 0)
     return rhs;
-  else if (base.compare(rhs) == 0)
-    return lhs;
+//  else if (base.compare(rhs) == 0)
+//    return lhs;
   else {
     switch (base->getKind()) {
     case Expr::InvalidKind:
-    case Expr::Constant: { return base; }
+    case Expr::Constant: {
+      return base;
+    }
 
     case Expr::NotOptimized:
     case Expr::Read:
@@ -319,9 +327,24 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
     case Expr::LShr:
     case Expr::AShr: {
       ref<Expr> kids[2];
+//      llvm::outs() << "--- Begin substitution - " << base->getKind()
+//                   << " ---\n";
+//      base->dump();
+//      llvm::outs() << "--------------------------\n";
+
       kids[0] = substituteExpr(base->getKid(0), lhs, rhs);
+//      kids[0]->dump();
+//      llvm::outs() << "--------------------------\n";
+
       kids[1] = substituteExpr(base->getKid(1), lhs, rhs);
-      return base->rebuild(kids);
+//      kids[1]->dump();
+//      llvm::outs() << "--------------------------\n";
+
+      base = base->rebuild(kids);
+//      base->dump();
+//      llvm::outs() << "--- End substitution - " << base->getKind() << " ---\n";
+
+      return base;
     }
 
     case Expr::Select: {
@@ -335,6 +358,7 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
   }
   // Sanity check
   klee_error("Control should not reach here in TxWPHelper::substituteExpr!");
+
   return base;
 }
 
