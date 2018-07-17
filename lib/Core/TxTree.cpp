@@ -2464,11 +2464,25 @@ ref<Expr> TxTreeNode::getWPInterpolant(
     if (parent)
       this->parent->setChildWPInterpolant(expr);
   } else {
-//    llvm::outs() << "--- start intersection ---\n";
-//    childWPInterpolant[0]->dump();
-//    llvm::outs() << "-----------\n";
-//    childWPInterpolant[1]->dump();
-//    llvm::outs() << "--- end intersection ---\n";
+
+    // Get branch condition
+    llvm::Instruction *i = reverseInstructionList.back().first->inst;
+    if (i->getOpcode() == llvm::Instruction::Br) {
+      llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(i);
+      if (br->isConditional()) {
+        branchCondition = wp->getBrCondition(i);
+      }
+    }
+
+    //    llvm::outs() << "--- start intersection ---\n";
+    //    branchCondition->dump();
+    //    llvm::outs() << "-----------\n";
+    //    childWPInterpolant[0]->dump();
+    //    llvm::outs() << "-----------\n";
+    //    childWPInterpolant[1]->dump();
+    //    llvm::outs() << "-----------\n";
+    //    branchCondition->dump();
+    //    llvm::outs() << "--- end intersection ---\n";
 
     // remove unrelated part from interpolant, concretely addressed store and
     // return And(w1r, w2r)
@@ -2483,16 +2497,21 @@ ref<Expr> TxTreeNode::getWPInterpolant(
 
     // Generate weakest precondition fot the current node
     // All instructions are marked
+
+    llvm::outs() << "\n------ Right after intersection -------\n";
+    wp->getWPExpr()->dump();
+    llvm::outs() << "\n---------------------------------------\n";
+
+    reverseInstructionList.pop_back();
     expr = wp->GenerateWP(reverseInstructionList);
+
     if (parent)
       this->parent->setChildWPInterpolant(expr);
   }
 
-  //-----------
-  //  llvm::outs() << "\n======= WP =====\n";
-  //  expr->dump();
-  //  llvm::outs() << "\n================\n";
-  //-----------
+  klee_warning("Start printing the WP");
+  wp->getWPExpr()->dump();
+  klee_warning("End of printing the WP");
   return expr;
 }
 

@@ -115,6 +115,19 @@ ref<Expr> TxPartitionHelper::createAnd(std::vector<ref<Expr> > exprs) {
   return result;
 }
 
+ref<Expr> TxPartitionHelper::createAnd(std::set<ref<Expr> > exprs) {
+  std::set<ref<Expr> >::const_iterator it = exprs.begin();
+  ref<Expr> result = *(it);
+  std::advance(it, 1);
+  if (exprs.size() >= 1) {
+    for (; it != exprs.end(); ++it) {
+      ref<Expr> currentExpr = (*it);
+      result = AndExpr::create(result, currentExpr);
+    }
+  }
+  return result;
+}
+
 void TxPartitionHelper::getExprsFromAndExpr(ref<Expr> e,
                                             std::vector<ref<Expr> > &exprs) {
   if (!e.isNull()) {

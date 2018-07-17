@@ -190,8 +190,9 @@ public:
       std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
   ref<Expr> getPrevExpr(ref<Expr> e, llvm::Instruction *i);
 
-private:
   ref<Expr> getBrCondition(llvm::Instruction *ins);
+private:
+
   ref<Expr> getCondition(llvm::Value *value);
   ref<Expr> getCmpCondition(llvm::CmpInst *cmp);
   ref<Expr> getBinCondition(llvm::CmpInst *cmp);

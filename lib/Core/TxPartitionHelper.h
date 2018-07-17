@@ -50,6 +50,7 @@ public:
   static std::vector<Partition> partition(std::vector<ref<Expr> > exprs);
 
   static ref<Expr> createAnd(std::vector<ref<Expr> > exprs);
+  static ref<Expr> createAnd(std::set<ref<Expr> > exprs);
   static void getExprsFromAndExpr(ref<Expr> e, std::vector<ref<Expr> > &exprs);
 
   static ref<Expr> True() { return ConstantExpr::alloc(1, Expr::Bool); };
