@@ -26,6 +26,7 @@
 #include "TxDependency.h"
 #include "TxTree.h"
 #include "TxWPHelper.h"
+#include "TxExprHelper.h"
 #include <vector>
 
 namespace klee {

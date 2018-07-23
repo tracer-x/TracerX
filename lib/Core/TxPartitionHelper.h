@@ -56,7 +56,6 @@ public:
   static ref<Expr> True() { return ConstantExpr::alloc(1, Expr::Bool); };
   static ref<Expr> False() { return ConstantExpr::alloc(0, Expr::Bool); };
 
-private:
   static void getExprVars(ref<Expr> e, std::set<std::string> &vars);
   static void visit(ref<Expr> node, std::set<ref<Expr> > &currentComp,
                     std::map<ref<Expr>, std::set<ref<Expr> > > &ref2ref,

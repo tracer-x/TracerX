@@ -1055,7 +1055,8 @@ ref<Expr> TxWeakestPreCondition::intersectExpr(
                                       w1Parts.at(0).exprs.end());
   interpolantParts.at(1).exprs.insert(w2Parts.at(0).exprs.begin(),
                                       w2Parts.at(0).exprs.end());
-  ref<Expr> res = TxPartitionHelper::createAnd(interpolantParts.at(1).exprs);
+  std::vector<ref<Expr> > tmpExprs = TxExprHelper::simplify(interpolantParts.at(1).exprs);
+  ref<Expr> res = TxPartitionHelper::createAnd(tmpExprs);
 
   return res;
 }
