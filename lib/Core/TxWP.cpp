@@ -1058,7 +1058,6 @@ ref<Expr> TxWeakestPreCondition::intersectExpr(
   std::vector<ref<Expr> > tmpExprs =
       TxExprHelper::simplify(interpolantParts.at(1).exprs);
   ref<Expr> res = TxPartitionHelper::createAnd(tmpExprs);
-
   return res;
 }
 
@@ -1943,16 +1942,16 @@ ref<Expr> TxWeakestPreCondition::getPrevExpr(ref<Expr> e,
     ref<Expr> right = this->generateExprFromOperand(i, 1);
     ref<Expr> eqExpr = EqExpr::create(right, left);
     ref<Expr> result = TxWPHelper::substituteExpr(e, eqExpr);
-//
-//    llvm::outs() << "--- Begin substitution ---\n";
-//    i->dump();
-//    llvm::outs() << "--------------------------\n";
-//    e->dump();
-//    llvm::outs() << "--------------------------\n";
-//    eqExpr->dump();
-//    llvm::outs() << "--------------------------\n";
-//    result->dump();
-//    llvm::outs() << "--- End substitution ---\n";
+    //
+    //    llvm::outs() << "--- Begin substitution ---\n";
+    //    i->dump();
+    //    llvm::outs() << "--------------------------\n";
+    //    e->dump();
+    //    llvm::outs() << "--------------------------\n";
+    //    eqExpr->dump();
+    //    llvm::outs() << "--------------------------\n";
+    //    result->dump();
+    //    llvm::outs() << "--- End substitution ---\n";
 
     ret = result;
     break;

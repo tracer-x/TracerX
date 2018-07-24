@@ -18,7 +18,9 @@
 #define LIB_CORE_TXEXPRHELPER_H_
 
 #include "TxPartitionHelper.h"
+#include "TxWPHelper.h"
 #include <iostream>
+#include <limits>
 #include <map>
 #include <set>
 #include <string>
@@ -31,6 +33,8 @@ public:
   virtual ~TxExprHelper();
   static std::vector<ref<Expr> > simplify(std::set<ref<Expr> > exprs);
   static std::vector<ref<Expr> > rangeSimplify(std::vector<ref<Expr> > exprs);
+  static float getBound(ref<Expr> expr);
+  static bool isaVar(ref<Expr> e);
 };
 }
 #endif /* LIB_CORE_TXEXPRHELPER_H_ */
