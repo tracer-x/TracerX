@@ -1055,7 +1055,8 @@ ref<Expr> TxWeakestPreCondition::intersectExpr(
                                       w1Parts.at(0).exprs.end());
   interpolantParts.at(1).exprs.insert(w2Parts.at(0).exprs.begin(),
                                       w2Parts.at(0).exprs.end());
-  std::vector<ref<Expr> > tmpExprs = TxExprHelper::simplify(interpolantParts.at(1).exprs);
+  std::vector<ref<Expr> > tmpExprs =
+      TxExprHelper::simplify(interpolantParts.at(1).exprs);
   ref<Expr> res = TxPartitionHelper::createAnd(tmpExprs);
 
   return res;
@@ -1926,7 +1927,7 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
       //      llvm::outs() << "--- end 4 ---\n";
     }
   }
-
+  WPExpr = TxWPHelper::simplifyWPExpr(WPExpr);
   return WPExpr;
 }
 
@@ -1940,22 +1941,20 @@ ref<Expr> TxWeakestPreCondition::getPrevExpr(ref<Expr> e,
     }
     ref<Expr> left = this->generateExprFromOperand(i, 0);
     ref<Expr> right = this->generateExprFromOperand(i, 1);
-    ref<Expr> result = EqExpr::create(right, left);
-    ref<Expr> result1 = TxWPHelper::substituteExpr(e, result);
+    ref<Expr> eqExpr = EqExpr::create(right, left);
+    ref<Expr> result = TxWPHelper::substituteExpr(e, eqExpr);
+//
+//    llvm::outs() << "--- Begin substitution ---\n";
+//    i->dump();
+//    llvm::outs() << "--------------------------\n";
+//    e->dump();
+//    llvm::outs() << "--------------------------\n";
+//    eqExpr->dump();
+//    llvm::outs() << "--------------------------\n";
+//    result->dump();
+//    llvm::outs() << "--- End substitution ---\n";
 
-    //    llvm::outs() << "--- Begin substitution ---\n";
-    //    i->dump();
-    //    llvm::outs() << "--------------------------\n";
-    //    e->dump();
-    //    llvm::outs() << "--------------------------\n";
-    //    result->dump();
-    //    llvm::outs() << "--------------------------\n";
-    //    result1->dump();
-    //    llvm::outs() << "--- End substitution ---\n";
-
-    // Turning off simplification for now
-    // ret = TxWPHelper::simplifyWPExpr(TxWPHelper::substituteExpr(e, result));
-    ret = result1;
+    ret = result;
     break;
   }
 

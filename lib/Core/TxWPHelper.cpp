@@ -31,7 +31,29 @@ ref<Expr> TxWPHelper::simplifyWPExpr(ref<Expr> e) {
     return e->rebuild(kids);
   }
   case Expr::Eq:
-  case Expr::Ne:
+  case Expr::Ne: {
+    ref<Expr> kids[2];
+    kids[0] = e->getKid(0);
+    kids[1] = e->getKid(1);
+    if (kids[0]->getKind() == Expr::Eq || kids[0]->getKind() == Expr::Ne ||
+        kids[1]->getKind() == Expr::Eq || kids[1]->getKind() == Expr::Ne) {
+      return e;
+    }
+    std::map<ref<Expr>, uint64_t> *newLinearTerm =
+        new std::map<ref<Expr>, uint64_t>;
+    if (isa<ConstantExpr>(kids[1])) {
+      ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[1]);
+      insertTerm(newLinearTerm, constant->getZExtValue(),
+                 TxWPArrayStore::constValues);
+    } else {
+      newLinearTerm = simplifyWPTerm(newLinearTerm, kids[1]);
+    }
+    newLinearTerm = simplifyWPTerm(newLinearTerm, kids[0]);
+    result = convertToExpr(e, newLinearTerm);
+
+    delete newLinearTerm;
+    break;
+  }
   case Expr::Ult:
   case Expr::Ule:
   case Expr::Ugt:
@@ -257,6 +279,10 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> e, ref<Expr> eq) {
   }
   case Expr::Eq: {
     ref<Expr> lhs = eq->getKid(0);
+    if (isa<ConstantExpr>(lhs)) {
+      result = e;
+      break;
+    }
     ref<Expr> rhs = eq->getKid(1);
     if (isa<ConstantExpr>(rhs)) {
       ref<Expr> temp = lhs;
@@ -281,8 +307,8 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
 
   if (base.compare(lhs) == 0)
     return rhs;
-//  else if (base.compare(rhs) == 0)
-//    return lhs;
+  //  else if (base.compare(rhs) == 0)
+  //    return lhs;
   else {
     switch (base->getKind()) {
     case Expr::InvalidKind:
@@ -327,22 +353,23 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
     case Expr::LShr:
     case Expr::AShr: {
       ref<Expr> kids[2];
-//      llvm::outs() << "--- Begin substitution - " << base->getKind()
-//                   << " ---\n";
-//      base->dump();
-//      llvm::outs() << "--------------------------\n";
+      //      llvm::outs() << "--- Begin substitution - " << base->getKind()
+      //                   << " ---\n";
+      //      base->dump();
+      //      llvm::outs() << "--------------------------\n";
 
       kids[0] = substituteExpr(base->getKid(0), lhs, rhs);
-//      kids[0]->dump();
-//      llvm::outs() << "--------------------------\n";
+      //      kids[0]->dump();
+      //      llvm::outs() << "--------------------------\n";
 
       kids[1] = substituteExpr(base->getKid(1), lhs, rhs);
-//      kids[1]->dump();
-//      llvm::outs() << "--------------------------\n";
+      //      kids[1]->dump();
+      //      llvm::outs() << "--------------------------\n";
 
       base = base->rebuild(kids);
-//      base->dump();
-//      llvm::outs() << "--- End substitution - " << base->getKind() << " ---\n";
+      //      base->dump();
+      //      llvm::outs() << "--- End substitution - " << base->getKind() << "
+      //      ---\n";
 
       return base;
     }
