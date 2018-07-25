@@ -26,6 +26,16 @@
 #include <string>
 
 namespace klee {
+class Bound {
+public:
+  float value;
+  bool isEq;
+  Bound() {
+    value = std::numeric_limits<float>::max();
+    isEq = false;
+  }
+};
+
 class TxExprHelper {
 private:
 public:

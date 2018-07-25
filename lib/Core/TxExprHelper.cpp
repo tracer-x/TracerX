@@ -53,92 +53,84 @@ std::vector<ref<Expr> > TxExprHelper::simplify(std::set<ref<Expr> > exprs) {
 std::vector<ref<Expr> >
 TxExprHelper::rangeSimplify(std::vector<ref<Expr> > exprs) {
   std::vector<ref<Expr> > ret;
-  ref<Expr> ltex;
-  bool eqUpperBound = false;
-  ref<Expr> gtex;
-  bool eqLowerBound = false;
-  float upperBound = std::numeric_limits<float>::max();
-  float lowerBound = std::numeric_limits<float>::min();
+  ref<Expr> less;
+  Bound upper;
+  ref<Expr> greater;
+  Bound lower;
+
+  //  bool eqUpperBound = false;
+  //  bool eqLowerBound = false;
+  //  float upperBound = std::numeric_limits<float>::max();
+  //  float lowerBound = std::numeric_limits<float>::min();
   for (std::vector<ref<Expr> >::const_iterator it = exprs.begin(),
                                                ie = exprs.end();
        it != ie; ++it) {
     ref<Expr> tmp = TxWPHelper::simplifyWPExpr(*it);
 
     // if cannot compute the bound then skip
-    float bound = getBound(tmp);
-    if (bound == std::numeric_limits<float>::max()) {
+    float boundVal = getBound(tmp);
+    if (boundVal == std::numeric_limits<float>::max()) {
       ret.push_back(tmp);
       continue;
     }
     switch (tmp->getKind()) {
     case Expr::Ult:
     case Expr::Slt: {
-      if (ltex.isNull()) {
-        ltex = tmp;
-        upperBound = bound;
-        eqUpperBound = false;
-      } else if (bound < upperBound) {
+      if (less.isNull()) {
+        less = tmp;
+        upper.value = boundVal;
+        upper.isEq = false;
+      } else if (boundVal < upper.value) {
         // if upper bound is valid and lower than current upper bound
         // then take the new one and update bound
-        ltex = tmp;
-        upperBound = bound;
-        eqUpperBound = false;
-      } else {
-        ret.push_back(tmp);
+        less = tmp;
+        upper.value = boundVal;
+        upper.isEq = false;
       }
       break;
     }
-
     case Expr::Ule:
     case Expr::Sle: {
-      if (ltex.isNull()) {
-        ltex = tmp;
-        upperBound = bound;
-        eqUpperBound = true;
+      if (less.isNull()) {
+        less = tmp;
+        upper.value = boundVal;
+        upper.isEq = true;
       } else {
-        if (bound == upperBound && eqUpperBound == false) {
-          eqUpperBound = true;
-        } else if (bound < upperBound) {
-          ltex = tmp;
-          upperBound = bound;
-          eqUpperBound = true;
-        } else {
-          ret.push_back(tmp);
+        if (boundVal == upper.value && upper.isEq == false) {
+          upper.isEq = true;
+        } else if (boundVal < upper.value) {
+          less = tmp;
+          upper.value = boundVal;
+          upper.isEq = true;
         }
       }
       break;
     }
-
     case Expr::Ugt:
     case Expr::Sgt: {
-      if (ltex.isNull()) {
-        gtex = tmp;
-        lowerBound = bound;
-        eqLowerBound = false;
-      } else if (bound > lowerBound) {
-        lowerBound = bound;
-        gtex = tmp;
-        eqLowerBound = false;
-      } else {
-        ret.push_back(tmp);
+      if (less.isNull()) {
+        greater = tmp;
+        lower.value = boundVal;
+        lower.isEq = false;
+      } else if (boundVal > lower.value) {
+        greater = tmp;
+        lower.value = boundVal;
+        lower.isEq = false;
       }
       break;
     }
-
     case Expr::Sge:
     case Expr::Uge: {
-      if (ltex.isNull()) {
-        gtex = tmp;
-        eqLowerBound = true;
+      if (less.isNull()) {
+        greater = tmp;
+        lower.value = true;
       } else {
-        if (bound == lowerBound && eqLowerBound == false) {
-          eqLowerBound = true;
-        } else if (bound > lowerBound) {
-          gtex = tmp;
-          lowerBound = bound;
-          eqLowerBound = true;
-        } else {
-          ret.push_back(tmp);
+        if (boundVal == lower.value && lower.isEq == false) {
+          lower.isEq = true;
+        } else if (boundVal > lower.value) {
+          greater = tmp;
+          lower.value = boundVal;
+          lower.isEq = true;
         }
       }
       break;
@@ -148,15 +140,15 @@ TxExprHelper::rangeSimplify(std::vector<ref<Expr> > exprs) {
     }
   }
 
-  if (!ltex.isNull())
-    ret.push_back(ltex);
-  if (!gtex.isNull())
-    ret.push_back(gtex);
+  if (!less.isNull())
+    ret.push_back(less);
+  if (!greater.isNull())
+    ret.push_back(greater);
   return ret;
 }
 
 float TxExprHelper::getBound(ref<Expr> e) {
-  float bound = std::numeric_limits<float>::max();
+  float ret = std::numeric_limits<float>::max();
   switch (e->getKind()) {
   case Expr::Ult:
   case Expr::Slt:
@@ -168,13 +160,31 @@ float TxExprHelper::getBound(ref<Expr> e) {
   case Expr::Uge: {
     ref<Expr> left = e->getKid(0);
     ref<Expr> right = e->getKid(1);
-    if (isaVar(left) && isa<ConstantExpr>(right)) {
-      ref<ConstantExpr> boundEx = dyn_cast<ConstantExpr>(right);
-      bound = (float)boundEx->getZExtValue();
+    if (isa<ConstantExpr>(right)) {
+      float rightVal = dyn_cast<ConstantExpr>(right)->getZExtValue();
+      if (isaVar(left)) {
+        ret = rightVal;
+      } else {
+        switch (left->getKind()) {
+        case Expr::Mul: {
+          ref<Expr> kids[2];
+          kids[0] = left->getKid(0);
+          kids[1] = left->getKid(1);
+          if (isa<ConstantExpr>(kids[0]) && isaVar(kids[1])) {
+            float coeff = dyn_cast<ConstantExpr>(kids[0])->getZExtValue();
+            ret = rightVal / coeff;
+          } else if (isa<ConstantExpr>(kids[1]) && isaVar(kids[0])) {
+            float coeff = dyn_cast<ConstantExpr>(kids[1])->getZExtValue();
+            ret = rightVal / coeff;
+          }
+          break;
+        }
+        }
+      }
     }
   }
   }
-  return bound;
+  return ret;
 }
 
 bool TxExprHelper::isaVar(ref<Expr> e) {
