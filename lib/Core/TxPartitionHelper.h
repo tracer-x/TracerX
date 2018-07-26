@@ -25,12 +25,12 @@
 
 namespace klee {
 
-class Partition {
+template <class T> class Partition {
 public:
-  std::set<ref<Expr> > exprs;
+  std::set<T> exprs;
   std::set<std::string> vars;
   void print() {
-    for (std::set<ref<Expr> >::const_iterator it = exprs.begin(),
+    for (typename std::set<T>::const_iterator it = exprs.begin(),
                                               ie = exprs.end();
          it != ie; ++it) {
       (*it)->dump();
@@ -45,9 +45,16 @@ public:
 
 class TxPartitionHelper {
 public:
-  static std::vector<Partition> partitionOnCond(ref<Expr> cond,
-                                                std::vector<ref<Expr> > exprs);
-  static std::vector<Partition> partition(std::vector<ref<Expr> > exprs);
+  static std::vector<Partition<ref<Expr> > >
+  partitionExprsOnCond(ref<Expr> cond, std::vector<ref<Expr> > exprs);
+  static std::vector<Partition<ref<Expr> > >
+  partitionExprs(std::vector<ref<Expr> > exprs);
+
+  static std::vector<Partition<ref<TxAllocationContext> > >
+  partitionConAddStore(TxStore::TopInterpolantStore conAddStore);
+  static std::vector<Partition<ref<TxAllocationContext> > >
+  partitionConAddStoreOnCond(ref<Expr> cond,
+                             TxStore::TopInterpolantStore conAddStore);
 
   static ref<Expr> createAnd(std::vector<ref<Expr> > exprs);
   static ref<Expr> createAnd(std::set<ref<Expr> > exprs);
@@ -57,10 +64,14 @@ public:
   static ref<Expr> False() { return ConstantExpr::alloc(0, Expr::Bool); };
 
   static void getExprVars(ref<Expr> e, std::set<std::string> &vars);
-  static void visit(ref<Expr> node, std::set<ref<Expr> > &currentComp,
-                    std::map<ref<Expr>, std::set<ref<Expr> > > &ref2ref,
-                    std::set<ref<Expr> > &marked);
   static bool isShared(std::set<std::string> ss1, std::set<std::string> ss2);
+
+  template <class T>
+  static std::vector<std::set<T> >
+  findConnectedComps(std::map<T, std::set<T> > graph);
+  template <class T>
+  static void visit(T node, std::set<T> &curComp,
+                    std::map<T, std::set<T> > &graph, std::set<T> &marked);
 };
 }
 #endif /* TXLIB_CORE_PARTITIONHELPER_H_ */

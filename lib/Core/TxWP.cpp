@@ -1008,14 +1008,36 @@ ref<Expr> TxWeakestPreCondition::intersectExpr(
   //    interpolant->dump();
   //  llvm::outs() << "\n===============\n";
 
-  std::map<std::string, ref<Expr> > entries =
-      extractExprs(concretelyAddressedStore);
+  std::vector<Partition<ref<TxAllocationContext> > > conAddStoreParts =
+      TxPartitionHelper::partitionConAddStoreOnCond(branchCondition,
+                                                    concretelyAddressedStore);
+  //  llvm::outs() << "\n------concrete address store partitions-------\n";
+  //  branchCondition->dump();
+  //  for (unsigned int i = 0; i < conAddStoreParts.size(); i++) {
+  //    conAddStoreParts.at(i).print();
+  //    llvm::outs() << "\n-------------\n";
+  //  }
+  //  llvm::outs() << "\n===============\n";
+  //  llvm::outs() << "\n------start deleting address store partitions size = "
+  //               << concretelyAddressedStore.size() << "\n";
+  for (TxStore::TopInterpolantStore::const_iterator
+           mapIt = concretelyAddressedStore.begin(),
+           mapIe = concretelyAddressedStore.end();
+       mapIt != mapIe; ++mapIt) {
+    if (!(conAddStoreParts[0].exprs.find(mapIt->first) ==
+          conAddStoreParts[0].exprs.end())) {
+      concretelyAddressedStore.erase(mapIt->first);
+    }
+  }
+  //  llvm::outs() << "\n------end deleting address store partitions size = "
+  //               << concretelyAddressedStore.size() << "\n";
 
   // partition interpolant based on branchCondition
   std::vector<ref<Expr> > interpolantExprs;
   TxPartitionHelper::getExprsFromAndExpr(interpolant, interpolantExprs);
-  std::vector<Partition> interpolantParts =
-      TxPartitionHelper::partitionOnCond(branchCondition, interpolantExprs);
+  std::vector<Partition<ref<Expr> > > interpolantParts =
+      TxPartitionHelper::partitionExprsOnCond(branchCondition,
+                                              interpolantExprs);
 
   //    llvm::outs() << "\n------interpolant partitions-------\n";
   //    for (unsigned int i = 0; i < interpolantParts.size(); i++) {
@@ -1027,8 +1049,8 @@ ref<Expr> TxWeakestPreCondition::intersectExpr(
   // partition w1 based on branchCondition
   std::vector<ref<Expr> > w1Exprs;
   TxPartitionHelper::getExprsFromAndExpr(expr1, w1Exprs);
-  std::vector<Partition> w1Parts =
-      TxPartitionHelper::partitionOnCond(branchCondition, w1Exprs);
+  std::vector<Partition<ref<Expr> > > w1Parts =
+      TxPartitionHelper::partitionExprsOnCond(branchCondition, w1Exprs);
 
   //    llvm::outs() << "\n------wp1 partitions-------\n";
   //    for (unsigned int i = 0; i < w1Parts.size(); i++) {
@@ -1040,8 +1062,8 @@ ref<Expr> TxWeakestPreCondition::intersectExpr(
   // partition w2 based on branchCondition
   std::vector<ref<Expr> > w2Exprs;
   TxPartitionHelper::getExprsFromAndExpr(expr2, w2Exprs);
-  std::vector<Partition> w2Parts =
-      TxPartitionHelper::partitionOnCond(branchCondition, w2Exprs);
+  std::vector<Partition<ref<Expr> > > w2Parts =
+      TxPartitionHelper::partitionExprsOnCond(branchCondition, w2Exprs);
 
   //    llvm::outs() << "\n------wp2 partitions-------\n";
   //    for (unsigned int i = 0; i < w2Parts.size(); i++) {

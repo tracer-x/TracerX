@@ -155,92 +155,71 @@ bool TxPartitionHelper::isShared(std::set<std::string> ss1,
   return false;
 }
 
-std::vector<Partition>
-TxPartitionHelper::partition(std::vector<ref<Expr> > exprs) {
-
+std::vector<Partition<ref<Expr> > >
+TxPartitionHelper::partitionExprs(std::vector<ref<Expr> > exprs) {
   // build relation map [var -> set<ref<Expr>>]
-  std::map<ref<Expr>, std::set<std::string> > ref2var;
-  std::map<std::string, std::set<ref<Expr> > > var2ref;
+  std::map<ref<Expr>, std::set<std::string> > ref2vars;
+  std::map<std::string, std::set<ref<Expr> > > var2refs;
   for (std::vector<ref<Expr> >::const_iterator exprIt = exprs.begin(),
                                                exprIe = exprs.end();
        exprIt != exprIe; ++exprIt) {
     std::set<std::string> vars;
     getExprVars(*exprIt, vars);
-    ref2var[*exprIt] = vars;
+    ref2vars[*exprIt] = vars;
     for (std::set<std::string>::const_iterator strIt = vars.begin(),
                                                strIe = vars.end();
          strIt != strIe; ++strIt) {
-      var2ref[*strIt].insert(*exprIt);
+      var2refs[*strIt].insert(*exprIt);
     }
   }
 
   // build map [ref<Expr> -> vector<ref<Expr>>]
-  std::map<ref<Expr>, std::set<ref<Expr> > > ref2ref;
+  std::map<ref<Expr>, std::set<ref<Expr> > > ref2refs;
   for (std::vector<ref<Expr> >::const_iterator exprIt = exprs.begin(),
                                                exprIe = exprs.end();
        exprIt != exprIe; ++exprIt) {
     // get set of vars
-    std::set<std::string> vars = ref2var[*exprIt];
+    std::set<std::string> vars = ref2vars[*exprIt];
     // collect related refs
     for (std::set<std::string>::const_iterator strIt = vars.begin(),
                                                strIe = vars.end();
          strIt != strIe; ++strIt) {
-      ref2ref[*exprIt].insert(var2ref[*strIt].begin(), var2ref[*strIt].end());
+      ref2refs[*exprIt].insert(var2refs[*strIt].begin(),
+                               var2refs[*strIt].end());
     }
   }
 
   // build connected components as partitions
-  std::set<ref<Expr> > marked;
-  std::vector<Partition> partitions;
-  for (std::map<ref<Expr>, std::set<ref<Expr> > >::const_iterator
-           mapIt = ref2ref.begin(),
-           mapIe = ref2ref.end();
-       mapIt != mapIe; ++mapIt) {
-    // visit un-marked nodes
-    if (marked.find(mapIt->first) == marked.end()) {
-      std::set<ref<Expr> > currentComp;
-      visit(mapIt->first, currentComp, ref2ref, marked);
-
-      Partition p;
-      p.exprs = currentComp;
-      for (std::set<ref<Expr> >::const_iterator exprIt = currentComp.begin(),
-                                                exprIe = currentComp.end();
-           exprIt != exprIe; ++exprIt) {
-        p.vars.insert(ref2var[*exprIt].begin(), ref2var[*exprIt].end());
-      }
-      partitions.push_back(p);
+  std::vector<std::set<ref<Expr> > > ccs =
+      findConnectedComps<ref<Expr> >(ref2refs);
+  std::vector<Partition<ref<Expr> > > partitions;
+  for (std::vector<std::set<ref<Expr> > >::const_iterator it = ccs.begin(),
+                                                          ie = ccs.end();
+       it != ie; ++it) {
+    Partition<ref<Expr> > p;
+    p.exprs = *it;
+    for (std::set<ref<Expr> >::const_iterator exprIt = it->begin(),
+                                              exprIe = it->end();
+         exprIt != exprIe; ++exprIt) {
+      p.vars.insert(ref2vars[*exprIt].begin(), ref2vars[*exprIt].end());
     }
+    partitions.push_back(p);
   }
   return partitions;
 }
 
-void TxPartitionHelper::visit(
-    ref<Expr> node, std::set<ref<Expr> > &currentComp,
-    std::map<ref<Expr>, std::set<ref<Expr> > > &ref2ref,
-    std::set<ref<Expr> > &marked) {
-  marked.insert(node);
-  currentComp.insert(node);
-  // recursively call on adjacent nodes
-  for (std::set<ref<Expr> >::const_iterator it = ref2ref[node].begin(),
-                                            ie = ref2ref[node].end();
-       it != ie; ++it) {
-    if (marked.find(*it) == marked.end()) {
-      visit(*it, currentComp, ref2ref, marked);
-    }
-  }
-}
+std::vector<Partition<ref<Expr> > >
+TxPartitionHelper::partitionExprsOnCond(ref<Expr> cond,
+                                        std::vector<ref<Expr> > exprs) {
+  std::vector<Partition<ref<Expr> > > partitions = partitionExprs(exprs);
 
-std::vector<Partition>
-TxPartitionHelper::partitionOnCond(ref<Expr> cond,
-                                   std::vector<ref<Expr> > exprs) {
-  std::vector<Partition> partitions = partition(exprs);
-
-  Partition nonRelated;
-  Partition related;
+  Partition<ref<Expr> > nonRelated;
+  Partition<ref<Expr> > related;
   std::set<std::string> condVars;
   getExprVars(cond, condVars);
-  for (std::vector<Partition>::const_iterator partIt = partitions.begin(),
-                                              partIe = partitions.end();
+  for (std::vector<Partition<ref<Expr> > >::const_iterator
+           partIt = partitions.begin(),
+           partIe = partitions.end();
        partIt != partIe; ++partIt) {
     if (!isShared(condVars, partIt->vars)) {
       nonRelated.exprs.insert(partIt->exprs.begin(), partIt->exprs.end());
@@ -250,8 +229,127 @@ TxPartitionHelper::partitionOnCond(ref<Expr> cond,
       related.vars.insert(partIt->vars.begin(), partIt->vars.end());
     }
   }
-  std::vector<Partition> ret;
+  std::vector<Partition<ref<Expr> > > ret;
   ret.push_back(nonRelated);
   ret.push_back(related);
   return ret;
+}
+
+std::vector<Partition<ref<TxAllocationContext> > >
+TxPartitionHelper::partitionConAddStore(
+    TxStore::TopInterpolantStore conAddStore) {
+  // build relation map [var -> set<entry>]
+  std::map<ref<TxAllocationContext>, std::set<std::string> > entry2vars;
+  std::map<std::string, std::set<ref<TxAllocationContext> > > var2entries;
+  for (TxStore::TopInterpolantStore::const_iterator mapIt = conAddStore.begin(),
+                                                    mapIe = conAddStore.end();
+       mapIt != mapIe; ++mapIt) {
+    std::set<std::string> vars;
+    std::string var(mapIt->first->getValue()->getName().data());
+    vars.insert(var);
+    getExprVars(mapIt->second.begin()->second->getExpression(), vars);
+    entry2vars[mapIt->first] = vars;
+    for (std::set<std::string>::const_iterator strIt = vars.begin(),
+                                               strIe = vars.end();
+         strIt != strIe; ++strIt) {
+      var2entries[*strIt].insert(mapIt->first);
+    }
+  }
+
+  // build map [ref<TxAllocationContext> -> vector<ref<TxAllocationContext>>]
+  std::map<ref<TxAllocationContext>, std::set<ref<TxAllocationContext> > > entry2entries;
+  for (std::map<ref<TxAllocationContext>, std::set<std::string> >::const_iterator
+           entryIt = entry2vars.begin(),
+           entryIe = entry2vars.end();
+       entryIt != entryIe; ++entryIt) {
+    // collect related entries
+    for (std::set<std::string>::const_iterator strIt = entryIt->second.begin(),
+                                               strIe = entryIt->second.end();
+         strIt != strIe; ++strIt) {
+      entry2entries[entryIt->first].insert(var2entries[*strIt].begin(),
+                                           var2entries[*strIt].end());
+    }
+  }
+
+  // build connected components as partitions
+  std::vector<std::set<ref<TxAllocationContext> > > ccs =
+      findConnectedComps<ref<TxAllocationContext> >(entry2entries);
+  std::vector<Partition<ref<TxAllocationContext> > > partitions;
+  for (std::vector<std::set<ref<TxAllocationContext> > >::const_iterator
+           it = ccs.begin(),
+           ie = ccs.end();
+       it != ie; ++it) {
+    Partition<ref<TxAllocationContext> > p;
+    p.exprs = *it;
+    for (std::set<ref<TxAllocationContext> >::const_iterator exprIt = it->begin(),
+                                                    exprIe = it->end();
+         exprIt != exprIe; ++exprIt) {
+      p.vars.insert(entry2vars[*exprIt].begin(), entry2vars[*exprIt].end());
+    }
+    partitions.push_back(p);
+  }
+  return partitions;
+}
+
+std::vector<Partition<ref<TxAllocationContext> > >
+TxPartitionHelper::partitionConAddStoreOnCond(
+    ref<Expr> cond, TxStore::TopInterpolantStore conAddStore) {
+  std::vector<Partition<ref<TxAllocationContext> > > partitions =
+      partitionConAddStore(conAddStore);
+  Partition<ref<TxAllocationContext> > nonRelated;
+  Partition<ref<TxAllocationContext> > related;
+  std::set<std::string> condVars;
+  getExprVars(cond, condVars);
+
+  for (std::vector<Partition<ref<TxAllocationContext> > >::const_iterator
+           partIt = partitions.begin(),
+           partIe = partitions.end();
+       partIt != partIe; ++partIt) {
+    if (!isShared(condVars, partIt->vars)) {
+      nonRelated.exprs.insert(partIt->exprs.begin(), partIt->exprs.end());
+      nonRelated.vars.insert(partIt->vars.begin(), partIt->vars.end());
+    } else {
+      related.exprs.insert(partIt->exprs.begin(), partIt->exprs.end());
+      related.vars.insert(partIt->vars.begin(), partIt->vars.end());
+    }
+  }
+  std::vector<Partition<ref<TxAllocationContext> > > ret;
+  ret.push_back(nonRelated);
+  ret.push_back(related);
+  return ret;
+  return partitions;
+}
+
+template <class T>
+std::vector<std::set<T> >
+TxPartitionHelper::findConnectedComps(std::map<T, std::set<T> > graph) {
+  std::vector<std::set<T> > ret;
+  std::set<T> marked;
+  for (typename std::map<T, std::set<T> >::const_iterator mapIt = graph.begin(),
+                                                          mapIe = graph.end();
+       mapIt != mapIe; ++mapIt) {
+    // visit un-marked nodes
+    if (marked.find(mapIt->first) == marked.end()) {
+      std::set<T> curComp;
+      visit(mapIt->first, curComp, graph, marked);
+      ret.push_back(curComp);
+    }
+  }
+  return ret;
+}
+
+template <class T>
+void TxPartitionHelper::visit(T node, std::set<T> &curComp,
+                              std::map<T, std::set<T> > &graph,
+                              std::set<T> &marked) {
+  marked.insert(node);
+  curComp.insert(node);
+  // recursively call on adjacent nodes
+  for (typename std::set<T>::const_iterator it = graph[node].begin(),
+                                            ie = graph[node].end();
+       it != ie; ++it) {
+    if (marked.find(*it) == marked.end()) {
+      visit(*it, curComp, graph, marked);
+    }
+  }
 }
