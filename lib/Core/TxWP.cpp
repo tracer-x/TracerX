@@ -1963,15 +1963,20 @@ ref<Expr> TxWeakestPreCondition::getPrevExpr(ref<Expr> e,
     ref<Expr> left = this->generateExprFromOperand(i, 0);
     ref<Expr> right = this->generateExprFromOperand(i, 1);
     ref<Expr> eqExpr = EqExpr::create(right, left);
-    ref<Expr> result = TxWPHelper::substituteExpr(e, eqExpr);
-    //
+
     //    llvm::outs() << "--- Begin substitution ---\n";
-    //    i->dump();
-    //    llvm::outs() << "--------------------------\n";
+    //    //    llvm::outs() << "[i]----\n";
+    //    //    i->dump();
+    //    llvm::outs() << "[e]----\n";
     //    e->dump();
-    //    llvm::outs() << "--------------------------\n";
-    //    eqExpr->dump();
-    //    llvm::outs() << "--------------------------\n";
+    //    llvm::outs() << "[left]----\n";
+    //    left->dump();
+    //    llvm::outs() << "[right]----\n";
+    //    right->dump();
+
+    ref<Expr> result = TxWPHelper::substituteExpr(e, right, left);
+
+    //    llvm::outs() << "[result]----\n";
     //    result->dump();
     //    llvm::outs() << "--- End substitution ---\n";
 
@@ -2269,6 +2274,13 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
   } else if (llvm::isa<llvm::CmpInst>(operand1)) {
     llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(operand1);
     left = getCmpCondition(cmp);
+  } else if (llvm::isa<llvm::GlobalVariable>(operand1)) {
+    left = dependency->getAddress(operand1, &TxWPArrayStore::ac,
+                                  TxWPArrayStore::array, this);
+  } else if (llvm::isa<llvm::Argument>(operand1)) {
+    //    llvm::Argument arg = dyn_cast<llvm::Argument>(operand1);
+    left = dependency->getAddress(operand1, &TxWPArrayStore::ac,
+                                  TxWPArrayStore::array, this);
   } else {
     operand1->dump();
     klee_error("TxWeakestPreCondition::generateExprFromOperand Remaining"

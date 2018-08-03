@@ -269,47 +269,20 @@ bool TxWPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
   return false;
 }
 
-ref<Expr> TxWPHelper::substituteExpr(ref<Expr> e, ref<Expr> eq) {
-
-  ref<Expr> result;
-  switch (eq->getKind()) {
-  case Expr::Constant: {
-    // Nothing is needed to be done, it's either true or false
-    break;
-  }
-  case Expr::Eq: {
-    ref<Expr> lhs = eq->getKid(0);
-    if (isa<ConstantExpr>(lhs)) {
-      result = e;
-      break;
-    }
-    ref<Expr> rhs = eq->getKid(1);
-    if (isa<ConstantExpr>(rhs)) {
-      ref<Expr> temp = lhs;
-      lhs = rhs;
-      rhs = temp;
-    }
-
-    result = substituteExpr(e, lhs, rhs);
-    break;
-  }
-  default: {
-    e->dump();
-    klee_error("Substitution for this expressions is not defined yet!");
-  }
-  }
-
-  return result;
-}
-
 ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
                                      const ref<Expr> rhs) {
+  //  llvm::outs() << "--- Begin substitution ---\n";
+  //  llvm::outs() << "[e]----\n";
+  //  base->dump();
+  //  llvm::outs() << "[left]----\n";
+  //  lhs->dump();
+  //  llvm::outs() << "[right]----\n";
+  //  rhs->dump();
+  //  llvm::outs() << "--- End substitution ---\n";
 
-  if (base.compare(lhs) == 0)
+  if (base.compare(lhs) == 0) { // base case
     return rhs;
-  //  else if (base.compare(rhs) == 0)
-  //    return lhs;
-  else {
+  } else {
     switch (base->getKind()) {
     case Expr::InvalidKind:
     case Expr::Constant: {
@@ -368,8 +341,8 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
 
       base = base->rebuild(kids);
       //      base->dump();
-      //      llvm::outs() << "--- End substitution - " << base->getKind() << "
-      //      ---\n";
+      //      llvm::outs() << "--- End substitution - " << base->getKind() <<
+      //      "---\n ";
 
       return base;
     }
@@ -383,8 +356,10 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
     }
     }
   }
+
   // Sanity check
-  klee_error("Control should not reach here in TxWPHelper::substituteExpr!");
+  //  klee_error("Control should not reach here in
+  //  TxWPHelper::substituteExpr!");
 
   return base;
 }

@@ -47,7 +47,6 @@ public:
   static ref<Expr> convertToExpr(ref<Expr> e,
                                  std::map<ref<Expr>, uint64_t> *newLinearTerm);
 
-  static ref<Expr> substituteExpr(ref<Expr> e, ref<Expr> eq);
   static ref<Expr> substituteExpr(ref<Expr> base, const ref<Expr> lhs,
                                   const ref<Expr> rhs);
   static bool isTargetDependent(llvm::Value *inst, ref<Expr> expr);
