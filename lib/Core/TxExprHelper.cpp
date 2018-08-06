@@ -18,6 +18,336 @@
 
 namespace klee {
 
+ref<Expr> TxExprHelper::singleSimplify(ref<Expr> e) {}
+
+ref<Expr> TxExprHelper::CONST_REF = ConstantExpr::create(1, Expr::Int32);
+
+/**
+ * Remove Not() at the beginning if possible
+ */
+ref<Expr> TxExprHelper::simplifyNot(ref<Expr> e) {
+  ref<Expr> ret;
+  if (e->getKind() == Expr::Not) {
+    ref<Expr> inExpr = e->getKid(0);
+    switch (inExpr->getKind()) {
+    case Expr::Ne: {
+      ref<Expr> kids[2];
+      kids[0] = inExpr->getKid(0);
+      kids[1] = inExpr->getKid(1);
+      ret = EqExpr::create(kids[0], kids[1]);
+      break;
+    }
+    case Expr::Sle: {
+      ref<Expr> kids[2];
+      kids[0] = inExpr->getKid(0);
+      kids[1] = inExpr->getKid(1);
+      ret = SgtExpr::create(kids[0], kids[1]);
+      break;
+    }
+    case Expr::Slt: {
+      ref<Expr> kids[2];
+      kids[0] = inExpr->getKid(0);
+      kids[1] = inExpr->getKid(1);
+      ret = SgeExpr::create(kids[0], kids[1]);
+      break;
+    }
+    case Expr::Sge: {
+      ref<Expr> kids[2];
+      kids[0] = inExpr->getKid(0);
+      kids[1] = inExpr->getKid(1);
+      ret = SltExpr::create(kids[0], kids[1]);
+      break;
+    }
+    case Expr::Sgt: {
+      ref<Expr> kids[2];
+      kids[0] = inExpr->getKid(0);
+      kids[1] = inExpr->getKid(1);
+      ret = SleExpr::create(kids[0], kids[1]);
+      break;
+    }
+    case Expr::Ule: {
+      ref<Expr> kids[2];
+      kids[0] = inExpr->getKid(0);
+      kids[1] = inExpr->getKid(1);
+      ret = UgtExpr::create(kids[0], kids[1]);
+      break;
+    }
+    case Expr::Ult: {
+      ref<Expr> kids[2];
+      kids[0] = inExpr->getKid(0);
+      kids[1] = inExpr->getKid(1);
+      ret = UgeExpr::create(kids[0], kids[1]);
+      break;
+    }
+    case Expr::Uge: {
+      ref<Expr> kids[2];
+      kids[0] = inExpr->getKid(0);
+      kids[1] = inExpr->getKid(1);
+      ret = UltExpr::create(kids[0], kids[1]);
+      break;
+    }
+    case Expr::Ugt: {
+      ref<Expr> kids[2];
+      kids[0] = inExpr->getKid(0);
+      kids[1] = inExpr->getKid(1);
+      ret = UleExpr::create(kids[0], kids[1]);
+      break;
+    }
+    default: {
+      ret = e;
+      break;
+    }
+    }
+  } else {
+    ret = e;
+  }
+
+  //  llvm::outs() << "\n------TxExprHelper::simplifyNot-------\n";
+  //  e->dump();
+  //  ret->dump();
+  //  llvm::outs() << "\n===============\n";
+  return ret;
+}
+
+ref<Expr> TxExprHelper::simplifyLinear(ref<Expr> e) {
+
+  switch (e->getKind()) {
+  case Expr::And: {
+    ref<Expr> kids[2];
+    kids[0] = simplifyLinear(e->getKid(0));
+    kids[1] = simplifyLinear(e->getKid(1));
+    return e->rebuild(kids);
+  }
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge: {
+    std::map<ref<Expr>, int> ref2coeff;
+    ref<Expr> left = e->getKid(0);
+    ref<Expr> right = e->getKid(1);
+
+    bool b1 = extractCoeff(left, 1, ref2coeff);
+
+    //    llvm::outs() << "\n------TxExprHelper::simplifyLinear::left-------\n";
+    //    llvm::outs() << "[E]:\n";
+    //    e->dump();
+    //    llvm::outs() << "Left:\n";
+    //    left->dump();
+    //    for (std::map<ref<Expr>, int>::const_iterator it = ref2coeff.begin(),
+    //                                                  ie = ref2coeff.end();
+    //         it != ie; ++it) {
+    //      llvm::outs() << "First:\n";
+    //      it->first->dump();
+    //      llvm::outs() << "Second:" << it->second << "\n";
+    //    }
+    //    llvm::outs() << "\n===============\n";
+
+    if (!b1)
+      return e;
+    bool b2 = extractCoeff(right, -1, ref2coeff);
+
+    //    llvm::outs() << "\n------TxExprHelper::simplifyLinear-------\n";
+    //    llvm::outs() << "Left:\n";
+    //    left->dump();
+    //    llvm::outs() << "Right:\n";
+    //    right->dump();
+    //    for (std::map<ref<Expr>, int>::const_iterator it = ref2coeff.begin(),
+    //                                                  ie = ref2coeff.end();
+    //         it != ie; ++it) {
+    //      llvm::outs() << "First:\n";
+    //      it->first->dump();
+    //      llvm::outs() << "Second:" << it->second << "\n";
+    //    }
+    //    llvm::outs() << "\n===============\n";
+
+    if (!b2) {
+      return e;
+    }
+
+    //    llvm::outs() << "\n------TxExprHelper::simplifyLinear-------\n";
+    //    llvm::outs() << "e:\n";
+    //    e->dump();
+    //    llvm::outs() << "makeExpr(e, ref2coeff):\n";
+    //    makeExpr(e, ref2coeff)->dump();
+    //    llvm::outs() << "\n===============\n";
+    return makeExpr(e, ref2coeff);
+  }
+  default:
+    return e;
+  }
+}
+
+/**
+ * Create a map from var -> coeff
+ */
+bool TxExprHelper::extractCoeff(ref<Expr> e, int mul,
+                                std::map<ref<Expr>, int> &ref2coeff) {
+
+  if (isaVar(e)) {
+    ref2coeff[e] = ref2coeff[e] + mul;
+    return true;
+  } else {
+    switch (e->getKind()) {
+    case Expr::Constant: {
+      ref<ConstantExpr> coeff = dyn_cast<ConstantExpr>(e);
+      ref2coeff[CONST_REF] = ref2coeff[CONST_REF] + coeff->getZExtValue() * mul;
+      return true;
+    }
+    case Expr::Mul: {
+      ref<Expr> kids[2];
+      kids[0] = e->getKid(0);
+      kids[1] = e->getKid(1);
+      if (isa<ConstantExpr>(kids[0]) && isaVar(kids[1])) {
+        ref<ConstantExpr> coeff = dyn_cast<ConstantExpr>(kids[0]);
+        ref2coeff[kids[1]] = ref2coeff[kids[1]] + coeff->getZExtValue() * mul;
+        return true;
+      } else if (isa<ConstantExpr>(kids[1]) && isaVar(kids[0])) {
+        ref<ConstantExpr> coeff = dyn_cast<ConstantExpr>(kids[1]);
+        ref2coeff[kids[0]] = ref2coeff[kids[0]] + coeff->getZExtValue() * mul;
+        return true;
+      } else {
+        return false;
+      }
+    }
+    case Expr::Add: {
+      ref<Expr> kids[2];
+      kids[0] = e->getKid(0);
+      kids[1] = e->getKid(1);
+      bool b1 = extractCoeff(kids[0], mul, ref2coeff);
+      if (!b1)
+        return false;
+      bool b2 = extractCoeff(kids[1], mul, ref2coeff);
+      if (!b2)
+        return false;
+      return true;
+    }
+    case Expr::Sub: {
+      ref<Expr> kids[2];
+      kids[0] = e->getKid(0);
+      kids[1] = e->getKid(1);
+      bool b1 = extractCoeff(kids[0], mul, ref2coeff);
+      if (!b1)
+        return false;
+      bool b2 = extractCoeff(kids[1], -mul, ref2coeff);
+      if (!b2)
+        return false;
+      return true;
+    }
+    default: { return false; }
+    }
+  }
+}
+
+ref<Expr> TxExprHelper::makeExpr(ref<Expr> e,
+                                 std::map<ref<Expr>, int> &ref2coeff) {
+  std::vector<ref<Expr> > pos;
+  std::vector<ref<Expr> > neg;
+  int c = 0;
+  for (std::map<ref<Expr>, int>::const_iterator it = ref2coeff.begin(),
+                                                ie = ref2coeff.end();
+       it != ie; ++it) {
+    if (it->first == CONST_REF) { // CONST
+      c = it->second;
+    } else { // VAR
+      if (it->second > 0) {
+        ref<Expr> tmp =
+            (it->second == 1)
+                ? it->first
+                : MulExpr::create(ConstantExpr::create(it->second, Expr::Int32),
+                                  it->first);
+        pos.push_back(tmp);
+      } else if (it->second < 0) {
+        // convert to positive coeff and sub
+        uint32_t uc = -(it->second);
+        ref<Expr> tmp =
+            (uc == 1) ? it->first
+                      : MulExpr::create(ConstantExpr::create(uc, Expr::Int32),
+                                        it->first);
+        neg.push_back(tmp);
+      }
+    }
+  }
+
+  ref<Expr> kids[2];
+  // if no positive coeff then use for kids[1]
+  if (pos.size() == 0) {
+    if (neg.size() == 0) {
+      klee_warning(
+          "TxExprHelper::makeExpr: There is no variable in expression!");
+      return e;
+    }
+    // add all neg to the right hand side
+    std::vector<ref<Expr> >::const_iterator it = neg.begin();
+    kids[1] = *(it);
+    std::advance(it, 1);
+    if (neg.size() >= 1) {
+      for (; it != neg.end(); ++it) {
+        kids[1] = AddExpr::create(kids[1], (*it));
+      }
+    }
+  } else {
+    // add pos to the left hand side
+    std::vector<ref<Expr> >::const_iterator it = pos.begin();
+    kids[0] = *(it);
+    std::advance(it, 1);
+    if (neg.size() >= 1) {
+      for (; it != neg.end(); ++it) {
+        kids[0] = AddExpr::create(kids[0], (*it));
+      }
+    }
+    // sub neg to the left hand side
+    for (std::vector<ref<Expr> >::const_iterator it = neg.begin(),
+                                                 ie = neg.end();
+         it != ie; ++it) {
+      kids[0] = SubExpr::create(kids[0], (*it));
+    }
+  }
+
+  //  llvm::outs() << "\n------TxExprHelper::makeExpr-------\n";
+  //  if (!kids[0].isNull())
+  //    kids[0]->dump();
+  //  else
+  //    llvm::outs() << "kids[0] is null\n";
+  //  llvm::outs() << "\n---------------\n";
+  //  if (!kids[1].isNull())
+  //    kids[1]->dump();
+  //  else
+  //    llvm::outs() << "kids[1] is null\n";
+  //  llvm::outs() << "\n===============\n";
+
+  if (c > 0) { // add to left
+    ref<Expr> cExpr = ConstantExpr::create(c, Expr::Int32);
+    kids[0] = kids[0].isNull() ? cExpr : AddExpr::create(kids[0], cExpr);
+  } else if (c < 0) { // add to right
+    uint32_t tmpc = -c;
+    ref<Expr> ce = ConstantExpr::create(tmpc, Expr::Int32);
+    kids[1] = kids[1].isNull() ? ce : AddExpr::create(kids[1], ce);
+  }
+
+  if (kids[0].isNull()) {
+    kids[0] = ConstantExpr::create(0, Expr::Int32);
+  }
+  if (kids[1].isNull()) {
+    kids[1] = ConstantExpr::create(0, Expr::Int32);
+  }
+
+  //  llvm::outs() << "\n------TxExprHelper::makeExpr-------\n";
+  //  if (!kids[0].isNull())
+  //    kids[0]->dump();
+  //  llvm::outs() << "\n---------------\n";
+  //  if (!kids[1].isNull())
+  //    kids[1]->dump();
+  //  llvm::outs() << "\n===============\n";
+
+  return e->rebuild(kids);
+}
+
 std::vector<ref<Expr> > TxExprHelper::simplify(std::set<ref<Expr> > exprs) {
   std::vector<ref<Expr> > ret;
 

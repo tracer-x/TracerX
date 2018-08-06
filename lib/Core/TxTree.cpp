@@ -2488,23 +2488,23 @@ ref<Expr> TxTreeNode::getWPInterpolant(
     // Generate weakest precondition fot the current node
     // All instructions are marked
 
-//    llvm::outs() << "\n------ WP after intersection -------\n";
-//    wp->getWPExpr()->dump();
-//    llvm::outs() << "\n---------------------------------------\n";
+    //    llvm::outs() << "\n------ WP after intersection -------\n";
+    //    wp->getWPExpr()->dump();
+    //    llvm::outs() << "\n---------------------------------------\n";
 
     reverseInstructionList.pop_back();
     expr = wp->GenerateWP(reverseInstructionList);
 
-//    llvm::outs() << "\n------ WP after pushing up -------\n";
-//    wp->getWPExpr()->dump();
-//    llvm::outs() << "\n---------------------------------------\n";
+    //    llvm::outs() << "\n------ WP after pushing up -------\n";
+    //    wp->getWPExpr()->dump();
+    //    llvm::outs() << "\n---------------------------------------\n";
 
     if (parent)
       this->parent->setChildWPInterpolant(expr);
   }
 
   klee_warning("Start printing the WP");
-  wp->getWPExpr()->dump();
+  expr->dump();
   klee_warning("End of printing the WP");
   return expr;
 }

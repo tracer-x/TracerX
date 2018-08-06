@@ -1077,8 +1077,9 @@ ref<Expr> TxWeakestPreCondition::intersectExpr(
                                       w1Parts.at(0).exprs.end());
   interpolantParts.at(1).exprs.insert(w2Parts.at(0).exprs.begin(),
                                       w2Parts.at(0).exprs.end());
-  std::vector<ref<Expr> > tmpExprs =
-      TxExprHelper::simplify(interpolantParts.at(1).exprs);
+  //  std::vector<ref<Expr> > tmpExprs =
+  //      TxExprHelper::simplify(interpolantParts.at(1).exprs);
+  std::set<ref<Expr> > tmpExprs = interpolantParts.at(1).exprs;
   ref<Expr> res = TxPartitionHelper::createAnd(tmpExprs);
   return res;
 }
@@ -1872,6 +1873,9 @@ TxWeakestPreCondition::updateExistentials(std::set<const Array *> existentials,
 // Updated Version of Weakest PreCondition
 // =========================================================================
 
+/**
+ * Push up expression to top of BB
+ */
 ref<Expr> TxWeakestPreCondition::GenerateWP(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
 
@@ -1898,7 +1902,7 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
     if (flag == 1) {
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- create and expression from the condition and this->WPExpr
-      ref<Expr> cond = getBrCondition(i);
+      ref<Expr> cond = TxExprHelper::simplifyNot(getBrCondition(i));
       if (False() == WPExpr) {
         WPExpr = cond;
       } else {
@@ -1915,7 +1919,8 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
       // 2- generate not(condition): expr::not(condition)
       // 3- create and expression from the condition and this->WPExpr
 
-      ref<Expr> negCond = NotExpr::create(getBrCondition(i));
+      ref<Expr> negCond =
+          TxExprHelper::simplifyNot(NotExpr::create(getBrCondition(i)));
       if (False() == WPExpr) {
         WPExpr = negCond;
       } else {
@@ -1928,18 +1933,6 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
       //      negCond->dump();
       //      WPExpr->dump();
       //      llvm::outs() << "--- end 2 ---\n";
-    } else if (i->getOpcode() == llvm::Instruction::Br) {
-      llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(i);
-      if (br->isConditional()) {
-
-        ref<Expr> cond = getBrCondition(i);
-        node->setBranchCondition(cond);
-        //        llvm::outs() << "--- start 3 ---\n";
-        //        i->dump();
-        //        node->getBranchCondition()->dump();
-        //        llvm::outs() << "--- end 3 ---\n";
-      }
-
     } else if (i->getOpcode() == llvm::Instruction::Store) {
       WPExpr = getPrevExpr(WPExpr, i);
       //      llvm::outs() << "--- start 4 ---\n";
@@ -1948,7 +1941,7 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
       //      llvm::outs() << "--- end 4 ---\n";
     }
   }
-  WPExpr = TxWPHelper::simplifyWPExpr(WPExpr);
+  WPExpr = TxExprHelper::simplifyLinear(WPExpr);
   return WPExpr;
 }
 

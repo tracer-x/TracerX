@@ -38,9 +38,22 @@ public:
 
 class TxExprHelper {
 private:
+  static ref<Expr> CONST_REF;
+
 public:
   TxExprHelper();
   virtual ~TxExprHelper();
+
+  static ref<Expr> singleSimplify(ref<Expr> e);
+  static ref<Expr> simplifyNot(ref<Expr> e);
+  static ref<Expr> simplifyLinear(ref<Expr> e);
+  static bool extractCoeff(ref<Expr> e, int mul,
+                           std::map<ref<Expr>, int> &ref2coeff);
+  static ref<Expr> makeExpr(ref<Expr> e,
+                            std::map<ref<Expr>, int> &ref2coeff);
+
+  static ref<Expr> multipleSimplify(ref<Expr> expr);
+
   static std::vector<ref<Expr> > simplify(std::set<ref<Expr> > exprs);
   static std::vector<ref<Expr> > rangeSimplify(std::vector<ref<Expr> > exprs);
   static float getBound(ref<Expr> expr);
