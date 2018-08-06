@@ -426,6 +426,20 @@ TxExprHelper::rangeSimplifyFromExprs(std::set<ref<Expr> > exprs) {
     }
   }
 
+  //  llvm::outs() << "\n----TxExprHelper::rangeSimplifyFromExprs----\n";
+  //  for (std::set<ref<Expr> >::const_iterator it = exprs.begin(),
+  //                                            ie = exprs.end();
+  //       it != ie; ++it) {
+  //    (*it)->dump();
+  //  }
+  //  llvm::outs() << "\n-----------------\n";
+  //  for (std::vector<ref<Expr> >::const_iterator it = ret.begin(), ie =
+  //  ret.end();
+  //       it != ie; ++it) {
+  //    (*it)->dump();
+  //  }
+  //  llvm::outs() << "\n===============\n";
+
   return ret;
 }
 
@@ -438,29 +452,73 @@ TxExprHelper::combineSharedSingleVarExprs(std::vector<ref<Expr> > exprs) {
                                                ie = exprs.end();
        it != ie; ++it) {
     Bound b = getBound(*it);
+
+    //    llvm::outs() <<
+    //    "\n----TxExprHelper::combineSharedSingleVarExprs----\n";
+    //    (*it)->dump();
+    //    llvm::outs() << "[type, value] = [" << b.type << ", " << b.value <<
+    //    "]\n";
+    //    llvm::outs() << (b.type == Bound::le) << "\n";
+    //    llvm::outs() << "\n===============\n";
+
     if (b.type == Bound::invalid) {
       ret.push_back(*it);
+      //      llvm::outs() <<
+      //      "\n----TxExprHelper::combineSharedSingleVarExprs::Bound::"
+      //                      "invalid----\n";
     } else if (b.type == Bound::lt) {
       // update upper bound if applicable
       if (upper.type == Bound::invalid || b.value < upper.value) {
         upper = b;
       }
+      //      llvm::outs()
+      //          <<
+      //          "\n----TxExprHelper::combineSharedSingleVarExprs::Bound::lt----\n";
     } else if (b.type == Bound::le) {
       // update upper bound if applicable
       if (upper.type == Bound::invalid || b.value <= upper.value) {
         upper = b;
       }
+      //      llvm::outs()
+      //          <<
+      //          "\n----TxExprHelper::combineSharedSingleVarExprs::Bound::le----\n";
     } else if (b.type == Bound::gt) {
       // update lower bound if applicable
       if (lower.type == Bound::invalid || b.value > lower.value) {
         lower = b;
       }
-    } else if (b.type == Bound::le) {
+      //      llvm::outs()
+      //          <<
+      //          "\n----TxExprHelper::combineSharedSingleVarExprs::Bound::gt----\n";
+    } else if (b.type == Bound::ge) {
+
       // update lower bound if applicable
       if (lower.type == Bound::invalid || b.value >= lower.value) {
         lower = b;
       }
+
+      //      llvm::outs()
+      //          <<
+      //          "\n----TxExprHelper::combineSharedSingleVarExprs::Bound::le----\n";
+      //      (*it)->dump();
+      //      llvm::outs() << "[type, value] = [" << b.type << ", " << b.value
+      //      << "]\n";
+      //      llvm::outs() << "[type, value] = [" << lower.type << ", " <<
+      //      lower.value
+      //                   << "]\n";
+      //      llvm::outs() << "\n===============\n";
     }
+
+    //    llvm::outs() << "\n----TxExprHelper::combineSharedSingleVarExprs
+    //    2----\n";
+    //    (*it)->dump();
+    //    llvm::outs() << "[type, value] = [" << upper.type << ", " <<
+    //    upper.value
+    //                 << "]\n";
+    //    llvm::outs() << "[type, value] = [" << lower.type << ", " <<
+    //    lower.value
+    //                 << "]\n";
+    //    llvm::outs() << "\n===============\n";
   }
 
   if (upper.type != Bound::invalid)
@@ -533,6 +591,7 @@ Bound TxExprHelper::getBound(ref<Expr> e) {
   }
 
   float val = -c / coeff;
+
   switch (e->getKind()) {
   case Expr::Ult:
   case Expr::Slt: {
@@ -578,7 +637,7 @@ Bound TxExprHelper::getBound(ref<Expr> e) {
   }
   b.e = e;
 
-  //  llvm::outs() << "\n--------TxExprHelper::getBoundE---------\n";
+  //  llvm::outs() << "\n--------TxExprHelper::getBound---------\n";
   //  e->dump();
   //  llvm::outs() << "[type, value] = [" << b.type << ", " << b.value << "]\n";
   //  llvm::outs() << "\n===============\n";
