@@ -18,8 +18,6 @@
 
 namespace klee {
 
-ref<Expr> TxExprHelper::singleSimplify(ref<Expr> e) {}
-
 ref<Expr> TxExprHelper::CONST_REF = ConstantExpr::create(1, Expr::Int32);
 
 /**
@@ -185,6 +183,7 @@ ref<Expr> TxExprHelper::simplifyLinear(ref<Expr> e) {
 
 /**
  * Create a map from var -> coeff
+ * mul = 1 or -1
  */
 bool TxExprHelper::extractCoeff(ref<Expr> e, int mul,
                                 std::map<ref<Expr>, int> &ref2coeff) {
@@ -348,137 +347,150 @@ ref<Expr> TxExprHelper::makeExpr(ref<Expr> e,
   return e->rebuild(kids);
 }
 
-std::vector<ref<Expr> > TxExprHelper::simplify(std::set<ref<Expr> > exprs) {
+/**
+ * Simplify single expression based on range
+ */
+ref<Expr> TxExprHelper::rangSimplify(ref<Expr> e) {
+  // collect AndExpr
+  std::vector<ref<Expr> > andExprs;
+  TxPartitionHelper::getExprsFromAndExpr(e, andExprs);
+  std::vector<ref<Expr> > es = rangeSimplifyFromExprs(andExprs);
+  return TxPartitionHelper::createAnd(es);
+}
+
+/**
+ * Simplify multiple expressions on range
+ */
+std::vector<ref<Expr> >
+TxExprHelper::rangeSimplifyFromExprs(std::vector<ref<Expr> > exprs) {
   std::vector<ref<Expr> > ret;
 
-  // combine expressions sharing 1 variable
-  std::map<std::string, std::vector<ref<Expr> > > var2ref;
-  std::set<std::string> vars;
-  for (std::set<ref<Expr> >::const_iterator it = exprs.begin(),
-                                            ie = exprs.end();
+  // combine expressions sharing 1 variable into 1 entry, others are kept in ret
+  std::map<std::string, std::vector<ref<Expr> > > var2refs;
+  for (std::vector<ref<Expr> >::const_iterator it = exprs.begin(),
+                                               ie = exprs.end();
        it != ie; ++it) {
+    std::set<std::string> vars;
     TxPartitionHelper::getExprVars(*it, vars);
     if (vars.size() == 1) {
-      var2ref[*vars.begin()].push_back(*it);
+      var2refs[*vars.begin()].push_back(*it);
     } else {
       ret.push_back(*it);
     }
   }
 
-  // simplify and insert to ret
+  // simplify vector of expressions in each entry
   for (std::map<std::string, std::vector<ref<Expr> > >::const_iterator
-           mapIt = var2ref.begin(),
-           mapIe = var2ref.end();
+           mapIt = var2refs.begin(),
+           mapIe = var2refs.end();
        mapIt != mapIe; ++mapIt) {
     if (mapIt->second.size() > 1) {
-      std::vector<ref<Expr> > sv = rangeSimplify(mapIt->second);
+      std::vector<ref<Expr> > sv = combineSharedSingleVarExprs(mapIt->second);
       ret.insert(ret.begin(), sv.begin(), sv.end());
     } else {
       ret.insert(ret.begin(), mapIt->second.begin(), mapIt->second.end());
     }
   }
+
   return ret;
 }
 
 std::vector<ref<Expr> >
-TxExprHelper::rangeSimplify(std::vector<ref<Expr> > exprs) {
+TxExprHelper::rangeSimplifyFromExprs(std::set<ref<Expr> > exprs) {
   std::vector<ref<Expr> > ret;
-  ref<Expr> less;
-  Bound upper;
-  ref<Expr> greater;
-  Bound lower;
 
-  //  bool eqUpperBound = false;
-  //  bool eqLowerBound = false;
-  //  float upperBound = std::numeric_limits<float>::max();
-  //  float lowerBound = std::numeric_limits<float>::min();
-  for (std::vector<ref<Expr> >::const_iterator it = exprs.begin(),
-                                               ie = exprs.end();
+  // combine expressions sharing 1 variable into 1 entry, others are kept in ret
+  std::map<std::string, std::vector<ref<Expr> > > var2refs;
+  for (std::set<ref<Expr> >::const_iterator it = exprs.begin(),
+                                            ie = exprs.end();
        it != ie; ++it) {
-    ref<Expr> tmp = TxWPHelper::simplifyWPExpr(*it);
-
-    // if cannot compute the bound then skip
-    float boundVal = getBound(tmp);
-    if (boundVal == std::numeric_limits<float>::max()) {
-      ret.push_back(tmp);
-      continue;
-    }
-    switch (tmp->getKind()) {
-    case Expr::Ult:
-    case Expr::Slt: {
-      if (less.isNull()) {
-        less = tmp;
-        upper.value = boundVal;
-        upper.isEq = false;
-      } else if (boundVal < upper.value) {
-        // if upper bound is valid and lower than current upper bound
-        // then take the new one and update bound
-        less = tmp;
-        upper.value = boundVal;
-        upper.isEq = false;
-      }
-      break;
-    }
-    case Expr::Ule:
-    case Expr::Sle: {
-      if (less.isNull()) {
-        less = tmp;
-        upper.value = boundVal;
-        upper.isEq = true;
-      } else {
-        if (boundVal == upper.value && upper.isEq == false) {
-          upper.isEq = true;
-        } else if (boundVal < upper.value) {
-          less = tmp;
-          upper.value = boundVal;
-          upper.isEq = true;
-        }
-      }
-      break;
-    }
-    case Expr::Ugt:
-    case Expr::Sgt: {
-      if (less.isNull()) {
-        greater = tmp;
-        lower.value = boundVal;
-        lower.isEq = false;
-      } else if (boundVal > lower.value) {
-        greater = tmp;
-        lower.value = boundVal;
-        lower.isEq = false;
-      }
-      break;
-    }
-    case Expr::Sge:
-    case Expr::Uge: {
-      if (less.isNull()) {
-        greater = tmp;
-        lower.value = true;
-      } else {
-        if (boundVal == lower.value && lower.isEq == false) {
-          lower.isEq = true;
-        } else if (boundVal > lower.value) {
-          greater = tmp;
-          lower.value = boundVal;
-          lower.isEq = true;
-        }
-      }
-      break;
-    }
-    default:
-      ret.push_back(tmp);
+    std::set<std::string> vars;
+    TxPartitionHelper::getExprVars(*it, vars);
+    if (vars.size() == 1) {
+      var2refs[*vars.begin()].push_back(*it);
+    } else {
+      ret.push_back(*it);
     }
   }
 
-  if (!less.isNull())
-    ret.push_back(less);
-  if (!greater.isNull())
-    ret.push_back(greater);
+  // simplify vector of expressions in each entry
+  for (std::map<std::string, std::vector<ref<Expr> > >::const_iterator
+           mapIt = var2refs.begin(),
+           mapIe = var2refs.end();
+       mapIt != mapIe; ++mapIt) {
+    if (mapIt->second.size() > 1) {
+      std::vector<ref<Expr> > sv = combineSharedSingleVarExprs(mapIt->second);
+      ret.insert(ret.begin(), sv.begin(), sv.end());
+    } else {
+      ret.insert(ret.begin(), mapIt->second.begin(), mapIt->second.end());
+    }
+  }
+
   return ret;
 }
 
-float TxExprHelper::getBound(ref<Expr> e) {
-  float ret = std::numeric_limits<float>::max();
+std::vector<ref<Expr> >
+TxExprHelper::combineSharedSingleVarExprs(std::vector<ref<Expr> > exprs) {
+  std::vector<ref<Expr> > ret;
+  Bound upper;
+  Bound lower;
+  for (std::vector<ref<Expr> >::const_iterator it = exprs.begin(),
+                                               ie = exprs.end();
+       it != ie; ++it) {
+    Bound b = getBound(*it);
+    if (b.type == Bound::invalid) {
+      ret.push_back(*it);
+    } else if (b.type == Bound::lt) {
+      // update upper bound if applicable
+      if (upper.type == Bound::invalid || b.value < upper.value) {
+        upper = b;
+      }
+    } else if (b.type == Bound::le) {
+      // update upper bound if applicable
+      if (upper.type == Bound::invalid || b.value <= upper.value) {
+        upper = b;
+      }
+    } else if (b.type == Bound::gt) {
+      // update lower bound if applicable
+      if (lower.type == Bound::invalid || b.value > lower.value) {
+        lower = b;
+      }
+    } else if (b.type == Bound::le) {
+      // update lower bound if applicable
+      if (lower.type == Bound::invalid || b.value >= lower.value) {
+        lower = b;
+      }
+    }
+  }
+
+  if (upper.type != Bound::invalid)
+    ret.push_back(upper.e);
+  if (lower.type != Bound::invalid)
+    ret.push_back(lower.e);
+
+  //  llvm::outs() << "\n----TxExprHelper::combineSharedSingleVarExprs----\n";
+  //  for (std::vector<ref<Expr> >::const_iterator it = exprs.begin(),
+  //                                               ie = exprs.end();
+  //       it != ie; ++it) {
+  //    (*it)->dump();
+  //  }
+  //  llvm::outs() << "\n-----------------\n";
+  //  for (std::vector<ref<Expr> >::const_iterator it = ret.begin(), ie =
+  //  ret.end();
+  //       it != ie; ++it) {
+  //    (*it)->dump();
+  //  }
+  //  llvm::outs() << "\n===============\n";
+
+  return ret;
+}
+
+Bound TxExprHelper::getBound(ref<Expr> e) {
+  Bound b;
+  bool isValidExpr = false;
+  float c = 0;
+  float coeff = 0;
+  std::map<ref<Expr>, int> ref2coeff;
   switch (e->getKind()) {
   case Expr::Ult:
   case Expr::Slt:
@@ -488,33 +500,90 @@ float TxExprHelper::getBound(ref<Expr> e) {
   case Expr::Sgt:
   case Expr::Sge:
   case Expr::Uge: {
+    isValidExpr = true;
     ref<Expr> left = e->getKid(0);
     ref<Expr> right = e->getKid(1);
-    if (isa<ConstantExpr>(right)) {
-      float rightVal = dyn_cast<ConstantExpr>(right)->getZExtValue();
-      if (isaVar(left)) {
-        ret = rightVal;
-      } else {
-        switch (left->getKind()) {
-        case Expr::Mul: {
-          ref<Expr> kids[2];
-          kids[0] = left->getKid(0);
-          kids[1] = left->getKid(1);
-          if (isa<ConstantExpr>(kids[0]) && isaVar(kids[1])) {
-            float coeff = dyn_cast<ConstantExpr>(kids[0])->getZExtValue();
-            ret = rightVal / coeff;
-          } else if (isa<ConstantExpr>(kids[1]) && isaVar(kids[0])) {
-            float coeff = dyn_cast<ConstantExpr>(kids[1])->getZExtValue();
-            ret = rightVal / coeff;
-          }
-          break;
-        }
-        }
+    extractCoeff(left, 1, ref2coeff);
+    extractCoeff(right, -1, ref2coeff);
+    for (std::map<ref<Expr>, int>::const_iterator it = ref2coeff.begin(),
+                                                  ie = ref2coeff.end();
+         it != ie; ++it) {
+      if (it->first == CONST_REF) { // CONST
+        c = it->second;
+      } else if (isaVar(it->first)) {
+        coeff = it->second;
       }
     }
+    break;
+  }
+  default: {
+    isValidExpr = false;
+    break;
   }
   }
-  return ret;
+
+  if (!isValidExpr) {
+    b.type = Bound::invalid;
+    return b;
+  }
+  if (coeff == 0.0) {
+    klee_warning("TxExprHelper::getBound: There is no var in the expression!");
+    b.type = Bound::invalid;
+    return b;
+  }
+
+  float val = -c / coeff;
+  switch (e->getKind()) {
+  case Expr::Ult:
+  case Expr::Slt: {
+    if (coeff > 0) {
+      b.type = Bound::lt;
+    } else {
+      b.type = Bound::gt;
+    }
+    b.value = val;
+    break;
+  }
+  case Expr::Ule:
+  case Expr::Sle: {
+    if (coeff > 0) {
+      b.type = Bound::le;
+    } else {
+      b.type = Bound::ge;
+    }
+    b.value = val;
+    break;
+  }
+  case Expr::Ugt:
+  case Expr::Sgt: {
+    if (coeff > 0) {
+      b.type = Bound::gt;
+    } else {
+      b.type = Bound::lt;
+    }
+    b.value = val;
+    break;
+  }
+  case Expr::Sge:
+  case Expr::Uge: {
+    if (coeff > 0) {
+      b.type = Bound::ge;
+    } else {
+      b.type = Bound::le;
+    }
+    b.value = val;
+    break;
+  }
+  default: { break; }
+  }
+  b.e = e;
+
+  //  llvm::outs() << "\n--------TxExprHelper::getBoundE---------\n";
+  //  e->dump();
+  //  llvm::outs() << "[type, value] = [" << b.type << ", " << b.value << "]\n";
+  //  llvm::outs() << "\n===============\n";
+
+  return b;
 }
 
 bool TxExprHelper::isaVar(ref<Expr> e) {

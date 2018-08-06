@@ -28,11 +28,13 @@
 namespace klee {
 class Bound {
 public:
+  enum BType { invalid, lt, le, gt, ge };
+  ref<Expr> e;
+  BType type;
   float value;
-  bool isEq;
   Bound() {
     value = std::numeric_limits<float>::max();
-    isEq = false;
+    type = invalid;
   }
 };
 
@@ -44,19 +46,22 @@ public:
   TxExprHelper();
   virtual ~TxExprHelper();
 
-  static ref<Expr> singleSimplify(ref<Expr> e);
   static ref<Expr> simplifyNot(ref<Expr> e);
   static ref<Expr> simplifyLinear(ref<Expr> e);
   static bool extractCoeff(ref<Expr> e, int mul,
                            std::map<ref<Expr>, int> &ref2coeff);
-  static ref<Expr> makeExpr(ref<Expr> e,
-                            std::map<ref<Expr>, int> &ref2coeff);
+  static ref<Expr> makeExpr(ref<Expr> e, std::map<ref<Expr>, int> &ref2coeff);
 
   static ref<Expr> multipleSimplify(ref<Expr> expr);
 
-  static std::vector<ref<Expr> > simplify(std::set<ref<Expr> > exprs);
-  static std::vector<ref<Expr> > rangeSimplify(std::vector<ref<Expr> > exprs);
-  static float getBound(ref<Expr> expr);
+  static std::vector<ref<Expr> >
+  rangeSimplifyFromExprs(std::vector<ref<Expr> > exprs);
+  static std::vector<ref<Expr> >
+  rangeSimplifyFromExprs(std::set<ref<Expr> > exprs);
+  static ref<Expr> rangSimplify(ref<Expr> e);
+  static std::vector<ref<Expr> >
+  combineSharedSingleVarExprs(std::vector<ref<Expr> > exprs);
+  static Bound getBound(ref<Expr> expr);
   static bool isaVar(ref<Expr> e);
 };
 }
