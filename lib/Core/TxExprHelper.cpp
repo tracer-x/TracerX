@@ -24,10 +24,21 @@ ref<Expr> TxExprHelper::CONST_REF = ConstantExpr::create(1, Expr::Int32);
  * Remove Not() at the beginning if possible
  */
 ref<Expr> TxExprHelper::simplifyNot(ref<Expr> e) {
+  //  llvm::outs() << "\n------TxExprHelper::simplifyNot 1-------\n";
+  //  e->dump();
+  //  llvm::outs() << "\n===============\n";
+
   ref<Expr> ret;
   if (e->getKind() == Expr::Not) {
     ref<Expr> inExpr = e->getKid(0);
     switch (inExpr->getKind()) {
+    case Expr::Eq: {
+      ref<Expr> kids[2];
+      kids[0] = inExpr->getKid(0);
+      kids[1] = inExpr->getKid(1);
+      ret = NeExpr::create(kids[0], kids[1]);
+      break;
+    }
     case Expr::Ne: {
       ref<Expr> kids[2];
       kids[0] = inExpr->getKid(0);
@@ -96,7 +107,42 @@ ref<Expr> TxExprHelper::simplifyNot(ref<Expr> e) {
       break;
     }
     }
-  } else {
+  }
+  //  else if (e->getKind() == Expr::Eq) {
+  //
+  //    ref<Expr> kids[2];
+  //    kids[0] = e->getKid(0);
+  //    kids[1] = e->getKid(1);
+  //
+  //    llvm::outs() << "\n------TxExprHelper::simplifyNot Eq-------\n";
+  //    kids[0]->dump();
+  //    llvm::outs() << "isFalse(kids[0]) = " << isFalse(kids[0]) << "\n";
+  //    kids[1]->dump();
+  //    llvm::outs() << "isFalse(kids[1]) = " << isFalse(kids[1]) << "\n";
+  //    llvm::outs() << "\n===============\n";
+  //
+  //    // if one of sides is False then convert the other one
+  //    if (isFalse(kids[0])) {
+  //      llvm::outs() << "== 1 : " << (kids[1]->getKind() == Expr::Eq) << "\n";
+  //      if (kids[1]->getKind() == Expr::Eq) {
+  //        ret = NeExpr::create(kids[1]->getKid(0), kids[1]->getKid(1));
+  //        llvm::outs() << "== dump ret ==\n";
+  //        kids[1]->getKid(0)->dump();
+  //        kids[1]->getKid(1)->dump();
+  //        ret->dump();
+  //      } else if (kids[1]->getKind() == Expr::Ne) {
+  //        ret = EqExpr::create(kids[1]->getKid(0), kids[1]->getKid(1));
+  //      }
+  //    } else if (isFalse(kids[1])) {
+  //      if (kids[0]->getKind() == Expr::Eq) {
+  //        ret = NeExpr::create(kids[0]->getKid(0), kids[0]->getKid(1));
+  //      } else if (kids[0]->getKind() == Expr::Ne) {
+  //        ret = EqExpr::create(kids[0]->getKid(0), kids[0]->getKid(1));
+  //      }
+  //    }
+  //    ret = e;
+  //  }
+  else {
     ret = e;
   }
 
@@ -653,5 +699,14 @@ bool TxExprHelper::isaVar(ref<Expr> e) {
     }
   }
   return ret;
+}
+
+bool TxExprHelper::isFalse(ref<Expr> e) {
+  if (e->getKind() == Expr::Constant) {
+    ConstantExpr *ce = dyn_cast<ConstantExpr>(e);
+    bool ret = ce->getZExtValue(1);
+    return !ret;
+  }
+  return false;
 }
 }

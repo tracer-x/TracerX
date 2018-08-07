@@ -63,7 +63,7 @@ public:
   combineSharedSingleVarExprs(std::vector<ref<Expr> > exprs);
   static Bound getBound(ref<Expr> expr);
   static bool isaVar(ref<Expr> e);
-  static void updateBound(Bound &oldVal, Bound newVal);
+  static bool isFalse(ref<Expr> e);
 };
 }
 #endif /* LIB_CORE_TXEXPRHELPER_H_ */
