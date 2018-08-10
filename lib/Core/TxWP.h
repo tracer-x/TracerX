@@ -88,7 +88,7 @@ public:
     return ConstantExpr::alloc(0, Expr::Bool);
   };
 
-  void resetWPExpr() { WPExpr = False(); }
+  void resetWPExpr() { WPExpr = True(); }
 
   void setWPExpr(ref<Expr> expr) { WPExpr = expr; }
 
