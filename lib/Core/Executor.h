@@ -399,6 +399,8 @@ private:
   void terminateStateEarly(ExecutionState &state, const llvm::Twine &message);
   // call exit handler and terminate state
   void terminateStateOnExit(ExecutionState &state);
+  // call when assertion violated
+  void markAssertionFail(ExecutionState &state);
   // call error handler and terminate state
   void terminateStateOnError(ExecutionState &state, const llvm::Twine &message,
                              enum TerminateReason termReason,

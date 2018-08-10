@@ -3479,6 +3479,10 @@ bool Executor::shouldExitOn(enum TerminateReason termReason) {
   return false;
 }
 
+void Executor::markAssertionFail(ExecutionState &state) {
+	state.txTreeNode->setAssertionFail();
+}
+
 void Executor::terminateStateOnError(ExecutionState &state,
                                      const llvm::Twine &messaget,
                                      enum TerminateReason termReason,

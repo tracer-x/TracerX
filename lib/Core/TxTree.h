@@ -452,6 +452,8 @@ class TxTreeNode {
   /// \brief Indicates that a generic error was encountered in this node
   bool genericEarlyTermination;
 
+  bool assertionFail;
+
   void setProgramPoint(llvm::Instruction *instr) {
     if (!programPoint)
       programPoint = reinterpret_cast<uintptr_t>(instr);
@@ -641,6 +643,8 @@ public:
   }
 
   void setGenericEarlyTermination() { genericEarlyTermination = true; }
+
+  void setAssertionFail() { assertionFail = true; }
 
   TxStore *getStore() const { return dependency->getStore(); }
 
