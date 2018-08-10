@@ -2464,6 +2464,19 @@ ref<Expr> TxTreeNode::getWPInterpolant(
     expr = wp->GenerateWP(reverseInstructionList);
     if (parent)
       this->parent->setChildWPInterpolant(expr);
+
+    klee_warning("Start printing the WP: at LEAF");
+    expr->dump();
+    klee_warning("End of printing the WP: at LEAF");
+  } else if (wp->False() == childWPInterpolant[0] ||
+             wp->False() == childWPInterpolant[1]) {
+    expr = wp->False();
+    if (parent)
+      this->parent->setChildWPInterpolant(expr);
+
+    klee_warning("Start printing the WP: one of child nodes is False");
+    expr->dump();
+    klee_warning("End of printing the WP: one of child nodes is False");
   } else {
 
     // Get branch condition
@@ -2474,6 +2487,11 @@ ref<Expr> TxTreeNode::getWPInterpolant(
         branchCondition = wp->getBrCondition(i);
       }
     }
+
+    //    llvm::outs() << "\n-----begin childWPInterpolant -------\n";
+    //    childWPInterpolant[0]->dump();
+    //    childWPInterpolant[1]->dump();
+    //    llvm::outs() << "\n-----end childWPInterpolant----------------\n";
 
     // remove unrelated part from interpolant, concretely addressed store and
     // return And(w1r, w2r)
@@ -2502,11 +2520,12 @@ ref<Expr> TxTreeNode::getWPInterpolant(
 
     if (parent)
       this->parent->setChildWPInterpolant(expr);
+
+    klee_warning("Start printing the WP after intersection");
+    expr->dump();
+    klee_warning("End of printing the WP after intersection");
   }
 
-  klee_warning("Start printing the WP");
-  expr->dump();
-  klee_warning("End of printing the WP");
   return expr;
 }
 
