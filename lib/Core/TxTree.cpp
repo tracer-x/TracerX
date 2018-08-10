@@ -2412,7 +2412,7 @@ TxTreeNode::TxTreeNode(
       graph(_parent ? _parent->graph : 0),
       instructionsDepth(_parent ? _parent->instructionsDepth : 0),
       targetData(_targetData), globalAddresses(_globalAddresses),
-      genericEarlyTermination(false), isSubsumed(false) {
+      genericEarlyTermination(false), assertionFail(false), isSubsumed(false) {
   if (_parent) {
     entryCallHistory = _parent->callHistory;
     callHistory = _parent->callHistory;
@@ -2455,8 +2455,21 @@ ref<Expr> TxTreeNode::getWPInterpolant(
 
   ref<Expr> expr;
 
-  if (wp->False() == childWPInterpolant[0] &&
-      wp->False() == childWPInterpolant[1]) {
+  //  klee_message("-- Start printing assertionFail");
+  //  llvm::outs() << "assertionFail = " << assertionFail << "\n";
+  //  klee_message("-- End of printing assertionFail");
+
+  if (assertionFail) {
+    expr = wp->False();
+    if (parent)
+      this->parent->setChildWPInterpolant(expr);
+
+    klee_warning("Start printing the WP: Assertion Fail");
+    expr->dump();
+    klee_warning("End of printing the WP: Assertion Fail");
+
+  } else if (wp->False() == childWPInterpolant[0] &&
+             wp->False() == childWPInterpolant[1]) {
     wp->resetWPExpr();
 
     // Generate weakest precondition from pathCondition and/or BB instructions
