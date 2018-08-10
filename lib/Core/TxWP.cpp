@@ -207,7 +207,7 @@ std::string TxWPArrayStore::getFunctionName(llvm::Value *i) {
 
 TxWeakestPreCondition::TxWeakestPreCondition(TxTreeNode *_node,
                                              TxDependency *_dependency) {
-  WPExpr = False();
+  WPExpr = True();
 
   // Used to represent constants during the simplification of WPExpr to
   // canonical form
@@ -1903,7 +1903,7 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- create and expression from the condition and this->WPExpr
       ref<Expr> cond = TxExprHelper::simplifyNot(getBrCondition(i));
-      if (False() == WPExpr) {
+      if (True() == WPExpr) {
         WPExpr = cond;
       } else {
         WPExpr = AndExpr::create(WPExpr, cond);
@@ -1921,7 +1921,7 @@ ref<Expr> TxWeakestPreCondition::GenerateWP(
 
       ref<Expr> negCond =
           TxExprHelper::simplifyNot(NotExpr::create(getBrCondition(i)));
-      if (False() == WPExpr) {
+      if (True() == WPExpr) {
         WPExpr = negCond;
       } else {
         WPExpr = AndExpr::create(WPExpr, negCond);

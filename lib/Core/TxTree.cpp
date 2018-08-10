@@ -2424,9 +2424,8 @@ TxTreeNode::TxTreeNode(
 
   // Set the child WP Interpolants to false
   wp = new TxWeakestPreCondition(this, this->dependency);
-  childWPInterpolant[0] = wp->False();
-  childWPInterpolant[1] = wp->False();
-  branchCondition = wp->False();
+  childWPInterpolant[0] = wp->True();
+  childWPInterpolant[1] = wp->True();
 }
 
 TxTreeNode::~TxTreeNode() {
@@ -2455,11 +2454,26 @@ ref<Expr> TxTreeNode::getWPInterpolant(
 
   ref<Expr> expr;
 
-  //  klee_message("-- Start printing assertionFail");
-  //  llvm::outs() << "assertionFail = " << assertionFail << "\n";
-  //  klee_message("-- End of printing assertionFail");
+  //  klee_message("-- 000 ---");
+  //  childWPInterpolant[0]->dump();
+  //  llvm::outs() << "-----\n";
+  //  childWPInterpolant[1]->dump();
+  //  klee_message("--- End 000 ---");
 
   if (assertionFail) {
+    //    llvm::outs() << "--- 1111---\n";
+    //    for (std::vector<std::pair<KInstruction *, int> >::const_iterator
+    //             it = reverseInstructionList.begin(),
+    //             ie = reverseInstructionList.end();
+    //         it != ie; ++it) {
+    //      llvm::Instruction *i = (*it).first->inst;
+    //      int flag = (*it).second;
+    //      // instruction list
+    //      i->dump();
+    //      llvm::outs() << flag << "\n";
+    //    }
+    //    llvm::outs() << "--- End 111 ---\n";
+
     expr = wp->False();
     if (parent)
       this->parent->setChildWPInterpolant(expr);
@@ -2468,9 +2482,22 @@ ref<Expr> TxTreeNode::getWPInterpolant(
     expr->dump();
     klee_warning("End of printing the WP: Assertion Fail");
 
-  } else if (wp->False() == childWPInterpolant[0] &&
-             wp->False() == childWPInterpolant[1]) {
+  } else if (wp->True() == childWPInterpolant[0] &&
+             wp->True() == childWPInterpolant[1]) {
     wp->resetWPExpr();
+
+    //    llvm::outs() << "--- Begin 222 ---\n";
+    //    for (std::vector<std::pair<KInstruction *, int> >::const_iterator
+    //             it = reverseInstructionList.begin(),
+    //             ie = reverseInstructionList.end();
+    //         it != ie; ++it) {
+    //      llvm::Instruction *i = (*it).first->inst;
+    //      int flag = (*it).second;
+    //      // instruction list
+    //      i->dump();
+    //      llvm::outs() << flag << "\n";
+    //    }
+    //    llvm::outs() << "--- End 222 ---\n";
 
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->GenerateWP(reverseInstructionList);
@@ -2479,6 +2506,7 @@ ref<Expr> TxTreeNode::getWPInterpolant(
 
     klee_warning("Start printing the WP: at LEAF");
     expr->dump();
+
     klee_warning("End of printing the WP: at LEAF");
   } else if (wp->False() == childWPInterpolant[0] ||
              wp->False() == childWPInterpolant[1]) {
@@ -2542,7 +2570,7 @@ ref<Expr> TxTreeNode::getWPInterpolant(
 }
 
 void TxTreeNode::setChildWPInterpolant(ref<Expr> interpolant) {
-  if (wp->False() == childWPInterpolant[0])
+  if (wp->True() == childWPInterpolant[0])
     childWPInterpolant[0] = interpolant;
   else
     childWPInterpolant[1] = interpolant;
