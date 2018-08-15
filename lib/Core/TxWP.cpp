@@ -1378,35 +1378,40 @@ ref<Expr> TxWeakestPreCondition::instantiateSingleExpression(
 // Functions Updating the Subsumption Table Entry
 // =========================================================================
 
-TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
-    TxSubsumptionTableEntry *entry, std::vector<ref<Expr> > wp) {
-
-  if (wp.size() == 1) {
-    // The only Partition is not related to guard (only related to guard)
-    ref<Expr> notRelatedPartition = wp.at(0);
-    entry =
-        updateSubsumptionTableEntrySinglePartition(entry, notRelatedPartition);
-  } else if (wp.size() == 3) {
-    // The first Partition is the related to guard (which cannot be replaced)
-    // The second Partition is the not related to guard
-    ref<Expr> notRelatedPartition = wp.at(1);
-    entry =
-        updateSubsumptionTableEntrySinglePartition(entry, notRelatedPartition);
-  } else if (wp.size() == 2) {
-    // The first Partition is the related to guard (which can be replaced too)
-    // The second Partition is the non-related to guard
-    ref<Expr> relatedPartition = wp.at(0);
-    entry = updateSubsumptionTableEntrySinglePartition(entry, relatedPartition);
-    ref<Expr> notRelatedPartition = wp.at(1);
-    entry =
-        updateSubsumptionTableEntrySinglePartition(entry, notRelatedPartition);
-  } else {
-    llvm::errs() << "Number of partitions: " << wp.size() << "\n";
-    klee_error("TxWeakestPreCondition::updateSubsumptionTableEntry: More than "
-               "3 partitions are not supported yet!");
-  }
-  return entry;
-}
+// TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
+//    TxSubsumptionTableEntry *entry, std::vector<ref<Expr> > wp) {
+//
+//  if (wp.size() == 1) {
+//    // The only Partition is not related to guard (only related to guard)
+//    ref<Expr> notRelatedPartition = wp.at(0);
+//    entry =
+//        updateSubsumptionTableEntrySinglePartition(entry,
+//        notRelatedPartition);
+//  } else if (wp.size() == 3) {
+//    // The first Partition is the related to guard (which cannot be replaced)
+//    // The second Partition is the not related to guard
+//    ref<Expr> notRelatedPartition = wp.at(1);
+//    entry =
+//        updateSubsumptionTableEntrySinglePartition(entry,
+//        notRelatedPartition);
+//  } else if (wp.size() == 2) {
+//    // The first Partition is the related to guard (which can be replaced too)
+//    // The second Partition is the non-related to guard
+//    ref<Expr> relatedPartition = wp.at(0);
+//    entry = updateSubsumptionTableEntrySinglePartition(entry,
+//    relatedPartition);
+//    ref<Expr> notRelatedPartition = wp.at(1);
+//    entry =
+//        updateSubsumptionTableEntrySinglePartition(entry,
+//        notRelatedPartition);
+//  } else {
+//    llvm::errs() << "Number of partitions: " << wp.size() << "\n";
+//    klee_error("TxWeakestPreCondition::updateSubsumptionTableEntry: More than
+//    "
+//               "3 partitions are not supported yet!");
+//  }
+//  return entry;
+//}
 
 TxSubsumptionTableEntry *
 TxWeakestPreCondition::updateSubsumptionTableEntrySinglePartition(
