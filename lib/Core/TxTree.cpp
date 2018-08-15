@@ -1741,10 +1741,11 @@ void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
 
 void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
                                       const std::string &prefix) const {
-
-  stream << prefix << "\nwp interpolant = ";
-  wpInterpolant->print(stream);
-  stream << "\n";
+  if (WPInterpolant) {
+    stream << prefix << "\nwp interpolant = ";
+    wpInterpolant->print(stream);
+    stream << "\n";
+  }
 }
 
 void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
@@ -2173,22 +2174,11 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       TxSubsumptionTableEntry *entry =
           new TxSubsumptionTableEntry(node, node->entryCallHistory);
 
-      //      if (WPInterpolant) {
-      // TODO WP: FIX THE CODE BASED ON THE CHANGE OF WP FROM EXPR TO
-      // VECTOR<EXPR>
-      //        std::vector<ref<Expr> > WPExpr = entry->getWPInterpolant();
-      //        Solver::Validity result;
-      //        std::vector<ref<Expr> > unsatCore;
-      //
-      //        ref<Expr> WPExprConjunction = node->wp->True();
-      //        for (std::vector<ref<Expr> >::const_iterator it =
-      //        WPExpr.begin(),
-      //                                                     ie = WPExpr.end();
-      //             it != ie; ++it) {
-      //          WPExprConjunction = AndExpr::create(WPExprConjunction, (*it));
-      //        }
-      //
-      //        entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
+      if (WPInterpolant) {
+        ref<Expr> WPExpr = entry->getWPInterpolant();
+        entry =
+            node->wp->updateSubsumptionTableEntrySinglePartition(entry, WPExpr);
+      }
 
       // TODO: Is this needed? Can we remove this part?
       //        bool success =
