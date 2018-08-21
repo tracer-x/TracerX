@@ -129,6 +129,10 @@ public:
   /// \param stream The stream to print the data to.
   /// \param prefix Padding spaces to print before the actual data.
   void print(llvm::raw_ostream &stream, const std::string &prefix) const;
+
+  llvm::Value *getValue() { return value; };
+
+  std::vector<llvm::Instruction *> getCallHistory() { return callHistory; };
 };
 
 class TxAllocationInfo {

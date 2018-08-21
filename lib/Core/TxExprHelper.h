@@ -64,6 +64,9 @@ public:
   static Bound getBound(ref<Expr> expr);
   static bool isaVar(ref<Expr> e);
   static bool isFalse(ref<Expr> e);
+
+  //
+  static void extractReadExprs(ref<Expr> e, std::vector<ref<Expr> > &readExprs);
 };
 }
 #endif /* LIB_CORE_TXEXPRHELPER_H_ */

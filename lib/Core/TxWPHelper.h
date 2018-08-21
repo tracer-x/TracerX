@@ -27,6 +27,8 @@
 
 namespace klee {
 
+class TxWPArrayStore;
+
 class TxWPHelper {
 
 public:
@@ -49,7 +51,8 @@ public:
 
   static ref<Expr> substituteExpr(ref<Expr> base, const ref<Expr> lhs,
                                   const ref<Expr> rhs);
-  static bool isTargetDependent(llvm::Value *inst, ref<Expr> expr);
+  static bool isTargetDependent(TxWPArrayStore *wpStore, llvm::Value *inst,
+                                ref<Expr> expr);
 };
 
 } /* namespace klee */
