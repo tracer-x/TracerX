@@ -160,6 +160,9 @@ ref<Expr> TxExprHelper::simplifyLinear(ref<Expr> e) {
     ref<Expr> kids[2];
     kids[0] = simplifyLinear(e->getKid(0));
     kids[1] = simplifyLinear(e->getKid(1));
+    if (kids[0] == kids[1]) {
+      return kids[0];
+    }
     return e->rebuild(kids);
   }
   case Expr::Eq:
@@ -514,7 +517,9 @@ TxExprHelper::combineSharedSingleVarExprs(std::vector<ref<Expr> > exprs) {
       //                      "invalid----\n";
     } else if (b.type == Bound::lt) {
       // update upper bound if applicable
-      if (upper.type == Bound::invalid || b.value < upper.value) {
+      if (upper.type == Bound::invalid ||
+          (upper.type == Bound::lt && b.value < upper.value) ||
+          (upper.type == Bound::le && b.value <= upper.value)) {
         upper = b;
       }
       //      llvm::outs()
@@ -522,7 +527,7 @@ TxExprHelper::combineSharedSingleVarExprs(std::vector<ref<Expr> > exprs) {
       //          "\n----TxExprHelper::combineSharedSingleVarExprs::Bound::lt----\n";
     } else if (b.type == Bound::le) {
       // update upper bound if applicable
-      if (upper.type == Bound::invalid || b.value <= upper.value) {
+      if (upper.type == Bound::invalid || b.value < upper.value) {
         upper = b;
       }
       //      llvm::outs()
@@ -530,7 +535,9 @@ TxExprHelper::combineSharedSingleVarExprs(std::vector<ref<Expr> > exprs) {
       //          "\n----TxExprHelper::combineSharedSingleVarExprs::Bound::le----\n";
     } else if (b.type == Bound::gt) {
       // update lower bound if applicable
-      if (lower.type == Bound::invalid || b.value > lower.value) {
+      if (lower.type == Bound::invalid ||
+          (lower.type == Bound::gt && b.value > lower.value) ||
+          (lower.type == Bound::ge && b.value >= lower.value)) {
         lower = b;
       }
       //      llvm::outs()
@@ -539,7 +546,7 @@ TxExprHelper::combineSharedSingleVarExprs(std::vector<ref<Expr> > exprs) {
     } else if (b.type == Bound::ge) {
 
       // update lower bound if applicable
-      if (lower.type == Bound::invalid || b.value >= lower.value) {
+      if (lower.type == Bound::invalid || b.value > lower.value) {
         lower = b;
       }
 
@@ -708,5 +715,82 @@ bool TxExprHelper::isFalse(ref<Expr> e) {
     return !ret;
   }
   return false;
+}
+
+void TxExprHelper::extractReadExprs(ref<Expr> e,
+                                    std::vector<ref<Expr> > &readExprs) {
+  switch (e->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    break;
+  }
+
+  case Expr::Read: {
+    readExprs.push_back(e);
+    break;
+  }
+  case Expr::Concat: {
+    readExprs.push_back(e);
+    break;
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    // Extract the one kid and extract variable from that
+    ref<Expr> kids[1];
+    kids[0] = e->getKid(0);
+    extractReadExprs(kids[0], readExprs);
+    break;
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    // Extract the two kids and extract variable from that
+    ref<Expr> kids[2];
+    kids[0] = e->getKid(0);
+    kids[1] = e->getKid(1);
+    extractReadExprs(kids[0], readExprs);
+    extractReadExprs(kids[1], readExprs);
+    break;
+  }
+
+  case Expr::Select: {
+    // Extract the three kids and extract variable from that
+    ref<Expr> kids[3];
+    kids[0] = e->getKid(0);
+    kids[1] = e->getKid(1);
+    kids[2] = e->getKid(2);
+    extractReadExprs(kids[0], readExprs);
+    extractReadExprs(kids[1], readExprs);
+    extractReadExprs(kids[2], readExprs);
+    break;
+  }
+  default:
+    break;
+  }
 }
 }
