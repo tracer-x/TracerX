@@ -1719,7 +1719,7 @@ static inline const llvm::fltSemantics *fpWidthToSemantics(unsigned width) {
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
 
-  if (WPInterpolant)
+  if (INTERPOLATION_ENABLED && WPInterpolant)
     txTree->storeInstruction(ki);
 
   switch (i->getOpcode()) {

@@ -31,6 +31,8 @@
 
 namespace klee {
 
+class TxWPArrayStore;
+
 /// \brief The subsumption table.
 ///
 /// This is the database of states that have been generalized by the
@@ -176,6 +178,10 @@ class TxSubsumptionTableEntry {
   TxStore::TopInterpolantStore symbolicallyAddressedStore;
 
   ref<Expr> wpInterpolant;
+
+  /// \brief Performs the replacement mechanism for replacing variables in WP
+  /// Expr, used in replacing free with bound variables.
+  TxWPArrayStore *wpStore;
 
   std::set<const Array *> existentials;
 
