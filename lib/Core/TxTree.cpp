@@ -17,18 +17,18 @@
 
 #include "TimingSolver.h"
 
+#include "TxDependency.h"
+#include "TxShadowArray.h"
+#include <fstream>
 #include <klee/CommandLine.h>
 #include <klee/Expr.h>
+#include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/Solver.h>
 #include <klee/SolverStats.h>
-#include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ExprPPrinter.h>
 #include <klee/util/TxExprUtil.h>
 #include <klee/util/TxPrintUtil.h>
-#include <fstream>
 #include <vector>
-#include "TxDependency.h"
-#include "TxShadowArray.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
@@ -43,8 +43,8 @@ using namespace klee;
 Statistic TxSubsumptionTableEntry::concretelyAddressedStoreExpressionBuildTime(
     "concretelyAddressedStoreExpressionBuildTime", "concreteStoreTime");
 Statistic
-TxSubsumptionTableEntry::symbolicallyAddressedStoreExpressionBuildTime(
-    "symbolicallyAddressedStoreExpressionBuildTime", "symbolicStoreTime");
+    TxSubsumptionTableEntry::symbolicallyAddressedStoreExpressionBuildTime(
+        "symbolicallyAddressedStoreExpressionBuildTime", "symbolicStoreTime");
 Statistic TxSubsumptionTableEntry::solverAccessTime("solverAccessTime",
                                                     "solverAccessTime");
 
@@ -60,6 +60,12 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
       callHistory, substitution, existentials, concretelyAddressedStore,
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
       symbolicallyAddressedHistoricalStore);
+
+  if (WPInterpolant)
+    wpInterpolant = node->getWPInterpolant(
+        interpolant, existentials, concretelyAddressedStore,
+        symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
+        symbolicallyAddressedHistoricalStore);
 }
 
 TxSubsumptionTableEntry::~TxSubsumptionTableEntry() {}
@@ -144,9 +150,8 @@ ref<Expr> TxSubsumptionTableEntry::makeConstraint(
   return constraint;
 }
 
-bool
-TxSubsumptionTableEntry::hasVariableInSet(std::set<const Array *> &existentials,
-                                          ref<Expr> expr) {
+bool TxSubsumptionTableEntry::hasVariableInSet(
+    std::set<const Array *> &existentials, ref<Expr> expr) {
   for (int i = 0, numKids = expr->getNumKids(); i < numKids; ++i) {
     if (llvm::isa<ReadExpr>(expr)) {
       ReadExpr *readExpr = llvm::dyn_cast<ReadExpr>(expr);
@@ -225,15 +230,13 @@ TxSubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
   // which may contain both normal and shadow variables.
   ref<Expr> body = expr->body;
 
+  // We only simplify a conjunction of interpolant and equalities
+  if (!llvm::isa<AndExpr>(body))
+    return existsExpr;
+
   // If the post-simplified body was a constant, simply return the body;
   if (llvm::isa<ConstantExpr>(body))
     return body;
-
-  // We only simplify a conjunction of interpolant and equalities
-  if (!llvm::isa<AndExpr>(body)) {
-    hasExistentialsOnly = !hasVariableNotInSet(expr->variables, body);
-    return existsExpr;
-  }
 
   // The equality constraint is only a single disjunctive clause
   // of a CNF formula. In this case we simplify nothing.
@@ -402,7 +405,7 @@ ref<Expr> TxSubsumptionTableEntry::replaceExpr(ref<Expr> originalExpr,
 
   if (originalExpr->getKid(0) == replacedExpr)
     return TxShadowArray::createBinaryOfSameKind(originalExpr, replacementExpr,
-                                               originalExpr->getKid(1));
+                                                 originalExpr->getKid(1));
 
   if (originalExpr->getKid(1) == replacedExpr)
     return TxShadowArray::createBinaryOfSameKind(
@@ -552,10 +555,9 @@ ref<Expr> TxSubsumptionTableEntry::simplifyEqualityExpr(
   assert(!"Invalid expression type.");
 }
 
-void
-TxSubsumptionTableEntry::getSubstitution(std::set<const Array *> &existentials,
-                                         ref<Expr> equalities,
-                                         std::map<ref<Expr>, ref<Expr> > &map) {
+void TxSubsumptionTableEntry::getSubstitution(
+    std::set<const Array *> &existentials, ref<Expr> equalities,
+    std::map<ref<Expr>, ref<Expr> > &map) {
   // It is assumed the rhs is an expression on the free variables.
   if (llvm::isa<EqExpr>(equalities)) {
     ref<Expr> lhs = equalities->getKid(0);
@@ -792,6 +794,29 @@ bool TxSubsumptionTableEntry::subsumed(
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
+  if (WPInterpolant) {
+    // Checking if weakest pre-condition holds. In case WPInterpolant
+    // flag is set, this serves as the first check when subsuming a node.
+    // If it fails then false is returned. If it succeeds then the
+    // second check is performed.
+    bool result = state.txTreeNode->checkWPAtSubsumption(
+        wpInterpolant, state, __concretelyAddressedHistoricalStore,
+        __symbolicallyAddressedHistoricalStore, timeout, debugSubsumptionLevel);
+
+    if (result != Solver::True) {
+      if (debugSubsumptionLevel >= 1) {
+        klee_message("#%lu=>#%lu: Check failure at WP Expr check ",
+                     state.txTreeNode->getNodeSequenceNumber(),
+                     nodeSequenceNumber);
+      }
+      return false;
+    }
+    if (debugSubsumptionLevel >= 1) {
+      klee_message("#%lu=>#%lu: Weakest precondition check success",
+                   state.txTreeNode->getNodeSequenceNumber(),
+                   nodeSequenceNumber);
+    }
+  }
   // Tell the solver implementation that we are checking for subsumption for
   // collecting statistics of solver calls.
   SubsumptionCheckMarker subsumptionCheckMarker;
@@ -803,6 +828,11 @@ bool TxSubsumptionTableEntry::subsumed(
                    state.txTreeNode->getNodeSequenceNumber(),
                    nodeSequenceNumber);
     }
+
+    if (WPInterpolant)
+      // In case a node is subsumed, the WP Expr is stored at the parent node.
+      // This is crucial for generating WP Expr at the parent node.
+      state.txTreeNode->setWPAtSubsumption(wpInterpolant);
     return true;
   }
 
@@ -1077,13 +1107,13 @@ bool TxSubsumptionTableEntry::subsumed(
               e->getAddress()->getOffset(), coreValues, corePointerValues,
               unifiedBases, debugSubsumptionLevel);
           if (constraint.isNull())
-              return false;
-            if (stateEqualityConstraints.isNull()) {
-              stateEqualityConstraints = constraint;
-            } else {
-              stateEqualityConstraints =
-                  AndExpr::create(constraint, stateEqualityConstraints);
-            }
+            return false;
+          if (stateEqualityConstraints.isNull()) {
+            stateEqualityConstraints = constraint;
+          } else {
+            stateEqualityConstraints =
+                AndExpr::create(constraint, stateEqualityConstraints);
+          }
         } else {
           // Match not found
           return false;
@@ -1247,10 +1277,10 @@ bool TxSubsumptionTableEntry::subsumed(
             stateEqualityConstraints =
                 AndExpr::create(constraint, stateEqualityConstraints);
           }
-          } else {
-            // Match not found
-            return false;
-          }
+        } else {
+          // Match not found
+          return false;
+        }
       } else {
         ref<TxStoreEntry> e = mIt->second;
         bool leftUse =
@@ -1307,6 +1337,10 @@ bool TxSubsumptionTableEntry::subsumed(
 
       interpolateValues(state, coreValues, corePointerValues,
                         debugSubsumptionLevel);
+      if (WPInterpolant)
+        // In case a node is subsumed, the WP Expr is stored at the parent node.
+        // This is crucial for generating WP Expr at the parent node.
+        state.txTreeNode->setWPAtSubsumption(wpInterpolant);
       return true;
     }
 
@@ -1317,7 +1351,8 @@ bool TxSubsumptionTableEntry::subsumed(
       if (debugSubsumptionLevel >= 2) {
         klee_message("Before simplification:\n%s",
                      TxPrettyExpressionBuilder::constructQuery(
-                         state.constraints, existsExpr).c_str());
+                         state.constraints, existsExpr)
+                         .c_str());
       }
       expr = simplifyExistsExpr(existsExpr, exprHasNoFreeVariables);
     }
@@ -1375,7 +1410,11 @@ bool TxSubsumptionTableEntry::subsumed(
                          state.txTreeNode->getNodeSequenceNumber(),
                          nodeSequenceNumber, msg.c_str());
           }
-
+          if (WPInterpolant)
+            // In case a node is subsumed, the WP Expr is stored at the parent
+            // node.
+            // This is crucial for generating WP Expr at the parent node.
+            state.txTreeNode->setWPAtSubsumption(wpInterpolant);
           return true;
         } else {
           // Here we try to get bound-variables-free conjunction, if there is
@@ -1392,7 +1431,8 @@ bool TxSubsumptionTableEntry::subsumed(
           if (debugSubsumptionLevel >= 2) {
             klee_message("Querying for subsumption check:\n%s",
                          TxPrettyExpressionBuilder::constructQuery(
-                             state.constraints, expr).c_str());
+                             state.constraints, expr)
+                             .c_str());
           }
 
           if (llvm::isa<ExistsExpr>(expr)) {
@@ -1426,9 +1466,10 @@ bool TxSubsumptionTableEntry::subsumed(
 
       } else {
         if (debugSubsumptionLevel >= 2) {
-          klee_message("Querying for subsumption check:\n%s",
-                       TxPrettyExpressionBuilder::constructQuery(
-                           state.constraints, expr).c_str());
+          klee_message(
+              "Querying for subsumption check:\n%s",
+              TxPrettyExpressionBuilder::constructQuery(state.constraints, expr)
+                  .c_str());
         }
         // We call the solver in the standard way if the
         // formula is unquantified.
@@ -1461,6 +1502,11 @@ bool TxSubsumptionTableEntry::subsumed(
 
         interpolateValues(state, coreValues, corePointerValues,
                           debugSubsumptionLevel);
+        if (WPInterpolant)
+          // In case a node is subsumed, the WP Expr is stored at the parent
+          // node.
+          // This is crucial for generating WP Expr at the parent node.
+          state.txTreeNode->setWPAtSubsumption(wpInterpolant);
         return true;
       }
       if (debugSubsumptionLevel >= 1) {
@@ -1485,9 +1531,12 @@ bool TxSubsumptionTableEntry::subsumed(
 
     // We create path condition marking structure and mark core constraints
     state.txTreeNode->unsatCoreInterpolation(unsatCore);
-
     interpolateValues(state, coreValues, corePointerValues,
                       debugSubsumptionLevel);
+    if (WPInterpolant)
+      // In case a node is subsumed, the WP Expr is stored at the parent node.
+      // This is crucial for generating WP Expr at the parent node.
+      state.txTreeNode->setWPAtSubsumption(wpInterpolant);
     return true;
   }
 #endif /* ENABLE_Z3 */
@@ -1496,6 +1545,63 @@ bool TxSubsumptionTableEntry::subsumed(
 
 ref<Expr> TxSubsumptionTableEntry::getInterpolant() const {
   return interpolant;
+}
+
+ref<Expr> TxSubsumptionTableEntry::getWPInterpolant() const {
+  return wpInterpolant;
+}
+
+TxStore::LowerInterpolantStore
+TxSubsumptionTableEntry::getConcretelyAddressedHistoricalStore() const {
+  return concretelyAddressedHistoricalStore;
+}
+
+TxStore::LowerInterpolantStore
+TxSubsumptionTableEntry::getSymbolicallyAddressedHistoricalStore() const {
+  return symbolicallyAddressedHistoricalStore;
+}
+
+TxStore::TopInterpolantStore
+TxSubsumptionTableEntry::getConcretelyAddressedStore() const {
+  return concretelyAddressedStore;
+}
+
+TxStore::TopInterpolantStore
+TxSubsumptionTableEntry::getSymbolicallyAddressedStore() const {
+  return symbolicallyAddressedStore;
+}
+
+std::set<const Array *> TxSubsumptionTableEntry::getExistentials() const {
+  return existentials;
+}
+
+void TxSubsumptionTableEntry::setInterpolant(ref<Expr> _interpolant) {
+  interpolant = _interpolant;
+}
+
+void TxSubsumptionTableEntry::setConcretelyAddressedHistoricalStore(
+    TxStore::LowerInterpolantStore _concretelyAddressedHistoricalStore) {
+  concretelyAddressedHistoricalStore = _concretelyAddressedHistoricalStore;
+}
+
+void TxSubsumptionTableEntry::setSymbolicallyAddressedHistoricalStore(
+    TxStore::LowerInterpolantStore _symbolicallyAddressedHistoricalStore) {
+  symbolicallyAddressedHistoricalStore = _symbolicallyAddressedHistoricalStore;
+}
+
+void TxSubsumptionTableEntry::setConcretelyAddressedStore(
+    TxStore::TopInterpolantStore _concretelyAddressedStore) {
+  concretelyAddressedStore = _concretelyAddressedStore;
+}
+
+void TxSubsumptionTableEntry::setSymbolicallyAddressedStore(
+    TxStore::TopInterpolantStore _symbolicallyAddressedStore) {
+  symbolicallyAddressedStore = _symbolicallyAddressedStore;
+}
+
+void TxSubsumptionTableEntry::setExistentials(
+    std::set<const Array *> _existentials) {
+  existentials = _existentials;
 }
 
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
@@ -1624,19 +1730,40 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
   stream << "]";
 }
 
+void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream) const {
+  printWP(stream, 0);
+}
+
+void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
+                                      const unsigned paddingAmount) const {
+  printWP(stream, makeTabs(paddingAmount));
+}
+
+void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
+                                      const std::string &prefix) const {
+  if (WPInterpolant) {
+    stream << prefix << "\nwp interpolant = ";
+    wpInterpolant->print(stream);
+    stream << "\n";
+  }
+}
+
 void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
   stream << "KLEE: done:     Time for actual solver calls in subsumption check "
-            "(ms) = " << ((double)stats::subsumptionQueryTime.getValue()) / 1000
-         << "\n";
+            "(ms) = "
+         << ((double)stats::subsumptionQueryTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     Number of solver calls for subsumption check "
-            "(failed) = " << stats::subsumptionQueryCount.getValue() << " ("
+            "(failed) = "
+         << stats::subsumptionQueryCount.getValue() << " ("
          << stats::subsumptionQueryFailureCount.getValue() << ")\n";
   stream << "KLEE: done:     Concrete store expression build time (ms) = "
          << ((double)concretelyAddressedStoreExpressionBuildTime.getValue()) /
-                1000 << "\n";
+                1000
+         << "\n";
   stream << "KLEE: done:     Symbolic store expression build time (ms) = "
          << ((double)symbolicallyAddressedStoreExpressionBuildTime.getValue()) /
-                1000 << "\n";
+                1000
+         << "\n";
   stream << "KLEE: done:     Solver access time (ms) = "
          << ((double)solverAccessTime.getValue()) / 1000 << "\n";
 }
@@ -1767,12 +1894,11 @@ void TxSubsumptionTable::CallHistoryIndexedTable::print(
 /**/
 
 std::map<uintptr_t, TxSubsumptionTable::CallHistoryIndexedTable *>
-TxSubsumptionTable::instance;
+    TxSubsumptionTable::instance;
 
-void
-TxSubsumptionTable::insert(uintptr_t id,
-                           const std::vector<llvm::Instruction *> &callHistory,
-                           TxSubsumptionTableEntry *entry) {
+void TxSubsumptionTable::insert(
+    uintptr_t id, const std::vector<llvm::Instruction *> &callHistory,
+    TxSubsumptionTableEntry *entry) {
   CallHistoryIndexedTable *subTable = 0;
 
   TxTree::entryNumber++; // Count of entries in the table
@@ -1895,8 +2021,8 @@ uint64_t TxTree::blockCount = 1;
 void TxTree::printTimeStat(std::stringstream &stream) {
   stream << "KLEE: done:     setCurrentINode = "
          << ((double)setCurrentINodeTime.getValue()) / 1000 << "\n";
-  stream << "KLEE: done:     remove = " << ((double)removeTime.getValue()) /
-                                               1000 << "\n";
+  stream << "KLEE: done:     remove = "
+         << ((double)removeTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     subsumptionCheck = "
          << ((double)subsumptionCheckTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     markPathCondition = "
@@ -1921,7 +2047,8 @@ void TxTree::printTableStat(std::stringstream &stream) {
 
   stream << "KLEE: done:     Average solver calls per subsumption check = "
          << inTwoDecimalPoints((double)stats::subsumptionQueryCount /
-                               (double)subsumptionCheckCount) << "\n";
+                               (double)subsumptionCheckCount)
+         << "\n";
 }
 
 std::string TxTree::inTwoDecimalPoints(const double n) {
@@ -1941,9 +2068,9 @@ std::string TxTree::inTwoDecimalPoints(const double n) {
 std::string TxTree::getInterpolationStat() {
   std::stringstream stream;
   stream << "KLEE: done: Total reduced symbolic execution tree nodes = "
-		 << TxTreeGraph::nodeCount  << "\n";
-  stream << "KLEE: done: Total number of visited basic blocks = "
-		 << blockCount  << "\n";
+         << TxTreeGraph::nodeCount << "\n";
+  stream << "KLEE: done: Total number of visited basic blocks = " << blockCount
+         << "\n";
   stream << "\nKLEE: done: Subsumption statistics\n";
   printTableStat(stream);
   stream << "\nKLEE: done: TxTree method execution times (ms):\n";
@@ -1964,6 +2091,10 @@ TxTree::TxTree(
     currentTxTreeNode = TxTreeNode::createRoot(_targetData, _globalAddresses);
   }
   root = currentTxTreeNode;
+
+  // Used by WP expression
+  TxWPArrayStore::array = TxWPArrayStore::ac.CreateArray("const", 128);
+  TxWPArrayStore::constValues = ConstantExpr::create(0, 32);
 }
 
 bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
@@ -1976,8 +2107,9 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
   // first instruction executed of the sequence executed for a state
   // node, typically this the first instruction of a basic block.
   // Subsumption check only matches against this first instruction.
-  if (!state.txTreeNode || reinterpret_cast<uintptr_t>(state.pc->inst) !=
-                               state.txTreeNode->getProgramPoint())
+  if (!state.txTreeNode ||
+      reinterpret_cast<uintptr_t>(state.pc->inst) !=
+          state.txTreeNode->getProgramPoint())
     return false;
 
   int debugSubsumptionLevel =
@@ -2012,8 +2144,9 @@ void TxTree::setCurrentINode(ExecutionState &state) {
   TxTreeGraph::setCurrentNode(state, currentTxTreeNode->nodeSequenceNumber);
 }
 
-void TxTree::remove(TxTreeNode *node, bool dumping) {
+void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 #ifdef ENABLE_Z3
+  TxTreeNode *node = state->txTreeNode;
   TimerStatIncrementer t(removeTime);
   assert(!node->left && !node->right);
   do {
@@ -2037,8 +2170,34 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
                      node->getNodeSequenceNumber());
       }
 
+      // generate marking and wp interpolant
       TxSubsumptionTableEntry *entry =
           new TxSubsumptionTableEntry(node, node->entryCallHistory);
+
+      if (WPInterpolant) {
+        ref<Expr> WPExpr = entry->getWPInterpolant();
+        entry =
+            node->wp->updateSubsumptionTableEntrySinglePartition(entry, WPExpr);
+      }
+
+      // TODO: Is this needed? Can we remove this part?
+      //        bool success =
+      //            solver->evaluate(*state, WPExprConjunction, result,
+      //            unsatCore);
+      //        if (success != true)
+      //          klee_error("TxTree::remove: Implication test failed");
+      //        if (result == Solver::True) {
+      //          continue;
+      //        } else {
+      //          klee_warning("TxTree::remove: Implication test unknown");
+      //          // If the result of implication is Solver::False and/or
+      //          // Solver::Unknown the chance that the WP interpolant
+      //          // improves the interpolant from the deletion algorithm
+      //          // is slim. As a result, in such cases the interpolant
+      //          // from deletion is not changed.
+      //        }
+      //      }
+
       TxSubsumptionTable::insert(node->getProgramPoint(),
                                  node->entryCallHistory, entry);
 
@@ -2048,6 +2207,7 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
         std::string msg;
         llvm::raw_string_ostream out(msg);
         entry->print(out);
+        entry->printWP(out);
         out.flush();
         klee_message("%s", msg.c_str());
       }
@@ -2127,6 +2287,28 @@ void TxTree::executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
   symbolicExecutionError = false;
 }
 
+void TxTree::storeInstruction(KInstruction *instr) {
+  currentTxTreeNode->reverseInstructionList.push_back(
+      std::pair<KInstruction *, bool>(instr, 0));
+}
+
+void TxTree::markInstruction(KInstruction *instr, bool branchFlag) {
+  std::vector<std::pair<KInstruction *, int> >::iterator iter =
+      std::find(currentTxTreeNode->reverseInstructionList.begin(),
+                currentTxTreeNode->reverseInstructionList.end(),
+                std::pair<KInstruction *, int>(instr, 0));
+  // Marking all the br instruction that have one branch as infeasible.
+  // Other infeasible paths (like the infeasible paths in the internal
+  // KLEE function klee_make_symbolic are not tracked by weakest pre-
+  // condition approach.
+  if (isa<llvm::BranchInst>(iter->first->inst)) {
+    if (branchFlag == true)
+      iter->second = 1;
+    else
+      iter->second = 2;
+  }
+}
+
 void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
                        std::string edges) const {
   if (n->left != 0) {
@@ -2171,6 +2353,8 @@ void TxTree::dump() const { this->print(llvm::errs()); }
 // Statistics
 Statistic TxTreeNode::getInterpolantTime("GetInterpolantTime",
                                          "GetInterpolantTime");
+Statistic TxTreeNode::getWPInterpolantTime("GetWPInterpolantTime",
+                                           "GetWPInterpolantTime");
 Statistic TxTreeNode::addConstraintTime("AddConstraintTime",
                                         "AddConstraintTime");
 Statistic TxTreeNode::splitTime("SplitTime", "SplitTime");
@@ -2182,8 +2366,8 @@ Statistic TxTreeNode::bindReturnValueTime("BindReturnValueTime",
 Statistic TxTreeNode::getStoredExpressionsTime("GetStoredExpressionsTime",
                                                "GetStoredExpressionsTime");
 Statistic
-TxTreeNode::getStoredCoreExpressionsTime("GetStoredCoreExpressionsTime",
-                                         "GetStoredCoreExpressionsTime");
+    TxTreeNode::getStoredCoreExpressionsTime("GetStoredCoreExpressionsTime",
+                                             "GetStoredCoreExpressionsTime");
 
 // The interpolation tree node sequence number
 uint64_t TxTreeNode::nextNodeSequenceNumber = 1;
@@ -2191,12 +2375,15 @@ uint64_t TxTreeNode::nextNodeSequenceNumber = 1;
 void TxTreeNode::printTimeStat(std::stringstream &stream) {
   stream << "KLEE: done:     getInterpolant = "
          << ((double)getInterpolantTime.getValue()) / 1000 << "\n";
+  if (WPInterpolant)
+    stream << "KLEE: done:     get WP Interpolant = "
+           << ((double)getWPInterpolantTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     addConstraintTime = "
          << ((double)addConstraintTime.getValue()) / 1000 << "\n";
-  stream << "KLEE: done:     splitTime = " << ((double)splitTime.getValue()) /
-                                                  1000 << "\n";
-  stream << "KLEE: done:     execute = " << ((double)executeTime.getValue()) /
-                                                1000 << "\n";
+  stream << "KLEE: done:     splitTime = "
+         << ((double)splitTime.getValue()) / 1000 << "\n";
+  stream << "KLEE: done:     execute = "
+         << ((double)executeTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     bindCallArguments = "
          << ((double)bindCallArgumentsTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     bindReturnValue = "
@@ -2215,7 +2402,7 @@ TxTreeNode::TxTreeNode(
       graph(_parent ? _parent->graph : 0),
       instructionsDepth(_parent ? _parent->instructionsDepth : 0),
       targetData(_targetData), globalAddresses(_globalAddresses),
-      genericEarlyTermination(false), isSubsumed(false) {
+      genericEarlyTermination(false), assertionFail(false), isSubsumed(false) {
   if (_parent) {
     entryCallHistory = _parent->callHistory;
     callHistory = _parent->callHistory;
@@ -2224,11 +2411,19 @@ TxTreeNode::TxTreeNode(
   // Inherit the abstract dependency or NULL
   dependency = new TxDependency(_parent ? _parent->dependency : 0, _targetData,
                                 _globalAddresses);
+
+  // Set the child WP Interpolants to false
+  wp = new TxWeakestPreCondition(this, this->dependency);
+  childWPInterpolant[0] = wp->True();
+  childWPInterpolant[1] = wp->True();
 }
 
 TxTreeNode::~TxTreeNode() {
   if (dependency)
     delete dependency;
+  if (wp) {
+    delete wp;
+  }
 }
 
 ref<Expr> TxTreeNode::getInterpolant(
@@ -2237,6 +2432,180 @@ ref<Expr> TxTreeNode::getInterpolant(
   TimerStatIncrementer t(getInterpolantTime);
   ref<Expr> expr = dependency->packInterpolant(replacements, substitution);
   return expr;
+}
+
+ref<Expr> TxTreeNode::getWPInterpolant(
+    ref<Expr> interpolant, std::set<const Array *> existentials,
+    TxStore::TopInterpolantStore concretelyAddressedStore,
+    TxStore::TopInterpolantStore symbolicallyAddressedStore,
+    TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
+    TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore) {
+  TimerStatIncrementer t(getWPInterpolantTime);
+
+  ref<Expr> expr;
+
+  //  klee_message("-- 000 ---");
+  //  childWPInterpolant[0]->dump();
+  //  llvm::outs() << "-----\n";
+  //  childWPInterpolant[1]->dump();
+  //  klee_message("--- End 000 ---");
+
+  if (assertionFail) {
+    //    llvm::outs() << "--- 1111---\n";
+    //    for (std::vector<std::pair<KInstruction *, int> >::const_iterator
+    //             it = reverseInstructionList.begin(),
+    //             ie = reverseInstructionList.end();
+    //         it != ie; ++it) {
+    //      llvm::Instruction *i = (*it).first->inst;
+    //      int flag = (*it).second;
+    //      // instruction list
+    //      i->dump();
+    //      llvm::outs() << flag << "\n";
+    //    }
+    //    llvm::outs() << "--- End 111 ---\n";
+
+    expr = wp->False();
+    if (parent)
+      this->parent->setChildWPInterpolant(expr);
+
+    klee_warning("Start printing the WP: Assertion Fail");
+    expr->dump();
+    klee_warning("End of printing the WP: Assertion Fail");
+
+  } else if (wp->True() == childWPInterpolant[0] &&
+             wp->True() == childWPInterpolant[1]) {
+    wp->resetWPExpr();
+
+    //    llvm::outs() << "--- Begin 222 ---\n";
+    //    for (std::vector<std::pair<KInstruction *, int> >::const_iterator
+    //             it = reverseInstructionList.begin(),
+    //             ie = reverseInstructionList.end();
+    //         it != ie; ++it) {
+    //      llvm::Instruction *i = (*it).first->inst;
+    //      int flag = (*it).second;
+    //      // instruction list
+    //      i->dump();
+    //      llvm::outs() << flag << "\n";
+    //    }
+    //    llvm::outs() << "--- End 222 ---\n";
+
+    // Generate weakest precondition from pathCondition and/or BB instructions
+    expr = wp->GenerateWP(reverseInstructionList);
+    if (parent)
+      this->parent->setChildWPInterpolant(expr);
+
+    klee_warning("Start printing the WP: at LEAF");
+    expr->dump();
+
+    klee_warning("End of printing the WP: at LEAF");
+  } else if (wp->False() == childWPInterpolant[0] ||
+             wp->False() == childWPInterpolant[1]) {
+    expr = wp->False();
+    if (parent)
+      this->parent->setChildWPInterpolant(expr);
+
+    klee_warning("Start printing the WP: one of child nodes is False");
+    expr->dump();
+    klee_warning("End of printing the WP: one of child nodes is False");
+  } else {
+
+    // Get branch condition
+    llvm::Instruction *i = reverseInstructionList.back().first->inst;
+    if (i->getOpcode() == llvm::Instruction::Br) {
+      llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(i);
+      if (br->isConditional()) {
+        branchCondition = wp->getBrCondition(i);
+      }
+    }
+
+    //    llvm::outs() << "\n-----begin childWPInterpolant -------\n";
+    //    childWPInterpolant[0]->dump();
+    //    childWPInterpolant[1]->dump();
+    //    llvm::outs() << "\n-----end childWPInterpolant----------------\n";
+
+    // remove unrelated part from interpolant, concretely addressed store and
+    // return And(w1r, w2r)
+    expr = wp->intersectExpr(
+        branchCondition, childWPInterpolant[0], childWPInterpolant[1],
+        interpolant, existentials, concretelyAddressedHistoricalStore,
+        symbolicallyAddressedHistoricalStore, concretelyAddressedStore,
+        symbolicallyAddressedStore);
+
+    // Setting the intersection of child nodes as the target in the current node
+    wp->setWPExpr(expr);
+
+    // Generate weakest precondition fot the current node
+    // All instructions are marked
+
+    //    llvm::outs() << "\n------ WP after intersection -------\n";
+    //    wp->getWPExpr()->dump();
+    //    llvm::outs() << "\n---------------------------------------\n";
+
+    reverseInstructionList.pop_back();
+    expr = wp->GenerateWP(reverseInstructionList);
+
+    //    llvm::outs() << "\n------ WP after pushing up -------\n";
+    //    wp->getWPExpr()->dump();
+    //    llvm::outs() << "\n---------------------------------------\n";
+
+    if (parent)
+      this->parent->setChildWPInterpolant(expr);
+
+    klee_warning("Start printing the WP after intersection");
+    expr->dump();
+    klee_warning("End of printing the WP after intersection");
+  }
+
+  return expr;
+}
+
+void TxTreeNode::setChildWPInterpolant(ref<Expr> interpolant) {
+  if (wp->True() == childWPInterpolant[0])
+    childWPInterpolant[0] = interpolant;
+  else
+    childWPInterpolant[1] = interpolant;
+}
+
+ref<Expr> TxTreeNode::getChildWPInterpolant(int flag) {
+  if (flag == 0)
+    return childWPInterpolant[0];
+  else
+    return childWPInterpolant[1];
+}
+
+bool TxTreeNode::checkWPAtSubsumption(
+    ref<Expr> wpInterpolant, ExecutionState &state,
+    TxStore::LowerStateStore &concretelyAddressedHistoricalStore,
+    TxStore::LowerStateStore &symbolicallyAddressedHistoricalStore,
+    double timeout, int debugSubsumptionLevel) {
+
+  // TODO: Rasool, please help fixing this after change vector<ref<Expr> > to
+  // ref<Expr>
+
+  //  for (std::vector<ref<Expr> >::const_iterator it = wpInterpolant.begin(),
+  //                                               ie = wpInterpolant.end();
+  //       it != ie; ++it) {
+  //    ref<Expr> wpPartition = (*it);
+  //    ref<Expr> wpInstantiatedInterpolant =
+  //        wp->instantiateSingleExpression(dependency, callHistory,
+  //        wpPartition);
+  //    if (wpInstantiatedInterpolant->isTrue())
+  //      continue;
+  //    else if (wpInstantiatedInterpolant->isFalse())
+  //      return false;
+  //    else {
+  //      wpInstantiatedInterpolant->dump();
+  //      klee_error("TxTreeNode::checkWPAtSubsumption non constant value is not
+  //      "
+  //                 "handled yet");
+  //    }
+  //  }
+  return true;
+}
+
+void TxTreeNode::setWPAtSubsumption(ref<Expr> _wpInterpolant) {
+  if (parent)
+    parent->setChildWPInterpolant(_wpInterpolant);
 }
 
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
@@ -2275,8 +2644,8 @@ void TxTreeNode::bindReturnValue(llvm::CallInst *site, llvm::Instruction *inst,
 }
 
 void TxTreeNode::getStoredExpressions(
-    const std::vector<llvm::Instruction *> &_callHistory,
-    bool &leftRetrieval, TxStore::TopStateStore &__internalStore,
+    const std::vector<llvm::Instruction *> &_callHistory, bool &leftRetrieval,
+    TxStore::TopStateStore &__internalStore,
     TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) const {
   TimerStatIncrementer t(getStoredExpressionsTime);
@@ -2321,8 +2690,8 @@ uint64_t TxTreeNode::getInstructionsDepth() { return instructionsDepth; }
 
 void TxTreeNode::incInstructionsDepth() { ++instructionsDepth; }
 
-void
-TxTreeNode::unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore) {
+void TxTreeNode::unsatCoreInterpolation(
+    const std::vector<ref<Expr> > &unsatCore) {
   dependency->unsatCoreInterpolation(unsatCore);
 }
 

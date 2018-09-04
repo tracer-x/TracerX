@@ -15,6 +15,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "TxDependency.h"
+#include "TxShadowArray.h"
+#include "Context.h"
+#include "TxWP.h"
+#include <klee/util/ArrayCache.h>
 
 #include "Context.h"
 #include "klee/CommandLine.h"
@@ -62,6 +66,146 @@ TxDependency::registerNewTxStateValue(llvm::Value *value,
                                       ref<TxStateValue> vvalue) {
   valuesMap[value].push_back(vvalue);
   return vvalue;
+}
+
+ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
+                                   const Array *tmpArray,
+                                   TxWeakestPreCondition *wp) {
+  if (!value->hasName()) {
+    value->dump();
+    klee_error("Dependency::getAddress:Instruction has no name!\n");
+  }
+
+  std::string arrayName = value->getName();
+
+  if (arrayName == "")
+    klee_error("Dependency::getAddress Arrayname is empty !\n");
+  const std::string ext(".addr");
+  if (arrayName.find(ext) != std::string::npos)
+    arrayName = arrayName.substr(0, arrayName.size() - ext.size());
+  const Array *symArray = TxShadowArray::getSymbolicArray(arrayName);
+  if (symArray != NULL) {
+    // Symbolic array exists. Generating shadow Expr.
+    ref<Expr> Res(0);
+    unsigned NumBytes = symArray->getDomain() / 8;
+    assert(symArray->getDomain() == NumBytes * 8 && "Invalid read size!");
+
+    for (unsigned i = 0; i != NumBytes; ++i) {
+      unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
+      ref<Expr> Byte =
+          ReadExpr::create(UpdateList(symArray, 0),
+                           ConstantExpr::alloc(idx, symArray->getDomain()));
+      Res = i ? ConcatExpr::create(Byte, Res) : Byte;
+    }
+    // Storing entry
+    TxWPArrayStore::insert(value, symArray, Res);
+    return Res;
+  }
+
+  // Symbolic array doesn't exist create one
+  ref<Expr> tmpExpr = TxWPArrayStore::createAndInsert(arrayName, value);
+  return tmpExpr;
+}
+
+ref<Expr> TxDependency::getPointerAddress(llvm::ConstantExpr *gep,
+                                          ArrayCache *ac, const Array *tmpArray,
+                                          TxWeakestPreCondition *wp) {
+  std::string arrayName;
+  const std::string ext(".addr");
+  const Array *symArray;
+  ref<Expr> Res;
+  long int offset = 0;
+  ref<Expr> tmpExpr;
+
+  // Todo: only catching the type of integer and pointers
+  unsigned int size = 0;
+  if (gep->getType()->isIntegerTy()) {
+    size = gep->getType()->getIntegerBitWidth();
+  } else if (gep->getType()->isPointerTy() &&
+             gep->getType()->getArrayElementType()->isIntegerTy()) {
+    size = gep->getType()->getArrayElementType()->getIntegerBitWidth();
+  } else if (gep->getType()->isPointerTy() &&
+             gep->getType()->getArrayElementType()->isArrayTy() &&
+             gep->getType()
+                 ->getArrayElementType()
+                 ->getArrayElementType()
+                 ->isIntegerTy()) {
+    size = gep->getType()
+               ->getArrayElementType()
+               ->getArrayElementType()
+               ->getIntegerBitWidth();
+  } else {
+    gep->getType()->dump();
+    klee_error(
+        "Dependency::getPointerAddress getting size is not defined for this "
+        "type yet");
+  }
+
+  if (gep->getNumOperands() == 3) {
+    if (llvm::ConstantInt *CI =
+            dyn_cast<llvm::ConstantInt>(gep->getOperand(2))) {
+      if (CI->getBitWidth() <= 64) {
+        offset = CI->getSExtValue();
+      } else {
+        klee_error("Dependency::getPointerAddress bit size is incorrect.");
+      }
+    } else {
+      klee_error("Dependency::getPointerAddress not integer.");
+    }
+
+    if (!gep->getOperand(0)->hasName()) {
+      klee_error("Dependency::getPointerAddress Instruction has no name!\n");
+    }
+    arrayName = gep->getOperand(0)->getName();
+    if (arrayName == "")
+      klee_error("Dependency::getPointerAddress Arrayname is empty !\n");
+
+    if (arrayName.find(ext) != std::string::npos)
+      arrayName = arrayName.substr(0, arrayName.size() - ext.size());
+    symArray = TxShadowArray::getSymbolicArray(arrayName);
+
+    if (symArray != NULL) {
+      // Symbolic array exists. Generating shadow Expr.
+      unsigned NumBytes = size / 8;
+      if (NumBytes > 1)
+        klee_error("Dependency::getPointerAddress Expression generation not "
+                   "implemented yet");
+      Res =
+          ReadExpr::create(UpdateList(symArray, 0),
+                           ConstantExpr::alloc(offset, symArray->getDomain()));
+
+      // Storing entry
+      TxWPArrayStore::insert(gep, symArray, Res);
+      return Res;
+    } else {
+      klee_error("Dependency::getPointerAddress Symbolic array not exists.");
+      return tmpExpr;
+    }
+  } else {
+    klee_error("Dependency::getPointerAddress for more or less than 3 "
+               "arguments to getElementPtrConstantExpr not implemented yet.");
+    return tmpExpr;
+  }
+}
+
+ref<Expr> TxDependency::getLatestValueOfAddress(
+    llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory) {
+
+  bool allowInconsistency = true;
+  ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
+
+  ref<TxStateValue> addressValue =
+      this->getLatestValue(value, callHistory, dummy, allowInconsistency);
+
+  if (addressValue.isNull())
+    return dummy;
+  ref<TxStateAddress> address = addressValue->getPointerInfo();
+  if (address.isNull())
+    klee_error("Dependency::getLatestValueOfAddress Address is null");
+  ref<TxStoreEntry> entry = store->find(address);
+  if (entry.isNull())
+    klee_error("Dependency::getLatestValueOfAddress No entry found");
+  return entry->getContent()->getExpression();
 }
 
 ref<TxStateValue> TxDependency::getLatestValue(

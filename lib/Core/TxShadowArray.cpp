@@ -142,3 +142,27 @@ TxShadowArray::getShadowExpression(ref<Expr> expr,
 }
 
 }
+
+const Array *TxShadowArray::getSymbolicArray(std::string name) {
+  for (std::map<const Array *, const Array *>::iterator
+           it = shadowArray.begin(),
+           ie = shadowArray.end();
+       it != ie; ++it) {
+    if ((*it).first->getName() == name) {
+      return (*it).first;
+    }
+  }
+  return NULL;
+}
+
+const Array *TxShadowArray::getSymbolicShadowArray(std::string name) {
+  for (std::map<const Array *, const Array *>::iterator
+           it = shadowArray.begin(),
+           ie = shadowArray.end();
+       it != ie; ++it) {
+    if ((*it).first->getName() == name) {
+      return (*it).second;
+    }
+  }
+  return NULL;
+}
