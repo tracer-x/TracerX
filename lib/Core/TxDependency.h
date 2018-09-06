@@ -43,6 +43,8 @@
 
 namespace klee {
 
+class TxWeakestPreCondition;
+
 /// \brief Computation of memory regions the unsatisfiability core depends
 /// upon, which is used to compute the interpolant stored in the table.
 ///
@@ -431,6 +433,24 @@ public:
         concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);
   }
+  
+  // \brief This function is used in WP analysis, in case the variable
+  // has no address in the memory (is a register) a temporary array is
+  // created for it in the memory
+  ref<Expr> getAddress(llvm::Value *value, ArrayCache *ac, const Array *array,
+                       TxWeakestPreCondition *wp);
+
+  // \brief This function is used in WP analysis, where the value is pointing
+  // to a pointer type. in case the variable has no address in the memory (is
+  // a register) a temporary array is created for it in the memory
+  ref<Expr> getPointerAddress(llvm::ConstantExpr *gep, ArrayCache *ac,
+                              const Array *tmpArray, TxWeakestPreCondition *wp);
+
+  // \brief This function is used in WP analysis, it returns the value of an
+  // address
+  ref<Expr>
+  getLatestValueOfAddress(llvm::Value *value,
+                         const std::vector<llvm::Instruction *> &callHistory);
 
   ref<TxStateValue>
   getLatestValue(llvm::Value *value,
@@ -544,6 +564,8 @@ public:
                                          ref<Expr> address);
 
   TxStore *getStore() const { return store; }
+
+  TxPathCondition *getPathCondition() const { return pathCondition; }
 
   /// \brief Print the content of the object to the LLVM error stream
   void dump() const {

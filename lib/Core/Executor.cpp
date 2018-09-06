@@ -909,6 +909,8 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       // We then extract the unsatisfiability core of antecedent and not
       // consequent as the Craig interpolant.
       txTree->markPathCondition(current, unsatCore);
+      if (WPInterpolant)
+        txTree->markInstruction(current.prevPC, true);
     }
 
     return StatePair(&current, 0);
@@ -924,6 +926,8 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       // which means that antecedent -> not(consequent) is valid. In this
       // case also we extract the unsat core of the proof
       txTree->markPathCondition(current, unsatCore);
+      if (WPInterpolant)
+        txTree->markInstruction(current.prevPC, false);
     }
 
     return StatePair(0, &current);
@@ -1554,6 +1558,9 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
+
+  if (WPInterpolant)
+    txTree->storeInstruction(ki);
 
   switch (i->getOpcode()) {
     // Control flow
@@ -2834,7 +2841,7 @@ void Executor::updateStates(ExecutionState *current) {
       seedMap.erase(it3);
     processTree->remove(es->ptreeNode);
     if (INTERPOLATION_ENABLED)
-      txTree->remove(es->txTreeNode, (current == 0));
+      txTree->remove(es,solver, (current == 0));
     delete es;
   }
   removedStates.clear();
@@ -3180,7 +3187,7 @@ void Executor::terminateState(ExecutionState &state) {
     processTree->remove(state.ptreeNode);
 
     if (INTERPOLATION_ENABLED)
-      txTree->remove(state.txTreeNode, false);
+      txTree->remove(&state,solver, false);
     delete &state;
   }
 }
@@ -3293,6 +3300,10 @@ bool Executor::shouldExitOn(enum TerminateReason termReason) {
       return true;
 
   return false;
+}
+
+void Executor::markAssertionFail(ExecutionState &state) {
+	state.txTreeNode->setAssertionFail();
 }
 
 void Executor::terminateStateOnError(ExecutionState &state,
