@@ -174,6 +174,13 @@ extern "C" {
    * state debug flag to the value specified via -debug-state command-line
    * option, otherwise, it switches off state debugging. */
   void tracerx_debug_state_off();
+
+  /* Store a vector of integers persistently. */
+  void tracerx_memo();
+
+  /* Check if a vector of integers is stored previously. */
+  void tracerx_memo_check();
+
 #ifdef __cplusplus
 }
 #endif
