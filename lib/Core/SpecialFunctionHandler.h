@@ -68,7 +68,22 @@ namespace klee {
     static const_iterator end();
     static int size();
 
+    // const_iterator to iterate over stored HandlerInfo
+    // FIXME: Implement >, >=, <=, < operators
+    class persistentObject {
+    private:
+      std::vector<std::vector<int> > objects;
+      int count;
 
+    public:
+      void insert(std::vector<int> items) { objects.push_back(items); }
+      bool contains(std::vector<int> items) {
+        return std::find(objects.begin(), objects.end(), items) !=
+               objects.end();
+      }
+    };
+
+    persistentObject po;
 
   public:
     SpecialFunctionHandler(Executor &_executor);
@@ -107,6 +122,8 @@ namespace klee {
     HANDLER(handleDebugStateOff);
     HANDLER(handleDebugSubsumption);
     HANDLER(handleDebugSubsumptionOff);
+    HANDLER(handleMemoCheck);
+    HANDLER(handleMemo);
     HANDLER(handleDefineFixedObject);
     HANDLER(handleDelete);    
     HANDLER(handleDeleteArray);

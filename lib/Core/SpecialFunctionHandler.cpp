@@ -78,73 +78,74 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 #define addDNR(name, handler) { name, \
                                 &SpecialFunctionHandler::handler, \
                                 true, false, false }
-  addDNR("__assert_rtn", handleAssertFail),
-  addDNR("__assert_fail", handleAssertFail),
-  addDNR("_assert", handleAssert),
-  addDNR("abort", handleAbort),
-  addDNR("_exit", handleExit),
-  { "exit", &SpecialFunctionHandler::handleExit, true, false, true },
-  addDNR("klee_abort", handleAbort),
-  addDNR("klee_silent_exit", handleSilentExit),
-  addDNR("klee_report_error", handleReportError),
-  add("calloc", handleCalloc, true),
-  add("free", handleFree, false),
-  add("klee_assume", handleAssume, false),
-  add("klee_check_memory_access", handleCheckMemoryAccess, false),
-  add("klee_get_valuef", handleGetValue, true),
-  add("klee_get_valued", handleGetValue, true),
-  add("klee_get_valuel", handleGetValue, true),
-  add("klee_get_valuell", handleGetValue, true),
-  add("klee_get_value_i32", handleGetValue, true),
-  add("klee_get_value_i64", handleGetValue, true),
-  add("klee_define_fixed_object", handleDefineFixedObject, false),
-  add("klee_get_obj_size", handleGetObjSize, true),
-  add("klee_get_errno", handleGetErrno, true),
-  add("klee_is_symbolic", handleIsSymbolic, true),
-  add("klee_make_symbolic", handleMakeSymbolic, false),
-  add("klee_mark_global", handleMarkGlobal, false),
-  add("klee_merge", handleMerge, false),
-  add("klee_prefer_cex", handlePreferCex, false),
-  add("klee_posix_prefer_cex", handlePosixPreferCex, false),
-  add("klee_print_expr", handlePrintExpr, false),
-  add("klee_print_range", handlePrintRange, false),
-  add("klee_set_forking", handleSetForking, false),
-  add("klee_stack_trace", handleStackTrace, false),
-  add("klee_warning", handleWarning, false),
-  add("klee_warning_once", handleWarningOnce, false),
-  add("klee_alias_function", handleAliasFunction, false),
-  add("malloc", handleMalloc, true),
-  add("realloc", handleRealloc, true),
+    addDNR("__assert_rtn", handleAssertFail),
+    addDNR("__assert_fail", handleAssertFail),
+    addDNR("_assert", handleAssert),
+    addDNR("abort", handleAbort),
+    addDNR("_exit", handleExit),
+    {"exit", &SpecialFunctionHandler::handleExit, true, false, true},
+    addDNR("klee_abort", handleAbort),
+    addDNR("klee_silent_exit", handleSilentExit),
+    addDNR("klee_report_error", handleReportError),
+    add("calloc", handleCalloc, true),
+    add("free", handleFree, false),
+    add("klee_assume", handleAssume, false),
+    add("klee_check_memory_access", handleCheckMemoryAccess, false),
+    add("klee_get_valuef", handleGetValue, true),
+    add("klee_get_valued", handleGetValue, true),
+    add("klee_get_valuel", handleGetValue, true),
+    add("klee_get_valuell", handleGetValue, true),
+    add("klee_get_value_i32", handleGetValue, true),
+    add("klee_get_value_i64", handleGetValue, true),
+    add("klee_define_fixed_object", handleDefineFixedObject, false),
+    add("klee_get_obj_size", handleGetObjSize, true),
+    add("klee_get_errno", handleGetErrno, true),
+    add("klee_is_symbolic", handleIsSymbolic, true),
+    add("klee_make_symbolic", handleMakeSymbolic, false),
+    add("klee_mark_global", handleMarkGlobal, false),
+    add("klee_merge", handleMerge, false),
+    add("klee_prefer_cex", handlePreferCex, false),
+    add("klee_posix_prefer_cex", handlePosixPreferCex, false),
+    add("klee_print_expr", handlePrintExpr, false),
+    add("klee_print_range", handlePrintRange, false),
+    add("klee_set_forking", handleSetForking, false),
+    add("klee_stack_trace", handleStackTrace, false),
+    add("klee_warning", handleWarning, false),
+    add("klee_warning_once", handleWarningOnce, false),
+    add("klee_alias_function", handleAliasFunction, false),
+    add("malloc", handleMalloc, true),
+    add("realloc", handleRealloc, true),
 
-  // operator delete[](void*)
-  add("_ZdaPv", handleDeleteArray, false),
-  // operator delete(void*)
-  add("_ZdlPv", handleDelete, false),
+    // operator delete[](void*)
+    add("_ZdaPv", handleDeleteArray, false),
+    // operator delete(void*)
+    add("_ZdlPv", handleDelete, false),
 
-  // operator new[](unsigned int)
-  add("_Znaj", handleNewArray, true),
-  // operator new(unsigned int)
-  add("_Znwj", handleNew, true),
+    // operator new[](unsigned int)
+    add("_Znaj", handleNewArray, true),
+    // operator new(unsigned int)
+    add("_Znwj", handleNew, true),
 
-  // FIXME-64: This is wrong for 64-bit long...
+    // FIXME-64: This is wrong for 64-bit long...
 
-  // operator new[](unsigned long)
-  add("_Znam", handleNewArray, true),
-  // operator new(unsigned long)
-  add("_Znwm", handleNew, true),
+    // operator new[](unsigned long)
+    add("_Znam", handleNewArray, true),
+    // operator new(unsigned long)
+    add("_Znwm", handleNew, true),
 
-  // clang -fsanitize=unsigned-integer-overflow
-  add("__ubsan_handle_add_overflow", handleAddOverflow, false),
-  add("__ubsan_handle_sub_overflow", handleSubOverflow, false),
-  add("__ubsan_handle_mul_overflow", handleMulOverflow, false),
-  add("__ubsan_handle_divrem_overflow", handleDivRemOverflow, false),
+    // clang -fsanitize=unsigned-integer-overflow
+    add("__ubsan_handle_add_overflow", handleAddOverflow, false),
+    add("__ubsan_handle_sub_overflow", handleSubOverflow, false),
+    add("__ubsan_handle_mul_overflow", handleMulOverflow, false),
+    add("__ubsan_handle_divrem_overflow", handleDivRemOverflow, false),
 
-  // change debug information
-  add("tracerx_debug_subsumption", handleDebugSubsumption, false),
-  add("tracerx_debug_subsumption_off", handleDebugSubsumption, false),
-  add("tracerx_debug_state", handleDebugState, false),
-  add("tracerx_debug_state_off", handleDebugStateOff, false),
-
+    // change debug information
+    add("tracerx_debug_subsumption", handleDebugSubsumption, false),
+    add("tracerx_debug_subsumption_off", handleDebugSubsumption, false),
+    add("tracerx_debug_state", handleDebugState, false),
+    add("tracerx_debug_state_off", handleDebugStateOff, false),
+    add("tracerx_memo_check", handleMemoCheck, true),
+    add("tracerx_memo", handleMemo, false),
 #undef addDNR
 #undef add
 };
@@ -703,6 +704,40 @@ void SpecialFunctionHandler::handleDebugStateOff(
   assert(arguments.size() == 0 &&
          "invalid number of arguments to tracerx_debug_state_off");
   state.debugStateOff();
+}
+
+void SpecialFunctionHandler::handleMemoCheck(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr> > &arguments) {
+  assert(arguments[0]->getKind() == 0 &&
+         "invalid length variable, the first argument should be constant");
+  ref<ConstantExpr> length = dyn_cast<ConstantExpr>(arguments[0]);
+  std::vector<int> obj;
+  for (int i = 1; i <= length->getAPValue().getSExtValue(); i++) {
+    assert(arguments[i]->getKind() == 0 &&
+           "invalid item, the items should be constant");
+    ref<ConstantExpr> item = dyn_cast<ConstantExpr>(arguments[i]);
+    obj.push_back(item->getAPValue().getSExtValue());
+  }
+  if (po.contains(obj))
+    executor.terminateStateOnExit(state);
+}
+
+void SpecialFunctionHandler::handleMemo(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments) {
+  assert(arguments[0]->getKind() == 0 &&
+         "invalid length variable, the first argument should be constant");
+  ref<ConstantExpr> length = dyn_cast<ConstantExpr>(arguments[0]);
+  std::vector<int> obj;
+  for (int i = 1; i <= length->getAPValue().getSExtValue(); i++) {
+    assert(arguments[i]->getKind() == 0 &&
+           "invalid item, the items should be constant");
+    ref<ConstantExpr> item = dyn_cast<ConstantExpr>(arguments[i]);
+    obj.push_back(item->getAPValue().getSExtValue());
+  }
+
+  po.insert(obj);
 }
 
 void SpecialFunctionHandler::handleGetValue(ExecutionState &state,
