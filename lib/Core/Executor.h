@@ -22,7 +22,7 @@
 #include "klee/Internal/Module/KModule.h"
 #include "klee/util/ArrayCache.h"
 #include "llvm/Support/raw_ostream.h"
-
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/ADT/Twine.h"
 
 #include <vector>
@@ -92,6 +92,9 @@ class Executor : public Interpreter {
   friend class StatsTracker;
 
 public:
+  std::set<llvm::BasicBlock*> visitedBlocks;
+  std::set<llvm::BasicBlock*> visitedBlocks1;
+
   class Timer {
   public:
     Timer();

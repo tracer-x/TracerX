@@ -1479,9 +1479,22 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
     PHINode *first = static_cast<PHINode*>(state.pc->inst);
     state.incomingBBIndex = first->getBasicBlockIndex(src);
   }
-  if (INTERPOLATION_ENABLED)
+//  if (INTERPOLATION_ENABLED)
     // blockCount increased to count all visited Basic Blocks
-    TxTree::blockCount++;
+
+//  TxTree::blockCount++;
+  //llvm::outs() << "**************\n";
+  //dst->back().dump();
+
+  //visitedBlocks.insert(dst); //count all destination basic blocks
+  visitedBlocks.insert(src);
+  visitedBlocks.insert(dst);
+
+  //kf->function->dump();
+  //llvm::errs() << "Abhi change start";
+  //dst->dump();
+
+  //llvm::errs() << "Abhi change end";
 }
 
 void Executor::printFileLine(ExecutionState &state, KInstruction *ki,
@@ -1578,7 +1591,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         statsTracker->framePopped(state);
 
       if (InvokeInst *ii = dyn_cast<InvokeInst>(caller)) {
-        transferToBasicBlock(ii->getNormalDest(), caller->getParent(), state);
+//        llvm::outs() << "******Linh-Sanghu**********\n";
+//    	  ii->dump();
+    	  transferToBasicBlock(ii->getNormalDest(), caller->getParent(), state);
       } else {
         state.pc = kcaller;
         ++state.pc;
@@ -3966,6 +3981,47 @@ void Executor::runFunctionAsMain(Function *f,
   unsigned NumPtrBytes = Context::get().getPointerWidth() / 8;
   KFunction *kf = kmodule->functionMap[f];
   assert(kf);
+  //Logic to dump all Branch and ret instructions
+  int allblockcount = 0;
+  llvm::errs() << "************All Blocks Start****************" << "\n";
+
+  //  llvm::errs() << kf << "\n";
+    //kf->dump();
+
+    for (std::map<llvm::Function*, KFunction*>::iterator it= kmodule->functionMap.begin(),ie=kmodule->functionMap.end();
+  		  it!=ie;++it) {
+
+
+  	  Function *tmpF = it->first;
+
+
+  	  for (llvm::Function::iterator b = tmpF->begin(); b != tmpF->end(); ++b) {
+
+          /*for (llvm::BasicBlock::iterator ins = b->begin(); ins != b->end();
+               ++ins) {
+    		  if (llvm::isa<llvm::BranchInst>(ins) || llvm::isa<llvm::ReturnInst>(ins)) {
+    		  allblockcount++;
+    		  llvm::errs() << "All Block count: " << allblockcount << "\n";
+    		  llvm::errs() << *ins << "\n";
+    		  }
+          }*/
+  		  //tmpF->dump();
+  		llvm::errs() << "BlockScopeStarts: " << "\n";
+  		allblockcount++;
+    	llvm::errs() << "Block Number: " << allblockcount << "\n";
+  		llvm::errs() <<"Function:"<< (*b->getParent()).getName(); //This logic is to print function name and block name together
+        (*b).dump();
+        llvm::errs() << "BlockScopeEnds: " << "\n";
+  	   }
+
+  	//it->first->dump(); //Uncomment it to dump all blocks
+
+     }
+
+
+
+    llvm::errs() << "************All Blocks End****************" << "\n";
+
   Function::arg_iterator ai = f->arg_begin(), ae = f->arg_end();
   if (ai!=ae) {
     arguments.push_back(ConstantExpr::alloc(argc, Expr::Int32));
@@ -4053,8 +4109,37 @@ void Executor::runFunctionAsMain(Function *f,
 #ifdef ENABLE_Z3
     // Print interpolation time statistics
     interpreterHandler->assignSubsumptionStats(TxTree::getInterpolationStat());
+
 #endif
   }
+  llvm::outs() << "Total number executed Basic Blocks at least once: " << visitedBlocks.size() << "\n";
+  llvm::outs() << "**************\n";
+    //dst->back().dump();
+
+
+
+  llvm::errs() << "************Visited Blocks Starts****************" << "\n";
+    for (std::set<llvm::BasicBlock*>::iterator it = visitedBlocks.begin(), ie=visitedBlocks.end(); it!=ie;++it
+              ) {
+
+    	llvm::errs() << "BlockScopeStarts: " << "\n";
+    	(*it)->getParent()->getName();
+    	//llvm::errs() <<";"<< (*BB.getParent()).getName();
+    	llvm::errs() <<"Function:"<< ((*it)->getParent())->getName(); //This logic is to print function name and block name together
+    	(*it)->dump(); //print whole visited blocks
+    	llvm::errs() << "BlockScopeEnds: " << "\n";
+
+        //kf->function->dump();
+  	  //(*it)->back().dump(); //print only branch instructions
+    }
+    llvm::errs() << "************Visited Blocks Ends****************" << "\n";
+
+
+
+
+
+  //llvm::outs() << "******function********\n";
+  //f->dump();
 
   // hack to clear memory objects
   delete memory;
