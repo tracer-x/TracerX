@@ -422,6 +422,9 @@ class TxTreeNode {
   /// \brief Child WP expressions
   ref<Expr> childWPInterpolant[2];
 
+  /// \brief Child WP Array Stores
+  TxWPArrayStore *childArrayStore[2];
+
   /// \brief An expressions representing branch condition (used in partitioning)
   ref<Expr> branchCondition;
 
@@ -530,7 +533,7 @@ public:
   /// where the WP expression is the conjunction of the expressions in
   /// the vector
   /// The input arguments are needed to do partitioning on WP Expression
-  ref<Expr> getWPInterpolant(
+  std::pair<ref<Expr>, TxWPArrayStore *> getWPInterpolant(
       ref<Expr> interpolant, std::set<const Array *> existentials,
       TxStore::TopInterpolantStore concretelyAddressedStore,
       TxStore::TopInterpolantStore symbolicallyAddressedStore,
@@ -545,6 +548,16 @@ public:
 
   /// \brief Get the stored child WP interpolants in the parent node
   ref<Expr> getChildWPInterpolant(int flag);
+
+
+  llvm::Instruction *getPreviousInstruction(llvm::PHINode *phi);
+
+  /// \brief Store the child WP interpolants in the parent node
+  void setChildWPStore(TxWPArrayStore *arrayStore);
+
+  /// \brief Get the stored child WP Array Store in the parent node
+  TxWPArrayStore *getChildWPStore(int flag);
+
 
   /// \brief Store the BranchCondition in the parent node (used for WP
   /// intersection)
@@ -564,7 +577,7 @@ public:
       double timeout, int debugSubsumptionLevel);
 
   /// \brief Copy WP to the parent node at subsumption point
-  void setWPAtSubsumption(ref<Expr> _wpInterpolant);
+  void setWPAtSubsumption(ref<Expr> _wpInterpolant, TxWPArrayStore *wpStore);
 
   /// \brief Extend the path condition with another constraint
   ///

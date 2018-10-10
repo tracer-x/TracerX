@@ -53,6 +53,8 @@ public:
                                   const ref<Expr> rhs);
   static bool isTargetDependent(TxWPArrayStore *wpStore, llvm::Value *inst,
                                 ref<Expr> expr);
+
+  static std::set<ref<Expr> > extractVariables(ref<Expr> expr);
 };
 
 } /* namespace klee */

@@ -1524,11 +1524,17 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
     //    llvm::outs() << "\n*******End looping concretelyAddressedStore
     //    *******\n";
 
-    if (!inConcAddStore) {
+    if (!inConcAddStore && concretelyAddressedStore.size() > 0) {
+      wp->dump();
       val->dump();
+      llvm::errs() << "concretelyAddressedStore size:"
+                   << concretelyAddressedStore.size() << "\n";
       klee_error("TxSubsumptionTableEntry "
                  "*TxWeakestPreCondition::updateSubsumptionTableEntry: cannot "
                  "find TxAllocationContext in concretelyAddressedStore");
+    } else if (concretelyAddressedStore.size() == 0) {
+      entry->setInterpolant(wp);
+      return entry;
     }
 
     // delete entries whose call history < longest
@@ -2041,24 +2047,70 @@ TxWeakestPreCondition::updateExistentials(std::set<const Array *> existentials,
 // Updated Version of Weakest PreCondition
 // =========================================================================
 
+std::pair<TxWPArrayStore *, std::pair<ref<Expr>, ref<Expr> > >
+TxWeakestPreCondition::mergeWPArrayStore(TxWPArrayStore *childArrayStore1,
+                                         TxWPArrayStore *childArrayStore2,
+                                         ref<Expr> childWPInterpolant1,
+                                         ref<Expr> childWPInterpolant2) {
+
+  for (ArrayStore::const_iterator it = childArrayStore2->arrayStore.begin(),
+                                  ie = childArrayStore2->arrayStore.end();
+       it != ie; ++it) {
+    if (childArrayStore1->arrayStore.find(it->first) ==
+        childArrayStore1->arrayStore.end())
+      childArrayStore2->arrayStore.insert(*it);
+    else {
+      childWPInterpolant2 = TxWPHelper::substituteExpr(
+          childWPInterpolant2, (*it).second.second,
+          childArrayStore1->arrayStore.find(it->first)->second.second);
+    }
+  }
+  return std::make_pair(childArrayStore1, std::make_pair(childWPInterpolant1,
+                                                         childWPInterpolant2));
+}
+
+void TxWeakestPreCondition::sanityCheckWPArrayStore(
+    TxWPArrayStore *childArrayStore, ref<Expr> childWPInterpolant) {
+  std::set<ref<Expr> > varsSet =
+      TxWPHelper::extractVariables(childWPInterpolant);
+  for (std::set<ref<Expr> >::const_iterator it = varsSet.begin(),
+                                            ie = varsSet.end();
+       it != ie; ++it) {
+    int flag = false;
+    for (ArrayStore::const_iterator it2 = childArrayStore->arrayStore.begin(),
+                                    ie2 = childArrayStore->arrayStore.end();
+         it2 != ie2; ++it2) {
+      if (it2->second.second == (*it)) {
+        flag = true;
+        continue;
+      }
+    }
+    if (flag == false) {
+      (*it)->dump();
+      klee_error("TxWeakestPreCondition::mapWPArrayStore - Sanity Check: var "
+                 "not found!");
+    }
+  }
+}
+
 /**
  * Push up expression to top of BB
  */
 ref<Expr> TxWeakestPreCondition::PushUp(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
 
-  //  llvm::outs() << "--- Begin printing instruction list ---\n";
-  //  for (std::vector<std::pair<KInstruction *, int> >::const_iterator
-  //           it = reverseInstructionList.begin(),
-  //           ie = reverseInstructionList.end();
-  //       it != ie; ++it) {
-  //    llvm::Instruction *i = (*it).first->inst;
-  //    int flag = (*it).second;
-  //    // instruction list
-  //    i->dump();
-  //    llvm::outs() << flag << "\n";
-  //  }
-  //  llvm::outs() << "--- End of printing instruction list ---\n";
+  //    llvm::outs() << "--- Begin printing instruction list ---\n";
+  //    for (std::vector<std::pair<KInstruction *, int> >::const_iterator
+  //             it = reverseInstructionList.begin(),
+  //             ie = reverseInstructionList.end();
+  //         it != ie; ++it) {
+  //      llvm::Instruction *i = (*it).first->inst;
+  //      int flag = (*it).second;
+  //      // instruction list
+  //      i->dump();
+  //      llvm::outs() << flag << "\n";
+  //    }
+  //    llvm::outs() << "--- End of printing instruction list ---\n";
 
   for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
@@ -2102,20 +2154,20 @@ ref<Expr> TxWeakestPreCondition::PushUp(
       //      WPExpr->dump();
       //      llvm::outs() << "--- end 2 ---\n";
     } else if (i->getOpcode() == llvm::Instruction::Store) {
-      //            llvm::outs() << "--- start 3 ---\n";
-      //            WPExpr->dump();
+      //                  llvm::outs() << "--- start 3 ---\n";
+      //                  WPExpr->dump();
       WPExpr = getPrevExpr(WPExpr, i);
 
-      //            i->dump();
-      //            WPExpr->dump();
-      //            llvm::outs() << "--- end 3 ---\n";
+      //                  i->dump();
+      //                  WPExpr->dump();
+      //                  llvm::outs() << "--- end 3 ---\n";
     }
   }
   //  llvm::outs() << "--- start simplifyLinear ---\n";
   //  WPExpr->dump();
 
-  WPExpr = TxExprHelper::simplifyLinear(WPExpr);
-  WPExpr = TxExprHelper::rangSimplify(WPExpr);
+  //  WPExpr = TxExprHelper::simplifyLinear(WPExpr);
+  //  WPExpr = TxExprHelper::rangSimplify(WPExpr);
   //  WPExpr->dump();
   //  llvm::outs() << "--- end simplifyLinear ---\n";
 
@@ -2464,6 +2516,23 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
     // TODO: Argument is correct?
     //    llvm::Argument arg = dyn_cast<llvm::Argument>(operand1);
     ret = dependency->getAddress(val, &(wpStore->ac), wpStore->array, this);
+  } else if (llvm::isa<llvm::PHINode>(val)) {
+    llvm::PHINode *phi = dyn_cast<llvm::PHINode>(val);
+    llvm::Instruction *prevInst = node->getPreviousInstruction(phi);
+    llvm::BasicBlock *prevInstBB = prevInst->getParent();
+    int phiFlag = false;
+    for (int i = 0; i < phi->getNumIncomingValues(); i++) {
+      if (phi->getIncomingBlock(i) == prevInstBB) {
+        llvm::Value *prevValue = phi->getIncomingValue(i);
+        ret = dependency->getAddress(prevValue, &(wpStore->ac), wpStore->array,
+                                     this);
+        phiFlag = true;
+      }
+    }
+    if (!phiFlag)
+      klee_error("TxWeakestPreCondition::generateExprFromOperand Phi "
+                 "instruction is not matching any incoming values!");
+
   } else {
     val->dump();
     klee_error("TxWeakestPreCondition::generateExprFromOperand Remaining"
