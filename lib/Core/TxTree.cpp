@@ -62,11 +62,12 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
       symbolicallyAddressedHistoricalStore);
 
   if (WPInterpolant) {
-    wpInterpolant = node->getWPInterpolant(
+    std::pair<ref<Expr>, TxWPArrayStore *> wpPair = node->getWPInterpolant(
         interpolant, existentials, concretelyAddressedStore,
         symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);
-    wpStore = node->getWP()->getWPStore();
+    wpInterpolant = wpPair.first;
+    wpStore = wpPair.second;
   }
 }
 
@@ -836,7 +837,7 @@ bool TxSubsumptionTableEntry::subsumed(
     if (WPInterpolant)
       // In case a node is subsumed, the WP Expr is stored at the parent node.
       // This is crucial for generating WP Expr at the parent node.
-      state.txTreeNode->setWPAtSubsumption(wpInterpolant);
+      state.txTreeNode->setWPAtSubsumption(wpInterpolant, wpStore);
     return true;
   }
 
@@ -1344,7 +1345,7 @@ bool TxSubsumptionTableEntry::subsumed(
       if (WPInterpolant)
         // In case a node is subsumed, the WP Expr is stored at the parent node.
         // This is crucial for generating WP Expr at the parent node.
-        state.txTreeNode->setWPAtSubsumption(wpInterpolant);
+        state.txTreeNode->setWPAtSubsumption(wpInterpolant, wpStore);
       return true;
     }
 
@@ -1418,7 +1419,7 @@ bool TxSubsumptionTableEntry::subsumed(
             // In case a node is subsumed, the WP Expr is stored at the parent
             // node.
             // This is crucial for generating WP Expr at the parent node.
-            state.txTreeNode->setWPAtSubsumption(wpInterpolant);
+            state.txTreeNode->setWPAtSubsumption(wpInterpolant, wpStore);
           return true;
         } else {
           // Here we try to get bound-variables-free conjunction, if there is
@@ -1510,7 +1511,7 @@ bool TxSubsumptionTableEntry::subsumed(
           // In case a node is subsumed, the WP Expr is stored at the parent
           // node.
           // This is crucial for generating WP Expr at the parent node.
-          state.txTreeNode->setWPAtSubsumption(wpInterpolant);
+          state.txTreeNode->setWPAtSubsumption(wpInterpolant, wpStore);
         return true;
       }
       if (debugSubsumptionLevel >= 1) {
@@ -1540,7 +1541,7 @@ bool TxSubsumptionTableEntry::subsumed(
     if (WPInterpolant)
       // In case a node is subsumed, the WP Expr is stored at the parent node.
       // This is crucial for generating WP Expr at the parent node.
-      state.txTreeNode->setWPAtSubsumption(wpInterpolant);
+      state.txTreeNode->setWPAtSubsumption(wpInterpolant, wpStore);
     return true;
   }
 #endif /* ENABLE_Z3 */
@@ -2441,6 +2442,8 @@ TxTreeNode::TxTreeNode(
   wp = new TxWeakestPreCondition(this, dependency);
   childWPInterpolant[0] = wp->True();
   childWPInterpolant[1] = wp->True();
+  childArrayStore[0] = NULL;
+  childArrayStore[1] = NULL;
 }
 
 TxTreeNode::~TxTreeNode() {
@@ -2459,7 +2462,7 @@ ref<Expr> TxTreeNode::getInterpolant(
   return expr;
 }
 
-ref<Expr> TxTreeNode::getWPInterpolant(
+std::pair<ref<Expr>, TxWPArrayStore *> TxTreeNode::getWPInterpolant(
     ref<Expr> interpolant, std::set<const Array *> existentials,
     TxStore::TopInterpolantStore concretelyAddressedStore,
     TxStore::TopInterpolantStore symbolicallyAddressedStore,
@@ -2468,6 +2471,7 @@ ref<Expr> TxTreeNode::getWPInterpolant(
   TimerStatIncrementer t(getWPInterpolantTime);
 
   ref<Expr> expr;
+  TxWPArrayStore *parentWPStore = wp->getWPStore();
 
   //  klee_message("-- 000 ---");
   //  childWPInterpolant[0]->dump();
@@ -2518,24 +2522,21 @@ ref<Expr> TxTreeNode::getWPInterpolant(
     expr = wp->PushUp(reverseInstructionList);
     if (parent) {
       this->parent->setChildWPInterpolant(expr);
-      // copy wp store
-      this->parent->getWP()->getWPStore()->arrayStore.insert(
-          wp->getWPStore()->arrayStore.begin(),
-          wp->getWPStore()->arrayStore.end());
+      this->parent->setChildWPStore(this->getWP()->getWPStore());
     }
 
-    klee_warning("Start printing the WP: at LEAF");
-    expr->dump();
-    klee_warning("End of printing the WP: at LEAF");
+    //    klee_warning("Start printing the WP: at LEAF");
+    //    expr->dump();
+    //    klee_warning("End of printing the WP: at LEAF");
   } else if (wp->False() == childWPInterpolant[0] ||
              wp->False() == childWPInterpolant[1]) {
     expr = wp->False();
     if (parent)
       this->parent->setChildWPInterpolant(expr);
 
-    klee_warning("Start printing the WP: one of child nodes is False");
-    expr->dump();
-    klee_warning("End of printing the WP: one of child nodes is False");
+    //    klee_warning("Start printing the WP: one of child nodes is False");
+    //    expr->dump();
+    //    klee_warning("End of printing the WP: one of child nodes is False");
   } else {
     // Get branch condition
     llvm::Instruction *i = reverseInstructionList.back().first->inst;
@@ -2545,6 +2546,18 @@ ref<Expr> TxTreeNode::getWPInterpolant(
         branchCondition = wp->getBrCondition(i);
       }
     }
+
+    std::pair<TxWPArrayStore *, std::pair<ref<Expr>, ref<Expr> > >
+        updatedWPExpr =
+            wp->mergeWPArrayStore(childArrayStore[0], childArrayStore[1],
+                                  childWPInterpolant[0], childWPInterpolant[1]);
+    wp->setWPStore(updatedWPExpr.first);
+    parentWPStore = updatedWPExpr.first;
+    childWPInterpolant[0] = updatedWPExpr.second.first;
+    childWPInterpolant[1] = updatedWPExpr.second.second;
+
+    wp->sanityCheckWPArrayStore(wp->getWPStore(), childWPInterpolant[0]);
+    wp->sanityCheckWPArrayStore(wp->getWPStore(), childWPInterpolant[1]);
 
     // remove unrelated part from interpolant, concretely addressed store and
     // return And(w1r, w2r)
@@ -2596,17 +2609,15 @@ ref<Expr> TxTreeNode::getWPInterpolant(
 
     if (parent) {
       this->parent->setChildWPInterpolant(expr);
-      this->parent->getWP()->getWPStore()->arrayStore.insert(
-          wp->getWPStore()->arrayStore.begin(),
-          wp->getWPStore()->arrayStore.end());
+      this->parent->setChildWPStore(this->getWP()->getWPStore());
     }
 
-    klee_warning("Start printing the WP after intersection");
-    expr->dump();
-    klee_warning("End of printing the WP after intersection");
+    //    klee_warning("Start printing the WP after intersection");
+    //    expr->dump();
+    //    klee_warning("End of printing the WP after intersection");
   }
 
-  return expr;
+  return std::make_pair(expr, parentWPStore);
 }
 
 void TxTreeNode::setChildWPInterpolant(ref<Expr> interpolant) {
@@ -2622,6 +2633,34 @@ ref<Expr> TxTreeNode::getChildWPInterpolant(int flag) {
   else
     return childWPInterpolant[1];
 }
+
+llvm::Instruction *TxTreeNode::getPreviousInstruction(llvm::PHINode *phi) {
+  for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
+           it = reverseInstructionList.rbegin(),
+           ie = reverseInstructionList.rend();
+       it != ie; ++it) {
+    if ((*it).first->inst == phi)
+      return (*++it).first->inst;
+  }
+  klee_error(
+      "TxTreeNode::getPreviousInstruction: Control should not reach here!");
+}
+
+void TxTreeNode::setChildWPStore(TxWPArrayStore *arrayStore) {
+  if (childArrayStore[0] == NULL)
+    childArrayStore[0] = arrayStore;
+  else
+    childArrayStore[1] = arrayStore;
+}
+
+TxWPArrayStore *TxTreeNode::getChildWPStore(int flag) {
+  if (flag == 0)
+    return childArrayStore[0];
+  else
+    return childArrayStore[1];
+}
+
+
 
 bool TxTreeNode::checkWPAtSubsumption(
     ref<Expr> wpInterpolant, ExecutionState &state,
@@ -2645,9 +2684,12 @@ bool TxTreeNode::checkWPAtSubsumption(
   return true;
 }
 
-void TxTreeNode::setWPAtSubsumption(ref<Expr> _wpInterpolant) {
-  if (parent)
+void TxTreeNode::setWPAtSubsumption(ref<Expr> _wpInterpolant,
+                                    TxWPArrayStore *_wpStore) {
+  if (parent) {
     parent->setChildWPInterpolant(_wpInterpolant);
+    parent->setChildWPStore(_wpStore);
+  }
 }
 
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {

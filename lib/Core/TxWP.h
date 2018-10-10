@@ -31,6 +31,10 @@
 
 namespace klee {
 
+typedef std::map<ref<TxAllocationContext>,
+                 std::pair<const Array *, ref<Expr> > >
+    ArrayStore;
+
 /// \brief Implements the replacement mechanism for replacing variables in WP
 /// Expr, used in replacing free with bound variables.
 class TxWPArrayStore {
@@ -43,8 +47,7 @@ public:
   /// \brief A mapping between TX addresses and the symbolic variable created
   /// for them
   /// in the reverse exploration and generation of the WP expression
-  std::map<ref<TxAllocationContext>, std::pair<const Array *, ref<Expr> > >
-      arrayStore;
+  ArrayStore arrayStore;
 
   ArrayCache ac;
   const Array *array;
@@ -107,6 +110,17 @@ public:
   void setWPExpr(ref<Expr> expr) { WPExpr = expr; }
 
   ref<Expr> getWPExpr() { return WPExpr; }
+
+  void setWPStore(TxWPArrayStore *_wpStore) { wpStore = _wpStore; }
+
+  std::pair<TxWPArrayStore *, std::pair<ref<Expr>, ref<Expr> > >
+  mergeWPArrayStore(TxWPArrayStore *childArrayStore1,
+                    TxWPArrayStore *childArrayStore2,
+                    ref<Expr> childWPInterpolant1,
+                    ref<Expr> childWPInterpolant2);
+
+  void sanityCheckWPArrayStore(TxWPArrayStore *childArrayStore,
+                               ref<Expr> childWPInterpolant);
 
   TxWPArrayStore *getWPStore() { return wpStore; }
 
