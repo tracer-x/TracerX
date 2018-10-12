@@ -2389,6 +2389,11 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Instruction *i,
       llvm::LoadInst *inst2 = dyn_cast<llvm::LoadInst>(inst->getOperand(0));
       ret = dependency->getAddress(inst2->getOperand(0), &(wpStore->ac),
                                    wpStore->array, this);
+    } else if (isa<llvm::GetElementPtrInst>(inst->getOperand(0))) {
+      llvm::GetElementPtrInst *gep =
+          dyn_cast<llvm::GetElementPtrInst>(inst->getOperand(0));
+      ret = dependency->getPointerAddress(gep, &(wpStore->ac), wpStore->array,
+                                          this);
     } else {
       ret = dependency->getAddress(inst->getOperand(0), &(wpStore->ac),
                                    wpStore->array, this);
