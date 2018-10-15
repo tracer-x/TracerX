@@ -92,6 +92,8 @@ class Executor : public Interpreter {
   friend class StatsTracker;
 
 public:
+  time_t startingTime;
+  int allblockcount;
   std::set<llvm::BasicBlock*> visitedBlocks;
   std::set<llvm::BasicBlock*> visitedBlocks1;
 
