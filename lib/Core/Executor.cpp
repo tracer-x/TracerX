@@ -106,6 +106,7 @@
 #include <vector>
 #include <string>
 
+
 #include <sys/mman.h>
 
 #include <errno.h>
@@ -1487,8 +1488,105 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   //dst->back().dump();
 
   //visitedBlocks.insert(dst); //count all destination basic blocks
+
+
+  if((kf->function->getName() != "klee_div_zero_check") && (kf->function->getName()!= "klee_range") && (kf->function->getName() != "klee_int") && (kf->function->getName() != "klee_overshift_check") && (kf->function->getName() != "memcpy") && (kf->function->getName() != "memmove") && (kf->function->getName() != "mempcpy") && (kf->function->getName() != "memset"))
+  {
+
+
+
   visitedBlocks.insert(src);
   visitedBlocks.insert(dst);
+
+
+  }
+   //---TRY to implement Live Coverage-starts
+
+    std::ofstream outfile;
+  	outfile.open ("Livecoverage.txt", std::ofstream::app);
+  	std::ofstream outfile1;
+    outfile1.open ("LogBlockCoverage.txt", std::ofstream::app);
+
+
+  	  	//outfile << "Sanghu";
+   	//ios::out | ios::app | ios::binary
+
+
+
+
+        time_t now = time(0);
+        //time_t now3 = startingTime;
+  	    struct tm  tstruct;
+  	    char       buf[80];
+  	    char       buf1[80];
+  	    tstruct = *localtime(&now);
+  	    // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
+  	    // for more information about date/time format
+  	    //strftime(buf, sizeof(buf), "%Y-%m-%d.%X", &tstruct);
+  	    //strftime(buf, sizeof(buf), "%T", &tstruct);
+  	    //strftime(buf1, sizeof(buf1), "%S", &tstruct);
+  	    //int diff;
+        //double difftime(time_t now, time_t now3)
+
+         //diff = (now/60) - (startingTime/60);
+         //outfile << startingTime;
+         //outfile << now;
+
+        //outfile << (time (0)) %60 << "\n";
+  	    //outfile << (time(&now)/60) - (time(&now3)/60);
+  	    //outfile << (time(&now)) - (time(&now3)) << "\n";
+  	    /*outfile << "time(0)" << time(0) << "\n";
+  	    outfile << "time(&now)" << time(&now) << "\n";
+  	    outfile << "now" << now << "\n";
+  	    outfile << "time(&startingTime)" << time(&startingTime) << "\n";
+  	    outfile << "startingTime" << startingTime << "\n";*/
+        double diff;
+        double checkpointinitial = 0.00;
+        double checkpoint1 = 600.00;
+        double checkpoint2 = 1200.00;
+        double checkpoint3 = 1800.00;
+        double checkpoint4 = 2400.00;
+        double checkpoint5 = 3000.00;
+        double checkpoint6 = 3600.00;
+
+        diff = now - startingTime;
+        float blockCoverage;
+        strftime(buf, sizeof(buf), "%T", &tstruct);
+        blockCoverage = ((float)visitedBlocks.size() / (float)allblockcount) * 100;
+        if((diff == checkpointinitial) || (diff == checkpoint1) || (diff == checkpoint2) || (diff == checkpoint3) || (diff == checkpoint4) || (diff == checkpoint5) || (diff == checkpoint6) )
+  	    {
+
+    	outfile << "************Visited Blocks Starts Live****************" << "\n";
+
+  	    outfile << buf << "\n";
+  	    outfile << "Total number executed Basic Blocks: " << visitedBlocks.size() << "\n";
+  	    outfile << "Total number of Basic Blocks: " <<  allblockcount << "\n";
+
+        outfile << "Block Coverage : " << std::fixed << std::setprecision(2) << blockCoverage << " percentage" << "\n";
+
+        //outfile << "Block Coverage%f : " <<  blockCoverage << "%" << "\n";
+
+
+  	/*for (std::set<llvm::BasicBlock*>::iterator it1 = visitedBlocks.begin(), ie1 =
+  			visitedBlocks.end(); it1 != ie1; ++it1) {
+  		outfile << "BlockScopeStarts: \n";
+  //		(*it)->getParent()->getName();
+  		//llvm::errs() <<";"<< (*BB.getParent()).getName();
+  		//std::string tmp = (*it1)->getParent()->getName();
+  		//outfile << "Function:" << tmp << "\n"; //This logic is to print function name and block name together
+  		//(*it)->dump(); //print whole visited blocks
+  		//std::string tmp1 = (*it);
+  //				outfile << (*it)->dump() << "\n";
+  		outfile << "BlockScopeEnds: " << "\n";
+
+  		//kf->function->dump();
+  		//(*it)->back().dump(); //print only branch instructions
+  	}*/
+  	outfile << "************Visited Blocks Ends Live****************" << "\n";
+  	    }
+        outfile1 << "[" << buf << "," << "(" << visitedBlocks.size() << "," << allblockcount << "," << std::fixed << std::setprecision(2) << blockCoverage << "%)]" << "\n";
+
+  	//----TRY to implement Live Coverage Ends
 
   //kf->function->dump();
   //llvm::errs() << "Abhi change start";
@@ -3982,7 +4080,8 @@ void Executor::runFunctionAsMain(Function *f,
   KFunction *kf = kmodule->functionMap[f];
   assert(kf);
   //Logic to dump all Branch and ret instructions
-  int allblockcount = 0;
+  //int allblockcount = 0;
+  allblockcount = 0;
   llvm::errs() << "************All Blocks Start****************" << "\n";
 
   //  llvm::errs() << kf << "\n";
@@ -3993,7 +4092,9 @@ void Executor::runFunctionAsMain(Function *f,
 
 
   	  Function *tmpF = it->first;
-
+      //This logic is to eliminates klee's extra checks to dump in files
+      if((tmpF->getName() != "klee_div_zero_check") && (tmpF->getName() != "klee_range") && (tmpF->getName() != "klee_int") && (tmpF->getName() != "klee_overshift_check") && (tmpF->getName() != "memcpy") && (tmpF->getName() != "memmove") && (tmpF->getName() != "mempcpy") && (tmpF->getName() != "memset"))
+      {
 
   	  for (llvm::Function::iterator b = tmpF->begin(); b != tmpF->end(); ++b) {
 
@@ -4006,6 +4107,8 @@ void Executor::runFunctionAsMain(Function *f,
     		  }
           }*/
   		  //tmpF->dump();
+
+
   		llvm::errs() << "BlockScopeStarts: " << "\n";
   		allblockcount++;
     	llvm::errs() << "Block Number: " << allblockcount << "\n";
@@ -4015,6 +4118,11 @@ void Executor::runFunctionAsMain(Function *f,
   	   }
 
   	//it->first->dump(); //Uncomment it to dump all blocks
+
+    }
+
+      startingTime = time(0);
+
 
      }
 
@@ -4116,12 +4224,12 @@ void Executor::runFunctionAsMain(Function *f,
   llvm::outs() << "**************\n";
     //dst->back().dump();
 
-
-
   llvm::errs() << "************Visited Blocks Starts****************" << "\n";
-    for (std::set<llvm::BasicBlock*>::iterator it = visitedBlocks.begin(), ie=visitedBlocks.end(); it!=ie;++it
-              ) {
 
+  for (std::set<llvm::BasicBlock*>::iterator it = visitedBlocks.begin(), ie=visitedBlocks.end(); it!=ie;++it
+              ) {
+	  if(( ((*it)->getParent())->getName()!= "klee_div_zero_check") && (((*it)->getParent())->getName() != "klee_range") && (((*it)->getParent())->getName() != "klee_int") && (((*it)->getParent())->getName() != "klee_overshift_check") && (((*it)->getParent())->getName() != "memcpy") && (((*it)->getParent())->getName() != "memmove") && (((*it)->getParent())->getName() != "mempcpy") && (((*it)->getParent())->getName() != "memset"))
+	        {
     	llvm::errs() << "BlockScopeStarts: " << "\n";
     	(*it)->getParent()->getName();
     	//llvm::errs() <<";"<< (*BB.getParent()).getName();
@@ -4131,9 +4239,37 @@ void Executor::runFunctionAsMain(Function *f,
 
         //kf->function->dump();
   	  //(*it)->back().dump(); //print only branch instructions
-    }
-    llvm::errs() << "************Visited Blocks Ends****************" << "\n";
+	       }
+     }
+	  llvm::errs() << "************Visited Blocks Ends****************" << "\n";
 
+
+//    std::ofstream outfile;
+//	outfile.open("Livecoverage.txt");
+//	outfile << "Sanghu";
+//	std::error_code OutErrorInfo;
+//	llvm::raw_fd_ostream() outFile(llvm::StringRef("Livecoverage.txt"), OutErrorInfo, llvm::sys::fs::F_None);
+//
+//	outfile << "************Visited Blocks Starts****************" << "\n";
+//
+//	for (std::set<llvm::BasicBlock*>::iterator it1 = visitedBlocks.begin(), ie1 =
+//			visitedBlocks.end(); it1 != ie1; ++it1) {
+//		outfile << "BlockScopeStarts: \n";
+////		(*it)->getParent()->getName();
+//		//llvm::errs() <<";"<< (*BB.getParent()).getName();
+//		std::string tmp = (*it1)->getParent()->getName();
+//		outfile << "Function:" << tmp << "\n"; //This logic is to print function name and block name together
+//		//(*it)->dump(); //print whole visited blocks
+//		//std::string tmp1 = (*it);
+////				outfile << (*it)->dump() << "\n";
+//		outfile << "BlockScopeEnds: " << "\n";
+//
+//		//kf->function->dump();
+//		//(*it)->back().dump(); //print only branch instructions
+//	}
+//	outfile << "************Visited Blocks Ends****************" << "\n";
+
+  	//llvm::raw_ostream()* stream;
 
 
 
