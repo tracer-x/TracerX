@@ -798,30 +798,35 @@ bool TxSubsumptionTableEntry::subsumed(
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
-  //  if (WPInterpolant) {
-  //    // Checking if weakest pre-condition holds. In case WPInterpolant
-  //    // flag is set, this serves as the first check when subsuming a node.
-  //    // If it fails then false is returned. If it succeeds then the
-  //    // second check is performed.
-  //    bool result = state.txTreeNode->checkWPAtSubsumption(
-  //        wpInterpolant, state, __concretelyAddressedHistoricalStore,
-  //        __symbolicallyAddressedHistoricalStore, timeout,
-  //        debugSubsumptionLevel);
-  //
-  //    if (result != Solver::True) {
-  //      if (debugSubsumptionLevel >= 1) {
-  //        klee_message("#%lu=>#%lu: Check failure at WP Expr check ",
-  //                     state.txTreeNode->getNodeSequenceNumber(),
-  //                     nodeSequenceNumber);
-  //      }
-  //      return false;
-  //    }
-  //    if (debugSubsumptionLevel >= 1) {
-  //      klee_message("#%lu=>#%lu: Weakest precondition check success",
-  //                   state.txTreeNode->getNodeSequenceNumber(),
-  //                   nodeSequenceNumber);
-  //    }
-  //  }
+  if (WPInterpolant) {
+    // Checking if weakest pre-condition holds. In case WPInterpolant
+    // flag is set, this serves as the first check when subsuming a node.
+    // If it fails then false is returned. If it succeeds then the
+    // second check is performed.
+    ref<Expr> wpInstantiatedInterpolant =
+        state.txTreeNode->checkWPAtSubsumption(wpInterpolant, wpStore);
+
+    Solver::Validity result;
+    std::vector<ref<Expr> > unsatCore;
+
+    bool success =
+        solver->evaluate(state, wpInstantiatedInterpolant, result, unsatCore);
+
+    if (!success || result != Solver::True) {
+      if (debugSubsumptionLevel >= 1) {
+        klee_message("#%lu=>#%lu: Check failure at WP Expr check ",
+                     state.txTreeNode->getNodeSequenceNumber(),
+                     nodeSequenceNumber);
+      }
+      return false;
+    }
+    if (debugSubsumptionLevel >= 1) {
+      klee_message("#%lu=>#%lu: Weakest precondition check success",
+                   state.txTreeNode->getNodeSequenceNumber(),
+                   nodeSequenceNumber);
+    }
+  }
+
   // Tell the solver implementation that we are checking for subsumption for
   // collecting statistics of solver calls.
   SubsumptionCheckMarker subsumptionCheckMarker;
@@ -2203,26 +2208,19 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         //        llvm::outs() << "*** End printing wpStore->arrayStore 22***
         //        \n";
 
+        Solver::Validity result;
+        std::vector<ref<Expr> > unsatCore;
+
+        bool success = solver->evaluate(*state, WPExpr, result, unsatCore);
+        if (success != true)
+          klee_error("TxTree::remove: WP Expr implication test failed");
+        if (WPExpr != node->wp->False() && result == Solver::False) {
+          state->txTreeNode->dependency->dump();
+          WPExpr->dump();
+          klee_error("TxTree::remove: WP Expr implication test is false");
+        }
         entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
       }
-
-      // TODO: Is this needed? Can we remove this part?
-      //        bool success =
-      //            solver->evaluate(*state, WPExprConjunction, result,
-      //            unsatCore);
-      //        if (success != true)
-      //          klee_error("TxTree::remove: Implication test failed");
-      //        if (result == Solver::True) {
-      //          continue;
-      //        } else {
-      //          klee_warning("TxTree::remove: Implication test unknown");
-      //          // If the result of implication is Solver::False and/or
-      //          // Solver::Unknown the chance that the WP interpolant
-      //          // improves the interpolant from the deletion algorithm
-      //          // is slim. As a result, in such cases the interpolant
-      //          // from deletion is not changed.
-      //        }
-      //      }
 
       TxSubsumptionTable::insert(node->getProgramPoint(),
                                  node->entryCallHistory, entry);
@@ -2493,13 +2491,15 @@ std::pair<ref<Expr>, TxWPArrayStore *> TxTreeNode::getWPInterpolant(
     //    }
     //    llvm::outs() << "--- End 111 ---\n";
 
-    expr = wp->False();
-    if (parent)
+    expr = wp->True();
+    if (parent) {
       this->parent->setChildWPInterpolant(expr);
+      this->parent->setChildWPStore(this->getWP()->getWPStore());
+    }
 
-    klee_warning("Start printing the WP: Assertion Fail");
-    expr->dump();
-    klee_warning("End of printing the WP: Assertion Fail");
+    //    klee_warning("Start printing the WP: Assertion Fail");
+    //    expr->dump();
+    //    klee_warning("End of printing the WP: Assertion Fail");
 
   } else if (wp->True() == childWPInterpolant[0] &&
              wp->True() == childWPInterpolant[1]) {
@@ -2531,8 +2531,10 @@ std::pair<ref<Expr>, TxWPArrayStore *> TxTreeNode::getWPInterpolant(
   } else if (wp->False() == childWPInterpolant[0] ||
              wp->False() == childWPInterpolant[1]) {
     expr = wp->False();
-    if (parent)
+    if (parent) {
       this->parent->setChildWPInterpolant(expr);
+      this->parent->setChildWPStore(this->getWP()->getWPStore());
+    }
 
     //    klee_warning("Start printing the WP: one of child nodes is False");
     //    expr->dump();
@@ -2660,28 +2662,11 @@ TxWPArrayStore *TxTreeNode::getChildWPStore(int flag) {
     return childArrayStore[1];
 }
 
-
-
-bool TxTreeNode::checkWPAtSubsumption(
-    ref<Expr> wpInterpolant, ExecutionState &state,
-    TxStore::LowerStateStore &concretelyAddressedHistoricalStore,
-    TxStore::LowerStateStore &symbolicallyAddressedHistoricalStore,
-    double timeout, int debugSubsumptionLevel) {
-
+ref<Expr> TxTreeNode::checkWPAtSubsumption(ref<Expr> wpInterpolant,
+                                           TxWPArrayStore *wpStore) {
   ref<Expr> wpInstantiatedInterpolant =
-      wp->instantiateWPExpression(dependency, callHistory, wpInterpolant);
-
-  if (wpInstantiatedInterpolant->isTrue())
-    return true;
-
-  else if (wpInstantiatedInterpolant->isFalse())
-    return false;
-  else {
-    wpInstantiatedInterpolant->dump();
-    klee_error("TxTreeNode::checkWPAtSubsumption non constant value is not"
-               "handled yet");
-  }
-  return true;
+      wp->instantiateWPExpression(dependency, wpInterpolant, wpStore);
+  return wpInstantiatedInterpolant;
 }
 
 void TxTreeNode::setWPAtSubsumption(ref<Expr> _wpInterpolant,

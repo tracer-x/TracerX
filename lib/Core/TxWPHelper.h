@@ -51,6 +51,12 @@ public:
 
   static ref<Expr> substituteExpr(ref<Expr> base, const ref<Expr> lhs,
                                   const ref<Expr> rhs);
+
+  static ref<Expr> substituteArray(ref<Expr> base, const Array *lhs,
+                                   const Array *rhs);
+
+  static ref<ReadExpr> ExtractReadExpr(ref<Expr> expr);
+
   static bool isTargetDependent(TxWPArrayStore *wpStore, llvm::Value *inst,
                                 ref<Expr> expr);
 

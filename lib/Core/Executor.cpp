@@ -3409,7 +3409,8 @@ bool Executor::shouldExitOn(enum TerminateReason termReason) {
 }
 
 void Executor::markAssertionFail(ExecutionState &state) {
-	state.txTreeNode->setAssertionFail();
+  if (INTERPOLATION_ENABLED && WPInterpolant)
+    state.txTreeNode->setAssertionFail();
 }
 
 void Executor::terminateStateOnError(ExecutionState &state,

@@ -66,7 +66,10 @@ public:
   static bool isFalse(ref<Expr> e);
 
   //
-  static void extractReadExprs(ref<Expr> e, std::vector<ref<Expr> > &readExprs);
+  static ref<Expr> removeShadowExprs(ref<Expr> e,
+                                     std::set<const Array *> shadowArrays);
+
+  static void extractArrays(ref<Expr> e, std::set<const Array *> &readArrays);
 };
 }
 #endif /* LIB_CORE_TXEXPRHELPER_H_ */

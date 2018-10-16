@@ -55,16 +55,21 @@ public:
 
   void insert(ref<TxAllocationContext>, const Array *array, ref<Expr> expr);
 
-  unsigned int getSize(llvm::Value *value);
+  std::pair<unsigned int, unsigned int> getSize(llvm::Value *value);
+
+  std::pair<unsigned int, unsigned int> getSize_aux(llvm::Type *type);
 
   ref<Expr> createAndInsert(ref<TxAllocationContext> address,
-                            std::string arrayName, llvm::Value *value);
+                            std::string arrayName, llvm::Value *value,
+                            ref<Expr> offset = NULL);
 
   const Array *getArrayRef(llvm::Value *value);
 
   llvm::Value *getValuePointer(ref<Expr> expr);
 
   ref<TxAllocationContext> getAddress(ref<Expr> var);
+
+  ref<TxAllocationContext> getAddress(const Array *arr);
 
   ref<TxAllocationContext> getAddress(llvm::Value *i);
 
@@ -134,17 +139,19 @@ public:
       std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
 
   // \brief Generate expression from operand of an instruction
-  ref<Expr> generateExprFromOperand(llvm::Instruction *i, int operand);
+  // The offset is only used when a pointer or array instruction are handled and
+  // first the offset is computed.
+  ref<Expr> generateExprFromOperand(llvm::Instruction *i, int operand,
+                                    ref<Expr> offset = NULL);
 
   // \brief Return LHS of an instruction as a read expression
   ref<Expr> getLHS(llvm::Instruction *i);
 
   // \brief Instantiates the variables in WPExpr by their latest value for the
   // implication test.
-  ref<Expr>
-  instantiateWPExpression(TxDependency *dependency,
-                          const std::vector<llvm::Instruction *> &callHistory,
-                          ref<Expr> singleWPExpr);
+  ref<Expr> instantiateWPExpression(TxDependency *dependency,
+                                    ref<Expr> singleWPExpr,
+                                    TxWPArrayStore *wpStore);
 
   /// \brief Perform the intersection of two weakest precondition expressions
   /// with respect to the branchCondition

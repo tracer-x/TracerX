@@ -717,8 +717,106 @@ bool TxExprHelper::isFalse(ref<Expr> e) {
   return false;
 }
 
-void TxExprHelper::extractReadExprs(ref<Expr> e,
-                                    std::vector<ref<Expr> > &readExprs) {
+ref<Expr>
+TxExprHelper::removeShadowExprs(ref<Expr> e,
+                                std::set<const Array *> shadowArrays) {
+  switch (e->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return e;
+  }
+
+  case Expr::Read: {
+    const Array *arr = llvm::dyn_cast<ReadExpr>(e)->getArray();
+    if (shadowArrays.find(arr) == shadowArrays.end())
+      return e;
+    else
+      return NULL;
+  }
+  case Expr::Concat: {
+    ref<ConcatExpr> concatVar = llvm::dyn_cast<ConcatExpr>(e);
+    const Array *arr =
+        llvm::dyn_cast<ReadExpr>(concatVar->getLeft())->getArray();
+    if (shadowArrays.find(arr) == shadowArrays.end())
+      return e;
+    else
+      return NULL;
+  }
+
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    // Extract the one kid and extract variable from that
+    ref<Expr> kid;
+    kid = e->getKid(0);
+    ref<Expr> newE = removeShadowExprs(kid, shadowArrays);
+    if (!newE.isNull())
+      return e;
+    else
+      return NULL;
+  }
+
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    // Extract the two kids and extract variable from that
+    ref<Expr> kids[2];
+    kids[0] = e->getKid(0);
+    kids[1] = e->getKid(1);
+    ref<Expr> newE1 = removeShadowExprs(kids[0], shadowArrays);
+    ref<Expr> newE2 = removeShadowExprs(kids[1], shadowArrays);
+    if (!newE1.isNull() && !newE2.isNull())
+      return e;
+    else
+      return NULL;
+  }
+
+  case Expr::Select: {
+    // Extract the three kids and extract variable from that
+    ref<Expr> kids[3];
+    kids[0] = e->getKid(0);
+    kids[1] = e->getKid(1);
+    kids[2] = e->getKid(2);
+    ref<Expr> newE1 = removeShadowExprs(kids[0], shadowArrays);
+    ref<Expr> newE2 = removeShadowExprs(kids[1], shadowArrays);
+    ref<Expr> newE3 = removeShadowExprs(kids[2], shadowArrays);
+    if (!newE1.isNull() && !newE2.isNull() && !newE3.isNull())
+      return e;
+    else
+      return NULL;
+  }
+  default:
+    klee_error(
+        "TxExprHelper::removeShadowExprs Control should not reach here!");
+    break;
+  }
+  return e;
+}
+
+void TxExprHelper::extractArrays(ref<Expr> e,
+                                 std::set<const Array *> &readArrays) {
   switch (e->getKind()) {
   case Expr::InvalidKind:
   case Expr::Constant: {
@@ -726,11 +824,14 @@ void TxExprHelper::extractReadExprs(ref<Expr> e,
   }
 
   case Expr::Read: {
-    readExprs.push_back(e);
+    ReadExpr *readExpr = llvm::dyn_cast<ReadExpr>(e);
+    readArrays.insert(readExpr->getArray());
     break;
   }
   case Expr::Concat: {
-    readExprs.push_back(e);
+    ref<ConcatExpr> concatVar = llvm::dyn_cast<ConcatExpr>(e);
+    readArrays.insert(
+        llvm::dyn_cast<ReadExpr>(concatVar->getLeft())->getArray());
     break;
   }
 
@@ -742,7 +843,7 @@ void TxExprHelper::extractReadExprs(ref<Expr> e,
     // Extract the one kid and extract variable from that
     ref<Expr> kids[1];
     kids[0] = e->getKid(0);
-    extractReadExprs(kids[0], readExprs);
+    extractArrays(kids[0], readArrays);
     break;
   }
 
@@ -773,8 +874,8 @@ void TxExprHelper::extractReadExprs(ref<Expr> e,
     ref<Expr> kids[2];
     kids[0] = e->getKid(0);
     kids[1] = e->getKid(1);
-    extractReadExprs(kids[0], readExprs);
-    extractReadExprs(kids[1], readExprs);
+    extractArrays(kids[0], readArrays);
+    extractArrays(kids[1], readArrays);
     break;
   }
 
@@ -784,9 +885,9 @@ void TxExprHelper::extractReadExprs(ref<Expr> e,
     kids[0] = e->getKid(0);
     kids[1] = e->getKid(1);
     kids[2] = e->getKid(2);
-    extractReadExprs(kids[0], readExprs);
-    extractReadExprs(kids[1], readExprs);
-    extractReadExprs(kids[2], readExprs);
+    extractArrays(kids[0], readArrays);
+    extractArrays(kids[1], readArrays);
+    extractArrays(kids[2], readArrays);
     break;
   }
   default:
