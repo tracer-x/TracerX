@@ -570,11 +570,8 @@ public:
   ref<Expr> getBranchCondition() { return branchCondition; }
 
   /// \brief Check WP Interpolant holds at subsumption point
-  bool checkWPAtSubsumption(
-      ref<Expr> wpInterpolant, ExecutionState &state,
-      TxStore::LowerStateStore &concretelyAddressedHistoricalStore,
-      TxStore::LowerStateStore &symbolicallyAddressedHistoricalStore,
-      double timeout, int debugSubsumptionLevel);
+  ref<Expr> checkWPAtSubsumption(ref<Expr> wpInterpolant,
+                                 TxWPArrayStore *wpStore);
 
   /// \brief Copy WP to the parent node at subsumption point
   void setWPAtSubsumption(ref<Expr> _wpInterpolant, TxWPArrayStore *wpStore);
