@@ -66,6 +66,7 @@ public:
 
 class Interpreter {
 public:
+  std::string InputFile;
   /// ModuleOptions - Module level options which can be set when
   /// registering a module with the interpreter.
   struct ModuleOptions {

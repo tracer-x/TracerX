@@ -93,9 +93,11 @@ class Executor : public Interpreter {
 
 public:
   time_t startingTime;
-  int allblockcount;
+  int allBlockCount;
+  bool allBlockCollected;
   std::set<llvm::BasicBlock*> visitedBlocks;
-  std::set<llvm::BasicBlock*> visitedBlocks1;
+  float blockCoverage;
+  int countFreq;
 
   class Timer {
   public:
