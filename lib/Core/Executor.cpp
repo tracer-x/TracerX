@@ -1480,10 +1480,9 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
     PHINode *first = static_cast<PHINode*>(state.pc->inst);
     state.incomingBBIndex = first->getBasicBlockIndex(src);
   }
-//  if (INTERPOLATION_ENABLED)
+ if (INTERPOLATION_ENABLED)
     // blockCount increased to count all visited Basic Blocks
-
-//  TxTree::blockCount++;
+  TxTree::blockCount++;
   //llvm::outs() << "**************\n";
   //dst->back().dump();
 
@@ -1506,7 +1505,8 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   	outfile.open ("Livecoverage.txt", std::ofstream::app);
   	std::ofstream outfile1;
     outfile1.open ("LogBlockCoverage.txt", std::ofstream::app);
-
+    std::ofstream outfile2;
+    outfile2.open ("record.dat", std::ofstream::app);
 
   	  	//outfile << "Sanghu";
    	//ios::out | ios::app | ios::binary
@@ -1552,6 +1552,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
         diff = now - startingTime;
         float blockCoverage;
         strftime(buf, sizeof(buf), "%T", &tstruct);
+
         blockCoverage = ((float)visitedBlocks.size() / (float)allblockcount) * 100;
         if((diff == checkpointinitial) || (diff == checkpoint1) || (diff == checkpoint2) || (diff == checkpoint3) || (diff == checkpoint4) || (diff == checkpoint5) || (diff == checkpoint6) )
   	    {
@@ -1585,7 +1586,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   	outfile << "************Visited Blocks Ends Live****************" << "\n";
   	    }
         outfile1 << "[" << buf << "," << "(" << visitedBlocks.size() << "," << allblockcount << "," << std::fixed << std::setprecision(2) << blockCoverage << "%)]" << "\n";
-
+        outfile2 << diff << "     " << std::fixed << std::setprecision(2) << blockCoverage << "\n";
   	//----TRY to implement Live Coverage Ends
 
   //kf->function->dump();
