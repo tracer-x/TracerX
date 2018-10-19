@@ -1480,14 +1480,19 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
     PHINode *first = static_cast<PHINode*>(state.pc->inst);
     state.incomingBBIndex = first->getBasicBlockIndex(src);
   }
- if (INTERPOLATION_ENABLED)
+ if (INTERPOLATION_ENABLED){
     // blockCount increased to count all visited Basic Blocks
   TxTree::blockCount++;
+ }
   //llvm::outs() << "**************\n";
   //dst->back().dump();
 
   //visitedBlocks.insert(dst); //count all destination basic blocks
 
+ //llvm::errs() << "************Dumping executed Blocks -- starts****************" << "\n";
+  //src->dump();
+  //dst->dump();
+  //llvm::errs() << "************Dumping executed Blocks -- Ends****************" << "\n";
 
   if((kf->function->getName() != "klee_div_zero_check") && (kf->function->getName()!= "klee_range") && (kf->function->getName() != "klee_int") && (kf->function->getName() != "klee_overshift_check") && (kf->function->getName() != "memcpy") && (kf->function->getName() != "memmove") && (kf->function->getName() != "mempcpy") && (kf->function->getName() != "memset"))
   {
