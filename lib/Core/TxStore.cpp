@@ -245,12 +245,22 @@ inline void TxStore::concreteToInterpolant(
     map[variable] = interpolantValue;
   } else if (entry->isCore(leftOfEntry)) {
     // Do not add to the map if entry is not used
-/*if (leftOfEntry) {
-  if (usedByLeftPath.find(entry) == usedByLeftPath.end())
-    return;
-} else if (usedByRightPath.find(entry) == usedByRightPath.end()) {
-  return;
-}*/
+    // The reason for commenting this code and adding the if statement
+    // after the commented code is to fix a bug which arises from
+    // insertions in usedByLeftPath and usedByRightPath. An entry is
+    // added to these if it is used in the subtree beneath it.
+    // However, in some cases for example when a path is infeasible
+    // the logic doesn't work. I have disabled this and I check both
+    // paths.
+    /*if (leftOfEntry) {
+      if (usedByLeftPath.find(entry) == usedByLeftPath.end())
+        return;
+    } else if (usedByRightPath.find(entry) == usedByRightPath.end()) {
+      return;
+    }*/
+    if (usedByLeftPath.find(entry) == usedByLeftPath.end() &&
+        usedByRightPath.find(entry) == usedByRightPath.end())
+      return;
 
 // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
@@ -278,12 +288,22 @@ inline void TxStore::symbolicToInterpolant(
     map[variable] = interpolantValue;
   } else if (entry->isCore(leftOfEntry)) {
     // Do not add to the map if entry is not used
-/*if (leftOfEntry) {
-  if (usedByLeftPath.find(entry) == usedByLeftPath.end())
-    return;
-} else if (usedByRightPath.find(entry) == usedByRightPath.end()) {
-  return;
-}*/
+    // The reason for commenting this code and adding the if statement
+    // after the commented code is to fix a bug which arises from
+    // insertions in usedByLeftPath and usedByRightPath. An entry is
+    // added to these if it is used in the subtree beneath it.
+    // However, in some cases for example when a path is infeasible
+    // the logic doesn't work. I have disabled this and I check both
+    // paths.
+    /*if (leftOfEntry) {
+      if (usedByLeftPath.find(entry) == usedByLeftPath.end())
+        return;
+    } else if (usedByRightPath.find(entry) == usedByRightPath.end()) {
+      return;
+    }*/
+    if (usedByRightPath.find(entry) == usedByRightPath.end() &&
+        usedByLeftPath.find(entry) == usedByLeftPath.end())
+      return;
 
 // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
