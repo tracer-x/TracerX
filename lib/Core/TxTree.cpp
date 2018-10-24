@@ -1319,7 +1319,8 @@ bool TxSubsumptionTableEntry::subsumed(
                      TxPrettyExpressionBuilder::constructQuery(
                          state.constraints, existsExpr).c_str());
       }
-      expr = simplifyExistsExpr(existsExpr, exprHasNoFreeVariables);
+      // expr = simplifyExistsExpr(existsExpr, exprHasNoFreeVariables);
+      expr = existsExpr;
     }
 
     // We finally simplify the conjunction using create()
