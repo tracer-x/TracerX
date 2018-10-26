@@ -734,8 +734,9 @@ TxSubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
   if (!hasVariableInSet(expr->variables, newBody))
     return newBody;
 
-  ref<Expr> ret = simplifyArithmeticBody(existsExpr->rebuild(&newBody),
-                                         hasExistentialsOnly);
+  // ref<Expr> ret =
+  // simplifyArithmeticBody(existsExpr->rebuild(&newBody),hasExistentialsOnly);
+  ref<Expr> ret = existsExpr->rebuild(&newBody);
   return ret;
 }
 
