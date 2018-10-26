@@ -734,8 +734,9 @@ TxSubsumptionTableEntry::simplifyExistsExpr(ref<Expr> existsExpr,
   if (!hasVariableInSet(expr->variables, newBody))
     return newBody;
 
-  ref<Expr> ret = simplifyArithmeticBody(existsExpr->rebuild(&newBody),
-                                         hasExistentialsOnly);
+  // ref<Expr> ret =
+  // simplifyArithmeticBody(existsExpr->rebuild(&newBody),hasExistentialsOnly);
+  ref<Expr> ret = existsExpr->rebuild(&newBody);
   return ret;
 }
 
@@ -1319,8 +1320,7 @@ bool TxSubsumptionTableEntry::subsumed(
                      TxPrettyExpressionBuilder::constructQuery(
                          state.constraints, existsExpr).c_str());
       }
-      // expr = simplifyExistsExpr(existsExpr, exprHasNoFreeVariables);
-      expr = existsExpr;
+      expr = simplifyExistsExpr(existsExpr, exprHasNoFreeVariables);
     }
 
     // We finally simplify the conjunction using create()
