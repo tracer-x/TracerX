@@ -1484,121 +1484,46 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
     // blockCount increased to count all visited Basic Blocks
   TxTree::blockCount++;
  }
-  //llvm::outs() << "**************\n";
-  //dst->back().dump();
-
-  //visitedBlocks.insert(dst); //count all destination basic blocks
-
- //llvm::errs() << "************Dumping executed Blocks -- starts****************" << "\n";
-  //src->dump();
-  //dst->dump();
-  //llvm::errs() << "************Dumping executed Blocks -- Ends****************" << "\n";
 
   if((kf->function->getName() != "klee_div_zero_check") && (kf->function->getName()!= "klee_range") && (kf->function->getName() != "klee_int") && (kf->function->getName() != "klee_overshift_check") && (kf->function->getName() != "memcpy") && (kf->function->getName() != "memmove") && (kf->function->getName() != "mempcpy") && (kf->function->getName() != "memset"))
   {
-
-
-
   visitedBlocks.insert(src);
   visitedBlocks.insert(dst);
-
-
   }
-   //---TRY to implement Live Coverage-starts
-
-    std::ofstream outfile;
-  	outfile.open ("Livecoverage.txt", std::ofstream::app);
-  	std::ofstream outfile1;
+    std::ofstream outfile1;
     outfile1.open ("LogBlockCoverage.txt", std::ofstream::app);
     std::ofstream outfile2;
     outfile2.open ("record.dat", std::ofstream::app);
+    std::ofstream outfile3;
+    outfile3.open ("executedblocks.txt", std::ofstream::app);
 
-  	  	//outfile << "Sanghu";
-   	//ios::out | ios::app | ios::binary
+    	time_t now = time(0);
+    	//time_t now3 = startingTime;
+  		struct tm  tstruct;
+  		char       buf[80];
+  		char       buf1[80];
+  		tstruct = *localtime(&now);
 
-
-
-
-        time_t now = time(0);
-        //time_t now3 = startingTime;
-  	    struct tm  tstruct;
-  	    char       buf[80];
-  	    char       buf1[80];
-  	    tstruct = *localtime(&now);
-  	    // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
-  	    // for more information about date/time format
-  	    //strftime(buf, sizeof(buf), "%Y-%m-%d.%X", &tstruct);
-  	    //strftime(buf, sizeof(buf), "%T", &tstruct);
-  	    //strftime(buf1, sizeof(buf1), "%S", &tstruct);
-  	    //int diff;
-        //double difftime(time_t now, time_t now3)
-
-         //diff = (now/60) - (startingTime/60);
-         //outfile << startingTime;
-         //outfile << now;
-
-        //outfile << (time (0)) %60 << "\n";
-  	    //outfile << (time(&now)/60) - (time(&now3)/60);
-  	    //outfile << (time(&now)) - (time(&now3)) << "\n";
-  	    /*outfile << "time(0)" << time(0) << "\n";
-  	    outfile << "time(&now)" << time(&now) << "\n";
-  	    outfile << "now" << now << "\n";
-  	    outfile << "time(&startingTime)" << time(&startingTime) << "\n";
-  	    outfile << "startingTime" << startingTime << "\n";*/
         double diff;
-        double checkpointinitial = 0.00;
-        double checkpoint1 = 600.00;
-        double checkpoint2 = 1200.00;
-        double checkpoint3 = 1800.00;
-        double checkpoint4 = 2400.00;
-        double checkpoint5 = 3000.00;
-        double checkpoint6 = 3600.00;
-
         diff = now - startingTime;
         float blockCoverage;
         strftime(buf, sizeof(buf), "%T", &tstruct);
 
         blockCoverage = ((float)visitedBlocks.size() / (float)allblockcount) * 100;
-        if((diff == checkpointinitial) || (diff == checkpoint1) || (diff == checkpoint2) || (diff == checkpoint3) || (diff == checkpoint4) || (diff == checkpoint5) || (diff == checkpoint6) )
-  	    {
 
-    	outfile << "************Visited Blocks Starts Live****************" << "\n";
-
-  	    outfile << buf << "\n";
-  	    outfile << "Total number executed Basic Blocks: " << visitedBlocks.size() << "\n";
-  	    outfile << "Total number of Basic Blocks: " <<  allblockcount << "\n";
-
-        outfile << "Block Coverage : " << std::fixed << std::setprecision(2) << blockCoverage << " percentage" << "\n";
-
-        //outfile << "Block Coverage%f : " <<  blockCoverage << "%" << "\n";
-
-
-  	/*for (std::set<llvm::BasicBlock*>::iterator it1 = visitedBlocks.begin(), ie1 =
+        for (std::set<llvm::BasicBlock*>::iterator it1 = visitedBlocks.begin(), ie1 =
   			visitedBlocks.end(); it1 != ie1; ++it1) {
-  		outfile << "BlockScopeStarts: \n";
-  //		(*it)->getParent()->getName();
-  		//llvm::errs() <<";"<< (*BB.getParent()).getName();
-  		//std::string tmp = (*it1)->getParent()->getName();
-  		//outfile << "Function:" << tmp << "\n"; //This logic is to print function name and block name together
-  		//(*it)->dump(); //print whole visited blocks
-  		//std::string tmp1 = (*it);
-  //				outfile << (*it)->dump() << "\n";
-  		outfile << "BlockScopeEnds: " << "\n";
-
-  		//kf->function->dump();
-  		//(*it)->back().dump(); //print only branch instructions
-  	}*/
-  	outfile << "************Visited Blocks Ends Live****************" << "\n";
-  	    }
+  		outfile3 << "BlockScopeStarts: \n";
+  		std::string tmp = (*it1)->getParent()->getName();
+  		BasicBlock *b = (*it1);
+  		std::string Str;
+  		raw_string_ostream OS(Str);
+  		b->print(OS);
+  		outfile3 << "Function:" << tmp << Str <<"\n"; //This logic is to print function name and block name together
+  		outfile3 << "BlockScopeEnds: " << "\n";
+        }
         outfile1 << "[" << buf << "," << "(" << visitedBlocks.size() << "," << allblockcount << "," << std::fixed << std::setprecision(2) << blockCoverage << "%)]" << "\n";
         outfile2 << diff << "     " << std::fixed << std::setprecision(2) << blockCoverage << "\n";
-  	//----TRY to implement Live Coverage Ends
-
-  //kf->function->dump();
-  //llvm::errs() << "Abhi change start";
-  //dst->dump();
-
-  //llvm::errs() << "Abhi change end";
 }
 
 void Executor::printFileLine(ExecutionState &state, KInstruction *ki,
