@@ -97,6 +97,7 @@ public:
   std::set<llvm::BasicBlock*> visitedBlocks;
   std::set<llvm::BasicBlock*> visitedBlocks1;
   float blockCoverage = 0;
+  int countFreq = 0;
 
   class Timer {
   public:

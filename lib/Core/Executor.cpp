@@ -1490,14 +1490,18 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
 
  if((kf->function->getName() != "klee_div_zero_check") && (kf->function->getName()!= "klee_range") && (kf->function->getName() != "klee_int") && (kf->function->getName() != "klee_overshift_check") && (kf->function->getName() != "memcpy") && (kf->function->getName() != "memmove") && (kf->function->getName() != "mempcpy") && (kf->function->getName() != "memset"))
   {
-//	 if(visitedBlocks.find(src) == visitedBlocks.end() && visitedBlocks.find(dst) == visitedBlocks.end()) count = 0;
-//	 else count++;
-//	 if(count == 100) {print_visitedBlocks; exit(0);}
-
+  if(visitedBlocks.find(src) == visitedBlocks.end() && visitedBlocks.find(dst) == visitedBlocks.end())
+  	   countFreq = 0;
+     else
+  	   countFreq++;
   visitedBlocks.insert(src);
   visitedBlocks.insert(dst);
-  }
-    std::ofstream outfile1;
+
+     }
+
+  if(countFreq <= 100)
+  {
+ 	std::ofstream outfile1;
     outfile1.open ("LogBlockCoverage.txt", std::ofstream::app);
     std::ofstream outfile2;
     outfile2.open ("record.dat", std::ofstream::app);
@@ -1531,11 +1535,15 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
         outfile1 << "[" << buf << "," << "(" << visitedBlocks.size() << "," << allblockcount << "," << std::fixed << std::setprecision(2) << blockCoverage << "%)]" << "\n";
         outfile2 << diff << "     " << std::fixed << std::setprecision(2) << blockCoverage << "\n";
 
- }
- else
+    return;
+  }
+  }
+  else
  {
 	  return;
  }
+
+
 }
 
 void Executor::printFileLine(ExecutionState &state, KInstruction *ki,
