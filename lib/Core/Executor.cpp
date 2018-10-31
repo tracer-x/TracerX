@@ -1485,8 +1485,15 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   TxTree::blockCount++;
  }
 
-  if((kf->function->getName() != "klee_div_zero_check") && (kf->function->getName()!= "klee_range") && (kf->function->getName() != "klee_int") && (kf->function->getName() != "klee_overshift_check") && (kf->function->getName() != "memcpy") && (kf->function->getName() != "memmove") && (kf->function->getName() != "mempcpy") && (kf->function->getName() != "memset"))
+ if(blockCoverage < 100.00)
+ {
+
+ if((kf->function->getName() != "klee_div_zero_check") && (kf->function->getName()!= "klee_range") && (kf->function->getName() != "klee_int") && (kf->function->getName() != "klee_overshift_check") && (kf->function->getName() != "memcpy") && (kf->function->getName() != "memmove") && (kf->function->getName() != "mempcpy") && (kf->function->getName() != "memset"))
   {
+//	 if(visitedBlocks.find(src) == visitedBlocks.end() && visitedBlocks.find(dst) == visitedBlocks.end()) count = 0;
+//	 else count++;
+//	 if(count == 100) {print_visitedBlocks; exit(0);}
+
   visitedBlocks.insert(src);
   visitedBlocks.insert(dst);
   }
@@ -1506,7 +1513,6 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
 
         double diff;
         diff = now - startingTime;
-        float blockCoverage;
         strftime(buf, sizeof(buf), "%T", &tstruct);
 
         blockCoverage = ((float)visitedBlocks.size() / (float)allblockcount) * 100;
@@ -1524,6 +1530,12 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
         }
         outfile1 << "[" << buf << "," << "(" << visitedBlocks.size() << "," << allblockcount << "," << std::fixed << std::setprecision(2) << blockCoverage << "%)]" << "\n";
         outfile2 << diff << "     " << std::fixed << std::setprecision(2) << blockCoverage << "\n";
+
+ }
+ else
+ {
+	  return;
+ }
 }
 
 void Executor::printFileLine(ExecutionState &state, KInstruction *ki,
