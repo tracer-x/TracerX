@@ -1493,8 +1493,9 @@ ref<Expr> TxWeakestPreCondition::instantiateWPExpression(
 //    expression.
 
 TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
-    TxSubsumptionTableEntry *entry, ref<Expr> wp) {
+    TxSubsumptionTableEntry *entry) {
 
+  ref<Expr> wp = entry->getWPInterpolant();
   // extract Arrays read expressions from wp
   std::set<const Array *> readArrays;
   TxExprHelper::extractArrays(wp, readArrays);

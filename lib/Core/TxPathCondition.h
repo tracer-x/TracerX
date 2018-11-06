@@ -66,7 +66,8 @@ public:
 };
 
 class TxPathCondition {
-
+  /// \brief The path condition, with the levels each one is introduced
+  std::map<ref<Expr>, ref<TxPCConstraint> > pcDepth;
 
   /// \brief Store elements used by left path
   std::set<ref<TxPCConstraint> > usedByLeftPath;
@@ -84,9 +85,6 @@ class TxPathCondition {
   TxPathCondition() : depth(0), parent(0), left(0), right(0) {}
 
 public:
-  /// \brief The path condition, with the levels each one is introduced
-  std::map<ref<Expr>, ref<TxPCConstraint> > pcDepth;
-
   ~TxPathCondition() {}
 
   static TxPathCondition *create(TxPathCondition *src) {
