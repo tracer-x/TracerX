@@ -19,7 +19,6 @@
 #include "TxDependency.h"
 #include "TxExprHelper.h"
 #include "TxPartitionHelper.h"
-#include "TxPartitionHelper1.h"
 #include "TxTree.h"
 #include "TxWPHelper.h"
 #include "klee/ExecutionState.h"
@@ -183,7 +182,7 @@ public:
 
   // \brief Update subsumption table entry based on one Partition from WP Expr
   TxSubsumptionTableEntry *
-  updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry, ref<Expr> wp);
+  updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry);
 
   // \brief Update concretelyAddressedStore based on the WP Expr
   TxStore::TopInterpolantStore updateConcretelyAddressedStore(

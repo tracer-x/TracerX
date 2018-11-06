@@ -256,12 +256,13 @@ TxStore::getAddressofLatestCopyLLVMValue(llvm::Value *val) {
     return address;
 
   // Sanity Check
-  klee_message("LLVM Value:");
+  llvm::errs() << "LLVM Value:\n";
   val->dump();
-  klee_message("Store:");
+  llvm::errs() << "Store:\n";
   this->dump();
-  klee_error("TxStore::getAddressofLatestCopyLLVMValue LLVM::Value not found "
-             "in store!");
+  llvm::errs() << "TxStore::getAddressofLatestCopyLLVMValue LLVM::Value not "
+                  "found in store!";
+  exit(0);
 }
 
 inline void TxStore::concreteToInterpolant(

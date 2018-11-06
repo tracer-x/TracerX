@@ -19,7 +19,6 @@
 
 #include "klee/Internal/Module/TxValues.h"
 #include "klee/util/Ref.h"
-#include "TxPartitionHelper1.h"
 
 #include <map>
 
@@ -38,15 +37,13 @@ public:
 
   class MiddleStateStore {
   private:
-
+    LowerStateStore concretelyAddressedStore;
 
     LowerStateStore symbolicallyAddressedStore;
 
     ref<TxAllocationInfo> allocInfo;
 
   public:
-    LowerStateStore concretelyAddressedStore;
-
     MiddleStateStore() {}
 
     MiddleStateStore(ref<TxAllocationInfo> _allocInfo)

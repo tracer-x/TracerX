@@ -62,7 +62,7 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
       symbolicallyAddressedHistoricalStore);
 
   if (WPInterpolant) {
-    std::pair<ref<Expr>, TxWPArrayStore *> wpPair = node->getWPInterpolant(
+    std::pair<ref<Expr>, TxWPArrayStore *> wpPair = node->generateWPInterpolant(
         interpolant, existentials, concretelyAddressedStore,
         symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);
@@ -2176,40 +2176,14 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
                      node->getNodeSequenceNumber());
       }
 
-      //      llvm::outs() << "\n *** Start printing wpStore->arrayStore 11***\n
-      //      ";
-      //      for (std::map<ref<TxAllocationContext>,
-      //                    std::pair<const Array *, ref<Expr> > >::iterator
-      //               arrStoreIt = node->wp->wpStore->arrayStore.begin(),
-      //               arrStoreIe = node->wp->wpStore->arrayStore.end();
-      //           arrStoreIt != arrStoreIe; ++arrStoreIt) {
-      //        arrStoreIt->first->dump();
-      //        arrStoreIt->second.second->dump();
-      //      }
-      //      llvm::outs() << "*** End printing wpStore->arrayStore 11*** \n";
-
       // generate marking and wp interpolant
       TxSubsumptionTableEntry *entry =
           new TxSubsumptionTableEntry(node, node->entryCallHistory);
 
       if (WPInterpolant) {
-        ref<Expr> WPExpr = entry->getWPInterpolant();
-
-        //        llvm::outs() << "\n *** Start printing wpStore->arrayStore 22
-        //        *** \n";
-        //        for (std::map<ref<TxAllocationContext>,
-        //                      std::pair<const Array *, ref<Expr> > >::iterator
-        //                 arrStoreIt = node->wp->wpStore->arrayStore.begin(),
-        //                 arrStoreIe = node->wp->wpStore->arrayStore.end();
-        //             arrStoreIt != arrStoreIe; ++arrStoreIt) {
-        //          arrStoreIt->first->dump();
-        //          arrStoreIt->second.second->dump();
-        //        }
-        //        llvm::outs() << "*** End printing wpStore->arrayStore 22***
-        //        \n";
-
         Solver::Validity result;
         std::vector<ref<Expr> > unsatCore;
+        ref<Expr> WPExpr = entry->getWPInterpolant();
 
         bool success = solver->evaluate(*state, WPExpr, result, unsatCore);
         if (success != true)
@@ -2219,7 +2193,7 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
           WPExpr->dump();
           klee_error("TxTree::remove: WP Expr implication test is false");
         }
-        entry = node->wp->updateSubsumptionTableEntry(entry, WPExpr);
+        entry = node->wp->updateSubsumptionTableEntry(entry);
       }
 
       TxSubsumptionTable::insert(node->getProgramPoint(),
@@ -2460,7 +2434,7 @@ ref<Expr> TxTreeNode::getInterpolant(
   return expr;
 }
 
-std::pair<ref<Expr>, TxWPArrayStore *> TxTreeNode::getWPInterpolant(
+std::pair<ref<Expr>, TxWPArrayStore *> TxTreeNode::generateWPInterpolant(
     ref<Expr> interpolant, std::set<const Array *> existentials,
     TxStore::TopInterpolantStore concretelyAddressedStore,
     TxStore::TopInterpolantStore symbolicallyAddressedStore,

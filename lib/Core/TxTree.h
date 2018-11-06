@@ -533,7 +533,7 @@ public:
   /// where the WP expression is the conjunction of the expressions in
   /// the vector
   /// The input arguments are needed to do partitioning on WP Expression
-  std::pair<ref<Expr>, TxWPArrayStore *> getWPInterpolant(
+  std::pair<ref<Expr>, TxWPArrayStore *> generateWPInterpolant(
       ref<Expr> interpolant, std::set<const Array *> existentials,
       TxStore::TopInterpolantStore concretelyAddressedStore,
       TxStore::TopInterpolantStore symbolicallyAddressedStore,
