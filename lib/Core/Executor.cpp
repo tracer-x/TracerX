@@ -3408,11 +3408,6 @@ bool Executor::shouldExitOn(enum TerminateReason termReason) {
   return false;
 }
 
-void Executor::markAssertionFail(ExecutionState &state) {
-  if (INTERPOLATION_ENABLED && WPInterpolant)
-    state.txTreeNode->setAssertionFail();
-}
-
 void Executor::terminateStateOnError(ExecutionState &state,
                                      const llvm::Twine &messaget,
                                      enum TerminateReason termReason,
@@ -3433,6 +3428,8 @@ void Executor::terminateStateOnError(ExecutionState &state,
       state.txTreeNode->setGenericEarlyTermination();
       TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
     }
+    if (WPInterpolant)
+      state.txTreeNode->setAssertionFail();
   }
 
   std::string message = messaget.str();
