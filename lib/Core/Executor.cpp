@@ -1485,63 +1485,58 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   TxTree::blockCount++;
  }
 
- if(blockCoverage < 100.00)
- {
-
- if((kf->function->getName() != "klee_div_zero_check") && (kf->function->getName()!= "klee_range") && (kf->function->getName() != "klee_int") && (kf->function->getName() != "klee_overshift_check") && (kf->function->getName() != "memcpy") && (kf->function->getName() != "memmove") && (kf->function->getName() != "mempcpy") && (kf->function->getName() != "memset"))
+if(blockCoverage < 100.00)
   {
-  if(visitedBlocks.find(src) == visitedBlocks.end() && visitedBlocks.find(dst) == visitedBlocks.end())
-  	   countFreq = 0;
-     else
-  	   countFreq++;
-  visitedBlocks.insert(src);
-  visitedBlocks.insert(dst);
 
-     }
+  if((kf->function->getName() != "klee_div_zero_check") && (kf->function->getName()!= "klee_range") && (kf->function->getName() != "klee_int") && (kf->function->getName() != "klee_overshift_check") && (kf->function->getName() != "memcpy") && (kf->function->getName() != "memmove") && (kf->function->getName() != "mempcpy") && (kf->function->getName() != "memset"))
+   {
+   if(visitedBlocks.find(src) == visitedBlocks.end() || visitedBlocks.find(dst) == visitedBlocks.end())
+   {
+   visitedBlocks.insert(src);
+   visitedBlocks.insert(dst);
+   std::ofstream outfile1;
+   outfile1.open ("LogBlockCoverage.txt", std::ofstream::app);
+   std::ofstream outfile2;
+   outfile2.open ("record.dat", std::ofstream::app);
+   std::ofstream outfile3;
+   outfile3.open ("executedblocks.txt", std::ofstream::app);
 
-  if(countFreq <= 100)
-  {
- 	std::ofstream outfile1;
-    outfile1.open ("LogBlockCoverage.txt", std::ofstream::app);
-    std::ofstream outfile2;
-    outfile2.open ("record.dat", std::ofstream::app);
-    std::ofstream outfile3;
-    outfile3.open ("executedblocks.txt", std::ofstream::app);
+     	time_t now = time(0);
+     	//time_t now3 = startingTime;
+   		struct tm  tstruct;
+   		char       buf[80];
+   		char       buf1[80];
+   		tstruct = *localtime(&now);
 
-    	time_t now = time(0);
-    	//time_t now3 = startingTime;
-  		struct tm  tstruct;
-  		char       buf[80];
-  		char       buf1[80];
-  		tstruct = *localtime(&now);
+         double diff;
+         diff = now - startingTime;
+         strftime(buf, sizeof(buf), "%T", &tstruct);
 
-        double diff;
-        diff = now - startingTime;
-        strftime(buf, sizeof(buf), "%T", &tstruct);
+         blockCoverage = ((float)visitedBlocks.size() / (float)allblockcount) * 100;
 
-        blockCoverage = ((float)visitedBlocks.size() / (float)allblockcount) * 100;
-
-        for (std::set<llvm::BasicBlock*>::iterator it1 = visitedBlocks.begin(), ie1 =
-  			visitedBlocks.end(); it1 != ie1; ++it1) {
-  		outfile3 << "BlockScopeStarts: \n";
-  		std::string tmp = (*it1)->getParent()->getName();
-  		BasicBlock *b = (*it1);
-  		std::string Str;
-  		raw_string_ostream OS(Str);
-  		b->print(OS);
-  		outfile3 << "Function:" << tmp << Str <<"\n"; //This logic is to print function name and block name together
-  		outfile3 << "BlockScopeEnds: " << "\n";
-        }
+         for (std::set<llvm::BasicBlock*>::iterator it1 = visitedBlocks.begin(), ie1 =
+   			visitedBlocks.end(); it1 != ie1; ++it1) {
+   		outfile3 << "BlockScopeStarts: \n";
+   		std::string tmp = (*it1)->getParent()->getName();
+   		BasicBlock *b = (*it1);
+   		std::string Str;
+   		raw_string_ostream OS(Str);
+   		b->print(OS);
+   		outfile3 << "Function:" << tmp << Str <<"\n"; //This logic is to print function name and block name together
+   		outfile3 << "BlockScopeEnds: " << "\n";
+         }
         outfile1 << "[" << buf << "," << "(" << visitedBlocks.size() << "," << allblockcount << "," << std::fixed << std::setprecision(2) << blockCoverage << "%)]" << "\n";
         outfile2 << diff << "     " << std::fixed << std::setprecision(2) << blockCoverage << "\n";
+   	   }
+   }
+}
+   else
+   {
+	   haltExecution = true;
+   }
 
-    return;
-  }
-  }
-  else
- {
-	  return;
- }
+
+
 
 
 }
