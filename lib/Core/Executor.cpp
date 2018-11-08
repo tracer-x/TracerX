@@ -1485,7 +1485,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
     TxTree::blockCount++;
   }
 
-  if (blockCoverage < 100.00) {
+  if (blockCoverage < 100.00 && countFreq <= 200) {
 
     if ((kf->function->getName() != "klee_div_zero_check") &&
         (kf->function->getName() != "klee_range") &&
@@ -1497,6 +1497,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
         (kf->function->getName() != "memset")) {
       if (visitedBlocks.find(src) == visitedBlocks.end() ||
           visitedBlocks.find(dst) == visitedBlocks.end()) {
+        countFreq = 0;
         visitedBlocks.insert(src);
         visitedBlocks.insert(dst);
         std::ofstream outfile1;
@@ -1541,6 +1542,8 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
                  << "\n";
         outfile2 << diff << "     " << std::fixed << std::setprecision(2)
                  << blockCoverage << "\n";
+      } else {
+        countFreq++;
       }
     }
   } else {
