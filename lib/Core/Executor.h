@@ -95,7 +95,6 @@ public:
   time_t startingTime;
   int allblockcount;
   std::set<llvm::BasicBlock*> visitedBlocks;
-  std::set<llvm::BasicBlock*> visitedBlocks1;
   float blockCoverage = 0;
   int countFreq = 0;
 
