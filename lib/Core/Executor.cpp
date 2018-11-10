@@ -338,6 +338,12 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
                             : std::max(MaxCoreSolverTime, MaxInstructionTime)),
       debugInstFile(0), debugLogBuffer(debugBufferString) {
 
+  // Coverage Counters
+	allBlockCount = 0;
+	allBlockCollected = false;
+	blockCoverage = 0;
+	countFreq = 0;
+
   if (coreSolverTimeout) UseForkedCoreSolver = true;
   Solver *coreSolver = klee::createCoreSolver(CoreSolverToUse);
   if (!coreSolver) {
@@ -1485,16 +1491,74 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
     TxTree::blockCount++;
   }
 
-  if (blockCoverage < 100.00 && countFreq <= 200) {
+  //llvm::errs() << "InputFile" << InputFile;
 
-    if ((kf->function->getName() != "klee_div_zero_check") &&
+  size_t lastindex = InputFile.find_last_of(".");
+  std::string InputFile1 = InputFile.substr(0, lastindex);
+  std::string InputFile2 = InputFile1 + ".c";
+	if (!allBlockCollected) {
+		allBlockCollected = true;
+		llvm::errs() << "************All Blocks Start****************" << "\n";
+
+		for (std::map<llvm::Function*, KFunction*>::iterator it =
+				kmodule->functionMap.begin(), ie = kmodule->functionMap.end();
+				it != ie; ++it) {
+			Function *tmpF = it->first;
+			KFunction *tmpKF = it->second;
+			KInstruction *tmpIns = tmpKF->instructions[0];
+		   const std::string path = tmpIns->info->file;
+		   std::size_t botDirPos = path.find_last_of("/");
+		   std::string file = path.substr(botDirPos+1, path.length());
+		   //llvm::errs() << "Filename ===>" <<  file << "\n";
+
+		   if (file == InputFile2) {
+		//This logic is to eliminates klee's extra checks to dump in files
+//		if ((tmpF->getName() != "klee_div_zero_check")
+//				&& (tmpF->getName() != "klee_range")
+//				&& (tmpF->getName() != "klee_int")
+//				&& (tmpF->getName() != "klee_overshift_check")
+//				&& (tmpF->getName() != "memcpy")
+//				&& (tmpF->getName() != "memmove")
+//				&& (tmpF->getName() != "mempcpy")
+//				&& (tmpF->getName() != "memset"))
+
+				for (llvm::Function::iterator b = tmpF->begin();
+						b != tmpF->end(); ++b) { //Uncomment later for rem. lib BB
+
+					llvm::errs() << "BlockScopeStarts: " << "\n";
+					allBlockCount++;
+					llvm::errs() << "Block Number: " << allBlockCount << "\n";
+					llvm::errs() << "Function:" << (*b->getParent()).getName(); //This logic is to print function name and block name together
+					(*b).dump();
+					llvm::errs() << "BlockScopeEnds: " << "\n";
+				}
+			}
+			startingTime = time(0);
+		}
+
+		llvm::errs() << "************All Blocks End****************" << "\n";
+	}
+
+	   Instruction * lastInst;
+	   const InstructionInfo &ii = getLastNonKleeInternalInstruction(state, &lastInst);
+	   const std::string path = ii.file;
+	   std::size_t botDirPos = path.find_last_of("/");
+	   std::string file = path.substr(botDirPos+1, path.length());
+	   //llvm::errs() << "Filename ===>" <<  file << "\n";
+
+
+  if (blockCoverage < 100.00) { //  && countFreq <= 200
+
+    /*if ((kf->function->getName() != "klee_div_zero_check") &&
         (kf->function->getName() != "klee_range") &&
         (kf->function->getName() != "klee_int") &&
         (kf->function->getName() != "klee_overshift_check") &&
         (kf->function->getName() != "memcpy") &&
         (kf->function->getName() != "memmove") &&
         (kf->function->getName() != "mempcpy") &&
-        (kf->function->getName() != "memset")) {
+        (kf->function->getName() != "memset"))*/
+	if(file == InputFile2)
+    {
       if (visitedBlocks.find(src) == visitedBlocks.end() ||
           visitedBlocks.find(dst) == visitedBlocks.end()) {
         countFreq = 0;
@@ -1506,6 +1570,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
         outfile2.open("record.dat", std::ofstream::app);
         std::ofstream outfile3;
         outfile3.open("executedblocks.txt", std::ofstream::app);
+
 
         time_t now = time(0);
         // time_t now3 = startingTime;
@@ -1519,7 +1584,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
         strftime(buf, sizeof(buf), "%T", &tstruct);
 
         blockCoverage =
-            ((float)visitedBlocks.size() / (float)allblockcount) * 100;
+            ((float)visitedBlocks.size() / (float)allBlockCount) * 100;
 
         for (std::set<llvm::BasicBlock *>::iterator it1 = visitedBlocks.begin(),
                                                     ie1 = visitedBlocks.end();
@@ -1537,7 +1602,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
                    << "\n";
         }
         outfile1 << "[" << buf << ","
-                 << "(" << visitedBlocks.size() << "," << allblockcount << ","
+                 << "(" << visitedBlocks.size() << "," << allBlockCount << ","
                  << std::fixed << std::setprecision(2) << blockCoverage << "%)]"
                  << "\n";
         outfile2 << diff << "     " << std::fixed << std::setprecision(2)
@@ -3150,9 +3215,43 @@ void Executor::run(ExecutionState &initialState) {
     }
 #endif
 
+
     if (INTERPOLATION_ENABLED &&
         txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
-      terminateStateOnSubsumption(state);
+       //print basic blocks
+
+//          llvm::errs() << "**********Intermeditate Check Visited Blocks starts********* " << "\n";
+//    	  //KFunction *kf = state.stack.back().kf;
+//
+//          for (std::map<llvm::Function*, KFunction*>::iterator it =
+//          				kmodule->functionMap.begin(), ie = kmodule->functionMap.end();
+//          				it != ie; ++it) {
+//    	  			Function *tmpF = it->first;
+//    	  			for (llvm::Function::iterator b = tmpF->begin();
+//					b != tmpF->end(); ++b) { //Uncomment later for rem. lib BB
+//    	  			llvm::errs() << "BlockScopeStarts: " << "\n";
+//    	  			llvm::errs() << "Function:" << (*b->getParent()).getName(); //This logic is to print function name and block name together
+//    	  			(*b).dump();
+//    	  			llvm::errs() << "BlockScopeEnds: " << "\n";
+//    	  			}
+//      	  }
+//    	  llvm::errs() << "**********Intermeditate Check Visited Blocks ends********* " << "\n";
+
+		/*llvm::errs() << "**********Intermeditate Check Visited Blocks starts********* " << "\n";
+		KFunction *kf = state.stack.back().kf;
+
+		for (llvm::Function::iterator b = kf->function->begin();
+					b != kf->function->end(); ++b) { //Uncomment later for rem. lib BB
+			llvm::errs() << "BlockScopeStarts: " << "\n";
+			llvm::errs() << "Function:" << (*b->getParent()).getName(); //This logic is to print function name and block name together
+			(*b).dump();
+			llvm::errs() << "BlockScopeEnds: " << "\n";
+      	}
+	    llvm::errs() << "**********Intermeditate Check Visited Blocks ends********* " << "\n";*/
+    	terminateStateOnSubsumption(state);
+
+
+
     } else
       {
 	KInstruction *ki = state.pc;
@@ -4037,54 +4136,7 @@ void Executor::runFunctionAsMain(Function *f,
   assert(kf);
   //Logic to dump all Branch and ret instructions
   //int allblockcount = 0;
-  allblockcount = 0;
-  llvm::errs() << "************All Blocks Start****************" << "\n";
 
-  //  llvm::errs() << kf << "\n";
-    //kf->dump();
-
-    for (std::map<llvm::Function*, KFunction*>::iterator it= kmodule->functionMap.begin(),ie=kmodule->functionMap.end();
-  		  it!=ie;++it) {
-
-
-  	  Function *tmpF = it->first;
-      //This logic is to eliminates klee's extra checks to dump in files
-      if((tmpF->getName() != "klee_div_zero_check") && (tmpF->getName() != "klee_range") && (tmpF->getName() != "klee_int") && (tmpF->getName() != "klee_overshift_check") && (tmpF->getName() != "memcpy") && (tmpF->getName() != "memmove") && (tmpF->getName() != "mempcpy") && (tmpF->getName() != "memset"))
-      {
-
-  	  for (llvm::Function::iterator b = tmpF->begin(); b != tmpF->end(); ++b) {
-
-          /*for (llvm::BasicBlock::iterator ins = b->begin(); ins != b->end();
-               ++ins) {
-    		  if (llvm::isa<llvm::BranchInst>(ins) || llvm::isa<llvm::ReturnInst>(ins)) {
-    		  allblockcount++;
-    		  llvm::errs() << "All Block count: " << allblockcount << "\n";
-    		  llvm::errs() << *ins << "\n";
-    		  }
-          }*/
-  		  //tmpF->dump();
-
-
-  		llvm::errs() << "BlockScopeStarts: " << "\n";
-  		allblockcount++;
-    	llvm::errs() << "Block Number: " << allblockcount << "\n";
-  		llvm::errs() <<"Function:"<< (*b->getParent()).getName(); //This logic is to print function name and block name together
-        (*b).dump();
-        llvm::errs() << "BlockScopeEnds: " << "\n";
-  	   }
-
-  	//it->first->dump(); //Uncomment it to dump all blocks
-
-    }
-
-      startingTime = time(0);
-
-
-     }
-
-
-
-    llvm::errs() << "************All Blocks End****************" << "\n";
 
   Function::arg_iterator ai = f->arg_begin(), ae = f->arg_end();
   if (ai!=ae) {
@@ -4176,6 +4228,7 @@ void Executor::runFunctionAsMain(Function *f,
 
 #endif
   }
+
   llvm::outs() << "Total number executed Basic Blocks at least once: " << visitedBlocks.size() << "\n";
   llvm::outs() << "**************\n";
     //dst->back().dump();
@@ -4184,8 +4237,8 @@ void Executor::runFunctionAsMain(Function *f,
 
   for (std::set<llvm::BasicBlock*>::iterator it = visitedBlocks.begin(), ie=visitedBlocks.end(); it!=ie;++it
               ) {
-	  if(( ((*it)->getParent())->getName()!= "klee_div_zero_check") && (((*it)->getParent())->getName() != "klee_range") && (((*it)->getParent())->getName() != "klee_int") && (((*it)->getParent())->getName() != "klee_overshift_check") && (((*it)->getParent())->getName() != "memcpy") && (((*it)->getParent())->getName() != "memmove") && (((*it)->getParent())->getName() != "mempcpy") && (((*it)->getParent())->getName() != "memset"))
-	        {
+	  //if(( ((*it)->getParent())->getName()!= "klee_div_zero_check") && (((*it)->getParent())->getName() != "klee_range") && (((*it)->getParent())->getName() != "klee_int") && (((*it)->getParent())->getName() != "klee_overshift_check") && (((*it)->getParent())->getName() != "memcpy") && (((*it)->getParent())->getName() != "memmove") && (((*it)->getParent())->getName() != "mempcpy") && (((*it)->getParent())->getName() != "memset"))
+	     {
     	llvm::errs() << "BlockScopeStarts: " << "\n";
     	(*it)->getParent()->getName();
     	//llvm::errs() <<";"<< (*BB.getParent()).getName();
@@ -4195,9 +4248,10 @@ void Executor::runFunctionAsMain(Function *f,
 
         //kf->function->dump();
   	  //(*it)->back().dump(); //print only branch instructions
-	       }
+	     }
      }
-	  llvm::errs() << "************Visited Blocks Ends****************" << "\n";
+	llvm::errs() << "************Visited Basic Blocks Count:" << visitedBlocks.size() << "\n";
+	llvm::errs() << "************Visited Blocks Ends****************" << "\n";
 
 
 //    std::ofstream outfile;
