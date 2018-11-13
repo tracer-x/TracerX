@@ -107,6 +107,10 @@ public:
 
   void unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore);
 
+  void getExprVars(ref<Expr> e, std::set<ref<Expr> > &vars);
+
+  bool containsVar(ref<Expr> e, ref<Expr> var);
+
   ref<Expr>
   packInterpolant(std::set<const Array *> &replacements,
                   std::map<ref<Expr>, ref<Expr> > &substitution) const;

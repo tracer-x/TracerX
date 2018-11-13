@@ -15,10 +15,11 @@
 
 #include "TxPathCondition.h"
 
+#include "TxShadowArray.h"
 #include "klee/CommandLine.h"
 #include "klee/util/TxExprUtil.h"
 #include "klee/util/TxTreeGraph.h"
-#include "TxShadowArray.h"
+#include <klee/Internal/Support/ErrorHandling.h>
 
 using namespace klee;
 
@@ -94,20 +95,68 @@ void TxPathCondition::unsatCoreInterpolation(
   std::map<uint64_t, std::set<ref<TxPCConstraint> > > depthToConstraintSet;
   std::set<uint64_t> keySet;
   std::vector<uint64_t> sortedKeys;
+  //  if(unsatCore.size()>0){
+  //	  std::vector<ref<Expr> > unsatCore2 = unsatCore;
+  //	  llvm::errs() << "=======================================>sajjad1\n";
+  //	  for (std::vector<ref<Expr> >::iterator
+  //	           it = unsatCore2.begin(),
+  //	           ie = unsatCore2.end();
+  //	       it != ie; ++it) {
+  //		  (*it)->dump();
+  //		  llvm::errs() <<
+  //"=======================================>sajjad1.5\n";
+  //
+  //	  }
+  //	  llvm::errs() << "=======================================>sajjad2\n";
+  //  }
+  //
+  //
+  //  for (std::map<ref<Expr>, ref<TxPCConstraint> >::iterator it =
+  //  pcDepth.begin(),
+  //                                               ie = pcDepth.end();
+  //       it != ie; ++it) {
+  //	  llvm::errs() << "=======================================>sajjad3\n";
+  //	  (*it).first->dump();
+  //	  llvm::errs() << "=======================================>sajjad4\n";
+  //	  (*it).second->dump();
+  //	  llvm::errs() << "=======================================>sajjad5\n";
+  //  }
 
   for (std::vector<ref<Expr> >::const_iterator it = unsatCore.begin(),
                                                ie = unsatCore.end();
        it != ie; ++it) {
     std::map<ref<Expr>, ref<TxPCConstraint> >::iterator pcDepthIter =
         pcDepth.find(*it);
-    // FIXME: Sometimes some constraints are not in the PC. This is
-    // because constraints are not properly added at state merge.
     if (pcDepthIter != pcDepth.end()) {
       ref<TxPCConstraint> &pcConstraint = pcDepthIter->second;
       depthToConstraintSet[pcConstraint->getDepth()].insert(pcConstraint);
       keySet.insert(pcConstraint->getDepth());
 
       TxTreeGraph::setAsCore(pcConstraint.get());
+    } else {
+      klee_error("Not handled yet!");
+      //    	std::set<ref<Expr> > vars;
+      //    	this->getExprVars((*it),vars);
+      //    	for (std::set<ref<Expr> >::iterator it2 = vars.begin(),
+      //    										ie2
+      //    =
+      //    vars.end();
+      //    	    	       it2 != ie2; ++it2) {
+      //        	for (std::map<ref<Expr>, ref<TxPCConstraint> >::iterator
+      //        it3 = pcDepth.begin(),
+      //        	                                               	   	   	 ie3
+      //        = pcDepth.end();
+      //        	       it3 != ie3; ++it3) {
+      //        		if(this->containsVar((*it3).first,(*it2))){
+      //				  ref<TxPCConstraint> &pcConstraint =
+      //(*it3).second;
+      //				  depthToConstraintSet[pcConstraint->getDepth()].insert(pcConstraint);
+      //				  keySet.insert(pcConstraint->getDepth());
+      //
+      //				  TxTreeGraph::setAsCore(pcConstraint.get());
+      //        		}
+      //        	}
+      //    	}
     }
   }
 
@@ -147,6 +196,161 @@ void TxPathCondition::unsatCoreInterpolation(
       }
     }
   }
+}
+
+void TxPathCondition::getExprVars(ref<Expr> e, std::set<ref<Expr> > &vars) {
+  switch (e->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    break;
+  }
+  case Expr::Read: {
+    vars.insert(e);
+    break;
+  }
+  case Expr::Concat: {
+    vars.insert(e);
+    break;
+  }
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    // Extract the one kid and extract variable from that
+    ref<Expr> kids[1];
+    kids[0] = e->getKid(0);
+    getExprVars(kids[0], vars);
+    break;
+  }
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    // Extract the two kids and extract variable from that
+    ref<Expr> kids[2];
+    kids[0] = e->getKid(0);
+    kids[1] = e->getKid(1);
+    getExprVars(kids[0], vars);
+    getExprVars(kids[1], vars);
+    break;
+  }
+  case Expr::Select: {
+    // Extract the three kids and extract variable from that
+    ref<Expr> kids[3];
+    kids[0] = e->getKid(0);
+    kids[1] = e->getKid(1);
+    kids[2] = e->getKid(2);
+    getExprVars(kids[0], vars);
+    getExprVars(kids[1], vars);
+    getExprVars(kids[2], vars);
+    break;
+  }
+  default:
+    break;
+  }
+}
+
+bool TxPathCondition::containsVar(ref<Expr> e, ref<Expr> var) {
+  switch (e->getKind()) {
+  case Expr::InvalidKind:
+  case Expr::Constant: {
+    return false;
+  }
+  case Expr::Read: {
+    if (e == var)
+      return true;
+    else
+      return false;
+    break;
+  }
+  case Expr::Concat: {
+    if (e == var)
+      return true;
+    else
+      return false;
+    break;
+  }
+  case Expr::NotOptimized:
+  case Expr::Not:
+  case Expr::Extract:
+  case Expr::ZExt:
+  case Expr::SExt: {
+    // Extract the one kid and extract variable from that
+    ref<Expr> kids[1];
+    kids[0] = e->getKid(0);
+    return containsVar(kids[0], var);
+    break;
+  }
+  case Expr::Eq:
+  case Expr::Ne:
+  case Expr::Ult:
+  case Expr::Ule:
+  case Expr::Ugt:
+  case Expr::Uge:
+  case Expr::Slt:
+  case Expr::Sle:
+  case Expr::Sgt:
+  case Expr::Sge:
+  case Expr::Add:
+  case Expr::Sub:
+  case Expr::Mul:
+  case Expr::UDiv:
+  case Expr::SDiv:
+  case Expr::URem:
+  case Expr::SRem:
+  case Expr::And:
+  case Expr::Or:
+  case Expr::Xor:
+  case Expr::Shl:
+  case Expr::LShr:
+  case Expr::AShr: {
+    // Extract the two kids and extract variable from that
+    ref<Expr> kids[2];
+    kids[0] = e->getKid(0);
+    kids[1] = e->getKid(1);
+    if (containsVar(kids[0], var) || containsVar(kids[1], var))
+      return true;
+    else
+      return false;
+    break;
+  }
+  case Expr::Select: {
+    // Extract the three kids and extract variable from that
+    ref<Expr> kids[3];
+    kids[0] = e->getKid(0);
+    kids[1] = e->getKid(1);
+    kids[2] = e->getKid(2);
+    if (containsVar(kids[0], var) || containsVar(kids[1], var) ||
+        containsVar(kids[2], var))
+      return true;
+    else
+      return false;
+    break;
+  }
+  default:
+    break;
+  }
+  return false;
 }
 
 ref<Expr> TxPathCondition::packInterpolant(

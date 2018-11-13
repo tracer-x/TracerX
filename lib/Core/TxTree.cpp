@@ -2236,6 +2236,17 @@ ref<Expr> TxTreeNode::getInterpolant(
     std::set<const Array *> &replacements,
     std::map<ref<Expr>, ref<Expr> > &substitution) const {
   TimerStatIncrementer t(getInterpolantTime);
+  if (substitution.size() > 0) {
+    klee_warning("sajjad1");
+    for (std::map<ref<Expr>, ref<Expr> >::iterator it = substitution.begin(),
+                                                   ie = substitution.end();
+         it != ie; ++it) {
+      (*it).first->dump();
+      klee_warning("sajjad2");
+      (*it).second->dump();
+    }
+    klee_warning("sajjad3");
+  }
   ref<Expr> expr = dependency->packInterpolant(replacements, substitution);
   return expr;
 }

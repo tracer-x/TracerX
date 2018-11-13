@@ -572,7 +572,6 @@ void TxDependency::execute(llvm::Instruction *instr,
       // This handles only the case when the switch argument can be reduced to a
       // constant. Here we interpolate since a constant switch argument means
       // that there are infeasible branches.
-
       std::string reason = "";
       if (debugSubsumptionLevel > 1) {
         llvm::raw_string_ostream stream(reason);
@@ -586,6 +585,8 @@ void TxDependency::execute(llvm::Instruction *instr,
         stream.flush();
       }
       markAllValues(instr->getOperand(0), argExpr, reason);
+      //      this->dump();
+      //      klee_error("sajjad:%d",debugSubsumptionLevel);
       break;
     }
     default: { assert(!"unhandled unary instruction"); }

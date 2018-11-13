@@ -36,11 +36,32 @@ bool TimingSolver::evaluate(const ExecutionState &state, ref<Expr> expr,
 
   sys::TimeValue now = util::getWallTimeVal();
 
+  //  llvm::errs() << "sajjad1: Expr before simplify\n";
+  //  expr->dump();
+
   std::vector<ref<Expr> > simplificationCore;
   if (simplifyExprs)
     expr = state.constraints.simplifyExpr(expr, simplificationCore);
 
   unsatCore.clear();
+
+  //  llvm::errs() << "sajjad2: Expr After simplify\n";
+  //  expr->dump();
+  //  llvm::errs() << "sajjad3: Simplifications collected\n";
+  //  for (std::vector<ref<Expr> >::iterator
+  //             it = simplificationCore.begin(),
+  //             ie = simplificationCore.end();
+  //         it != ie; ++it) {
+  //  	  (*it)->dump();
+  //  }
+  //  llvm::errs() << "sajjad4: state.constraints\n";
+  //    for (ConstraintManager::const_iterator
+  //             it = state.constraints.begin(),
+  //             ie = state.constraints.end();
+  //         it != ie; ++it) {
+  //  	  (*it)->dump();
+  //    }
+  //  llvm::errs() << "sajjad5\n";
 
   bool success =
       solver->evaluate(Query(state.constraints, expr), result, unsatCore);
