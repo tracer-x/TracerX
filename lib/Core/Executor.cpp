@@ -1497,7 +1497,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   std::string InputFile1 = InputFile.substr(0, lastindex);
   std::string InputFile2 = InputFile1 + ".c";
 	if (!allBlockCollected) {
-		allBlockCollected = true;
+		allBlockCollected = true; 
 		llvm::errs() << "************All Blocks Start****************" << "\n";
 
 		for (std::map<llvm::Function*, KFunction*>::iterator it =
@@ -1521,10 +1521,11 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
 //				&& (tmpF->getName() != "memmove")
 //				&& (tmpF->getName() != "mempcpy")
 //				&& (tmpF->getName() != "memset"))
-
+                //if(tmpF->getName() != "usage") //added to block usage function
+				{					
 				for (llvm::Function::iterator b = tmpF->begin();
 						b != tmpF->end(); ++b) { //Uncomment later for rem. lib BB
-
+                  
 					llvm::errs() << "BlockScopeStarts: " << "\n";
 					allBlockCount++;
 					llvm::errs() << "Block Number: " << allBlockCount << "\n";
@@ -1532,6 +1533,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
 					(*b).dump();
 					llvm::errs() << "BlockScopeEnds: " << "\n";
 				}
+			   }
 			}
 			startingTime = time(0);
 		}
@@ -1547,7 +1549,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
 	   //llvm::errs() << "Filename ===>" <<  file << "\n";
 
 
-  if (blockCoverage < 100.00) { //  && countFreq <= 200
+  //if (blockCoverage < 100.00) { //  && countFreq <= 200
 
     /*if ((kf->function->getName() != "klee_div_zero_check") &&
         (kf->function->getName() != "klee_range") &&
@@ -1557,8 +1559,11 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
         (kf->function->getName() != "memmove") &&
         (kf->function->getName() != "mempcpy") &&
         (kf->function->getName() != "memset"))*/
+		
 	if(file == InputFile2)
     {
+		//if(kf->function->getName() != "usage") //added to block usage function
+		{
       if (visitedBlocks.find(src) == visitedBlocks.end() ||
           visitedBlocks.find(dst) == visitedBlocks.end()) {
         countFreq = 0;
@@ -1601,6 +1606,8 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
           outfile3 << "BlockScopeEnds: "
                    << "\n";
         }
+
+        klee_warning("Visited Blocks Up to now=========================:%d\n",visitedBlocks.size());
         outfile1 << "[" << buf << ","
                  << "(" << visitedBlocks.size() << "," << allBlockCount << ","
                  << std::fixed << std::setprecision(2) << blockCoverage << "%)]"
@@ -1611,8 +1618,9 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
         countFreq++;
       }
     }
-  } else {
+ /* } else {
     haltExecution = true;
+  }*/
   }
 }
 
@@ -4238,7 +4246,8 @@ void Executor::runFunctionAsMain(Function *f,
   for (std::set<llvm::BasicBlock*>::iterator it = visitedBlocks.begin(), ie=visitedBlocks.end(); it!=ie;++it
               ) {
 	  //if(( ((*it)->getParent())->getName()!= "klee_div_zero_check") && (((*it)->getParent())->getName() != "klee_range") && (((*it)->getParent())->getName() != "klee_int") && (((*it)->getParent())->getName() != "klee_overshift_check") && (((*it)->getParent())->getName() != "memcpy") && (((*it)->getParent())->getName() != "memmove") && (((*it)->getParent())->getName() != "mempcpy") && (((*it)->getParent())->getName() != "memset"))
-	     {
+	     //if(((*it)->getParent())->getName()!= "usage") //added to block usage function
+		 {
     	llvm::errs() << "BlockScopeStarts: " << "\n";
     	(*it)->getParent()->getName();
     	//llvm::errs() <<";"<< (*BB.getParent()).getName();
