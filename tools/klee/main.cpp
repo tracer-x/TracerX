@@ -486,6 +486,8 @@ KleeHandler::KleeHandler(int argc, char **argv)
 
   // open info
   m_infoFile = openOutputFile("info");
+
+
 }
 
 KleeHandler::~KleeHandler() {
