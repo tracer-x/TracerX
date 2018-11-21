@@ -1638,6 +1638,8 @@ int main(int argc, char **argv, char **envp) {
                    sys::StrError(errno).c_str());
       }
     }
+    if (BBCoverage > 0)
+      interpreter->InputFile = InputFile;
     interpreter->runFunctionAsMain(mainFn, pArgc, pArgv, pEnvp);
 
     while (!seeds.empty()) {

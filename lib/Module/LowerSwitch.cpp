@@ -89,9 +89,6 @@ void LowerSwitchPass::switchConvert(CaseItr begin, CaseItr end,
 
   // Branch to our shiny new if-then stuff...
   BranchInst::Create(curHead, origBlock);
-
-
-
 }
 
 // processSwitchInst - Replace the specified switch instruction with a sequence

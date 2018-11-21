@@ -85,6 +85,8 @@ extern llvm::cl::opt<int> DebugState;
 
 extern llvm::cl::opt<int> DebugSubsumption;
 
+extern llvm::cl::opt<int> BBCoverage;
+
 extern llvm::cl::opt<bool> ExactAddressInterpolant;
 
 extern llvm::cl::opt<bool> SpecialFunctionBoundInterpolation;

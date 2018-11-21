@@ -466,8 +466,7 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
     llvm::errs() << "KLEE: escaping functions: [";
     for (std::set<Function*>::iterator it = escapingFunctions.begin(), 
          ie = escapingFunctions.end(); it != ie; ++it) {
-    	std::string tmp2 = (*it)->getName();
-    	llvm::errs() << tmp2 << ", ";
+      llvm::errs() << (*it)->getName() << ", ";
     }
     llvm::errs() << "]\n";
   }
