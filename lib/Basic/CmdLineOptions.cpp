@@ -142,6 +142,17 @@ llvm::cl::opt<int> DebugSubsumption(
                    "higher the more (default=0 (off))."),
     llvm::cl::init(0));
 
+llvm::cl::opt<int>
+    BBCoverage("write-BB-cov",
+               llvm::cl::desc("Set level of distinct basic block coverage: the "
+                              "higher the more (default=0 (off))\n"
+                              "= 1 Only report Basic Block Coverage\n"
+                              "= 2 Also Report Covered Basic Blocks\n"
+                              "= 3 Report Live Coverage\n"
+                              "= 4 Generate Coverage by Time Plot\n"),
+
+               llvm::cl::init(0));
+
 llvm::cl::opt<bool> ExactAddressInterpolant(
     "exact-address-interpolant",
     llvm::cl::desc("This option uses exact address for interpolating "
