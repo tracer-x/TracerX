@@ -1565,6 +1565,14 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
           (kf->function->getName() != "memset")) {
         if (visitedBlocks.find(src) == visitedBlocks.end() ||
             visitedBlocks.find(dst) == visitedBlocks.end()) {
+
+          bool newSrcFlag = false;
+          bool newDstFlag = false;
+          if (visitedBlocks.find(src) == visitedBlocks.end())
+            newSrcFlag = true;
+          if (visitedBlocks.find(dst) == visitedBlocks.end())
+            newDstFlag = true;
+
           visitedBlocks.insert(src);
           visitedBlocks.insert(dst);
           time_t now = time(0);
@@ -1574,31 +1582,41 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
               ((float)visitedBlocks.size() / (float)allBlockCount) * 100;
           //************Live Coverage Start****************"
           if (BBCoverage >= 3) {
-            for (std::set<llvm::BasicBlock *>::iterator
-                     it1 = visitedBlocks.begin(),
-                     ie1 = visitedBlocks.end();
-                 it1 != ie1; ++it1) {
-
-              std::string tmp = (*it1)->getParent()->getName();
-              BasicBlock *b = (*it1);
+            std::string outfile3 =
+                interpreterHandler->getOutputFilename("LiveBB.txt");
+            if ((klee_message_file = fopen(outfile3.c_str(), "a+")) == NULL)
+              klee_error("cannot open file \"%s\": %s", outfile3.c_str(),
+                         strerror(errno));
+            std::string g3(outfile3.c_str());
+            std::ofstream out3(outfile3.c_str(), std::ofstream::app);
+            if (newSrcFlag == true) {
+              std::string tmp = src->getParent()->getName();
               std::string Str;
               raw_string_ostream OS(Str);
-              b->print(OS);
-              std::string outfile3 =
-                  interpreterHandler->getOutputFilename("LiveBB.txt");
-              if ((klee_message_file = fopen(outfile3.c_str(), "a+")) == NULL)
-                klee_error("cannot open file \"%s\": %s", outfile3.c_str(),
-                           strerror(errno));
-              std::string g3(outfile3.c_str());
-              std::ofstream out3(outfile3.c_str(), std::ofstream::app);
+              src->print(OS);
               if (!out3.fail()) {
                 out3 << "BlockScopeStarts: \n";
                 out3 << "Function:" << tmp << Str << "\n";
                 out3 << "BlockScopeEnds: "
                      << "\n";
-                out3.close();
               }
             }
+            if (newDstFlag == true) {
+              std::string tmp = dst->getParent()->getName();
+              std::string Str;
+              raw_string_ostream OS(Str);
+              dst->print(OS);
+              if (!out3.fail()) {
+                out3 << "BlockScopeStarts: \n";
+                out3 << "Function:" << tmp << Str << "\n";
+                out3 << "BlockScopeEnds: "
+                     << "\n";
+              }
+            }
+            out3.close();
+
+            // --------------------------------------------------------------------------
+
             struct tm tstruct;
             tstruct = *localtime(&now);
             strftime(buf, sizeof(buf), "%T", &tstruct);
