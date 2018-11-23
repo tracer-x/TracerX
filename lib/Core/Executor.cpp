@@ -1494,7 +1494,9 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
     char buf[80];
     size_t lastindex = InputFile.find_last_of(".");
     std::string InputFile1 = InputFile.substr(0, lastindex);
-    std::string InputFile2 = InputFile1 + ".c";
+    lastindex = InputFile1.find_last_of("/");
+    std::string InputFile2 = InputFile1.substr(lastindex + 1);
+    InputFile2 = InputFile2 + ".c";
     if (!allBlockCollected) {
       allBlockCollected = true;
       //************All Blocks Start****************
@@ -1537,8 +1539,8 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
                   out4 << "Function:" << tmp1 << Str1 << "\n";
                   out4 << "BlockScopeEnds: "
                        << "\n";
-                  out4.close();
                 }
+                out4.close();
               }
             }
           }
@@ -1636,8 +1638,8 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
                    << std::fixed << std::setprecision(2) << blockCoverage
                    << "%)]"
                    << "\n";
-              out1.close();
             }
+            out1.close();
           }
           //************Live Coverage Finish****************"
           //************Coverage Plot Start****************"
@@ -1652,8 +1654,8 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
             if (!out2.fail()) {
               out2 << diff << "     " << std::fixed << std::setprecision(2)
                    << blockCoverage << "\n";
-              out2.close();
             }
+            out2.close();
           }
           //************Coverage Plot Finish****************"
         }
@@ -4272,8 +4274,8 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
         out5 << "Function:" << tmp2 << Str2 << "\n";
         out5 << "BlockScopeEnds: "
              << "\n";
-        out5.close();
       }
+      out5.close();
     }
   }
 
