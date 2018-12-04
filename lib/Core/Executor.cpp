@@ -3537,8 +3537,8 @@ void Executor::terminateStateOnError(ExecutionState &state,
     interpreterHandler->incErrorTerminationTest();
     interpreterHandler->processTestCase(state, msg.str().c_str(), suffix);
   }
-    
-  terminateState(state);
+    //Sanghu commented this
+  //terminateState(state);
 
   if (shouldExitOn(termReason))
     haltExecution = true;
