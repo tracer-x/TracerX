@@ -153,6 +153,14 @@ llvm::cl::opt<int>
 
                llvm::cl::init(0));
 
+llvm::cl::opt<bool> EmitAllErrorsInSamePath(
+    "emit-all-errors-in-same-path",
+    llvm::cl::desc("Enables detection of multiple errors "
+                   "in same paths (default=false (off)). Note: Specially used for achieving MC/DC."),
+    llvm::cl::init(false));
+
+
+
 llvm::cl::opt<bool> ExactAddressInterpolant(
     "exact-address-interpolant",
     llvm::cl::desc("This option uses exact address for interpolating "
