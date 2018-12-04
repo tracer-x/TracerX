@@ -16,48 +16,43 @@
 
 namespace klee {
 
-llvm::cl::opt<bool>
-UseFastCexSolver("use-fast-cex-solver",
-		 llvm::cl::init(false),
-		 llvm::cl::desc("(default=off)"));
+llvm::cl::opt<bool> UseFastCexSolver("use-fast-cex-solver",
+                                     llvm::cl::init(false),
+                                     llvm::cl::desc("(default=off)"));
 
 llvm::cl::opt<bool>
-UseCexCache("use-cex-cache",
-            llvm::cl::init(true),
+UseCexCache("use-cex-cache", llvm::cl::init(true),
             llvm::cl::desc("Use counterexample caching (default=on)"));
 
 llvm::cl::opt<bool>
-UseCache("use-cache",
-         llvm::cl::init(true),
+UseCache("use-cache", llvm::cl::init(true),
          llvm::cl::desc("Use validity caching (default=on)"));
 
-llvm::cl::opt<bool>
-UseIndependentSolver("use-independent-solver",
-                     llvm::cl::init(true),
-                     llvm::cl::desc("Use constraint independence (default=on)"));
+llvm::cl::opt<bool> UseIndependentSolver(
+    "use-independent-solver", llvm::cl::init(true),
+    llvm::cl::desc("Use constraint independence (default=on)"));
 
-llvm::cl::opt<bool>
-DebugValidateSolver("debug-validate-solver",
-		             llvm::cl::init(false));
-  
-llvm::cl::opt<int>
-MinQueryTimeToLog("min-query-time-to-log",
-                  llvm::cl::init(0),
-                  llvm::cl::value_desc("milliseconds"),
-                  llvm::cl::desc("Set time threshold (in ms) for queries logged in files. "
-                                 "Only queries longer than threshold will be logged. (default=0). "
-                                 "Set this param to a negative value to log timeouts only."));
+llvm::cl::opt<bool> DebugValidateSolver("debug-validate-solver",
+                                        llvm::cl::init(false));
 
-llvm::cl::opt<double>
-MaxCoreSolverTime("max-solver-time",
-           llvm::cl::desc("Maximum amount of time for a single SMT query (default=0s (off)). Enables --use-forked-solver"),
-           llvm::cl::init(0.0),
-           llvm::cl::value_desc("seconds"));
+llvm::cl::opt<int> MinQueryTimeToLog(
+    "min-query-time-to-log", llvm::cl::init(0),
+    llvm::cl::value_desc("milliseconds"),
+    llvm::cl::desc(
+        "Set time threshold (in ms) for queries logged in files. "
+        "Only queries longer than threshold will be logged. (default=0). "
+        "Set this param to a negative value to log timeouts only."));
 
-llvm::cl::opt<bool>
-UseForkedCoreSolver("use-forked-solver",
-             llvm::cl::desc("Run the core SMT solver in a forked process (default=on)"),
-             llvm::cl::init(true));
+llvm::cl::opt<double> MaxCoreSolverTime(
+    "max-solver-time",
+    llvm::cl::desc("Maximum amount of time for a single SMT query (default=0s "
+                   "(off)). Enables --use-forked-solver"),
+    llvm::cl::init(0.0), llvm::cl::value_desc("seconds"));
+
+llvm::cl::opt<bool> UseForkedCoreSolver(
+    "use-forked-solver",
+    llvm::cl::desc("Run the core SMT solver in a forked process (default=on)"),
+    llvm::cl::init(true));
 
 llvm::cl::opt<bool> CoreSolverOptimizeDivides(
     "solver-optimize-divides",
@@ -65,8 +60,10 @@ llvm::cl::opt<bool> CoreSolverOptimizeDivides(
                    "passing to core SMT solver (default=off)"),
     llvm::cl::init(false));
 
-/* Using cl::list<> instead of cl::bits<> results in quite a bit of ugliness when it comes to checking
- * if an option is set. Unfortunately with gcc4.7 cl::bits<> is broken with LLVM2.9 and I doubt everyone
+/* Using cl::list<> instead of cl::bits<> results in quite a bit of ugliness
+ * when it comes to checking
+ * if an option is set. Unfortunately with gcc4.7 cl::bits<> is broken with
+ * LLVM2.9 and I doubt everyone
  * wants to patch their copy of LLVM just for these options.
  */
 llvm::cl::list<QueryLoggingSolverType> queryLoggingOptions(
@@ -143,15 +140,21 @@ llvm::cl::opt<int> DebugSubsumption(
     llvm::cl::init(0));
 
 llvm::cl::opt<int>
-    BBCoverage("write-BB-cov",
-               llvm::cl::desc("Set level of distinct basic block coverage: the "
-                              "higher the more (default=0 (off))\n"
-                              "= 1 Only report Basic Block Coverage\n"
-                              "= 2 Also Report Covered Basic Blocks\n"
-                              "= 3 Report Live Coverage\n"
-                              "= 4 Generate Coverage by Time Plot\n"),
+BBCoverage("write-BB-cov",
+           llvm::cl::desc("Set level of distinct basic block coverage: the "
+                          "higher the more (default=0 (off))\n"
+                          "= 1 Only report Basic Block Coverage\n"
+                          "= 2 Also Report Covered Basic Blocks\n"
+                          "= 3 Report Live Coverage\n"
+                          "= 4 Generate Coverage by Time Plot\n"),
+           llvm::cl::init(0));
 
-               llvm::cl::init(0));
+llvm::cl::opt<bool> EmitAllErrorsInSamePath(
+    "emit-all-errors-in-same-path",
+    llvm::cl::desc("Enables detection of multiple errors "
+                   "in same paths (default=false (off)). Note: Specially used "
+                   "for achieving MC/DC."),
+    llvm::cl::init(false));
 
 llvm::cl::opt<bool> ExactAddressInterpolant(
     "exact-address-interpolant",
