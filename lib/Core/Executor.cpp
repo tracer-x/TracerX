@@ -1229,15 +1229,13 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       falseState->txTreeNode = ires.first;
       trueState->txTreeNode = ires.second;
       falseState->txTreeNode->setSpeculationFlag();
-      falseState->txTreeNode->setSpeculationVisitedPPs(
-          parentSpeculationVisitedPPs);
       trueState->txTreeNode->setSpeculationFlag();
-      trueState->txTreeNode->setSpeculationVisitedPPs(
-          parentSpeculationVisitedPPs);
     }
 
-    addConstraint(*trueState, condition);
-    addConstraint(*falseState, Expr::createIsZero(condition));
+    if (res != Solver::False)
+      addConstraint(*trueState, condition);
+    if (res != Solver::True)
+      addConstraint(*falseState, Expr::createIsZero(condition));
 
     // Kinda gross, do we even really still want this option?
     if (MaxDepth && MaxDepth <= trueState->depth) {
