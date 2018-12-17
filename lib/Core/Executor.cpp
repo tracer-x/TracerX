@@ -748,9 +748,266 @@ void Executor::branch(ExecutionState &state,
       addConstraint(*result[i], conditions[i]);
 }
 
-Executor::StatePair 
-Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
+Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
+                                   bool isInternal) {
+  Solver::Validity res;
+  std::map<ExecutionState *, std::vector<SeedInfo> >::iterator it =
+      seedMap.find(&current);
+  bool isSeeding = it != seedMap.end();
 
+  if (!isSeeding && !isa<ConstantExpr>(condition) &&
+      (MaxStaticForkPct != 1. || MaxStaticSolvePct != 1. ||
+       MaxStaticCPForkPct != 1. || MaxStaticCPSolvePct != 1.) &&
+      statsTracker->elapsed() > 60.) {
+    StatisticManager &sm = *theStatisticManager;
+    CallPathNode *cpn = current.stack.back().callPathNode;
+    if ((MaxStaticForkPct < 1. &&
+         sm.getIndexedValue(stats::forks, sm.getIndex()) >
+             stats::forks * MaxStaticForkPct) ||
+        (MaxStaticCPForkPct < 1. && cpn &&
+         (cpn->statistics.getValue(stats::forks) >
+          stats::forks * MaxStaticCPForkPct)) ||
+        (MaxStaticSolvePct < 1 &&
+         sm.getIndexedValue(stats::solverTime, sm.getIndex()) >
+             stats::solverTime * MaxStaticSolvePct) ||
+        (MaxStaticCPForkPct < 1. && cpn &&
+         (cpn->statistics.getValue(stats::solverTime) >
+          stats::solverTime * MaxStaticCPSolvePct))) {
+      ref<ConstantExpr> value;
+      bool success = solver->getValue(current, condition, value);
+      assert(success && "FIXME: Unhandled solver failure");
+      (void)success;
+      addConstraint(current, EqExpr::create(value, condition));
+      condition = value;
+    }
+  }
+
+  double timeout = coreSolverTimeout;
+  if (isSeeding)
+    timeout *= it->second.size();
+
+  // llvm::errs() << "Calling solver->evaluate on query:\n";
+  // ExprPPrinter::printQuery(llvm::errs(), current.constraints, condition);
+
+  solver->setTimeout(timeout);
+  std::vector<ref<Expr> > unsatCore;
+  bool success = solver->evaluate(current, condition, res, unsatCore);
+  solver->setTimeout(0);
+
+  if (!success) {
+    current.pc = current.prevPC;
+    terminateStateEarly(current, "Query timed out (fork).");
+    return StatePair(0, 0);
+  }
+
+  if (!isSeeding) {
+    if (replayPath && !isInternal) {
+      assert(replayPosition < replayPath->size() &&
+             "ran out of branches in replay path mode");
+      bool branch = (*replayPath)[replayPosition++];
+
+      if (res == Solver::True) {
+        assert(branch && "hit invalid branch in replay path mode");
+      } else if (res == Solver::False) {
+        assert(!branch && "hit invalid branch in replay path mode");
+      } else {
+        // add constraints
+        if (branch) {
+          res = Solver::True;
+          addConstraint(current, condition);
+        } else {
+          res = Solver::False;
+          addConstraint(current, Expr::createIsZero(condition));
+        }
+      }
+    } else if (res == Solver::Unknown) {
+      assert(!replayKTest && "in replay mode, only one branch can be true.");
+
+      if ((MaxMemoryInhibit && atMemoryLimit) || current.forkDisabled ||
+          inhibitForking || (MaxForks != ~0u && stats::forks >= MaxForks)) {
+
+        if (MaxMemoryInhibit && atMemoryLimit)
+          klee_warning_once(0, "skipping fork (memory cap exceeded)");
+        else if (current.forkDisabled)
+          klee_warning_once(0, "skipping fork (fork disabled on current path)");
+        else if (inhibitForking)
+          klee_warning_once(0, "skipping fork (fork disabled globally)");
+        else
+          klee_warning_once(0, "skipping fork (max-forks reached)");
+
+        TimerStatIncrementer timer(stats::forkTime);
+        if (theRNG.getBool()) {
+          addConstraint(current, condition);
+          res = Solver::True;
+        } else {
+          addConstraint(current, Expr::createIsZero(condition));
+          res = Solver::False;
+        }
+      }
+    }
+  }
+
+  // Fix branch in only-replay-seed mode, if we don't have both true
+  // and false seeds.
+  if (isSeeding && (current.forkDisabled || OnlyReplaySeeds) &&
+      res == Solver::Unknown) {
+    bool trueSeed = false, falseSeed = false;
+    // Is seed extension still ok here?
+    for (std::vector<SeedInfo>::iterator siit = it->second.begin(),
+                                         siie = it->second.end();
+         siit != siie; ++siit) {
+      ref<ConstantExpr> res;
+      bool success =
+          solver->getValue(current, siit->assignment.evaluate(condition), res);
+      assert(success && "FIXME: Unhandled solver failure");
+      (void)success;
+      if (res->isTrue()) {
+        trueSeed = true;
+      } else {
+        falseSeed = true;
+      }
+      if (trueSeed && falseSeed)
+        break;
+    }
+    if (!(trueSeed && falseSeed)) {
+      assert(trueSeed || falseSeed);
+
+      res = trueSeed ? Solver::True : Solver::False;
+      addConstraint(current,
+                    trueSeed ? condition : Expr::createIsZero(condition));
+    }
+  }
+
+  // XXX - even if the constraint is provable one way or the other we
+  // can probably benefit by adding this constraint and allowing it to
+  // reduce the other constraints. For example, if we do a binary
+  // search on a particular value, and then see a comparison against
+  // the value it has been fixed at, we should take this as a nice
+  // hint to just use the single constraint instead of all the binary
+  // search ones. If that makes sense.
+  if (res == Solver::True) {
+
+    if (!isInternal) {
+      if (pathWriter) {
+        current.pathOS << "1";
+      }
+    }
+
+    if (INTERPOLATION_ENABLED) {
+      // Validity proof succeeded of a query: antecedent -> consequent.
+      // We then extract the unsatisfiability core of antecedent and not
+      // consequent as the Craig interpolant.
+      txTree->markPathCondition(current, unsatCore);
+    }
+
+    return StatePair(&current, 0);
+  } else if (res == Solver::False) {
+    if (!isInternal) {
+      if (pathWriter) {
+        current.pathOS << "0";
+      }
+    }
+
+    if (INTERPOLATION_ENABLED) {
+      // Falsity proof succeeded of a query: antecedent -> consequent,
+      // which means that antecedent -> not(consequent) is valid. In this
+      // case also we extract the unsat core of the proof
+      txTree->markPathCondition(current, unsatCore);
+    }
+
+    return StatePair(0, &current);
+  } else {
+    TimerStatIncrementer timer(stats::forkTime);
+    ExecutionState *falseState, *trueState = &current;
+
+    ++stats::forks;
+
+    falseState = trueState->branch();
+    addedStates.push_back(falseState);
+
+    if (RandomizeFork && theRNG.getBool())
+      std::swap(trueState, falseState);
+
+    if (it != seedMap.end()) {
+      std::vector<SeedInfo> seeds = it->second;
+      it->second.clear();
+      std::vector<SeedInfo> &trueSeeds = seedMap[trueState];
+      std::vector<SeedInfo> &falseSeeds = seedMap[falseState];
+      for (std::vector<SeedInfo>::iterator siit = seeds.begin(),
+                                           siie = seeds.end();
+           siit != siie; ++siit) {
+        ref<ConstantExpr> res;
+        bool success = solver->getValue(
+            current, siit->assignment.evaluate(condition), res);
+        assert(success && "FIXME: Unhandled solver failure");
+        (void)success;
+        if (res->isTrue()) {
+          trueSeeds.push_back(*siit);
+        } else {
+          falseSeeds.push_back(*siit);
+        }
+      }
+
+      bool swapInfo = false;
+      if (trueSeeds.empty()) {
+        if (&current == trueState)
+          swapInfo = true;
+        seedMap.erase(trueState);
+      }
+      if (falseSeeds.empty()) {
+        if (&current == falseState)
+          swapInfo = true;
+        seedMap.erase(falseState);
+      }
+      if (swapInfo) {
+        std::swap(trueState->coveredNew, falseState->coveredNew);
+        std::swap(trueState->coveredLines, falseState->coveredLines);
+      }
+    }
+
+    current.ptreeNode->data = 0;
+    std::pair<PTree::Node *, PTree::Node *> res =
+        processTree->split(current.ptreeNode, falseState, trueState);
+    falseState->ptreeNode = res.first;
+    trueState->ptreeNode = res.second;
+
+    if (!isInternal) {
+      if (pathWriter) {
+        falseState->pathOS = pathWriter->open(current.pathOS);
+        trueState->pathOS << "1";
+        falseState->pathOS << "0";
+      }
+      if (symPathWriter) {
+        falseState->symPathOS = symPathWriter->open(current.symPathOS);
+        trueState->symPathOS << "1";
+        falseState->symPathOS << "0";
+      }
+    }
+
+    if (INTERPOLATION_ENABLED) {
+      std::pair<TxTreeNode *, TxTreeNode *> ires =
+          txTree->split(current.txTreeNode, falseState, trueState);
+      falseState->txTreeNode = ires.first;
+      trueState->txTreeNode = ires.second;
+    }
+
+    addConstraint(*trueState, condition);
+    addConstraint(*falseState, Expr::createIsZero(condition));
+
+    // Kinda gross, do we even really still want this option?
+    if (MaxDepth && MaxDepth <= trueState->depth) {
+      terminateStateEarly(*trueState, "max-depth exceeded.");
+      terminateStateEarly(*falseState, "max-depth exceeded.");
+      return StatePair(0, 0);
+    }
+
+    return StatePair(trueState, falseState);
+  }
+}
+
+Executor::StatePair
+Executor::branchFork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
+  llvm::outs() << "Starting branchFork ... \n";
   // The current node is in the speculation node
   if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode()) {
     return speculationFork(current, condition, isInternal);
@@ -883,6 +1140,15 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
                     trueSeed ? condition : Expr::createIsZero(condition));
     }
   }
+
+  llvm::outs() << "******************\n";
+  condition->dump();
+  if(condition->isTrue()) {
+	  return StatePair(&current, 0);
+  } else if (condition->isFalse()) {
+	  return StatePair(0, &current);
+  }
+  llvm::outs() << "******************\n";
 
   // XXX - even if the constraint is provable one way or the other we
   // can probably benefit by adding this constraint and allowing it to
@@ -2094,7 +2360,12 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // FIXME: Find a way that we don't have this hidden dependency.
       assert(bi->getCondition() == bi->getOperand(0) && "Wrong operand index!");
       ref<Expr> cond = eval(ki, 0, state).value;
-      Executor::StatePair branches = fork(state, cond, false);
+
+//      llvm::outs() << "******************\n";
+//      cond->dump();
+//      llvm::outs() << "******************\n";
+
+      Executor::StatePair branches = branchFork(state, cond, false);
 
       // NOTE: There is a hidden dependency here, markBranchVisited
       // requires that we still be in the context of the branch

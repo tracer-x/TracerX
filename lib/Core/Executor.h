@@ -328,6 +328,7 @@ private:
   // not hold, respectively. One of the states is necessarily the
   // current state, and one of the states may be null.
   StatePair fork(ExecutionState &current, ref<Expr> condition, bool isInternal);
+  StatePair branchFork(ExecutionState &current, ref<Expr> condition, bool isInternal);
 
   // Generally the nodes are in normal mode. In case an infeasible path
   // is found, an speculation node is generated for the infeasible path
