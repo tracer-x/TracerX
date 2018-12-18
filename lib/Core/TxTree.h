@@ -462,6 +462,7 @@ class TxTreeNode {
   bool genericEarlyTermination;
 
   bool assertionFail;
+  bool emitAllErrors;
 
   void setProgramPoint(llvm::Instruction *instr) {
     if (!programPoint)
@@ -526,19 +527,12 @@ public:
   ref<Expr> getInterpolant(std::set<const Array *> &replacements,
                            std::map<ref<Expr>, ref<Expr> > &substitution) const;
 
-  /// \brief Retrieve the weakest precondition interpolant for this node as KLEE expression object
+  /// \brief Retrieve the weakest precondition push up for this node as KLEE
+  /// expression object
   ///
-  /// \return Generate and return the weakest precondition interpolant
-  /// expression. The WP expression is stored in a vector of expressions
-  /// where the WP expression is the conjunction of the expressions in
-  /// the vector
-  /// The input arguments are needed to do partitioning on WP Expression
-  std::pair<ref<Expr>, TxWPArrayStore *> generateWPInterpolant(
-      ref<Expr> interpolant, std::set<const Array *> existentials,
-      TxStore::TopInterpolantStore concretelyAddressedStore,
-      TxStore::TopInterpolantStore symbolicallyAddressedStore,
-      TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
-      TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore);
+  /// \return Generate and return the weakest precondition push up
+  /// expression.
+  ref<Expr> generateWPInterpolant();
 
   /// \return Return the weakest precondition object
   TxWeakestPreCondition *getWP() { return wp; }
@@ -660,7 +654,10 @@ public:
 
   void setGenericEarlyTermination() { genericEarlyTermination = true; }
 
-  void setAssertionFail() { assertionFail = true; }
+  void setAssertionFail(bool _emitAllErrors) {
+    assertionFail = true;
+    emitAllErrors = _emitAllErrors;
+  }
 
   TxStore *getStore() const { return dependency->getStore(); }
 

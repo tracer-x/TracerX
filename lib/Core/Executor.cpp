@@ -3500,7 +3500,7 @@ void Executor::terminateStateOnError(ExecutionState &state,
       TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
     }
     if (WPInterpolant)
-      state.txTreeNode->setAssertionFail();
+      state.txTreeNode->setAssertionFail(EmitAllErrors);
   }
 
   std::string message = messaget.str();
