@@ -1007,7 +1007,6 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
 
 Executor::StatePair
 Executor::branchFork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
-  llvm::outs() << "Starting branchFork ... \n";
   // The current node is in the speculation node
   if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode()) {
     return speculationFork(current, condition, isInternal);
@@ -1141,14 +1140,14 @@ Executor::branchFork(ExecutionState &current, ref<Expr> condition, bool isIntern
     }
   }
 
-  llvm::outs() << "******************\n";
-  condition->dump();
+//  llvm::outs() << "******************\n";
+//  condition->dump();
   if(condition->isTrue()) {
 	  return StatePair(&current, 0);
   } else if (condition->isFalse()) {
 	  return StatePair(0, &current);
   }
-  llvm::outs() << "******************\n";
+//  llvm::outs() << "******************\n";
 
   // XXX - even if the constraint is provable one way or the other we
   // can probably benefit by adding this constraint and allowing it to
@@ -1331,14 +1330,12 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
       }
     }
 
-    if (INTERPOLATION_ENABLED) {
-      std::pair<TxTreeNode *, TxTreeNode *> ires =
-          txTree->split(current.txTreeNode, speculationFalseState, trueState);
-      speculationFalseState->txTreeNode = ires.first;
-      speculationFalseState->txTreeNode->setSpeculationFlag();
-      speculationFalseState->txTreeNode->resetSpeculationVisitedPPs();
-      trueState->txTreeNode = ires.second;
-    }
+    std::pair<TxTreeNode *, TxTreeNode *> ires =
+        txTree->split(current.txTreeNode, speculationFalseState, trueState);
+    speculationFalseState->txTreeNode = ires.first;
+    speculationFalseState->txTreeNode->setSpeculationFlag();
+    speculationFalseState->txTreeNode->visitedProgramPoints = new std::set<uintptr_t>();
+    trueState->txTreeNode = ires.second;
 
     addConstraint(*trueState, condition);
 
@@ -1376,14 +1373,12 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
       }
     }
 
-    if (INTERPOLATION_ENABLED) {
-      std::pair<TxTreeNode *, TxTreeNode *> ires =
-          txTree->split(current.txTreeNode, speculationTrueState, falseState);
-      speculationTrueState->txTreeNode = ires.first;
-      speculationTrueState->txTreeNode->setSpeculationFlag();
-      speculationTrueState->txTreeNode->resetSpeculationVisitedPPs();
-      falseState->txTreeNode = ires.second;
-    }
+    std::pair<TxTreeNode *, TxTreeNode *> ires =
+        txTree->split(current.txTreeNode, speculationTrueState, falseState);
+    speculationTrueState->txTreeNode = ires.first;
+    speculationTrueState->txTreeNode->setSpeculationFlag();
+    speculationTrueState->txTreeNode->visitedProgramPoints = new std::set<uintptr_t>();
+    falseState->txTreeNode = ires.second;
 
     addConstraint(*falseState, Expr::createIsZero(condition));
 
@@ -1394,12 +1389,16 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
 Executor::StatePair Executor::speculationFork(ExecutionState &current,
                                               ref<Expr> condition,
                                               bool isInternal) {
-  klee_warning("Speculaion node");
+  klee_warning("Speculation node");
   // Checking not revisiting the same program point twice (should fail since
   // speculation wouldn't be linear then)
   // Back jumping to the parent node
-  if (current.txTreeNode->isSpeculativeProgramPointRevisted(
-          current.txTreeNode->getProgramPoint())) {
+  llvm::outs() << "Size = " << current.txTreeNode->visitedProgramPoints->size() << "\n";
+  bool isPPVisited = (current.txTreeNode->visitedProgramPoints->find(
+                      current.txTreeNode->getProgramPoint()) !=
+                  current.txTreeNode->visitedProgramPoints->end());
+  llvm::outs() << "Is visited = " << isPPVisited << "\n";
+  if (isPPVisited) {
     std::vector<ExecutionState *> states = searcher->getStates();
     if (states.empty())
       klee_error("Executor::speculationFork\nback jump not implemented for "
@@ -1408,8 +1407,9 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     return StatePair(0, 0);
   }
 
+  llvm::outs() << "Not visited\n";
   // Storing the visited program points.
-  current.txTreeNode->storingSpeculativeProgramPoint(
+  current.txTreeNode->visitedProgramPoints->insert(
       current.txTreeNode->getProgramPoint());
 
   Solver::Validity res;
@@ -1430,6 +1430,11 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     return StatePair(0, 0);
   }
 
+  llvm::outs() << "00000000\n";
+  llvm::outs() << current.txTreeNode->visitedProgramPoints->size() << "\n";
+  llvm::outs() << "res = " << res << "\n";
+  llvm::outs() << "11111111\n";
+
   // XXX - even if the constraint is provable one way or the other we
   // can probably benefit by adding this constraint and allowing it to
   // reduce the other constraints. For example, if we do a binary
@@ -1439,8 +1444,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   // search ones. If that makes sense.
   if (res == Solver::True &&
       current.prevPC->inst->getOperand(1)->getName() == "cond.false") {
-
-    if (!isInternal) {
+	  llvm::outs() << "Trueeeeeeeeeee\n";
+	  if (!isInternal) {
       if (pathWriter) {
         current.pathOS << "1";
       }
@@ -1448,7 +1453,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     return StatePair(&current, 0);
   } else if (res == Solver::False &&
              current.prevPC->inst->getOperand(1)->getName() == "cond.false") {
-
+	  llvm::outs() << "Falsesssssssss\n";
     if (!isInternal) {
       if (pathWriter) {
         current.pathOS << "0";
@@ -1457,8 +1462,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     return StatePair(0, &current);
   } else {
 
-    TxSpeculativeRun *parentSpeculationVisitedPPs =
-        current.txTreeNode->getSpeculationVisitedPPs();
+//    TxSpeculativeRun *parentSpeculationVisitedPPs =
+//        current.txTreeNode->getSpeculationVisitedPPs();
     TimerStatIncrementer timer(stats::forkTime);
     ExecutionState *falseState, *trueState = &current;
 
@@ -1489,14 +1494,23 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       }
     }
 
-    if (INTERPOLATION_ENABLED) {
-      std::pair<TxTreeNode *, TxTreeNode *> ires =
-          txTree->split(current.txTreeNode, falseState, trueState);
-      falseState->txTreeNode = ires.first;
-      trueState->txTreeNode = ires.second;
-      falseState->txTreeNode->setSpeculationFlag();
-      trueState->txTreeNode->setSpeculationFlag();
-    }
+
+
+    std::pair<TxTreeNode *, TxTreeNode *> ires =
+        txTree->split(current.txTreeNode, falseState, trueState);
+    falseState->txTreeNode = ires.first;
+    falseState->txTreeNode->setSpeculationFlag();
+    falseState->txTreeNode->visitedProgramPoints = current.txTreeNode->visitedProgramPoints;
+
+    trueState->txTreeNode = ires.second;
+    trueState->txTreeNode->setSpeculationFlag();
+    trueState->txTreeNode->visitedProgramPoints = current.txTreeNode->visitedProgramPoints;
+
+    llvm::outs() << "00000000\n";
+    llvm::outs() << current.txTreeNode->visitedProgramPoints->size() << "\n";
+//    llvm::outs() << falseState->txTreeNode->visitedProgramPoints->size() << "\n";
+//    llvm::outs() << trueState->txTreeNode->visitedProgramPoints->size() << "\n";
+    llvm::outs() << "11111111\n";
 
     if (res != Solver::False)
       addConstraint(*trueState, condition);
@@ -2360,10 +2374,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // FIXME: Find a way that we don't have this hidden dependency.
       assert(bi->getCondition() == bi->getOperand(0) && "Wrong operand index!");
       ref<Expr> cond = eval(ki, 0, state).value;
-
-//      llvm::outs() << "******************\n";
-//      cond->dump();
-//      llvm::outs() << "******************\n";
 
       Executor::StatePair branches = branchFork(state, cond, false);
 

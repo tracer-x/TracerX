@@ -386,10 +386,6 @@ class TxTreeNode {
   // \brief Set if the speculation has failed and the node should be removed
   bool speculationFailed;
 
-  // \brief This object contains the visited program points in the speculation
-  // node
-  TxSpeculativeRun *speculationVisitedPPs;
-
   TxTreeNode *parent, *left, *right;
 
   uintptr_t programPoint;
@@ -478,6 +474,10 @@ public:
   ref<Expr> getInterpolant(std::set<const Array *> &replacements,
                            std::map<ref<Expr>, ref<Expr> > &substitution) const;
 
+  // \brief This object contains the visited program points in the speculation
+  // node
+  std::set<uintptr_t>* visitedProgramPoints;
+
   /// \brief Check if the current node is a speculation node
   bool isSpeculationNode();
 
@@ -506,23 +506,6 @@ public:
   void storeSpeculationUnsatCore(TimingSolver *solver,
                                  std::vector<ref<Expr> > unsatCore);
 
-  void resetSpeculationVisitedPPs() {
-    speculationVisitedPPs = new TxSpeculativeRun;
-  }
-
-  TxSpeculativeRun *getSpeculationVisitedPPs() { return speculationVisitedPPs; }
-
-  void setSpeculationVisitedPPs(TxSpeculativeRun *parentSpeculationVisitedPPs) {
-    speculationVisitedPPs = parentSpeculationVisitedPPs;
-  }
-
-  void storingSpeculativeProgramPoint(uintptr_t pp) {
-    speculationVisitedPPs->storingProgramPoint(pp);
-  }
-
-  bool isSpeculativeProgramPointRevisted(uintptr_t pp) {
-    return speculationVisitedPPs->isProgramPointRevisted(pp);
-  }
 
   /// \brief Extend the path condition with another constraint
   ///
