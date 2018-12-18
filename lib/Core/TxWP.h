@@ -109,6 +109,8 @@ public:
   ref<Expr> True() { return ConstantExpr::alloc(1, Expr::Bool); };
   ref<Expr> False() { return ConstantExpr::alloc(0, Expr::Bool); };
 
+  void resetFalseWPExpr() { WPExpr = False(); }
+
   void resetWPExpr() { WPExpr = True(); }
 
   void setWPExpr(ref<Expr> expr) { WPExpr = expr; }
@@ -154,13 +156,8 @@ public:
 
   /// \brief Perform the intersection of two weakest precondition expressions
   /// with respect to the branchCondition
-  ref<Expr> intersectExpr(
-      ref<Expr> branchCondition, ref<Expr> expr1, ref<Expr> expr2,
-      ref<Expr> interpolant, std::set<const Array *> existentials,
-      TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
-      TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore,
-      TxStore::TopInterpolantStore concretelyAddressedStore,
-      TxStore::TopInterpolantStore symbolicallyAddressedStore);
+  ref<Expr> intersectWPExpr(ref<Expr> branchCondition, ref<Expr> expr1,
+                            ref<Expr> expr2);
 
   std::map<std::string, ref<Expr> >
   extractExprs(TxStore::TopInterpolantStore concretelyAddressedStore);

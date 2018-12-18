@@ -61,14 +61,8 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
       symbolicallyAddressedHistoricalStore);
 
-  if (WPInterpolant) {
-    std::pair<ref<Expr>, TxWPArrayStore *> wpPair = node->generateWPInterpolant(
-        interpolant, existentials, concretelyAddressedStore,
-        symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
-        symbolicallyAddressedHistoricalStore);
-    wpInterpolant = wpPair.first;
-    wpStore = wpPair.second;
-  }
+  if (WPInterpolant)
+    wpInterpolant = node->generateWPInterpolant();
 }
 
 TxSubsumptionTableEntry::~TxSubsumptionTableEntry() {}
@@ -2400,7 +2394,8 @@ TxTreeNode::TxTreeNode(
       graph(_parent ? _parent->graph : 0),
       instructionsDepth(_parent ? _parent->instructionsDepth : 0),
       targetData(_targetData), globalAddresses(_globalAddresses),
-      genericEarlyTermination(false), assertionFail(false), isSubsumed(false) {
+      genericEarlyTermination(false), assertionFail(false),
+      emitAllErrors(false), isSubsumed(false) {
   if (_parent) {
     entryCallHistory = _parent->callHistory;
     callHistory = _parent->callHistory;
@@ -2434,85 +2429,25 @@ ref<Expr> TxTreeNode::getInterpolant(
   return expr;
 }
 
-std::pair<ref<Expr>, TxWPArrayStore *> TxTreeNode::generateWPInterpolant(
-    ref<Expr> interpolant, std::set<const Array *> existentials,
-    TxStore::TopInterpolantStore concretelyAddressedStore,
-    TxStore::TopInterpolantStore symbolicallyAddressedStore,
-    TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore,
-    TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore) {
+ref<Expr> TxTreeNode::generateWPInterpolant() {
   TimerStatIncrementer t(getWPInterpolantTime);
 
   ref<Expr> expr;
-  TxWPArrayStore *parentWPStore = wp->getWPStore();
 
-  //  klee_message("-- 000 ---");
-  //  childWPInterpolant[0]->dump();
-  //  llvm::outs() << "-----\n";
-  //  childWPInterpolant[1]->dump();
-  //  klee_message("--- End 000 ---");
-
-  if (assertionFail) {
-    //    llvm::outs() << "--- 1111---\n";
-    //    for (std::vector<std::pair<KInstruction *, int> >::const_iterator
-    //             it = reverseInstructionList.begin(),
-    //             ie = reverseInstructionList.end();
-    //         it != ie; ++it) {
-    //      llvm::Instruction *i = (*it).first->inst;
-    //      int flag = (*it).second;
-    //      // instruction list
-    //      i->dump();
-    //      llvm::outs() << flag << "\n";
-    //    }
-    //    llvm::outs() << "--- End 111 ---\n";
-
-    expr = wp->True();
-    if (parent) {
-      this->parent->setChildWPInterpolant(expr);
-      this->parent->setChildWPStore(this->getWP()->getWPStore());
-    }
-
-    //    klee_warning("Start printing the WP: Assertion Fail");
-    //    expr->dump();
-    //    klee_warning("End of printing the WP: Assertion Fail");
-
-  } else if (wp->True() == childWPInterpolant[0] &&
-             wp->True() == childWPInterpolant[1]) {
+  if (assertionFail && emitAllErrors) {
+    expr = wp->False();
+  } else if (assertionFail) {
     wp->resetWPExpr();
-
-    //    llvm::outs() << "--- Begin 222 ---\n";
-    //    for (std::vector<std::pair<KInstruction *, int> >::const_iterator
-    //             it = reverseInstructionList.begin(),
-    //             ie = reverseInstructionList.end();
-    //         it != ie; ++it) {
-    //      llvm::Instruction *i = (*it).first->inst;
-    //      int flag = (*it).second;
-    //      // instruction list
-    //      i->dump();
-    //      llvm::outs() << flag << "\n";
-    //    }
-    //    llvm::outs() << "--- End 222 ---\n";
-
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->PushUp(reverseInstructionList);
-    if (parent) {
-      this->parent->setChildWPInterpolant(expr);
-      this->parent->setChildWPStore(this->getWP()->getWPStore());
-    }
-
-    //    klee_warning("Start printing the WP: at LEAF");
-    //    expr->dump();
-    //    klee_warning("End of printing the WP: at LEAF");
-  } else if (wp->False() == childWPInterpolant[0] ||
-             wp->False() == childWPInterpolant[1]) {
+  } else if (childWPInterpolant[0] == wp->False() ||
+             childWPInterpolant[1] == wp->False()) {
     expr = wp->False();
-    if (parent) {
-      this->parent->setChildWPInterpolant(expr);
-      this->parent->setChildWPStore(this->getWP()->getWPStore());
-    }
-
-    //    klee_warning("Start printing the WP: one of child nodes is False");
-    //    expr->dump();
-    //    klee_warning("End of printing the WP: one of child nodes is False");
+  } else if (childWPInterpolant[0] == wp->True() &&
+             childWPInterpolant[0] == wp->True()) {
+    wp->resetWPExpr();
+    // Generate weakest precondition from pathCondition and/or BB instructions
+    expr = wp->PushUp(reverseInstructionList);
   } else {
     // Get branch condition
     llvm::Instruction *i = reverseInstructionList.back().first->inst;
@@ -2523,77 +2458,16 @@ std::pair<ref<Expr>, TxWPArrayStore *> TxTreeNode::generateWPInterpolant(
       }
     }
 
-    std::pair<TxWPArrayStore *, std::pair<ref<Expr>, ref<Expr> > >
-        updatedWPExpr =
-            wp->mergeWPArrayStore(childArrayStore[0], childArrayStore[1],
-                                  childWPInterpolant[0], childWPInterpolant[1]);
-    wp->setWPStore(updatedWPExpr.first);
-    parentWPStore = updatedWPExpr.first;
-    childWPInterpolant[0] = updatedWPExpr.second.first;
-    childWPInterpolant[1] = updatedWPExpr.second.second;
-
-    wp->sanityCheckWPArrayStore(wp->getWPStore(), childWPInterpolant[0]);
-    wp->sanityCheckWPArrayStore(wp->getWPStore(), childWPInterpolant[1]);
-
-    // remove unrelated part from interpolant, concretely addressed store and
-    // return And(w1r, w2r)
-    expr = wp->intersectExpr(
-        branchCondition, childWPInterpolant[0], childWPInterpolant[1],
-        interpolant, existentials, concretelyAddressedHistoricalStore,
-        symbolicallyAddressedHistoricalStore, concretelyAddressedStore,
-        symbolicallyAddressedStore);
-
-    //    llvm::outs() << "\n-----begin childWPInterpolant -------\n";
-    //    childWPInterpolant[0]->dump();
-    //    childWPInterpolant[1]->dump();
-    //    branchCondition->dump();
-    //    expr->dump();
-    //    llvm::outs() << "\n-----end childWPInterpolant----------------\n";
-
-    // Setting the intersection of child nodes as the target in the current node
+    expr = wp->intersectWPExpr(branchCondition, childWPInterpolant[0],
+                               childWPInterpolant[1]);
     wp->setWPExpr(expr);
-
-    // Generate weakest precondition fot the current node
-    // All instructions are marked
-
-    //    llvm::outs() << "\n------ WP after intersection -------\n";
-    //    wp->getWPExpr()->dump();
-    //    llvm::outs() << "\n-------End WP after intersection-----------\n";
-
-    reverseInstructionList.pop_back();
-
-    //    llvm::outs() << "\n-- Start printing instructions after intersection
-    //    --\n";
-    //    for (std::vector<std::pair<KInstruction *, int> >::const_iterator
-    //             it = reverseInstructionList.begin(),
-    //             ie = reverseInstructionList.end();
-    //         it != ie; ++it) {
-    //      llvm::Instruction *i = (*it).first->inst;
-    //      int flag = (*it).second;
-    //      // instruction list
-    //      i->dump();
-    //      llvm::outs() << flag << "\n";
-    //    }
-    //    llvm::outs() << "\n-- End printing instructions after intersection
-    //    --\n";
-
+    // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->PushUp(reverseInstructionList);
-
-    //    llvm::outs() << "\n------ WP after pushing up -------\n";
-    //    wp->getWPExpr()->dump();
-    //    llvm::outs() << "\n------ WP end pushing up   -------\n";
-
-    if (parent) {
-      this->parent->setChildWPInterpolant(expr);
-      this->parent->setChildWPStore(this->getWP()->getWPStore());
-    }
-
-    //    klee_warning("Start printing the WP after intersection");
-    //    expr->dump();
-    //    klee_warning("End of printing the WP after intersection");
   }
-
-  return std::make_pair(expr, parentWPStore);
+  if (parent) {
+    this->parent->setChildWPInterpolant(expr);
+  }
+  return expr;
 }
 
 void TxTreeNode::setChildWPInterpolant(ref<Expr> interpolant) {
