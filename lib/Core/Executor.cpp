@@ -1393,11 +1393,12 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   // Checking not revisiting the same program point twice (should fail since
   // speculation wouldn't be linear then)
   // Back jumping to the parent node
-  llvm::outs() << "Size = " << current.txTreeNode->visitedProgramPoints->size() << "\n";
+
+
   bool isPPVisited = (current.txTreeNode->visitedProgramPoints->find(
                       current.txTreeNode->getProgramPoint()) !=
                   current.txTreeNode->visitedProgramPoints->end());
-  llvm::outs() << "Is visited = " << isPPVisited << "\n";
+
   if (isPPVisited) {
     std::vector<ExecutionState *> states = searcher->getStates();
     if (states.empty())
@@ -1408,6 +1409,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   }
 
   llvm::outs() << "Not visited\n";
+
   // Storing the visited program points.
   current.txTreeNode->visitedProgramPoints->insert(
       current.txTreeNode->getProgramPoint());
@@ -1430,11 +1432,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     return StatePair(0, 0);
   }
 
-  llvm::outs() << "00000000\n";
-  llvm::outs() << current.txTreeNode->visitedProgramPoints->size() << "\n";
-  llvm::outs() << "res = " << res << "\n";
-  llvm::outs() << "11111111\n";
-
   // XXX - even if the constraint is provable one way or the other we
   // can probably benefit by adding this constraint and allowing it to
   // reduce the other constraints. For example, if we do a binary
@@ -1442,18 +1439,16 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   // the value it has been fixed at, we should take this as a nice
   // hint to just use the single constraint instead of all the binary
   // search ones. If that makes sense.
-  if (res == Solver::True &&
-      current.prevPC->inst->getOperand(1)->getName() == "cond.false") {
-	  llvm::outs() << "Trueeeeeeeeeee\n";
+  if (res == Solver::True) {
+	  llvm::outs() << "True in Speculation mode\n";
 	  if (!isInternal) {
       if (pathWriter) {
         current.pathOS << "1";
       }
     }
     return StatePair(&current, 0);
-  } else if (res == Solver::False &&
-             current.prevPC->inst->getOperand(1)->getName() == "cond.false") {
-	  llvm::outs() << "Falsesssssssss\n";
+  } else if (res == Solver::False) {
+	llvm::outs() << "False in Speculation mode\n";
     if (!isInternal) {
       if (pathWriter) {
         current.pathOS << "0";
@@ -1461,9 +1456,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     }
     return StatePair(0, &current);
   } else {
-
-//    TxSpeculativeRun *parentSpeculationVisitedPPs =
-//        current.txTreeNode->getSpeculationVisitedPPs();
+	llvm::outs() << "Unknown in Speculation mode\n";
     TimerStatIncrementer timer(stats::forkTime);
     ExecutionState *falseState, *trueState = &current;
 
@@ -1494,23 +1487,11 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       }
     }
 
-
-
     std::pair<TxTreeNode *, TxTreeNode *> ires =
         txTree->split(current.txTreeNode, falseState, trueState);
+
     falseState->txTreeNode = ires.first;
-    falseState->txTreeNode->setSpeculationFlag();
-    falseState->txTreeNode->visitedProgramPoints = current.txTreeNode->visitedProgramPoints;
-
     trueState->txTreeNode = ires.second;
-    trueState->txTreeNode->setSpeculationFlag();
-    trueState->txTreeNode->visitedProgramPoints = current.txTreeNode->visitedProgramPoints;
-
-    llvm::outs() << "00000000\n";
-    llvm::outs() << current.txTreeNode->visitedProgramPoints->size() << "\n";
-//    llvm::outs() << falseState->txTreeNode->visitedProgramPoints->size() << "\n";
-//    llvm::outs() << trueState->txTreeNode->visitedProgramPoints->size() << "\n";
-    llvm::outs() << "11111111\n";
 
     if (res != Solver::False)
       addConstraint(*trueState, condition);
