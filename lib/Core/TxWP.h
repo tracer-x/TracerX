@@ -148,12 +148,6 @@ public:
   // \brief Return LHS of an instruction as a read expression
   ref<Expr> getLHS(llvm::Instruction *i);
 
-  // \brief Instantiates the variables in WPExpr by their latest value for the
-  // implication test.
-  ref<Expr> instantiateWPExpression(TxDependency *dependency,
-                                    ref<Expr> singleWPExpr,
-                                    TxWPArrayStore *wpStore);
-
   /// \brief Perform the intersection of two weakest precondition expressions
   /// with respect to the branchCondition
   ref<Expr> intersectWPExpr(ref<Expr> branchCondition, ref<Expr> expr1,
