@@ -563,12 +563,12 @@ public:
   /// intersection)
   ref<Expr> getBranchCondition() { return branchCondition; }
 
-  /// \brief Check WP Interpolant holds at subsumption point
-  ref<Expr> checkWPAtSubsumption(ref<Expr> wpInterpolant,
-                                 TxWPArrayStore *wpStore);
+  // \brief Instantiates the variables in WPExpr by their latest value for the
+  // implication test.
+  ref<Expr> instantiateWPatSubsumption(ref<Expr> wpInterpolant);
 
   /// \brief Copy WP to the parent node at subsumption point
-  void setWPAtSubsumption(ref<Expr> _wpInterpolant, TxWPArrayStore *wpStore);
+  void setWPatSubsumption(ref<Expr> _wpInterpolant);
 
   /// \brief Extend the path condition with another constraint
   ///
