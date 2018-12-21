@@ -3918,9 +3918,6 @@ void Executor::terminateState(ExecutionState &state) {
   }
 }
 
-void Executor::terminateSpeculationState(ExecutionState &state) {
-}
-
 void Executor::terminateStateOnSubsumption(ExecutionState &state) {
   assert(INTERPOLATION_ENABLED);
 
@@ -4038,11 +4035,11 @@ void Executor::terminateStateOnError(ExecutionState &state,
                                      enum TerminateReason termReason,
                                      const char *suffix,
                                      const llvm::Twine &info) {
-  if (INTERPOLATION_ENABLED && Speculation &&
-      state.txTreeNode->isSpeculationNode()) {
-    speculativeBackJump(state);
-    return;
-  }
+//  if (INTERPOLATION_ENABLED && Speculation &&
+//      state.txTreeNode->isSpeculationNode()) {
+//    speculativeBackJump(state);
+//    return;
+//  }
 
   interpreterHandler->incErrorTermination();
   if (INTERPOLATION_ENABLED) {
