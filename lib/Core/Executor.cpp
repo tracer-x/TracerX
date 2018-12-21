@@ -1398,17 +1398,10 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   bool isPPVisited = (current.txTreeNode->visitedProgramPoints->find(
                       current.txTreeNode->getProgramPoint()) !=
                   current.txTreeNode->visitedProgramPoints->end());
-
   if (isPPVisited) {
-    std::vector<ExecutionState *> states = searcher->getStates();
-    if (states.empty())
-      klee_error("Executor::speculationFork\nback jump not implemented for "
-                 "this Searcher class");
-    speculativeBackJump(current, states);
+    speculativeBackJump(current);
     return StatePair(0, 0);
   }
-
-  llvm::outs() << "Not visited\n";
 
   // Storing the visited program points.
   current.txTreeNode->visitedProgramPoints->insert(
@@ -1509,34 +1502,63 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   }
 }
 
-void Executor::speculativeBackJump(ExecutionState &current,
-                                   std::vector<ExecutionState *> states) {
-
+void Executor::speculativeBackJump(ExecutionState &current) {
   // marking the speculation nodes to be terminated
-  if (current.txTreeNode->getLeft() && current.txTreeNode->isSpeculationNode())
-    current.txTreeNode->getLeft()->setSpeculationFailed();
-  if (current.txTreeNode->getRight() && current.txTreeNode->isSpeculationNode())
-    current.txTreeNode->getRight()->setSpeculationFailed();
-  TxTreeNode *parent = current.txTreeNode->getParent();
+    llvm::outs() << "searcher states = " << searcher->getStates().size() << "\n";
+  std::vector<TxTreeNode *> deletedNodes;
+  TxTreeNode *tmp = current.txTreeNode;
+  tmp->setSpeculationFailed();
+  deletedNodes.push_back(tmp);
+  TxTreeNode *parent = tmp->getParent();
   while (parent && parent->isSpeculationNode()) {
     parent->setSpeculationFailed();
-    parent = parent->getParent();
-    if (parent->getLeft() && parent->getLeft()->isSpeculationNode())
+    // add sibling
+    if (parent->getLeft() && parent->getLeft() != tmp) {
       parent->getLeft()->setSpeculationFailed();
-    if (parent->getRight() && parent->getRight()->isSpeculationNode())
+      deletedNodes.push_back(parent->getLeft());
+    }
+    if (parent->getRight() && parent->getRight() != tmp) {
       parent->getRight()->setSpeculationFailed();
+      deletedNodes.push_back(parent->getRight());
+    }
+    deletedNodes.push_back(parent);
+    tmp = parent;
+    parent = parent->getParent();
   }
-  // removing the marked speculation nodes
-  terminateState(current);
-  for (std::vector<ExecutionState *>::const_iterator it = states.begin(),
-                                                     ie = states.end();
+  // collect removed states
+  std::vector<ExecutionState *> worklist = searcher->getStates();
+  std::vector<ExecutionState *> emptySpeculationStates;
+  std::vector<ExecutionState *> removedSpeculationStates;
+  for (std::vector<ExecutionState *>::const_iterator it = worklist.begin(),
+                                                     ie = worklist.end();
        it != ie; ++it) {
-    ExecutionState *state = (*it);
-    if (state->txTreeNode->isSpeculationFailedNode()) {
-      errs() << state->txTreeNode->isSpeculationNode() << "is speculative\n";
-      state->prevPC->inst->dump();
+    ExecutionState *tmp = (*it);
+    if (tmp->txTreeNode->isSpeculationFailedNode()) {
+        removedSpeculationStates.push_back(tmp);
     }
   }
+  searcher->update(0, emptySpeculationStates, removedSpeculationStates);
+
+  llvm::outs() << "=========\n";
+  llvm::outs() << "Nodes to be deleted = " << deletedNodes.size() << "\n";
+  llvm::outs() << "States to be deleted = " << removedSpeculationStates.size() << "\n";
+  llvm::outs() << "added states = " << addedStates.size() << "\n";
+  llvm::outs() << "removed states = " << removedStates.size() << "\n";
+    llvm::outs() << "searcher states = " << searcher->getStates().size() << "\n";
+
+  for (std::vector<TxTreeNode *>::iterator it = deletedNodes.begin(),
+                                           ie = deletedNodes.end();
+       it != ie; ++it) {
+    txTree->removeSpeculationFailedNodes(*it);
+  }
+
+  for (std::vector<ExecutionState *>::iterator it = removedSpeculationStates.begin(),
+                                               ie = removedSpeculationStates.end();
+       it != ie; ++it) {
+    delete *it;
+  }
+
+  llvm::outs() << "=====Finish deletion====\n";
 }
 
 void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
@@ -3896,6 +3918,9 @@ void Executor::terminateState(ExecutionState &state) {
   }
 }
 
+void Executor::terminateSpeculationState(ExecutionState &state) {
+}
+
 void Executor::terminateStateOnSubsumption(ExecutionState &state) {
   assert(INTERPOLATION_ENABLED);
 
@@ -4013,6 +4038,12 @@ void Executor::terminateStateOnError(ExecutionState &state,
                                      enum TerminateReason termReason,
                                      const char *suffix,
                                      const llvm::Twine &info) {
+  if (INTERPOLATION_ENABLED && Speculation &&
+      state.txTreeNode->isSpeculationNode()) {
+    speculativeBackJump(state);
+    return;
+  }
+
   interpreterHandler->incErrorTermination();
   if (INTERPOLATION_ENABLED) {
     interpreterHandler->incBranchingDepthOnErrorTermination(state.depth);

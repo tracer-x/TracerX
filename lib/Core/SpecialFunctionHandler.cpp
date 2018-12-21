@@ -331,9 +331,15 @@ void SpecialFunctionHandler::handleAssertFail(ExecutionState &state,
                                               KInstruction *target,
                                               std::vector<ref<Expr> > &arguments) {
   assert(arguments.size()==4 && "invalid number of arguments to __assert_fail");
-  executor.terminateStateOnError(
-      state, "ASSERTION FAIL: " + readStringAtAddress(state, arguments[0]),
-      Executor::Assert);
+  if (state.txTreeNode->isSpeculationNode()) {
+    executor.terminateStateOnError(
+        state, "SPECULATION FAIL: " + readStringAtAddress(state, arguments[0]),
+        Executor::Assert);
+  } else {
+    executor.terminateStateOnError(
+        state, "ASSERTION FAIL: " + readStringAtAddress(state, arguments[0]),
+        Executor::Assert);
+  }
 }
 
 void SpecialFunctionHandler::handleReportError(ExecutionState &state,

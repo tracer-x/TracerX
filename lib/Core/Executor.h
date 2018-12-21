@@ -337,8 +337,7 @@ private:
   StatePair addSpeculationNode(ExecutionState &current, ref<Expr> condition,
                                bool isInternal, bool falseBranchIsInfeasible);
 
-  void speculativeBackJump(ExecutionState &current,
-                           std::vector<ExecutionState *> states);
+  void speculativeBackJump(ExecutionState &current);
 
   // Speculation fork performs fork in the speculation mode.
   StatePair speculationFork(ExecutionState &current, ref<Expr> condition,
@@ -408,6 +407,7 @@ private:
 
   // remove state from queue and delete
   void terminateState(ExecutionState &state);
+
   // call subsumption handler and terminate state
   void terminateStateOnSubsumption(ExecutionState &state);
   // call exit handler and terminate state

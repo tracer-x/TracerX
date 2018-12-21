@@ -783,6 +783,8 @@ public:
   /// table entry.
   void remove(TxTreeNode *node, bool dumping);
 
+  void removeSpeculationFailedNodes(TxTreeNode *node);
+
   /// \brief Invokes the subsumption check
   bool subsumptionCheck(TimingSolver *solver, ExecutionState &state,
                         double timeout);

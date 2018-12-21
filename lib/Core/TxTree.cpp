@@ -2004,13 +2004,28 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
 }
 
 void TxTree::setCurrentINode(ExecutionState &state) {
-  TimerStatIncrementer t(setCurrentINodeTime);
+   llvm::outs() << state.txTreeNode->isSpeculationNode() << "-" << state.txTreeNode->isSpeculationFailedNode()<< "\n";
+	TimerStatIncrementer t(setCurrentINodeTime);
   currentTxTreeNode = state.txTreeNode;
   currentTxTreeNode->setProgramPoint(state.pc->inst);
   if (!currentTxTreeNode->nodeSequenceNumber)
     currentTxTreeNode->nodeSequenceNumber =
         TxTreeNode::nextNodeSequenceNumber++;
   TxTreeGraph::setCurrentNode(state, currentTxTreeNode->nodeSequenceNumber);
+}
+
+void TxTree::removeSpeculationFailedNodes(TxTreeNode *node) {
+  assert(!node->left && !node->right);
+  TxTreeNode *p = node->parent;
+  if (p) {
+    if (node == p->left) {
+      p->left = 0;
+    } else {
+      assert(node == p->right);
+      p->right = 0;
+    }
+  }
+  delete node;
 }
 
 void TxTree::remove(TxTreeNode *node, bool dumping) {
