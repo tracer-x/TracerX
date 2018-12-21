@@ -278,16 +278,10 @@ bool TxWPHelper::isTargetDependent(TxWPArrayStore *wpStore, llvm::Value *inst,
 
 ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
                                      const ref<Expr> rhs) {
-  //  llvm::outs() << "--- Begin substitution ---\n";
-  //  llvm::outs() << "[e]----\n";
-  //  base->dump();
-  //  llvm::outs() << "[left]----\n";
-  //  lhs->dump();
-  //  llvm::outs() << "[right]----\n";
-  //  rhs->dump();
-  //  llvm::outs() << "--- End substitution ---\n";
 
-  if (base.compare(lhs) == 0) { // base case
+  if (rhs.isNull()) {
+    return rhs;
+  } else if (base.compare(lhs) == 0) { // base case
     return rhs;
   } else {
     switch (base->getKind()) {
@@ -304,7 +298,10 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
     case Expr::SExt: {
       ref<Expr> kids[1];
       kids[0] = substituteExpr(base->getKid(0), lhs, rhs);
-      return base->rebuild(kids);
+      if (kids[0].isNull())
+        return kids[0];
+      else
+        return base->rebuild(kids);
     }
 
     case Expr::Concat:
@@ -326,47 +323,54 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
     case Expr::SDiv:
     case Expr::URem:
     case Expr::SRem:
-    case Expr::And:
-    case Expr::Or:
-    case Expr::Xor:
     case Expr::Shl:
     case Expr::LShr:
     case Expr::AShr: {
       ref<Expr> kids[2];
-      //      llvm::outs() << "--- Begin substitution - " << base->getKind()
-      //                   << " ---\n";
-      //      base->dump();
-      //      llvm::outs() << "--------------------------\n";
-
       kids[0] = substituteExpr(base->getKid(0), lhs, rhs);
-      //      kids[0]->dump();
-      //      llvm::outs() << "--------------------------\n";
-
       kids[1] = substituteExpr(base->getKid(1), lhs, rhs);
-      //      kids[1]->dump();
-      //      llvm::outs() << "--------------------------\n";
+      if (kids[0].isNull())
+        return kids[0];
+      else if (kids[1].isNull())
+        return kids[1];
+      else
+        return base->rebuild(kids);
+    }
 
-      base = base->rebuild(kids);
-      //      base->dump();
-      //      llvm::outs() << "--- End substitution - " << base->getKind() <<
-      //      "---\n ";
-
-      return base;
+    case Expr::And:
+    case Expr::Or:
+    case Expr::Xor: {
+      ref<Expr> kids[2];
+      kids[0] = substituteExpr(base->getKid(0), lhs, rhs);
+      kids[1] = substituteExpr(base->getKid(1), lhs, rhs);
+      if (kids[0].isNull())
+        return kids[1];
+      else if (kids[1].isNull())
+        return kids[0];
+      else
+        return base->rebuild(kids);
     }
 
     case Expr::Select: {
       ref<Expr> kids[3];
       kids[0] = substituteExpr(base->getKid(0), lhs, rhs);
       kids[1] = substituteExpr(base->getKid(1), lhs, rhs);
-      kids[2] = substituteExpr(base->getKid(1), lhs, rhs);
-      return base->rebuild(kids);
+      kids[2] = substituteExpr(base->getKid(2), lhs, rhs);
+      if (kids[0].isNull())
+        return kids[0];
+      else if (kids[1].isNull())
+        return kids[1];
+      else if (kids[2].isNull())
+        return kids[2];
+      else
+        return base->rebuild(kids);
+    }
+    default: {
+      base->dump();
+      klee_error("TxWPHelper::substituteExpr: Expression not supported yet!");
     }
     }
   }
-
-  // Sanity check
-  //  klee_error("Control should not reach here in
-  //  TxWPHelper::substituteExpr!");
 
   return base;
 }
