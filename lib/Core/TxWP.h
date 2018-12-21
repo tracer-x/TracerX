@@ -139,12 +139,6 @@ public:
   ref<Expr> PushUp(
       std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
 
-  // \brief Generate expression from operand of an instruction
-  // The offset is only used when a pointer or array instruction are handled and
-  // first the offset is computed.
-  ref<Expr> generateExprFromOperand(llvm::Instruction *i, int operand,
-                                    ref<Expr> offset = NULL);
-
   // \brief Return LHS of an instruction as a read expression
   ref<Expr> getLHS(llvm::Instruction *i);
 
@@ -201,15 +195,61 @@ public:
   ref<Expr> replaceCallArguments(ref<Expr> wp, llvm::Value *funcArg,
                                  llvm::Value *callArg);
 
-  // \brief Generate and return the weakest precondition expressions.
-  ref<Expr> getPrevExpr(ref<Expr> e, llvm::Instruction *i);
-
   ref<Expr> getBrCondition(llvm::Instruction *ins);
+
+  // \brief Generate expression from operand of an instruction
+  // The offset is only used when a pointer or array instruction are handled and
+  // first the offset is computed.
+  ref<Expr> generateExprFromOperand(llvm::Value *val, ref<Expr> offset = NULL);
 
 private:
   ref<Expr> getCondition(llvm::Value *value);
-  ref<Expr> getCmpCondition(llvm::CmpInst *cmp);
   ref<Expr> getBinCondition(llvm::CmpInst *cmp);
+
+  // \brief Handling ConstantInt LLVM Value
+  ref<Expr> getConstantInt(llvm::ConstantInt *cmp);
+
+  // \brief Handling ConstantExpr LLVM Value
+  ref<Expr> getConstantExpr(llvm::ConstantExpr *ce);
+
+  // \brief Handling Function Argument LLVM Value
+  ref<Expr> getFunctionArgument(llvm::Argument *arg);
+
+  // \brief Handling Alloca LLVM Value
+  ref<Expr> getAllocaInst(llvm::AllocaInst *alc);
+
+  // \brief Handling Pointer LLVM Value
+  ref<Expr> getPointer(llvm::LoadInst *p);
+
+  // \brief Handling Load GEP LLVM Value
+  ref<Expr> getLoadGep(llvm::LoadInst *p);
+
+  // \brief Handling Load LLVM Value
+  ref<Expr> getLoad(llvm::LoadInst *p);
+
+  // \brief Handling Binary Operator
+  ref<Expr> getBinaryInst(llvm::BinaryOperator *bo);
+
+  // \brief Handling Casting Instructions
+  ref<Expr> getCastInst(llvm::CastInst *ci);
+
+  // \brief Handling Cmp Instructions
+  ref<Expr> getCmpCondition(llvm::CmpInst *cmp);
+
+  // \brief Handling Switch Instructions
+  ref<Expr> getSwitchInst(llvm::SwitchInst *si);
+
+  // \brief Handling Phi Instructions
+  ref<Expr> getPhiInst(llvm::PHINode *phi);
+
+  // \brief Handling GEP Instructions
+  ref<Expr> getGepInst(llvm::GetElementPtrInst *gep);
+
+  // \brief Handling Call Instructions
+  ref<Expr> getCallInst(llvm::CallInst *ci);
+
+  // \brief Handling Call kLEE_assume
+  ref<Expr> getCallAssume(llvm::CallInst *ci);
 };
 }
 #endif /* TXWP_H_ */
