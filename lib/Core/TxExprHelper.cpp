@@ -401,8 +401,7 @@ ref<Expr> TxExprHelper::makeExpr(ref<Expr> e,
  */
 ref<Expr> TxExprHelper::rangSimplify(ref<Expr> e) {
   // collect AndExpr
-  std::vector<ref<Expr> > andExprs;
-  TxPartitionHelper::getExprsFromAndExpr(e, andExprs);
+  std::vector<ref<Expr> > andExprs = TxPartitionHelper::getExprsFromAndExpr(e);
   std::vector<ref<Expr> > es = rangeSimplifyFromExprs(andExprs);
   return TxPartitionHelper::createAnd(es);
 }
@@ -419,8 +418,7 @@ TxExprHelper::rangeSimplifyFromExprs(std::vector<ref<Expr> > exprs) {
   for (std::vector<ref<Expr> >::const_iterator it = exprs.begin(),
                                                ie = exprs.end();
        it != ie; ++it) {
-    std::set<std::string> vars;
-    TxPartitionHelper::getExprVars(*it, vars);
+    std::set<std::string> vars = TxPartitionHelper::getExprVars(*it);
     if (vars.size() == 1) {
       var2refs[*vars.begin()].push_back(*it);
     } else {
@@ -453,8 +451,7 @@ TxExprHelper::rangeSimplifyFromExprs(std::set<ref<Expr> > exprs) {
   for (std::set<ref<Expr> >::const_iterator it = exprs.begin(),
                                             ie = exprs.end();
        it != ie; ++it) {
-    std::set<std::string> vars;
-    TxPartitionHelper::getExprVars(*it, vars);
+    std::set<std::string> vars = TxPartitionHelper::getExprVars(*it);
     if (vars.size() == 1) {
       var2refs[*vars.begin()].push_back(*it);
     } else {
