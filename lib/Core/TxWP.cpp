@@ -1090,112 +1090,67 @@ TxWeakestPreCondition::~TxWeakestPreCondition() {}
 ref<Expr> TxWeakestPreCondition::intersectWPExpr(ref<Expr> branchCondition,
                                                  ref<Expr> expr1,
                                                  ref<Expr> expr2) {
+  // v
+  std::set<std::string> bvars = TxPartitionHelper::getExprVars(branchCondition);
 
-  ref<Expr> res;
-  /*  //  llvm::outs() << "\nbranchCondition - expr1 - expr2 - interpolant\n";
-    //  if (!branchCondition.isNull())
-    //    branchCondition->dump();
-    //  llvm::outs() << "\n--------------\n";
-    //  if (!expr1.isNull())
-    //    expr1->dump();
-    //  llvm::outs() << "\n--------------\n";
-    //  if (!expr2.isNull())
-    //    expr2->dump();
-    //  llvm::outs() << "\n--------------\n";
-    //  if (!interpolant.isNull())
-    //    interpolant->dump();
-    //  llvm::outs() << "\n===============\n";
-
-    std::vector<Partition<ref<TxAllocationContext> > > conAddStoreParts =
-        TxPartitionHelper::partitionConAddStoreOnCond(branchCondition,
-                                                      concretelyAddressedStore);
-    //  llvm::outs() << "\n------concrete address store partitions-------\n";
-    //  branchCondition->dump();
-    //  for (unsigned int i = 0; i < conAddStoreParts.size(); i++) {
-    //    conAddStoreParts.at(i).print();
-    //    llvm::outs() << "\n-------------\n";
-    //  }
-    //  llvm::outs() << "\n===============\n";
-    //  llvm::outs() << "\n------start deleting address store partitions size =
-    "
-    //               << concretelyAddressedStore.size() << "\n";
-    for (TxStore::TopInterpolantStore::const_iterator
-             mapIt = concretelyAddressedStore.begin(),
-             mapIe = concretelyAddressedStore.end();
-         mapIt != mapIe; ++mapIt) {
-      if (!(conAddStoreParts[0].exprs.find(mapIt->first) ==
-            conAddStoreParts[0].exprs.end())) {
-        concretelyAddressedStore.erase(mapIt->first);
-      }
+  // Closure(W1,v)
+  std::set<std::string> closure1 = bvars;
+  std::vector<ref<Expr> > expr1Comps =
+      TxPartitionHelper::getExprsFromAndExpr(expr1);
+  for (std::vector<ref<Expr> >::iterator it = expr1Comps.begin(),
+                                         ie = expr1Comps.end();
+       it != ie; ++it) {
+    std::set<std::string> tmpVars = TxPartitionHelper::getExprVars(*it);
+    if (TxPartitionHelper::isShared(closure1, tmpVars)) {
+      closure1.insert(tmpVars.begin(), tmpVars.end());
     }
-    //  llvm::outs() << "\n------end deleting address store partitions size = "
-    //               << concretelyAddressedStore.size() << "\n";
+  }
 
-    // partition interpolant based on branchCondition
-    std::vector<ref<Expr> > interpolantExprs;
-    TxPartitionHelper::getExprsFromAndExpr(interpolant, interpolantExprs);
-    std::vector<Partition<ref<Expr> > > interpolantParts =
-        TxPartitionHelper::partitionExprsOnCond(branchCondition,
-                                                interpolantExprs);
+  // Closure(W2,v)
+  std::set<std::string> closure2 = bvars;
+  std::vector<ref<Expr> > expr2Comps =
+      TxPartitionHelper::getExprsFromAndExpr(expr2);
+  for (std::vector<ref<Expr> >::iterator it = expr2Comps.begin(),
+                                         ie = expr2Comps.end();
+       it != ie; ++it) {
+    std::set<std::string> tmpVars = TxPartitionHelper::getExprVars(*it);
+    if (TxPartitionHelper::isShared(closure2, tmpVars)) {
+      closure2.insert(tmpVars.begin(), tmpVars.end());
+    }
+  }
 
-    //  llvm::outs() << "\n------interpolant partitions-------\n";
-    //  for (unsigned int i = 0; i < interpolantParts.size(); i++) {
-    //    interpolantParts.at(i).print();
-    //    llvm::outs() << "\n-------------\n";
-    //  }
-    //  llvm::outs() << "\n===============\n";
+  std::set<std::string> closure = closure1;
+  closure.insert(closure2.begin(), closure2.end());
 
-    // partition w1 based on branchCondition
-    std::vector<ref<Expr> > w1Exprs;
-    TxPartitionHelper::getExprsFromAndExpr(expr1, w1Exprs);
-    std::vector<Partition<ref<Expr> > > w1Parts =
-        TxPartitionHelper::partitionExprsOnCond(branchCondition, w1Exprs);
+  // v1, v2
+  std::set<std::string> wp1vars = TxPartitionHelper::getExprVars(expr1);
+  std::set<std::string> v1 = TxPartitionHelper::diff(wp1vars, closure);
+  std::set<std::string> wp2vars = TxPartitionHelper::getExprVars(expr2);
+  std::set<std::string> v2 = TxPartitionHelper::diff(wp2vars, closure);
 
-    //  llvm::outs() << "\n------wp1 partitions-------\n";
-    //  for (unsigned int i = 0; i < w1Parts.size(); i++) {
-    //    w1Parts.at(i).print();
-    //    llvm::outs() << "\n-------------\n";
-    //  }
-    //  llvm::outs() << "\n===============\n";
+  std::vector<ref<Expr> > expr0Comps;
+  // proj(W1, v1)
+  for (std::vector<ref<Expr> >::iterator it = expr1Comps.begin(),
+                                         ie = expr1Comps.end();
+       it != ie; ++it) {
+    std::set<std::string> tmpVars = TxPartitionHelper::getExprVars(*it);
+    if (TxPartitionHelper::isShared(v1, tmpVars)) {
+      expr0Comps.push_back(*it);
+    }
+  }
 
-    // partition w2 based on branchCondition
-    std::vector<ref<Expr> > w2Exprs;
-    TxPartitionHelper::getExprsFromAndExpr(expr2, w2Exprs);
-    std::vector<Partition<ref<Expr> > > w2Parts =
-        TxPartitionHelper::partitionExprsOnCond(branchCondition, w2Exprs);
+  // proj(W2, v2)
+  for (std::vector<ref<Expr> >::iterator it = expr2Comps.begin(),
+                                         ie = expr2Comps.end();
+       it != ie; ++it) {
+    std::set<std::string> tmpVars = TxPartitionHelper::getExprVars(*it);
+    if (TxPartitionHelper::isShared(v2, tmpVars)) {
+      expr0Comps.push_back(*it);
+    }
+  }
 
-    //  llvm::outs() << "\n------wp2 partitions-------\n";
-    //  for (unsigned int i = 0; i < w2Parts.size(); i++) {
-    //    w2Parts.at(i).print();
-    //    llvm::outs() << "\n-------------\n";
-    //  }
-    //  llvm::outs() << "\n===============\n";
-
-    // Keep related part from interpolant and non-related parts from WP1 & WP2
-    interpolantParts.at(1).exprs.insert(w1Parts.at(0).exprs.begin(),
-                                        w1Parts.at(0).exprs.end());
-    interpolantParts.at(1).exprs.insert(w2Parts.at(0).exprs.begin(),
-                                        w2Parts.at(0).exprs.end());
-
-    //  llvm::outs() << "\n------after intersection 1 -------\n";
-    //  for (std::set<ref<Expr> >::const_iterator
-    //           exprIt = interpolantParts.at(1).exprs.begin(),
-    //           exprIe = interpolantParts.at(1).exprs.end();
-    //       exprIt != exprIe; ++exprIt) {
-    //    (*exprIt)->dump();
-    //  }
-    //  llvm::outs() << "\n===============\n";
-
-    std::vector<ref<Expr> > tmpExprs =
-        TxExprHelper::rangeSimplifyFromExprs(interpolantParts.at(1).exprs);
-    //  std::set<ref<Expr> > tmpExprs = interpolantParts.at(1).exprs;
-    ref<Expr> res = TxPartitionHelper::createAnd(tmpExprs);
-
-    //  llvm::outs() << "\n------after intersection 2 -------\n";
-    //  res->dump();
-    //  llvm::outs() << "\n===============\n";*/
-
-  return res;
+  ref<Expr> expr0 = TxPartitionHelper::createAnd(expr0Comps);
+  return expr0;
 }
 
 // std::map<std::string, ref<Expr> > TxWeakestPreCondition::extractExprs(
