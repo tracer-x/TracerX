@@ -1319,217 +1319,113 @@ TxWeakestPreCondition::intersectExpr_aux(std::vector<ref<Expr> > expr1,
 // Functions Updating the Subsumption Table Entry
 // =========================================================================
 
-// \brief The algorithm for merging the WP with the deletion interpolant:
-// 1- Extract the variables (Read & Concat expressions) from WP
-// 2- For each variable find the respective ref<TxAllocationContext> from
-//    wpStore
-// 3- Extract the LLVM::Value from TxAllocationContext (getValue() function)
-// 4- Search the components in entry and keep only the ref<TxAllocationContext>
-//    with the same LLVM::Value component and the longest callHistory size
-//    (similar to  TxDependency::getAddressofLatestCopyLLVMValue).
-//    The logic here is that if multiple copies of the same LLVM::Value
-//    exists (like local variables of a recursive function), then the one
-//    with the longest callHistory is the latest one and hence, corresponds
-//    to the respective variable in WP.
-// 5- Change the LowerInterpolantStore to read or concat Expr on the variable
-//    (In future we might need to change the name of the var to _shadow_var).
-// 6- Add the respective Array * for each variable from wp to existentials
-// 7- Replace the expression in interpolant component of entry with the WP
-//    expression.
-
+/**
+ * Use WP to update MIU & PI in markings
+ */
 TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
     TxSubsumptionTableEntry *entry) {
 
-  ref<Expr> wp = entry->getWPInterpolant();
-  // extract Arrays read expressions from wp
-  std::set<const Array *> readArrays;
-  TxExprHelper::extractArrays(wp, readArrays);
+  // vars(w)
+  std::set<std::string> wpVars =
+      TxPartitionHelper::getExprVars(entry->getWPInterpolant());
 
-  // Adding Arrays of shadow version of read expressions
-  std::set<const Array *> shadowArrays;
-  for (std::set<const Array *>::iterator it = readArrays.begin(),
-                                         ie = readArrays.end();
-       it != ie; ++it) {
-    const Array *sarr = TxShadowArray::getSymbolicShadowArray((*it)->getName());
-    if (sarr != NULL)
-      shadowArrays.insert(sarr);
-  }
-
-  // removing shadow version of vars in WP Expr from Existentials
-  std::set<const Array *> newExistentials = entry->getExistentials();
-  for (std::set<const Array *>::iterator iter = newExistentials.begin();
-       iter != newExistentials.end();) {
-    if (shadowArrays.find(*iter) != shadowArrays.end())
-      newExistentials.erase(iter++);
-    else
-      ++iter;
-  }
-  entry->setExistentials(newExistentials);
-
-  // get TxAllocationContexts for ReadExpr from wpStore
-  // Only one of the variable or its shadow would have TxAllocationContexts
-  std::map<const Array *, ref<TxAllocationContext> > exprToAllocContext;
-  for (std::set<const Array *>::iterator exprIt = readArrays.begin(),
-                                         exprIe = readArrays.end();
-       exprIt != exprIe; ++exprIt) {
-    // search TxAllocationContext & add to the map
-    ref<TxAllocationContext> address = wpStore->getAddress(*exprIt);
-    if (!address.isNull()) {
-      ref<Expr> var = wpStore->getExpr(address);
-      exprToAllocContext[*exprIt] = address;
-    }
-  }
-
-  // removing vars in WP Expr from concretelyAddressedStore
+  // get vars(pi, miu)
+  // vars(pi)
+  std::set<std::string> pimiuVars =
+      TxPartitionHelper::getExprVars(entry->getInterpolant());
+  // vars(miu)
   TxStore::TopInterpolantStore concretelyAddressedStore =
       entry->getConcretelyAddressedStore();
-  // process concretelyAddressedStore based on each value
-  for (std::map<const Array *, ref<TxAllocationContext> >::iterator
-           e2AllocContextIt = exprToAllocContext.begin(),
-           e2AllocContextIe = exprToAllocContext.end();
-       e2AllocContextIt != e2AllocContextIe; ++e2AllocContextIt) {
-    llvm::Value *val = e2AllocContextIt->second->getValue();
-    // Find the entry to be deleted from concretelyAddressedStore
-    // The entry with the same value and longest call history
-    unsigned int longest = 0;
-    bool inConcAddStore = false;
-    TopInterpolantStore::iterator candidateToDelete;
-    for (TopInterpolantStore::iterator
-             concAddStoreIt = concretelyAddressedStore.begin(),
-             concAddStoreIe = concretelyAddressedStore.end();
-         concAddStoreIt != concAddStoreIe; ++concAddStoreIt) {
-      if (concAddStoreIt->first->getValue() == val &&
-          concAddStoreIt->first->getCallHistory().size() >= longest) {
-        longest = concAddStoreIt->first->getCallHistory().size();
-        inConcAddStore = true;
-        candidateToDelete = concAddStoreIt;
-      }
+  for (TxStore::TopInterpolantStore::iterator
+           it1 = concretelyAddressedStore.begin(),
+           ie1 = concretelyAddressedStore.end();
+       it1 != ie1; ++it1) {
+    assert(strcmp(it1->first->getValue()->getName().data(), "") == 0 &&
+           "Value has no name!");
+    pimiuVars.insert(it1->first->getValue()->getName().data());
+    std::set<std::string> right = TxPartitionHelper::getExprVars(
+        it1->second.begin()->second->getExpression());
+    pimiuVars.insert(right.begin(), right.end());
+  }
+
+  // get v1 = vars(pi,miu) - vars(w)
+  std::set<std::string> v1 = TxPartitionHelper::diff(pimiuVars, wpVars);
+
+  // closure(pi,miu,v1)
+  std::set<std::string> v1star = v1;
+  // closure on pi
+  std::vector<ref<Expr> > piComps =
+      TxPartitionHelper::getExprsFromAndExpr(entry->getInterpolant());
+  for (std::vector<ref<Expr> >::iterator it = piComps.begin(),
+                                         ie = piComps.end();
+       it != ie; ++it) {
+    std::set<std::string> tmp = TxPartitionHelper::getExprVars(*it);
+    if (TxPartitionHelper::isShared(tmp, v1star)) {
+      v1star.insert(tmp.begin(), tmp.end());
     }
+  }
+  // closure on miu
+  for (TxStore::TopInterpolantStore::iterator
+           it1 = concretelyAddressedStore.begin(),
+           ie1 = concretelyAddressedStore.end();
+       it1 != ie1; ++it1) {
+    std::set<std::string> tmp;
+    assert(strcmp(it1->first->getValue()->getName().data(), "") == 0 &&
+           "Value has no name!");
+    tmp.insert(it1->first->getValue()->getName().data());
+    std::set<std::string> right = TxPartitionHelper::getExprVars(
+        it1->second.begin()->second->getExpression());
+    tmp.insert(right.begin(), right.end());
+    if (TxPartitionHelper::isShared(tmp, v1star)) {
+      v1star.insert(tmp.begin(), tmp.end());
+    }
+  }
 
-    // Commenting this check, apparantly some WP expressions might not be
-    // marked!!!
-    /*if (!inConcAddStore && concretelyAddressedStore.size() > 0) {
-      wp->dump();
-      val->dump();
-      entry->dump();
-      llvm::errs() << "concretelyAddressedStore size:"
-                   << concretelyAddressedStore.size() << "\n";
-      klee_error("TxWeakestPreCondition::updateSubsumptionTableEntry: cannot "
-                 "find TxAllocationContext in concretelyAddressedStore");
-    } */
+  // v2
+  std::set<std::string> v2 = TxPartitionHelper::diff(wpVars, v1star);
 
-    if (inConcAddStore)
-      concretelyAddressedStore.erase(candidateToDelete);
+  // update pi by (wp,v2) and (pi,v1star)
+  std::vector<ref<Expr> > wpComps =
+      TxPartitionHelper::getExprsFromAndExpr(entry->getWPInterpolant());
+  std::vector<ref<Expr> > newpiComps;
+  for (std::vector<ref<Expr> >::iterator it = wpComps.begin(),
+                                         ie = wpComps.end();
+       it != ie; ++it) {
+    std::set<std::string> tmp = TxPartitionHelper::getExprVars(*it);
+    if (TxPartitionHelper::isShared(tmp, v2)) {
+      newpiComps.push_back(*it);
+    }
+  }
+  for (std::vector<ref<Expr> >::iterator it = piComps.begin(),
+                                         ie = piComps.end();
+       it != ie; ++it) {
+    std::set<std::string> tmp = TxPartitionHelper::getExprVars(*it);
+    if (TxPartitionHelper::isShared(tmp, v1star)) {
+      newpiComps.push_back(*it);
+    }
+  }
+  entry->setInterpolant(TxPartitionHelper::createAnd(newpiComps));
+
+  // update miu by (miu, v1star)
+  for (TxStore::TopInterpolantStore::iterator
+           it1 = concretelyAddressedStore.begin(),
+           ie1 = concretelyAddressedStore.end();
+       it1 != ie1; ++it1) {
+    std::set<std::string> tmp;
+    assert(strcmp(it1->first->getValue()->getName().data(), "") == 0 &&
+           "Value has no name!");
+    tmp.insert(it1->first->getValue()->getName().data());
+    std::set<std::string> right = TxPartitionHelper::getExprVars(
+        it1->second.begin()->second->getExpression());
+    tmp.insert(right.begin(), right.end());
+
+    if (!TxPartitionHelper::isShared(tmp, v1star)) {
+      concretelyAddressedStore.erase(it1);
+    }
   }
   entry->setConcretelyAddressedStore(concretelyAddressedStore);
 
-  // removing shadow version of vars in WP Expr from Existentials
-  ref<Expr> interpolant = entry->getInterpolant();
-  if (!interpolant.isNull()) {
-    ref<Expr> newInterpolant =
-        TxExprHelper::removeShadowExprs(interpolant, shadowArrays);
-    entry->setInterpolant(newInterpolant);
-  }
-
-  if (entry->getConcretelyAddressedHistoricalStore().size() > 0 ||
-      entry->getSymbolicallyAddressedHistoricalStore().size() > 0 ||
-      entry->getSymbolicallyAddressedStore().size() > 0) {
-    entry->dump();
-    klee_error("TxWeakestPreCondition::updateSubsumptionTableEntry: "
-               "ConcretelyAddressedHistoricalStore or "
-               "SymbolicallyAddressedHistoricalStore or "
-               "SymbolicallyAddressedStore are not empty.");
-  }
-
   return entry;
-
-  /*
-   ref<Expr> interpolant = entry->getInterpolant();
-   TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore =
-   entry->getConcretelyAddressedHistoricalStore();
-   TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore =
-   entry->getSymbolicallyAddressedHistoricalStore();
-   TxStore::TopInterpolantStore concretelyAddressedStore =
-   entry->getConcretelyAddressedStore();
-   TxStore::TopInterpolantStore symbolicallyAddressedStore =
-   entry->getSymbolicallyAddressedStore();
-   std::set<const Array *> existentials = entry->getExistentials();
-
-   if (concretelyAddressedHistoricalStore.size() > 0 ||
-   symbolicallyAddressedStore.size() > 0 ||
-   symbolicallyAddressedHistoricalStore.size() > 0) {
-   llvm::errs() << "Size of concretelyAddressedHistoricalStore: "
-   << concretelyAddressedStore.size() << "\n";
-   llvm::errs() << "Size of symbolicallyAddressedStore: "
-   << concretelyAddressedStore.size() << "\n";
-   llvm::errs() << "Size of symbolicallyAddressedHistoricalStore: "
-   << concretelyAddressedStore.size() << "\n";
-   klee_error(
-   "TxWeakestPreCondition::updateSubsumptionTableEntry for this case "
-   "is not implemented yet.");
-   } else {
-   // TODO: Should apply the algorithm above.
-   TxStore::TopInterpolantStore newConcretelyAddressedStore =
-   updateConcretelyAddressedStore(concretelyAddressedStore, wp);
-   entry->setConcretelyAddressedStore(newConcretelyAddressedStore);
-   //    ref<Expr> newInterpolant =
-   //        updateInterpolant(interpolant, replaceArrayWithShadow(wp));
-   //    std::set<const Array *> newExistentials =
-   //        updateExistentials(existentials, wp);
-   //    entry->setInterpolant(newInterpolant);
-   //    entry->setExistentials(newExistentials);
-   }
-   if (debugSubsumptionLevel >= 4) {
-   // For future reference
-   if (!interpolant.isNull())
-   interpolant->dump();
-
-   concretelyAddressedStore = entry->getConcretelyAddressedStore();
-   for (TopInterpolantStore::const_iterator
-   it = concretelyAddressedStore.begin(),
-   ie = concretelyAddressedStore.end();
-   it != ie; ++it) {
-   (*it).first->dump();
-   LowerInterpolantStore temp = (*it).second;
-   for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
-   ie2 = temp.end();
-   it2 != ie2; ++it2) {
-   (*it2).first->dump();
-   (*it2).second->dump();
-   }
-   }
-   for (TopInterpolantStore::const_iterator
-   it = symbolicallyAddressedStore.begin(),
-   ie = symbolicallyAddressedStore.end();
-   it != ie; ++it) {
-   (*it).first->dump();
-   LowerInterpolantStore temp = (*it).second;
-   for (LowerInterpolantStore::const_iterator it2 = temp.begin(),
-   ie2 = temp.end();
-   it2 != ie2; ++it2) {
-   (*it2).first->dump();
-   (*it2).second->dump();
-   }
-   }
-
-   for (LowerInterpolantStore::const_iterator
-   it = concretelyAddressedHistoricalStore.begin(),
-   ie = concretelyAddressedHistoricalStore.end();
-   it != ie; ++it) {
-   (*it).first->dump();
-   (*it).second->dump();
-   }
-
-   for (LowerInterpolantStore::const_iterator
-   it = symbolicallyAddressedHistoricalStore.begin(),
-   ie = symbolicallyAddressedHistoricalStore.end();
-   it != ie; ++it) {
-   (*it).first->dump();
-   (*it).second->dump();
-   }
-   }
-   return entry;
-   */
 }
 
 TxStore::TopInterpolantStore
