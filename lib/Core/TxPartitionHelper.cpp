@@ -139,10 +139,12 @@ std::set<std::string> TxPartitionHelper::diff(std::set<std::string> ss1,
 }
 
 ref<Expr> TxPartitionHelper::createAnd(std::vector<ref<Expr> > exprs) {
-  assert(exprs.size() > 0 && "No element in input!");
-
+  ref<Expr> result;
+  if (exprs.size() == 0) {
+    return result;
+  }
   std::vector<ref<Expr> >::const_iterator it = exprs.begin();
-  ref<Expr> result = *(it);
+  result = *(it);
   std::advance(it, 1);
   if (exprs.size() >= 1) {
     for (; it != exprs.end(); ++it) {
