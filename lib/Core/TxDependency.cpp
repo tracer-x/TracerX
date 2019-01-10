@@ -15,17 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "TxDependency.h"
-#include "Context.h"
-#include "TxShadowArray.h"
-#include "TxWP.h"
-#include <klee/util/ArrayCache.h>
 
 #include "Context.h"
-#include "TxShadowArray.h"
 #include "klee/CommandLine.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "klee/util/GetElementPtrTypeIterator.h"
 #include "klee/util/TxPrintUtil.h"
+#include "TxShadowArray.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
@@ -68,185 +64,6 @@ TxDependency::registerNewTxStateValue(llvm::Value *value,
   return vvalue;
 }
 
-ref<Expr> TxDependency::getAddress(llvm::Value *value, ArrayCache *ac,
-                                   const Array *tmpArray,
-                                   TxWeakestPreCondition *wp,
-                                   ref<Expr> offset) {
-  if (!value->hasName()) {
-    value->dump();
-    klee_error("Dependency::getAddress:Instruction has no name!\n");
-  }
-
-  ref<TxAllocationContext> addressContext =
-      store->getAddressofLatestCopyLLVMValue(value);
-  std::map<ref<TxAllocationContext>,
-           std::pair<const Array *, ref<Expr> > >::iterator asi =
-      wp->getWPStore()->arrayStore.find(addressContext);
-  if (asi != wp->getWPStore()->arrayStore.end()) {
-    return asi->second.second;
-  }
-
-  std::string arrayName = value->getName();
-  if (arrayName == "")
-    klee_error("Dependency::getAddress Arrayname is empty !\n");
-
-  // It seems these are not needed any more
-  //  const std::string ext(".addr");
-  //  if (arrayName.find(ext) != std::string::npos)
-  //    arrayName = arrayName.substr(0, arrayName.size() - ext.size());
-
-  const Array *symArray = TxShadowArray::getSymbolicArray(arrayName);
-  if (symArray != NULL) {
-    // Symbolic array exists. Generating shadow Expr.
-    ref<Expr> Res(0);
-    unsigned NumBytes = symArray->getSize();
-    assert(symArray->getSize() == NumBytes && "Invalid read size!");
-
-    for (unsigned i = 0; i != NumBytes; ++i) {
-      unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
-      ref<Expr> updOffset = ConstantExpr::alloc(idx, symArray->getDomain());
-      if (!offset.isNull())
-        updOffset = AddExpr::create(
-            offset, ConstantExpr::alloc(idx, symArray->getDomain()));
-
-      ref<Expr> Byte = ReadExpr::create(UpdateList(symArray, 0), updOffset);
-      Res = i ? ConcatExpr::create(Byte, Res) : Byte;
-    }
-    // Storing entry
-    wp->getWPStore()->insert(addressContext, symArray, Res);
-    return Res;
-  }
-
-  ref<Expr> tmpExpr;
-  if (!offset.isNull())
-    // Symbolic array doesn't exist create one
-    tmpExpr = wp->getWPStore()->createAndInsert(addressContext, arrayName,
-                                                value, offset);
-  else
-    // Symbolic array doesn't exist create one
-    tmpExpr =
-        wp->getWPStore()->createAndInsert(addressContext, arrayName, value);
-
-  //  llvm::outs() << "****Start TxDependency::getAddress 2****\n";
-  //  for (std::map<ref<TxAllocationContext>,
-  //                std::pair<const Array *, ref<Expr> > >::iterator
-  //           it = wp->getWPStore()->arrayStore.begin(),
-  //           ie = wp->getWPStore()->arrayStore.end();
-  //       it != ie; ++it) {
-  //    it->first->dump();
-  //    it->second.second->dump();
-  //  }
-  //  llvm::outs() << "****End TxDependency::getAddress 2****\n";
-
-  return tmpExpr;
-}
-
-ref<Expr> TxDependency::getPointerAddress(llvm::ConstantExpr *gep,
-                                          ArrayCache *ac, const Array *tmpArray,
-                                          TxWeakestPreCondition *wp) {
-  gep->dump();
-  klee_error("TxDependency::getPointerAddress\n");
-
-  std::string arrayName;
-  const std::string ext(".addr");
-  const Array *symArray;
-  ref<Expr> Res;
-  long int offset = 0;
-  ref<Expr> tmpExpr;
-
-  // Todo: only catching the type of integer and pointers
-  unsigned int size = 0;
-  if (gep->getType()->isIntegerTy()) {
-    size = gep->getType()->getIntegerBitWidth();
-  } else if (gep->getType()->isPointerTy() &&
-             gep->getType()->getArrayElementType()->isIntegerTy()) {
-    size = gep->getType()->getArrayElementType()->getIntegerBitWidth();
-  } else if (gep->getType()->isPointerTy() &&
-             gep->getType()->getArrayElementType()->isArrayTy() &&
-             gep->getType()
-                 ->getArrayElementType()
-                 ->getArrayElementType()
-                 ->isIntegerTy()) {
-    size = gep->getType()
-               ->getArrayElementType()
-               ->getArrayElementType()
-               ->getIntegerBitWidth();
-  } else {
-    gep->getType()->dump();
-    klee_error(
-        "Dependency::getPointerAddress getting size is not defined for this "
-        "type yet");
-  }
-
-  if (gep->getNumOperands() == 3) {
-    if (llvm::ConstantInt *CI =
-            dyn_cast<llvm::ConstantInt>(gep->getOperand(2))) {
-      if (CI->getBitWidth() <= 64) {
-        offset = CI->getSExtValue();
-      } else {
-        klee_error("Dependency::getPointerAddress bit size is incorrect.");
-      }
-    } else {
-      klee_error("Dependency::getPointerAddress not integer.");
-    }
-
-    if (!gep->getOperand(0)->hasName()) {
-      klee_error("Dependency::getPointerAddress Instruction has no name!\n");
-    }
-    arrayName = gep->getOperand(0)->getName();
-    if (arrayName == "")
-      klee_error("Dependency::getPointerAddress Arrayname is empty !\n");
-
-    if (arrayName.find(ext) != std::string::npos)
-      arrayName = arrayName.substr(0, arrayName.size() - ext.size());
-    symArray = TxShadowArray::getSymbolicArray(arrayName);
-
-    if (symArray != NULL) {
-      // Symbolic array exists. Generating shadow Expr.
-      unsigned NumBytes = size / 8;
-      if (NumBytes > 1)
-        klee_error("Dependency::getPointerAddress Expression generation not "
-                   "implemented yet");
-      Res =
-          ReadExpr::create(UpdateList(symArray, 0),
-                           ConstantExpr::alloc(offset, symArray->getDomain()));
-
-      // Storing entry
-      // TODO: Uncomment
-      // TxWPArrayStore::insert(gep, symArray, Res);
-      return Res;
-    } else {
-      klee_error("Dependency::getPointerAddress Symbolic array not exists.");
-      return tmpExpr;
-    }
-  } else {
-    klee_error("Dependency::getPointerAddress for more or less than 3 "
-               "arguments to getElementPtrConstantExpr not implemented yet.");
-    return tmpExpr;
-  }
-}
-
-ref<Expr>
-TxDependency::getLatestValueOfAddress(ref<TxAllocationContext> address) {
-
-  bool allowInconsistency = true;
-  ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
-
-  ref<TxStateValue> addressValue =
-      this->getLatestValue(address->getValue(), address->getCallHistory(),
-                           dummy, allowInconsistency);
-
-  if (addressValue.isNull())
-    return dummy;
-  ref<TxStateAddress> stateAddress = addressValue->getPointerInfo();
-  if (stateAddress.isNull())
-    klee_error("Dependency::getLatestValueOfAddress Address is null");
-  ref<TxStoreEntry> entry = store->find(stateAddress);
-  if (entry.isNull())
-    klee_error("Dependency::getLatestValueOfAddress No entry found");
-  return entry->getContent()->getExpression();
-}
-
 ref<TxStateValue> TxDependency::getLatestValue(
     llvm::Value *value, const std::vector<llvm::Instruction *> &callHistory,
     ref<Expr> valueExpr, bool allowInconsistency) {
@@ -268,7 +85,7 @@ ref<TxStateValue> TxDependency::getLatestValueNoConstantCheck(
   assert(value && "value cannot be null");
 
   std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::const_iterator
-      valuesMapIter = valuesMap.find(value);
+  valuesMapIter = valuesMap.find(value);
 
   if (valuesMapIter != valuesMap.end()) {
     if (!valueExpr.isNull()) {
@@ -628,8 +445,8 @@ void TxDependency::execute(llvm::Instruction *instr,
               returnValue);
         }
       } else if (std::mismatch(getValuePrefix.begin(), getValuePrefix.end(),
-                               calleeName.begin())
-                         .first == getValuePrefix.end() &&
+                               calleeName.begin()).first ==
+                     getValuePrefix.end() &&
                  args.size() == 2) {
         addDependencyViaExternalFunction(
             callHistory,
@@ -730,8 +547,8 @@ void TxDependency::execute(llvm::Instruction *instr,
       if (!val.isNull()) {
         addDependency(val, getNewTxStateValue(instr, callHistory, argExpr));
       } else if (!llvm::isa<llvm::Constant>(instr->getOperand(0)))
-      // Constants would kill dependencies, the remaining is for
-      // cases that may actually require dependencies.
+          // Constants would kill dependencies, the remaining is for
+          // cases that may actually require dependencies.
       {
         if (instr->getOperand(0)->getType()->isPointerTy()) {
           uint64_t size = targetData->getTypeStoreSize(
@@ -970,8 +787,8 @@ void TxDependency::execute(llvm::Instruction *instr,
               val, getNewTxStateValue(instr, callHistory, result));
         }
       } else if (!llvm::isa<llvm::Constant>(instr->getOperand(0)))
-      // Constants would kill dependencies, the remaining is for
-      // cases that may actually require dependencies.
+          // Constants would kill dependencies, the remaining is for
+          // cases that may actually require dependencies.
       {
         if (instr->getOperand(0)->getType()->isPointerTy()) {
           uint64_t size = targetData->getTypeStoreSize(
@@ -1133,10 +950,10 @@ void TxDependency::executeMakeSymbolic(
                      storedValue);
 }
 
-void TxDependency::executePHI(
-    llvm::Instruction *instr, unsigned int incomingBlock,
-    const std::vector<llvm::Instruction *> &callHistory, ref<Expr> valueExpr,
-    bool symbolicExecutionError) {
+void
+TxDependency::executePHI(llvm::Instruction *instr, unsigned int incomingBlock,
+                         const std::vector<llvm::Instruction *> &callHistory,
+                         ref<Expr> valueExpr, bool symbolicExecutionError) {
   llvm::PHINode *node = llvm::dyn_cast<llvm::PHINode>(instr);
   llvm::Value *llvmArgValue = node->getIncomingValue(incomingBlock);
   ref<TxStateValue> val = getLatestValue(llvmArgValue, callHistory, valueExpr);
@@ -1208,9 +1025,10 @@ bool TxDependency::executeMemoryOperation(
   return ret;
 }
 
-void TxDependency::bindCallArguments(
-    llvm::Instruction *i, std::vector<llvm::Instruction *> &callHistory,
-    std::vector<ref<Expr> > &arguments) {
+void
+TxDependency::bindCallArguments(llvm::Instruction *i,
+                                std::vector<llvm::Instruction *> &callHistory,
+                                std::vector<ref<Expr> > &arguments) {
   llvm::CallInst *site = llvm::dyn_cast<llvm::CallInst>(i);
 
   if (!site)
@@ -1244,9 +1062,10 @@ void TxDependency::bindCallArguments(
   }
 }
 
-void TxDependency::bindReturnValue(
-    llvm::CallInst *site, std::vector<llvm::Instruction *> &callHistory,
-    llvm::Instruction *i, ref<Expr> returnValue) {
+void
+TxDependency::bindReturnValue(llvm::CallInst *site,
+                              std::vector<llvm::Instruction *> &callHistory,
+                              llvm::Instruction *i, ref<Expr> returnValue) {
   llvm::ReturnInst *retInst = llvm::dyn_cast<llvm::ReturnInst>(i);
   if (site && retInst &&
       retInst->getReturnValue() // For functions returning void
@@ -1389,9 +1208,8 @@ ref<TxStateValue> TxDependency::evalConstant(
                    llvm::dyn_cast<llvm::ConstantDataSequential>(c)) {
       std::vector<ref<Expr> > kids;
       for (unsigned i = 0, e = cds->getNumElements(); i != e; ++i) {
-        ref<Expr> kid =
-            evalConstant(cds->getElementAsConstant(i), emptyCallHistory)
-                ->getExpression();
+        ref<Expr> kid = evalConstant(cds->getElementAsConstant(i),
+                                     emptyCallHistory)->getExpression();
         kids.push_back(kid);
       }
       return createConstantValue(

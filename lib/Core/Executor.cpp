@@ -897,8 +897,6 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       // We then extract the unsatisfiability core of antecedent and not
       // consequent as the Craig interpolant.
       txTree->markPathCondition(current, unsatCore);
-      if (WPInterpolant)
-        txTree->markInstruction(current.prevPC, true);
     }
 
     return StatePair(&current, 0);
@@ -914,8 +912,6 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       // which means that antecedent -> not(consequent) is valid. In this
       // case also we extract the unsat core of the proof
       txTree->markPathCondition(current, unsatCore);
-      if (WPInterpolant)
-        txTree->markInstruction(current.prevPC, false);
     }
 
     return StatePair(0, &current);
@@ -1718,9 +1714,6 @@ static inline const llvm::fltSemantics *fpWidthToSemantics(unsigned width) {
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
-
-  if (INTERPOLATION_ENABLED && WPInterpolant)
-    txTree->storeInstruction(ki);
 
   switch (i->getOpcode()) {
   // Control flow
@@ -3018,7 +3011,7 @@ void Executor::updateStates(ExecutionState *current) {
       seedMap.erase(it3);
     processTree->remove(es->ptreeNode);
     if (INTERPOLATION_ENABLED)
-      txTree->remove(es,solver, (current == 0));
+      txTree->remove(es->txTreeNode, (current == 0));
     delete es;
   }
   removedStates.clear();
@@ -3362,7 +3355,7 @@ void Executor::terminateState(ExecutionState &state) {
     processTree->remove(state.ptreeNode);
 
     if (INTERPOLATION_ENABLED)
-      txTree->remove(&state,solver, false);
+      txTree->remove(state.txTreeNode, false);
     delete &state;
   }
 }
@@ -3499,8 +3492,6 @@ void Executor::terminateStateOnError(ExecutionState &state,
       state.txTreeNode->setGenericEarlyTermination();
       TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
     }
-    if (WPInterpolant)
-      state.txTreeNode->setAssertionFail(EmitAllErrors);
   }
 
   std::string message = messaget.str();

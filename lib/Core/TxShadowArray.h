@@ -41,10 +41,6 @@ namespace klee {
     static std::string getShadowName(std::string name) {
       return "__shadow__" + name;
     }
-
-    static const Array *getSymbolicArray(std::string name);
-
-    static const Array *getSymbolicShadowArray(std::string name);
   };
 
 }
