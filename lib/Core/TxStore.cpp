@@ -234,6 +234,37 @@ void TxStore::getStoredCoreExpressions(
                    _symbolicallyAddressedHistoricalStore);
 }
 
+ref<TxAllocationContext>
+TxStore::getAddressofLatestCopyLLVMValue(llvm::Value *val) {
+  ref<TxAllocationContext> address;
+  bool foundValue = false;
+  for (TopStateStore::const_iterator it = internalStore.begin(),
+                                     ie = internalStore.end();
+       it != ie; ++it) {
+    ref<TxAllocationContext> temp = (*it).first;
+    if (temp->getValue() == val) {
+      if (!foundValue) {
+        address = temp;
+        foundValue = true;
+      } else if (temp->getCallHistory().size() >
+                 address->getCallHistory().size()) {
+        address = temp;
+      }
+    }
+  }
+  if (foundValue)
+    return address;
+
+  // Sanity Check
+  llvm::errs() << "LLVM Value:\n";
+  val->dump();
+  llvm::errs() << "Store:\n";
+  this->dump();
+  llvm::errs() << "TxStore::getAddressofLatestCopyLLVMValue LLVM::Value not "
+                  "found in store!";
+  exit(0);
+}
+
 inline void TxStore::concreteToInterpolant(
     ref<TxVariable> variable, ref<TxStoreEntry> entry,
     const std::map<ref<Expr>, ref<Expr> > &substitution,

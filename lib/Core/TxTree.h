@@ -25,11 +25,13 @@
 #include "klee/TimerStatIncrementer.h"
 #include "klee/util/ExprVisitor.h"
 #include "klee/util/TxTreeGraph.h"
-
 #include "llvm/Support/raw_ostream.h"
 #include "TxDependency.h"
+#include "TxWP.h"
 
 namespace klee {
+
+class TxWPArrayStore;
 
 /// \brief The subsumption table.
 ///
@@ -175,6 +177,12 @@ class TxSubsumptionTableEntry {
 
   TxStore::TopInterpolantStore symbolicallyAddressedStore;
 
+  ref<Expr> wpInterpolant;
+
+  /// \brief Performs the replacement mechanism for replacing variables in WP
+  /// Expr, used in replacing free with bound variables.
+  TxWPArrayStore *wpStore;
+
   std::set<const Array *> existentials;
 
   /// \brief A procedure for building subsumption check constraints using
@@ -319,8 +327,39 @@ public:
 
   ref<Expr> getInterpolant() const;
 
+  ref<Expr> getWPInterpolant() const;
+
+  TxStore::LowerInterpolantStore getConcretelyAddressedHistoricalStore() const;
+
+  TxStore::LowerInterpolantStore
+  getSymbolicallyAddressedHistoricalStore() const;
+
+  TxStore::TopInterpolantStore getConcretelyAddressedStore() const;
+
+  TxStore::TopInterpolantStore getSymbolicallyAddressedStore() const;
+
+  std::set<const Array *> getExistentials() const;
+
+  void setInterpolant(ref<Expr> _interpolant);
+
+  void setConcretelyAddressedHistoricalStore(
+      TxStore::LowerInterpolantStore _concretelyAddressedHistoricalStore);
+
+  void setSymbolicallyAddressedHistoricalStore(
+      TxStore::LowerInterpolantStore _symbolicallyAddressedHistoricalStore);
+
+  void setConcretelyAddressedStore(
+      TxStore::TopInterpolantStore _concretelyAddressedStore);
+
+  void setSymbolicallyAddressedStore(
+      TxStore::TopInterpolantStore _symbolicallyAddressedStore);
+
+  void setExistentials(std::set<const Array *> _existentials);
+
   void dump() const {
     this->print(llvm::errs());
+    llvm::errs() << "\n";
+    this->printWP(llvm::errs());
     llvm::errs() << "\n";
   }
 
@@ -329,6 +368,12 @@ public:
   void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
 
   void print(llvm::raw_ostream &stream, const std::string &prefix) const;
+
+  void printWP(llvm::raw_ostream &stream) const;
+
+  void printWP(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
+
+  void printWP(llvm::raw_ostream &stream, const std::string &prefix) const;
 };
 
 /// \brief The Tracer-X symbolic execution tree node.
@@ -354,6 +399,7 @@ class TxTreeNode {
   // class
 
   static Statistic getInterpolantTime;
+  static Statistic getWPInterpolantTime;
   static Statistic addConstraintTime;
   static Statistic splitTime;
   static Statistic executeTime;
@@ -369,9 +415,30 @@ class TxTreeNode {
   /// \brief Value dependencies
   TxDependency *dependency;
 
+  // \brief Instance of weakest precondition class used to generate WP
+  // interpolant
+  TxWeakestPreCondition *wp;
+
+  /// \brief Child WP expressions
+  ref<Expr> childWPInterpolant[2];
+
+  /// \brief Child WP Array Stores
+  TxWPArrayStore *childArrayStore[2];
+
+  /// \brief An expressions representing branch condition (used in partitioning)
+  ref<Expr> branchCondition;
+
   TxTreeNode *parent, *left, *right;
 
   uintptr_t programPoint;
+
+  /// \brief List of the instructions in the node in a reverse order (used only
+  /// in WP interpolation)
+  /// Second argument is 0 means instruction is not dependent to any target
+  /// Second argument is 1 means instruction is dependent to a target
+  /// Second argument is 2 means negation of the instruction is dependent to a
+  /// target
+  std::vector<std::pair<KInstruction *, int> > reverseInstructionList;
 
   uint64_t nodeSequenceNumber;
 
@@ -393,6 +460,9 @@ class TxTreeNode {
 
   /// \brief Indicates that a generic error was encountered in this node
   bool genericEarlyTermination;
+
+  bool assertionFail;
+  bool emitAllErrors;
 
   void setProgramPoint(llvm::Instruction *instr) {
     if (!programPoint)
@@ -456,6 +526,49 @@ public:
   /// \return The interpolant expression.
   ref<Expr> getInterpolant(std::set<const Array *> &replacements,
                            std::map<ref<Expr>, ref<Expr> > &substitution) const;
+
+  /// \brief Retrieve the weakest precondition push up for this node as KLEE
+  /// expression object
+  ///
+  /// \return Generate and return the weakest precondition push up
+  /// expression.
+  ref<Expr> generateWPInterpolant();
+
+  /// \return Return the weakest precondition object
+  TxWeakestPreCondition *getWP() { return wp; }
+
+  /// \brief Store the child WP interpolants in the parent node
+  void setChildWPInterpolant(ref<Expr> interpolant);
+
+  /// \brief Get the stored child WP interpolants in the parent node
+  ref<Expr> getChildWPInterpolant(int flag);
+
+
+  llvm::Instruction *getPreviousInstruction(llvm::PHINode *phi);
+
+  /// \brief Store the child WP interpolants in the parent node
+  void setChildWPStore(TxWPArrayStore *arrayStore);
+
+  /// \brief Get the stored child WP Array Store in the parent node
+  TxWPArrayStore *getChildWPStore(int flag);
+
+
+  /// \brief Store the BranchCondition in the parent node (used for WP
+  /// intersection)
+  void setBranchCondition(ref<Expr> _branchCondition) {
+    branchCondition = _branchCondition;
+  }
+
+  /// \brief Get the stored BranchCondition from the parent node (used for WP
+  /// intersection)
+  ref<Expr> getBranchCondition() { return branchCondition; }
+
+  // \brief Instantiates the variables in WPExpr by their latest value for the
+  // implication test.
+  ref<Expr> instantiateWPatSubsumption(ref<Expr> wpInterpolant);
+
+  /// \brief Copy WP to the parent node at subsumption point
+  void setWPatSubsumption(ref<Expr> _wpInterpolant);
 
   /// \brief Extend the path condition with another constraint
   ///
@@ -540,6 +653,11 @@ public:
   }
 
   void setGenericEarlyTermination() { genericEarlyTermination = true; }
+
+  void setAssertionFail(bool _emitAllErrors) {
+    assertionFail = true;
+    emitAllErrors = _emitAllErrors;
+  }
 
   TxStore *getStore() const { return dependency->getStore(); }
 
@@ -732,7 +850,7 @@ public:
   /// \param dumping Indicates whether we are dumping the states at the point
   /// KLEE itself is about to terminate. Here we should not create subsumption
   /// table entry.
-  void remove(TxTreeNode *node, bool dumping);
+  void remove(ExecutionState *state, TimingSolver *solver, bool dumping);
 
   /// \brief Invokes the subsumption check
   bool subsumptionCheck(TimingSolver *solver, ExecutionState &state,
@@ -860,6 +978,14 @@ public:
   /// dependency information, given a particular interpolation tree node.
   static void executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
                             std::vector<ref<Expr> > &args);
+
+  /// \brief Store instruction stores the list of instructions in a node
+  /// in reverse order for computing weakest precondition interpolant
+  void storeInstruction(KInstruction *instr);
+
+  /// \brief Mark an instruction in a node which contributes to computing
+  /// weakest precondition interpolant
+  void markInstruction(KInstruction *instr, bool branchFlag);
 
   /// \brief Print the content of the tree node object into a stream.
   ///
