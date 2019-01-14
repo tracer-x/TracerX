@@ -61,8 +61,9 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
       symbolicallyAddressedHistoricalStore);
 
-  if (WPInterpolant)
-    wpInterpolant = node->generateWPInterpolant();
+  // TODO: WP
+  //  if (WPInterpolant)
+  //    wpInterpolant = node->generateWPInterpolant();
 }
 
 TxSubsumptionTableEntry::~TxSubsumptionTableEntry() {}
@@ -792,7 +793,7 @@ bool TxSubsumptionTableEntry::subsumed(
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
-  if (WPInterpolant) {
+  if (WPInterpolant && !wpInterpolant.isNull()) {
     // Checking if weakest pre-condition holds. In case WPInterpolant
     // flag is set, this serves as the first check when subsuming a node.
     // If it fails then false is returned. If it succeeds then the
@@ -833,7 +834,7 @@ bool TxSubsumptionTableEntry::subsumed(
                    nodeSequenceNumber);
     }
 
-    if (WPInterpolant)
+    if (WPInterpolant && !wpInterpolant.isNull())
       // In case a node is subsumed, the WP Expr is stored at the parent node.
       // This is crucial for generating WP Expr at the parent node.
       state.txTreeNode->setWPatSubsumption(wpInterpolant);
@@ -1341,7 +1342,7 @@ bool TxSubsumptionTableEntry::subsumed(
 
       interpolateValues(state, coreValues, corePointerValues,
                         debugSubsumptionLevel);
-      if (WPInterpolant)
+      if (WPInterpolant && !wpInterpolant.isNull())
         // In case a node is subsumed, the WP Expr is stored at the parent node.
         // This is crucial for generating WP Expr at the parent node.
         state.txTreeNode->setWPatSubsumption(wpInterpolant);
@@ -1414,10 +1415,9 @@ bool TxSubsumptionTableEntry::subsumed(
                          state.txTreeNode->getNodeSequenceNumber(),
                          nodeSequenceNumber, msg.c_str());
           }
-          if (WPInterpolant)
+          if (WPInterpolant && !wpInterpolant.isNull())
             // In case a node is subsumed, the WP Expr is stored at the parent
-            // node.
-            // This is crucial for generating WP Expr at the parent node.
+            // node. This is crucial for generating WP Expr at the parent node.
             state.txTreeNode->setWPatSubsumption(wpInterpolant);
           return true;
         } else {
@@ -1506,10 +1506,9 @@ bool TxSubsumptionTableEntry::subsumed(
 
         interpolateValues(state, coreValues, corePointerValues,
                           debugSubsumptionLevel);
-        if (WPInterpolant)
+        if (WPInterpolant && !wpInterpolant.isNull())
           // In case a node is subsumed, the WP Expr is stored at the parent
-          // node.
-          // This is crucial for generating WP Expr at the parent node.
+          // node. This is crucial for generating WP Expr at the parent node.
           state.txTreeNode->setWPatSubsumption(wpInterpolant);
         return true;
       }
@@ -1537,7 +1536,7 @@ bool TxSubsumptionTableEntry::subsumed(
     state.txTreeNode->unsatCoreInterpolation(unsatCore);
     interpolateValues(state, coreValues, corePointerValues,
                       debugSubsumptionLevel);
-    if (WPInterpolant)
+    if (WPInterpolant && !wpInterpolant.isNull())
       // In case a node is subsumed, the WP Expr is stored at the parent node.
       // This is crucial for generating WP Expr at the parent node.
       state.txTreeNode->setWPatSubsumption(wpInterpolant);
@@ -2179,15 +2178,17 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         std::vector<ref<Expr> > unsatCore;
         ref<Expr> WPExpr = entry->getWPInterpolant();
 
-        bool success = solver->evaluate(*state, WPExpr, result, unsatCore);
-        if (success != true)
-          klee_error("TxTree::remove: WP Expr implication test failed");
-        if (WPExpr != node->wp->False() && result == Solver::False) {
-          state->txTreeNode->dependency->dump();
-          WPExpr->dump();
-          klee_error("TxTree::remove: WP Expr implication test is false");
+        if (!WPExpr.isNull()) {
+          bool success = solver->evaluate(*state, WPExpr, result, unsatCore);
+          if (success != true)
+            klee_error("TxTree::remove: WP Expr implication test failed");
+          if (WPExpr != node->wp->False() && result == Solver::False) {
+            state->txTreeNode->dependency->dump();
+            WPExpr->dump();
+            klee_error("TxTree::remove: WP Expr implication test is false");
+          }
+          entry = node->wp->updateSubsumptionTableEntry(entry);
         }
-        entry = node->wp->updateSubsumptionTableEntry(entry);
       }
 
       TxSubsumptionTable::insert(node->getProgramPoint(),
