@@ -215,6 +215,9 @@ private:
   // \brief Handling Function Argument LLVM Value
   ref<Expr> getFunctionArgument(llvm::Argument *arg);
 
+  // \brief Retrieving Alloca LLVM Value size
+  unsigned int getAllocaInstSize(llvm::AllocaInst *alc);
+
   // \brief Handling Alloca LLVM Value
   ref<Expr> getAllocaInst(llvm::AllocaInst *alc);
 

@@ -1941,6 +1941,10 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         ref<Expr> left = this->generateExprFromOperand(i->getOperand(0));
         ref<Expr> right = this->generateExprFromOperand(i->getOperand(1));
         WPExpr = TxWPHelper::substituteExpr(WPExpr, right, left);
+        klee_warning("WP");
+        WPExpr->dump();
+        i->dump();
+        klee_warning("WP");
       }
     }
   }
@@ -1954,7 +1958,8 @@ ref<Expr> TxWeakestPreCondition::getBrCondition(llvm::Instruction *ins) {
     return True();
   }
   llvm::BranchInst *br = llvm::dyn_cast<llvm::BranchInst>(ins);
-  return getCondition(br->getCondition());
+  ref<Expr> result = getCondition(br->getCondition());
+  return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
@@ -1965,7 +1970,7 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
   } else if (llvm::isa<llvm::BinaryOperator>(value)) {
     llvm::Instruction *binOp = dyn_cast<llvm::Instruction>(value);
     ref<Expr> left = this->generateExprFromOperand(binOp->getOperand(0));
-    ref<Expr> right = this->generateExprFromOperand(binOp->getOperand(0));
+    ref<Expr> right = this->generateExprFromOperand(binOp->getOperand(1));
     switch (binOp->getOpcode()) {
     case llvm::Instruction::And: {
       result = AndExpr::create(left, right);
@@ -1989,6 +1994,9 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
 ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
                                                          ref<Expr> offset) {
   ref<Expr> ret;
+  klee_warning("TxWeakestPreCondition::generateExprFromOperand0");
+  val->dump();
+  klee_warning("TxWeakestPreCondition::generateExprFromOperand1");
   if (isa<llvm::ConstantInt>(val)) {
     llvm::ConstantInt *constInt = dyn_cast<llvm::ConstantInt>(val);
     ret = getConstantInt(constInt);
@@ -2012,8 +2020,6 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
   } else if (isa<llvm::CastInst>(val)) {
     llvm::CallInst *ci = dyn_cast<llvm::CallInst>(val);
     ret = getCallInst(ci);
-  } else if (isa<llvm::AllocaInst>(val)) {
-
   } else if (llvm::isa<llvm::CmpInst>(val)) {
     llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(val);
     ret = getCmpCondition(cmp);
@@ -2025,6 +2031,9 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
   } else if (llvm::isa<llvm::PHINode>(val)) {
     llvm::PHINode *phi = dyn_cast<llvm::PHINode>(val);
     ret = getPhiInst(phi);
+  } else if (llvm::isa<llvm::AllocaInst>(val)) {
+    llvm::AllocaInst *alc = dyn_cast<llvm::AllocaInst>(val);
+    ret = getAllocaInst(alc);
   } else if (isa<llvm::GetElementPtrInst>(val)) {
     llvm::GetElementPtrInst *gep = dyn_cast<llvm::GetElementPtrInst>(val);
     ret = getGepInst(gep);
@@ -2033,61 +2042,152 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
     val->dump();
     llvm::errs() << "\nType:";
     val->getType()->dump();
-    klee_error("TxWeakestPreCondition::generateExprFromOperand Remaining"
+    klee_error("\nTxWeakestPreCondition::generateExprFromOperand Remaining"
                " cases not implemented yet\n");
   }
+  klee_warning("TxWeakestPreCondition::generateExprFromOperand2");
+  ret->dump();
+  klee_warning("TxWeakestPreCondition::generateExprFromOperand3\n\n");
   return ret;
 }
 
-ref<Expr> TxWeakestPreCondition::getConstantInt(llvm::ConstantInt *ci) {
+ref<Expr> TxWeakestPreCondition::getConstantInt(llvm::ConstantInt *CI) {
   ref<Expr> result;
+  if (CI->getBitWidth() <= 8)
+    result = ConstantExpr::create(CI->getZExtValue(), Expr::Int8);
+  else if (CI->getBitWidth() <= 16)
+    result = ConstantExpr::create(CI->getZExtValue(), Expr::Int16);
+  else if (CI->getBitWidth() <= 32)
+    result = ConstantExpr::create(CI->getZExtValue(), Expr::Int32);
+  else
+    result = ConstantExpr::create(CI->getZExtValue(), Expr::Int64);
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getConstantExpr(llvm::ConstantExpr *ce) {
   ref<Expr> result;
+  klee_error("PUSHUP2");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
   ref<Expr> result;
+  klee_error("PUSHUP3");
   return result;
 }
 
-ref<Expr> TxWeakestPreCondition::getAllocaInst(llvm::AllocaInst *alc) {
-  ref<Expr> result;
-  return result;
-}
 
 ref<Expr> TxWeakestPreCondition::getPointer(llvm::LoadInst *p) {
   ref<Expr> result;
+  klee_error("PUSHUP5");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getLoadGep(llvm::LoadInst *p) {
   ref<Expr> result;
+  klee_error("PUSHUP6");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
-  ref<Expr> result;
+  unsigned width;
+  ref<Expr> index, result;
+  if (isa<llvm::AllocaInst>(p->getOperand(0))) {
+    llvm::AllocaInst *alc = dyn_cast<llvm::AllocaInst>(p->getOperand(0));
+    width = getAllocaInstSize(alc);
+    index = ConstantExpr::create(0, width);
+    result =
+        WPVarExpr::create(p->getOperand(0), p->getOperand(0)->getName(), index);
+  } else {
+    klee_error("TxWeakestPreCondition::getLoad: Not implemented yet!");
+  }
+  return result;
+}
+
+ref<Expr> TxWeakestPreCondition::getAllocaInst(llvm::AllocaInst *alc) {
+  unsigned width;
+  ref<Expr> index, result;
+  width = getAllocaInstSize(alc);
+  index = ConstantExpr::create(0, width);
+  result = WPVarExpr::create(alc, alc->getName(), index);
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getBinaryInst(llvm::BinaryOperator *bo) {
-  ref<Expr> result;
-  return result;
+  ref<Expr> arg1 = generateExprFromOperand(bo->getOperand(0));
+  ref<Expr> arg2 = generateExprFromOperand(bo->getOperand(1));
+  ref<Expr> ret;
+  switch (bo->getOpcode()) {
+  case llvm::Instruction::Add: {
+    ret = AddExpr::create(arg1, arg2);
+    break;
+  }
+  case llvm::Instruction::Sub: {
+    ret = SubExpr::create(arg1, arg2);
+    break;
+  }
+  case llvm::Instruction::Mul: {
+    ret = MulExpr::create(arg1, arg2);
+    break;
+  }
+  case llvm::Instruction::UDiv: {
+    ret = UDivExpr::create(arg1, arg2);
+    break;
+  }
+  case llvm::Instruction::SDiv: {
+    ret = SDivExpr::create(arg1, arg2);
+    break;
+  }
+  case llvm::Instruction::URem: {
+    ret = URemExpr::create(arg1, arg2);
+    break;
+  }
+  case llvm::Instruction::SRem: {
+    ret = SRemExpr::create(arg1, arg2);
+    break;
+  }
+  case llvm::Instruction::And: {
+    ret = AndExpr::create(arg1, arg2);
+    break;
+  }
+  case llvm::Instruction::Or: {
+    ret = OrExpr::create(arg1, arg2);
+    break;
+  }
+  case llvm::Instruction::Xor: {
+    ret = XorExpr::create(arg1, arg2);
+    break;
+  }
+  case llvm::Instruction::Shl: {
+    ret = ShlExpr::create(arg1, arg2);
+    break;
+  }
+  case llvm::Instruction::LShr: {
+    ret = LShrExpr::create(arg1, arg2);
+    break;
+  }
+  case llvm::Instruction::AShr: {
+    ret = AShrExpr::create(arg1, arg2);
+    break;
+  }
+  default: {
+    klee_error("TxWeakestPreCondition::getBinaryInst Binary Operand "
+               "not implemented...\n");
+  }
+  }
+  return ret;
 }
 
 ref<Expr> TxWeakestPreCondition::getCastInst(llvm::CastInst *ci) {
   ref<Expr> result;
+  klee_error("PUSHUP9");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getCmpCondition(llvm::CmpInst *cmp) {
   // Getting the expressions from the left and right operand
   ref<Expr> left = this->generateExprFromOperand(cmp->getOperand(0));
-  ref<Expr> right = this->generateExprFromOperand(cmp->getOperand(0));
+  ref<Expr> right = this->generateExprFromOperand(cmp->getOperand(1));
   ref<Expr> result;
   // second step is to create the expression
   switch (cmp->getPredicate()) {
@@ -2181,48 +2281,52 @@ ref<Expr> TxWeakestPreCondition::getCmpCondition(llvm::CmpInst *cmp) {
 
 ref<Expr> TxWeakestPreCondition::getGepInst(llvm::GetElementPtrInst *gep) {
   ref<Expr> result;
+  klee_error("PUSHUP10");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getSwitchInst(llvm::SwitchInst *si) {
   ref<Expr> result;
+  klee_error("PUSHUP11");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getPhiInst(llvm::PHINode *phi) {
   ref<Expr> result;
+  klee_error("PUSHUP12");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getCallInst(llvm::CallInst *ci) {
   ref<Expr> result;
+  klee_error("PUSHUP13");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getCallAssume(llvm::CallInst *ci) {
   ref<Expr> result;
+  klee_error("PUSHUP14");
   return result;
 }
 
-/*  //  llvm::outs()
-  //      << "\n***Start TxWeakestPreCondition::generateExprFromOperand***\n";
-  //  i->dump();
-  //  llvm::outs()
-  //      << "\n***End TxWeakestPreCondition::generateExprFromOperand***\n";
+unsigned int TxWeakestPreCondition::getAllocaInstSize(llvm::AllocaInst *alc) {
+  unsigned int size;
 
-  // Generating WP from Operand1
-  ref<Expr> ret;
-  llvm::Value *val = i->getOperand(operand);
-  if (isa<llvm::ConstantInt>(val)) {
-    llvm::ConstantInt *CI = dyn_cast<llvm::ConstantInt>(val);
-    if (CI->getBitWidth() <= 8)
-      ret = ConstantExpr::create(CI->getZExtValue(), Expr::Int8);
-    else if (CI->getBitWidth() <= 16)
-      ret = ConstantExpr::create(CI->getZExtValue(), Expr::Int16);
-    else if (CI->getBitWidth() <= 32)
-      ret = ConstantExpr::create(CI->getZExtValue(), Expr::Int32);
-    else
-      ret = ConstantExpr::create(CI->getZExtValue(), Expr::Int64);
+  if (alc->getAllocatedType()->isIntegerTy()) {
+    size = Expr::Int32;
+  } else {
+    alc->dump();
+    alc->getType()->dump();
+    klee_error("TxWeakestPreCondition::getAllocaInstSize getting size is not "
+               "defined for this "
+               "type yet");
+  }
+  return size;
+}
+
+/*
+
+
   } else if (isa<llvm::LoadInst>(val)) {
     llvm::LoadInst *inst = dyn_cast<llvm::LoadInst>(val);
     if (isa<llvm::GlobalValue>(inst->getOperand(0))) {
@@ -2251,70 +2355,6 @@ ref<Expr> TxWeakestPreCondition::getCallAssume(llvm::CallInst *ci) {
     } else {
       ret = dependency->getAddress(inst->getOperand(0), &(wpStore->ac),
                                    wpStore->array, this, offset);
-    }
-  } else if (isa<llvm::BinaryOperator>(val)) {
-    llvm::Instruction *op1 = dyn_cast<llvm::Instruction>(val);
-    ref<Expr> arg1 = generateExprFromOperand(op1, 0);
-    ref<Expr> arg2 = generateExprFromOperand(op1, 1);
-
-    switch (op1->getOpcode()) {
-    case llvm::Instruction::Add: {
-      ret = AddExpr::create(arg1, arg2);
-      break;
-    }
-    case llvm::Instruction::Sub: {
-      ret = SubExpr::create(arg1, arg2);
-      break;
-    }
-    case llvm::Instruction::Mul: {
-      ret = MulExpr::create(arg1, arg2);
-      break;
-    }
-    case llvm::Instruction::UDiv: {
-      ret = UDivExpr::create(arg1, arg2);
-      break;
-    }
-    case llvm::Instruction::SDiv: {
-      ret = SDivExpr::create(arg1, arg2);
-      break;
-    }
-    case llvm::Instruction::URem: {
-      ret = URemExpr::create(arg1, arg2);
-      break;
-    }
-    case llvm::Instruction::SRem: {
-      ret = SRemExpr::create(arg1, arg2);
-      break;
-    }
-    case llvm::Instruction::And: {
-      ret = AndExpr::create(arg1, arg2);
-      break;
-    }
-    case llvm::Instruction::Or: {
-      ret = OrExpr::create(arg1, arg2);
-      break;
-    }
-    case llvm::Instruction::Xor: {
-      ret = XorExpr::create(arg1, arg2);
-      break;
-    }
-    case llvm::Instruction::Shl: {
-      ret = ShlExpr::create(arg1, arg2);
-      break;
-    }
-    case llvm::Instruction::LShr: {
-      ret = LShrExpr::create(arg1, arg2);
-      break;
-    }
-    case llvm::Instruction::AShr: {
-      ret = AShrExpr::create(arg1, arg2);
-      break;
-    }
-    default: {
-      klee_error(
-          "TxWeakestPreCondition::generateExprFromOperand Binary Operand "
-          "not implemented...\n");
-    }
     }
   } else if (isa<llvm::CastInst>(val)) {
     llvm::CastInst *op1 = dyn_cast<llvm::CastInst>(val);

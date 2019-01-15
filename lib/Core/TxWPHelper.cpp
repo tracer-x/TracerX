@@ -203,8 +203,8 @@ bool TxWPHelper::isTargetDependent(TxWPArrayStore *wpStore, llvm::Value *inst,
     return false;
   }
 
-  case Expr::Read: {
-    if (inst == wpStore->getValuePointer(expr)) {
+  case Expr::WPVar: {
+    if (inst == dyn_cast<WPVarExpr>(expr)->address) {
       return true;
     }
     return false;
@@ -290,8 +290,14 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
       return base;
     }
 
+    case Expr::WPVar: {
+      if (base.compare(lhs))
+        return rhs;
+      else
+        return base;
+    }
+
     case Expr::NotOptimized:
-    case Expr::Read:
     case Expr::Not:
     case Expr::Extract:
     case Expr::ZExt:
@@ -499,12 +505,7 @@ std::set<ref<Expr> > TxWPHelper::extractVariables(ref<Expr> expr) {
     return set;
   }
 
-  case Expr::Read: {
-    set.insert(expr);
-    return set;
-  }
-
-  case Expr::Concat: {
+  case Expr::WPVar: {
     set.insert(expr);
     return set;
   }
