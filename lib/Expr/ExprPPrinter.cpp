@@ -309,6 +309,12 @@ private:
     print(xe->getKid(0), PC);
   }
 
+  void printWPVar(const WPVarExpr *xe, PrintContext &PC, unsigned indent) {
+    PC << "(";
+    PC << xe->name;
+    PC << ")";
+  }
+
   void printExpr(const Expr *ep, PrintContext &PC, unsigned indent, bool printConstWidth=false) {
     bool simple = hasSimpleKids(ep);
     
@@ -430,6 +436,8 @@ public:
           printExpr(e.get(), PC, indent, true);
         } else if (const ExistsExpr *xe = dyn_cast<ExistsExpr>(e)) {
           printExists(xe, PC, indent);
+        } else if (const WPVarExpr *xe = dyn_cast<WPVarExpr>(e)) {
+          printWPVar(xe, PC, indent);
         } else
           printExpr(e.get(), PC, indent);	
         PC << ")";

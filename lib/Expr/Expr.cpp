@@ -152,6 +152,7 @@ void Expr::printKind(llvm::raw_ostream &os, Kind k) {
     X(Sgt);
     X(Sge);
     X(Exists);
+    X(WPVar);
 #undef X
   default:
     assert(0 && "invalid kind");
@@ -213,6 +214,12 @@ unsigned ExtractExpr::computeHash() {
 unsigned ReadExpr::computeHash() {
   unsigned res = index->hash() * Expr::MAGIC_HASH_CONSTANT;
   res ^= updates.hash();
+  hashValue = res;
+  return hashValue;
+}
+
+unsigned WPVarExpr::computeHash() {
+  unsigned res = index->hash() * Expr::MAGIC_HASH_CONSTANT;
   hashValue = res;
   return hashValue;
 }
@@ -554,8 +561,22 @@ ref<Expr> ReadExpr::create(const UpdateList &ul, ref<Expr> index) {
   return ReadExpr::alloc(ul, index);
 }
 
-int ReadExpr::compareContents(const Expr &b) const { 
+int ReadExpr::compareContents(const Expr &b) const {
   return updates.compare(static_cast<const ReadExpr&>(b).updates);
+}
+
+ref<Expr> WPVarExpr::create(llvm::Value* address, std::string name,ref<Expr> index) {
+  return WPVarExpr::alloc(address, name,index);
+}
+
+int WPVarExpr::compareContents(const Expr &b) const {
+  return this->address == static_cast<const WPVarExpr&>(b).address;
+}
+
+void WPVarExpr::print(llvm::raw_ostream &os) const {
+    os << "(WPVar ";
+    os << name;
+    os << ")";
 }
 
 ref<Expr> SelectExpr::create(ref<Expr> c, ref<Expr> t, ref<Expr> f) {
