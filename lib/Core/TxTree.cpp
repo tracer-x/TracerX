@@ -2179,6 +2179,7 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         ref<Expr> WPExpr = entry->getWPInterpolant();
 
         if (!WPExpr.isNull()) {
+          klee_error("FIXED TILL HERE!!!");
           bool success = solver->evaluate(*state, WPExpr, result, unsatCore);
           if (success != true)
             klee_error("TxTree::remove: WP Expr implication test failed");
