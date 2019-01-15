@@ -61,9 +61,8 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
       symbolicallyAddressedHistoricalStore);
 
-  // TODO: WP
-  //  if (WPInterpolant)
-  //    wpInterpolant = node->generateWPInterpolant();
+    if (WPInterpolant)
+      wpInterpolant = node->generateWPInterpolant();
 }
 
 TxSubsumptionTableEntry::~TxSubsumptionTableEntry() {}
@@ -1745,9 +1744,10 @@ void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
 void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
                                       const std::string &prefix) const {
   if (WPInterpolant) {
-    stream << prefix << "\nwp interpolant = ";
-    wpInterpolant->print(stream);
-    stream << "\n";
+    stream << prefix << "\nwp interpolant = [";
+    if (!wpInterpolant.isNull())
+    	wpInterpolant->print(stream);
+    stream << "]\n";
   }
 }
 
@@ -2434,7 +2434,6 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
   TimerStatIncrementer t(getWPInterpolantTime);
 
   ref<Expr> expr;
-
   if (assertionFail && emitAllErrors) {
     expr = wp->False();
   } else if (assertionFail) {
