@@ -798,7 +798,8 @@ bool TxSubsumptionTableEntry::subsumed(
     // If it fails then false is returned. If it succeeds then the
     // second check is performed.
     ref<Expr> wpInstantiatedInterpolant =
-        state.txTreeNode->instantiateWPatSubsumption(wpInterpolant);
+        state.txTreeNode->instantiateWPatSubsumption(
+            wpInterpolant, state.txTreeNode->getDependency());
 
     Solver::Validity result;
     std::vector<ref<Expr> > unsatCore;
@@ -1581,6 +1582,10 @@ void TxSubsumptionTableEntry::setInterpolant(ref<Expr> _interpolant) {
   interpolant = _interpolant;
 }
 
+void TxSubsumptionTableEntry::setWPInterpolant(ref<Expr> _wpInterpolant) {
+  wpInterpolant = _wpInterpolant;
+}
+
 void TxSubsumptionTableEntry::setConcretelyAddressedHistoricalStore(
     TxStore::LowerInterpolantStore _concretelyAddressedHistoricalStore) {
   concretelyAddressedHistoricalStore = _concretelyAddressedHistoricalStore;
@@ -2174,20 +2179,22 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
           new TxSubsumptionTableEntry(node, node->entryCallHistory);
 
       if (WPInterpolant) {
-        Solver::Validity result;
-        std::vector<ref<Expr> > unsatCore;
+        //        Solver::Validity result;
+        //        std::vector<ref<Expr> > unsatCore;
         ref<Expr> WPExpr = entry->getWPInterpolant();
-
         if (!WPExpr.isNull()) {
-          klee_error("FIXED TILL HERE!!!");
-          bool success = solver->evaluate(*state, WPExpr, result, unsatCore);
-          if (success != true)
-            klee_error("TxTree::remove: WP Expr implication test failed");
-          if (WPExpr != node->wp->False() && result == Solver::False) {
-            state->txTreeNode->dependency->dump();
-            WPExpr->dump();
-            klee_error("TxTree::remove: WP Expr implication test is false");
-          }
+          //          bool success = solver->evaluate(*state, WPExpr, result,
+          //          unsatCore);
+          //          if (success != true)
+          //            klee_error("TxTree::remove: WP Expr implication test
+          //            failed");
+          //          if (WPExpr != node->wp->False() && result ==
+          //          Solver::False) {
+          //            state->txTreeNode->dependency->dump();
+          //            WPExpr->dump();
+          //            klee_error("TxTree::remove: WP Expr implication test is
+          //            false");
+          //          }
           entry = node->wp->updateSubsumptionTableEntry(entry);
         }
       }
@@ -2441,6 +2448,11 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->PushUp(reverseInstructionList);
+    if (expr.isNull()) {
+      return expr;
+    }
+  } else if (childWPInterpolant[0].isNull() || childWPInterpolant[1].isNull()) {
+    expr = childWPInterpolant[0];
   } else if (childWPInterpolant[0] == wp->False() ||
              childWPInterpolant[1] == wp->False()) {
     expr = wp->False();
@@ -2449,6 +2461,9 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->PushUp(reverseInstructionList);
+    if (expr.isNull()) {
+      return expr;
+    }
   } else {
     // Get branch condition
     llvm::Instruction *i = reverseInstructionList.back().first->inst;
@@ -2457,10 +2472,16 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
       if (br->isConditional()) {
         branchCondition = wp->getBrCondition(i);
       }
+      if (branchCondition.isNull()) {
+        return branchCondition;
+      }
     }
 
     expr = wp->intersectWPExpr(branchCondition, childWPInterpolant[0],
                                childWPInterpolant[1]);
+    if (expr.isNull()) {
+      return expr;
+    }
     wp->setWPExpr(expr);
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->PushUp(reverseInstructionList);
@@ -2514,41 +2535,31 @@ TxWPArrayStore *TxTreeNode::getChildWPStore(int flag) {
 // =========================================================================
 // Instantiating WP Expression at Subsumption Point
 // =========================================================================
-ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant) {
-  return wpInterpolant;
-  /*ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
-  switch (singleWPExpr->getKind()) {
+ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
+                                                 TxDependency *dependency) {
+
+  switch (wpInterpolant->getKind()) {
   case Expr::InvalidKind:
   case Expr::Constant: {
-    return singleWPExpr;
+    return wpInterpolant;
   }
 
-  case Expr::Read: {
-    ref<TxAllocationContext> address = wpStore->getAddress(singleWPExpr);
-    if (address.isNull()) {
-      singleWPExpr->dump();
-      klee_error(
-          "TxWeakestPreCondition::instantiateWPExpression address is null");
-    }
-    ref<Expr> storeValue = dependency->getLatestValueOfAddress(address);
-    if (storeValue == dummy) {
-      return singleWPExpr;
-    }
-    return storeValue;
-  }
+  case Expr::WPVar: {
+    // TODO: Handle multiple copies of a var in stpre
+    ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant);
 
-  case Expr::Concat: {
-    ref<TxAllocationContext> address = wpStore->getAddress(singleWPExpr);
-    if (address.isNull()) {
-      singleWPExpr->dump();
-      klee_error(
-          "TxWeakestPreCondition::instantiateWPExpression address is null");
-    }
-    ref<Expr> storeValue = dependency->getLatestValueOfAddress(address);
-    if (storeValue == dummy) {
-      return singleWPExpr;
-    }
-    return storeValue;
+    ref<TxAllocationContext> alc =
+        dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
+    ref<TxStoreEntry> entry;
+    entry = dependency->getStore()->find(alc);
+
+    if (!entry.isNull())
+      return entry->getContent()->getExpression();
+
+    wpInterpolant->dump();
+    dependency->getStore()->dump();
+    klee_error("TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
+    break;
   }
 
   case Expr::NotOptimized:
@@ -2557,11 +2568,14 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant) {
   case Expr::ZExt:
   case Expr::SExt: {
     ref<Expr> kids[1];
-    kids[0] =
-        instantiateWPExpression(dependency, singleWPExpr->getKid(0), wpStore);
-    return singleWPExpr->rebuild(kids);
+    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
+    if (kids[0].isNull())
+      return kids[0];
+    else
+      return wpInterpolant->rebuild(kids);
   }
 
+  case Expr::Concat:
   case Expr::Eq:
   case Expr::Ne:
   case Expr::Ult:
@@ -2587,38 +2601,126 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant) {
   case Expr::LShr:
   case Expr::AShr: {
     ref<Expr> kids[2];
-
-    kids[0] =
-        instantiateWPExpression(dependency, singleWPExpr->getKid(0), wpStore);
-    kids[1] =
-        instantiateWPExpression(dependency, singleWPExpr->getKid(1), wpStore);
-    //    llvm::outs() << "----\n";
-    //    singleWPExpr->dump();
-    //    singleWPExpr->getKid(0)->dump();
-    //    singleWPExpr->getKid(1)->dump();
-    //    kids[0]->dump();
-    //    kids[1]->dump();
-    //    llvm::outs() << "----end\n";
-
-    return singleWPExpr->rebuild(kids);
+    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
+    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
+    return wpInterpolant->rebuild(kids);
   }
 
   case Expr::Select: {
     ref<Expr> kids[3];
-    kids[0] =
-        instantiateWPExpression(dependency, singleWPExpr->getKid(0), wpStore);
-    kids[1] =
-        instantiateWPExpression(dependency, singleWPExpr->getKid(1), wpStore);
-    kids[2] =
-        instantiateWPExpression(dependency, singleWPExpr->getKid(2), wpStore);
-    return singleWPExpr->rebuild(kids);
+    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
+    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
+    kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), dependency);
+    return wpInterpolant->rebuild(kids);
+  }
+  default: {
+    wpInterpolant->dump();
+    klee_error("TxWPHelper::substituteExpr: Expression not supported yet!");
+    return wpInterpolant;
   }
   }
-  // Sanity check
-  klee_error("Control should not reach here in "
-             "TxWeakestPreCondition::instantiateWPExpression!");
+  /*  ref<Expr> dummy = ConstantExpr::create(0, Expr::Bool);
+    switch (singleWPExpr->getKind()) {
+    case Expr::InvalidKind:
+    case Expr::Constant: {
+      return singleWPExpr;
+    }
 
-  return singleWPExpr;*/
+    case Expr::Read: {
+      ref<TxAllocationContext> address = wpStore->getAddress(singleWPExpr);
+      if (address.isNull()) {
+        singleWPExpr->dump();
+        klee_error(
+            "TxWeakestPreCondition::instantiateWPExpression address is null");
+      }
+      ref<Expr> storeValue = dependency->getLatestValueOfAddress(address);
+      if (storeValue == dummy) {
+        return singleWPExpr;
+      }
+      return storeValue;
+    }
+
+    case Expr::Concat: {
+      ref<TxAllocationContext> address = wpStore->getAddress(singleWPExpr);
+      if (address.isNull()) {
+        singleWPExpr->dump();
+        klee_error(
+            "TxWeakestPreCondition::instantiateWPExpression address is null");
+      }
+      ref<Expr> storeValue = dependency->getLatestValueOfAddress(address);
+      if (storeValue == dummy) {
+        return singleWPExpr;
+      }
+      return storeValue;
+    }
+
+    case Expr::NotOptimized:
+    case Expr::Not:
+    case Expr::Extract:
+    case Expr::ZExt:
+    case Expr::SExt: {
+      ref<Expr> kids[1];
+      kids[0] =
+          instantiateWPExpression(dependency, singleWPExpr->getKid(0), wpStore);
+      return singleWPExpr->rebuild(kids);
+    }
+
+    case Expr::Eq:
+    case Expr::Ne:
+    case Expr::Ult:
+    case Expr::Ule:
+    case Expr::Ugt:
+    case Expr::Uge:
+    case Expr::Slt:
+    case Expr::Sle:
+    case Expr::Sgt:
+    case Expr::Sge:
+    case Expr::LastKind:
+    case Expr::Add:
+    case Expr::Sub:
+    case Expr::Mul:
+    case Expr::UDiv:
+    case Expr::SDiv:
+    case Expr::URem:
+    case Expr::SRem:
+    case Expr::And:
+    case Expr::Or:
+    case Expr::Xor:
+    case Expr::Shl:
+    case Expr::LShr:
+    case Expr::AShr: {
+      ref<Expr> kids[2];
+
+      kids[0] =
+          instantiateWPExpression(dependency, singleWPExpr->getKid(0), wpStore);
+      kids[1] =
+          instantiateWPExpression(dependency, singleWPExpr->getKid(1), wpStore);
+      //    llvm::outs() << "----\n";
+      //    singleWPExpr->dump();
+      //    singleWPExpr->getKid(0)->dump();
+      //    singleWPExpr->getKid(1)->dump();
+      //    kids[0]->dump();
+      //    kids[1]->dump();
+      //    llvm::outs() << "----end\n";
+
+      return singleWPExpr->rebuild(kids);
+    }
+
+    case Expr::Select: {
+      ref<Expr> kids[3];
+      kids[0] =
+          instantiateWPExpression(dependency, singleWPExpr->getKid(0), wpStore);
+      kids[1] =
+          instantiateWPExpression(dependency, singleWPExpr->getKid(1), wpStore);
+      kids[2] =
+          instantiateWPExpression(dependency, singleWPExpr->getKid(2), wpStore);
+      return singleWPExpr->rebuild(kids);
+    }
+    }
+    // Sanity check
+    klee_error("Control should not reach here in "
+               "TxWeakestPreCondition::instantiateWPExpression!");
+  */
 }
 
 void TxTreeNode::setWPatSubsumption(ref<Expr> _wpInterpolant) {

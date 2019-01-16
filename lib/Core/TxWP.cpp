@@ -1326,13 +1326,15 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
     TxSubsumptionTableEntry *entry) {
 
   // vars(w)
-  std::set<std::string> wpVars =
-      TxPartitionHelper::getExprVars(entry->getWPInterpolant());
+  std::set<std::string> wpVars;
+  if (!entry->getWPInterpolant().isNull())
+    wpVars = TxPartitionHelper::getExprVars(entry->getWPInterpolant());
 
   // get vars(pi, miu)
   // vars(pi)
-  std::set<std::string> pimiuVars =
-      TxPartitionHelper::getExprVars(entry->getInterpolant());
+  std::set<std::string> pimiuVars;
+  if (!entry->getInterpolant().isNull())
+    pimiuVars = TxPartitionHelper::getExprVars(entry->getInterpolant());
   // vars(miu)
   TxStore::TopInterpolantStore concretelyAddressedStore =
       entry->getConcretelyAddressedStore();
@@ -1340,12 +1342,12 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
            it1 = concretelyAddressedStore.begin(),
            ie1 = concretelyAddressedStore.end();
        it1 != ie1; ++it1) {
-    assert(strcmp(it1->first->getValue()->getName().data(), "") == 0 &&
-           "Value has no name!");
-    pimiuVars.insert(it1->first->getValue()->getName().data());
-    std::set<std::string> right = TxPartitionHelper::getExprVars(
-        it1->second.begin()->second->getExpression());
-    pimiuVars.insert(right.begin(), right.end());
+    if (strcmp(it1->first->getValue()->getName().data(), "") != 0) {
+      pimiuVars.insert(it1->first->getValue()->getName().data());
+      std::set<std::string> right = TxPartitionHelper::getExprVars(
+          it1->second.begin()->second->getExpression());
+      pimiuVars.insert(right.begin(), right.end());
+    }
   }
 
   // get v1 = vars(pi,miu) - vars(w)
@@ -1364,20 +1366,21 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
       v1star.insert(tmp.begin(), tmp.end());
     }
   }
+
   // closure on miu
   for (TxStore::TopInterpolantStore::iterator
            it1 = concretelyAddressedStore.begin(),
            ie1 = concretelyAddressedStore.end();
        it1 != ie1; ++it1) {
     std::set<std::string> tmp;
-    assert(strcmp(it1->first->getValue()->getName().data(), "") == 0 &&
-           "Value has no name!");
-    tmp.insert(it1->first->getValue()->getName().data());
-    std::set<std::string> right = TxPartitionHelper::getExprVars(
-        it1->second.begin()->second->getExpression());
-    tmp.insert(right.begin(), right.end());
-    if (TxPartitionHelper::isShared(tmp, v1star)) {
-      v1star.insert(tmp.begin(), tmp.end());
+    if (strcmp(it1->first->getValue()->getName().data(), "") == 0) {
+      tmp.insert(it1->first->getValue()->getName().data());
+      std::set<std::string> right = TxPartitionHelper::getExprVars(
+          it1->second.begin()->second->getExpression());
+      tmp.insert(right.begin(), right.end());
+      if (TxPartitionHelper::isShared(tmp, v1star)) {
+        v1star.insert(tmp.begin(), tmp.end());
+      }
     }
   }
 
@@ -1387,15 +1390,18 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
   // update pi by (wp,v2) and (pi,v1star)
   std::vector<ref<Expr> > wpComps =
       TxPartitionHelper::getExprsFromAndExpr(entry->getWPInterpolant());
-  std::vector<ref<Expr> > newpiComps;
+
+  std::vector<ref<Expr> > newWPComps;
   for (std::vector<ref<Expr> >::iterator it = wpComps.begin(),
                                          ie = wpComps.end();
        it != ie; ++it) {
     std::set<std::string> tmp = TxPartitionHelper::getExprVars(*it);
-    if (TxPartitionHelper::isShared(tmp, v2)) {
-      newpiComps.push_back(*it);
+    if (TxPartitionHelper::isSubset(tmp, v2)) {
+      newWPComps.push_back(*it);
     }
   }
+
+  std::vector<ref<Expr> > newpiComps;
   for (std::vector<ref<Expr> >::iterator it = piComps.begin(),
                                          ie = piComps.end();
        it != ie; ++it) {
@@ -1404,7 +1410,12 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
       newpiComps.push_back(*it);
     }
   }
-  entry->setInterpolant(TxPartitionHelper::createAnd(newpiComps));
+
+  if (!entry->getWPInterpolant().isNull())
+    entry->setWPInterpolant(TxPartitionHelper::createAnd(newWPComps));
+
+  if (!entry->getInterpolant().isNull())
+    entry->setInterpolant(TxPartitionHelper::createAnd(newpiComps));
 
   // update miu by (miu, v1star)
   for (TxStore::TopInterpolantStore::iterator
@@ -1412,17 +1423,18 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
            ie1 = concretelyAddressedStore.end();
        it1 != ie1; ++it1) {
     std::set<std::string> tmp;
-    assert(strcmp(it1->first->getValue()->getName().data(), "") == 0 &&
-           "Value has no name!");
-    tmp.insert(it1->first->getValue()->getName().data());
-    std::set<std::string> right = TxPartitionHelper::getExprVars(
-        it1->second.begin()->second->getExpression());
-    tmp.insert(right.begin(), right.end());
+    if (strcmp(it1->first->getValue()->getName().data(), "") != 0) {
+      tmp.insert(it1->first->getValue()->getName().data());
+      std::set<std::string> right = TxPartitionHelper::getExprVars(
+          it1->second.begin()->second->getExpression());
+      tmp.insert(right.begin(), right.end());
 
-    if (!TxPartitionHelper::isShared(tmp, v1star)) {
-      concretelyAddressedStore.erase(it1);
+      if (!TxPartitionHelper::isShared(tmp, v1star)) {
+        concretelyAddressedStore.erase(it1);
+      }
     }
   }
+
   entry->setConcretelyAddressedStore(concretelyAddressedStore);
 
   return entry;
@@ -1919,7 +1931,11 @@ ref<Expr> TxWeakestPreCondition::PushUp(
     if (flag == 1) {
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- create and expression from the condition and this->WPExpr
-      ref<Expr> cond = TxExprHelper::simplifyNot(getBrCondition(i));
+      ref<Expr> result = getBrCondition(i);
+      if (result.isNull()) {
+        return result;
+      }
+      ref<Expr> cond = TxExprHelper::simplifyNot(result);
       if (True() == WPExpr) {
         WPExpr = cond;
       } else {
@@ -1929,8 +1945,11 @@ ref<Expr> TxWeakestPreCondition::PushUp(
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- generate not(condition): expr::not(condition)
       // 3- create and expression from the condition and this->WPExpr
-      ref<Expr> negCond =
-          TxExprHelper::simplifyNot(NotExpr::create(getBrCondition(i)));
+      ref<Expr> result = getBrCondition(i);
+      if (result.isNull()) {
+        return result;
+      }
+      ref<Expr> negCond = TxExprHelper::simplifyNot(NotExpr::create(result));
       if (True() == WPExpr) {
         WPExpr = negCond;
       } else {
@@ -1940,11 +1959,15 @@ ref<Expr> TxWeakestPreCondition::PushUp(
       if (TxWPHelper::isTargetDependent(wpStore, i->getOperand(1), WPExpr)) {
         ref<Expr> left = this->generateExprFromOperand(i->getOperand(0));
         ref<Expr> right = this->generateExprFromOperand(i->getOperand(1));
+        if (left.isNull() || right.isNull()) {
+          ref<Expr> result;
+          return result;
+        }
         WPExpr = TxWPHelper::substituteExpr(WPExpr, right, left);
-        klee_warning("WP");
-        WPExpr->dump();
-        i->dump();
-        klee_warning("WP");
+        //        klee_warning("WP");
+        //        WPExpr->dump();
+        //        i->dump();
+        //        klee_warning("WP");
       }
     }
   }
@@ -1971,6 +1994,8 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
     llvm::Instruction *binOp = dyn_cast<llvm::Instruction>(value);
     ref<Expr> left = this->generateExprFromOperand(binOp->getOperand(0));
     ref<Expr> right = this->generateExprFromOperand(binOp->getOperand(1));
+    if (left.isNull() || right.isNull())
+      return result;
     switch (binOp->getOpcode()) {
     case llvm::Instruction::And: {
       result = AndExpr::create(left, right);
@@ -1994,9 +2019,9 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
 ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
                                                          ref<Expr> offset) {
   ref<Expr> ret;
-  klee_warning("TxWeakestPreCondition::generateExprFromOperand0");
-  val->dump();
-  klee_warning("TxWeakestPreCondition::generateExprFromOperand1");
+  //  klee_warning("TxWeakestPreCondition::generateExprFromOperand0");
+  //  val->dump();
+  //  klee_warning("TxWeakestPreCondition::generateExprFromOperand1");
   if (isa<llvm::ConstantInt>(val)) {
     llvm::ConstantInt *constInt = dyn_cast<llvm::ConstantInt>(val);
     ret = getConstantInt(constInt);
@@ -2045,9 +2070,9 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
     klee_error("\nTxWeakestPreCondition::generateExprFromOperand Remaining"
                " cases not implemented yet\n");
   }
-  klee_warning("TxWeakestPreCondition::generateExprFromOperand2");
-  ret->dump();
-  klee_warning("TxWeakestPreCondition::generateExprFromOperand3\n\n");
+  //  klee_warning("TxWeakestPreCondition::generateExprFromOperand2");
+  //  ret->dump();
+  //  klee_warning("TxWeakestPreCondition::generateExprFromOperand3\n\n");
   return ret;
 }
 
@@ -2066,26 +2091,26 @@ ref<Expr> TxWeakestPreCondition::getConstantInt(llvm::ConstantInt *CI) {
 
 ref<Expr> TxWeakestPreCondition::getConstantExpr(llvm::ConstantExpr *ce) {
   ref<Expr> result;
-  klee_error("PUSHUP2");
+  klee_warning("PUSHUP2");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
   ref<Expr> result;
-  klee_error("PUSHUP3");
+  klee_warning("PUSHUP3");
   return result;
 }
 
 
 ref<Expr> TxWeakestPreCondition::getPointer(llvm::LoadInst *p) {
   ref<Expr> result;
-  klee_error("PUSHUP5");
+  klee_warning("PUSHUP5");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getLoadGep(llvm::LoadInst *p) {
   ref<Expr> result;
-  klee_error("PUSHUP6");
+  klee_warning("PUSHUP6");
   return result;
 }
 
@@ -2099,7 +2124,7 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
     result =
         WPVarExpr::create(p->getOperand(0), p->getOperand(0)->getName(), index);
   } else {
-    klee_error("TxWeakestPreCondition::getLoad: Not implemented yet!");
+    klee_warning("TxWeakestPreCondition::getLoad: Not implemented yet!");
   }
   return result;
 }
@@ -2114,9 +2139,11 @@ ref<Expr> TxWeakestPreCondition::getAllocaInst(llvm::AllocaInst *alc) {
 }
 
 ref<Expr> TxWeakestPreCondition::getBinaryInst(llvm::BinaryOperator *bo) {
+  ref<Expr> ret;
   ref<Expr> arg1 = generateExprFromOperand(bo->getOperand(0));
   ref<Expr> arg2 = generateExprFromOperand(bo->getOperand(1));
-  ref<Expr> ret;
+  if (arg1.isNull() || arg2.isNull())
+    return ret;
   switch (bo->getOpcode()) {
   case llvm::Instruction::Add: {
     ret = AddExpr::create(arg1, arg2);
@@ -2180,15 +2207,17 @@ ref<Expr> TxWeakestPreCondition::getBinaryInst(llvm::BinaryOperator *bo) {
 
 ref<Expr> TxWeakestPreCondition::getCastInst(llvm::CastInst *ci) {
   ref<Expr> result;
-  klee_error("PUSHUP9");
+  klee_warning("PUSHUP9");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getCmpCondition(llvm::CmpInst *cmp) {
   // Getting the expressions from the left and right operand
+  ref<Expr> result;
   ref<Expr> left = this->generateExprFromOperand(cmp->getOperand(0));
   ref<Expr> right = this->generateExprFromOperand(cmp->getOperand(1));
-  ref<Expr> result;
+  if (left.isNull() || right.isNull())
+    return result;
   // second step is to create the expression
   switch (cmp->getPredicate()) {
   case llvm::CmpInst::ICMP_EQ:
@@ -2281,31 +2310,31 @@ ref<Expr> TxWeakestPreCondition::getCmpCondition(llvm::CmpInst *cmp) {
 
 ref<Expr> TxWeakestPreCondition::getGepInst(llvm::GetElementPtrInst *gep) {
   ref<Expr> result;
-  klee_error("PUSHUP10");
+  klee_warning("PUSHUP10");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getSwitchInst(llvm::SwitchInst *si) {
   ref<Expr> result;
-  klee_error("PUSHUP11");
+  klee_warning("PUSHUP11");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getPhiInst(llvm::PHINode *phi) {
   ref<Expr> result;
-  klee_error("PUSHUP12");
+  klee_warning("PUSHUP12");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getCallInst(llvm::CallInst *ci) {
   ref<Expr> result;
-  klee_error("PUSHUP13");
+  klee_warning("PUSHUP13: getCallInst");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getCallAssume(llvm::CallInst *ci) {
   ref<Expr> result;
-  klee_error("PUSHUP14");
+  klee_warning("PUSHUP14");
   return result;
 }
 

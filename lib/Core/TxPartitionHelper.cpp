@@ -39,6 +39,12 @@ std::set<std::string> TxPartitionHelper::getExprVars(ref<Expr> expr) {
   case Expr::InvalidKind:
   case Expr::Constant: { return vars; }
 
+  case Expr::WPVar: {
+    ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(expr);
+    vars.insert(WPVar->address->getName());
+    return vars;
+  }
+
   case Expr::Read: {
     ref<ReadExpr> readExpr = dyn_cast<ReadExpr>(expr);
     vars.insert(readExpr->getName());
@@ -104,10 +110,14 @@ std::set<std::string> TxPartitionHelper::getExprVars(ref<Expr> expr) {
     vars1.insert(vars3.begin(), vars3.end());
     return vars1;
   }
+  default: {
+    // Sanity check
+    expr->dump();
+    klee_error("Control should not reach here in "
+               "TxPartitionHelper::getExprVars!");
   }
-  // Sanity check
-  klee_error("Control should not reach here in "
-             "TxPartitionHelper::getExprVars!");
+  }
+
   return vars;
 }
 
@@ -124,6 +134,21 @@ bool TxPartitionHelper::isShared(std::set<std::string> ss1,
     }
   }
   return false;
+}
+
+bool TxPartitionHelper::isSubset(std::set<std::string> ss1,
+                                 std::set<std::string> ss2) {
+  for (std::set<std::string>::const_iterator it1 = ss1.begin(), ie1 = ss1.end();
+       it1 != ie1; ++it1) {
+    for (std::set<std::string>::const_iterator it2 = ss2.begin(),
+                                               ie2 = ss2.end();
+         it2 != ie2; ++it2) {
+      if ((*it2).compare(*it1) != 0) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 std::set<std::string> TxPartitionHelper::diff(std::set<std::string> ss1,

@@ -342,6 +342,8 @@ public:
 
   void setInterpolant(ref<Expr> _interpolant);
 
+  void setWPInterpolant(ref<Expr> _wpInterpolant);
+
   void setConcretelyAddressedHistoricalStore(
       TxStore::LowerInterpolantStore _concretelyAddressedHistoricalStore);
 
@@ -565,7 +567,8 @@ public:
 
   // \brief Instantiates the variables in WPExpr by their latest value for the
   // implication test.
-  ref<Expr> instantiateWPatSubsumption(ref<Expr> wpInterpolant);
+  ref<Expr> instantiateWPatSubsumption(ref<Expr> wpInterpolant,
+                                       TxDependency *dependency);
 
   /// \brief Copy WP to the parent node at subsumption point
   void setWPatSubsumption(ref<Expr> _wpInterpolant);
@@ -660,6 +663,8 @@ public:
   }
 
   TxStore *getStore() const { return dependency->getStore(); }
+
+  TxDependency *getDependency() const { return dependency; }
 
   /// \brief Print the content of the tree node object to the LLVM error stream.
   void dump() const;
