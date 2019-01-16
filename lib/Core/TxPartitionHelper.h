@@ -31,6 +31,7 @@ public:
   static std::vector<ref<Expr> > getExprsFromAndExpr(ref<Expr> e);
   static std::set<std::string> getExprVars(ref<Expr> e);
   static bool isShared(std::set<std::string> ss1, std::set<std::string> ss2);
+  static bool isSubset(std::set<std::string> ss1, std::set<std::string> ss2);
   static std::set<std::string> diff(std::set<std::string> ss1,
                                     std::set<std::string> ss2);
   static ref<Expr> createAnd(std::vector<ref<Expr> > exprs);
