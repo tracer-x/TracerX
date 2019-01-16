@@ -78,6 +78,8 @@ public:
 
     ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;
 
+    ref<TxStoreEntry> find(ref<TxAllocationContext> alc) const;
+
     ref<TxStoreEntry> findConcrete(
         ref<TxVariable> var,
         std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases)
@@ -206,6 +208,9 @@ public:
 
   /// \brief Finds a store entry given an address
   ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;
+
+  /// \brief Finds a store entry given an LLVM value
+  ref<TxStoreEntry> find(ref<TxAllocationContext> alc) const;
 
   /// \brief This retrieves the locations known at this state, and the
   /// expressions stored in the locations. Returns as the last argument a pair

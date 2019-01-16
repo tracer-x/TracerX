@@ -46,6 +46,29 @@ TxStore::MiddleStateStore::find(ref<TxStateAddress> loc) const {
   return ret;
 }
 
+ref<TxStoreEntry>
+TxStore::MiddleStateStore::find(ref<TxAllocationContext> alc) const {
+  ref<TxStoreEntry> ret;
+
+  for (LowerStateStore::const_iterator
+           lowerIs = concretelyAddressedStore.begin(),
+           lowerIe = concretelyAddressedStore.end(), lowerIt = lowerIs;
+       lowerIt != lowerIe; ++lowerIt) {
+    if (lowerIt->first->getAllocationInfo()->getContext() == alc)
+      return lowerIt->second;
+  }
+
+  for (LowerStateStore::const_iterator
+           lowerIs = symbolicallyAddressedStore.begin(),
+           lowerIe = symbolicallyAddressedStore.end(), lowerIt = lowerIs;
+       lowerIt != lowerIe; ++lowerIt) {
+    if (lowerIt->first->getAllocationInfo()->getContext() == alc)
+      return lowerIt->second;
+  }
+
+  return ret;
+}
+
 ref<TxStoreEntry> TxStore::MiddleStateStore::findConcrete(
     ref<TxVariable> var,
     std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases)
@@ -198,6 +221,16 @@ ref<TxStoreEntry> TxStore::find(ref<TxStateAddress> loc) const {
       internalStore.find(loc->getContext());
   if (storeIter != internalStore.end()) {
     return storeIter->second.find(loc);
+  }
+
+  ref<TxStoreEntry> nullEntry;
+  return nullEntry;
+}
+
+ref<TxStoreEntry> TxStore::find(ref<TxAllocationContext> alc) const {
+  TopStateStore::const_iterator storeIter = internalStore.find(alc);
+  if (storeIter != internalStore.end()) {
+    return storeIter->second.find(alc);
   }
 
   ref<TxStoreEntry> nullEntry;
