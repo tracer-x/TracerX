@@ -2182,6 +2182,7 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         //        Solver::Validity result;
         //        std::vector<ref<Expr> > unsatCore;
         ref<Expr> WPExpr = entry->getWPInterpolant();
+
         if (!WPExpr.isNull()) {
           //          bool success = solver->evaluate(*state, WPExpr, result,
           //          unsatCore);
@@ -2448,9 +2449,6 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->PushUp(reverseInstructionList);
-    if (expr.isNull()) {
-      return expr;
-    }
   } else if (childWPInterpolant[0].isNull() || childWPInterpolant[1].isNull()) {
     expr = childWPInterpolant[0];
   } else if (childWPInterpolant[0] == wp->False() ||
@@ -2461,9 +2459,6 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->PushUp(reverseInstructionList);
-    if (expr.isNull()) {
-      return expr;
-    }
   } else {
     // Get branch condition
     llvm::Instruction *i = reverseInstructionList.back().first->inst;
@@ -2475,8 +2470,8 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
       if (branchCondition.isNull()) {
         return branchCondition;
       }
-    }
 
+    }
     expr = wp->intersectWPExpr(branchCondition, childWPInterpolant[0],
                                childWPInterpolant[1]);
     if (expr.isNull()) {
@@ -2493,7 +2488,7 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
 }
 
 void TxTreeNode::setChildWPInterpolant(ref<Expr> interpolant) {
-  if (wp->True() == childWPInterpolant[0])
+  if (!childWPInterpolant[0].isNull() && wp->True() == childWPInterpolant[0])
     childWPInterpolant[0] = interpolant;
   else
     childWPInterpolant[1] = interpolant;
@@ -2538,6 +2533,9 @@ TxWPArrayStore *TxTreeNode::getChildWPStore(int flag) {
 ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
                                                  TxDependency *dependency) {
 
+  if(wpInterpolant.isNull())
+	  return wpInterpolant;
+
   switch (wpInterpolant->getKind()) {
   case Expr::InvalidKind:
   case Expr::Constant: {
@@ -2550,11 +2548,18 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
 
     ref<TxAllocationContext> alc =
         dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
+
     ref<TxStoreEntry> entry;
     entry = dependency->getStore()->find(alc);
 
-    if (!entry.isNull())
-      return entry->getContent()->getExpression();
+    if (!entry.isNull()){
+    	if(wpInterpolant->getWidth() == entry->getContent()->getExpression()->getWidth()){
+    		return entry->getContent()->getExpression();
+    	} else {
+    		ref<Expr> result = ZExtExpr::create(entry->getContent()->getExpression(),wpInterpolant->getWidth());
+    		return result;
+    	}
+    }
 
     wpInterpolant->dump();
     dependency->getStore()->dump();
