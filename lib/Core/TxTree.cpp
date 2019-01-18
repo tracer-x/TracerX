@@ -2303,7 +2303,10 @@ void TxTree::markInstruction(KInstruction *instr, bool branchFlag) {
   // Other infeasible paths (like the infeasible paths in the internal
   // KLEE function klee_make_symbolic are not tracked by weakest pre-
   // condition approach.
-  if (isa<llvm::BranchInst>(iter->first->inst)) {
+  std::string fname = iter->first->inst->getParent()->getParent()->getName();
+  if (isa<llvm::BranchInst>(iter->first->inst) &&
+      fname.find("klee_") == std::string::npos &&
+      fname.find("tx_") == std::string::npos) {
     if (branchFlag == true)
       iter->second = 1;
     else

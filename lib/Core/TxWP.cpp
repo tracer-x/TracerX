@@ -1325,6 +1325,9 @@ TxWeakestPreCondition::intersectExpr_aux(std::vector<ref<Expr> > expr1,
 TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
     TxSubsumptionTableEntry *entry) {
 
+  if (entry->getWPInterpolant() == ConstantExpr::alloc(0, Expr::Bool))
+    entry->setWPInterpolant(ConstantExpr::alloc(1, Expr::Bool));
+
   // vars(w)
   std::set<std::string> wpVars;
   if (!entry->getWPInterpolant().isNull())
@@ -1940,6 +1943,11 @@ ref<Expr> TxWeakestPreCondition::PushUp(
       if (True() == WPExpr) {
         WPExpr = cond;
       } else {
+        if (WPExpr->getWidth() > cond->getWidth())
+          cond = ZExtExpr::create(cond, WPExpr->getWidth());
+        else if (WPExpr->getWidth() < cond->getWidth())
+          WPExpr = ZExtExpr::create(WPExpr, cond->getWidth());
+
         WPExpr = AndExpr::create(WPExpr, cond);
       }
     } else if (flag == 2) {
@@ -1955,6 +1963,11 @@ ref<Expr> TxWeakestPreCondition::PushUp(
       if (True() == WPExpr) {
         WPExpr = negCond;
       } else {
+        if (WPExpr->getWidth() > negCond->getWidth())
+          negCond = ZExtExpr::create(negCond, WPExpr->getWidth());
+        else if (WPExpr->getWidth() < negCond->getWidth())
+          WPExpr = ZExtExpr::create(WPExpr, negCond->getWidth());
+
         WPExpr = AndExpr::create(WPExpr, negCond);
       }
     } else if (i->getOpcode() == llvm::Instruction::Store) {
@@ -1966,10 +1979,10 @@ ref<Expr> TxWeakestPreCondition::PushUp(
           return result;
         }
         WPExpr = TxWPHelper::substituteExpr(WPExpr, right, left);
-        //        klee_warning("WP");
-        //        WPExpr->dump();
-        //        i->dump();
-        //        klee_warning("WP");
+        //                klee_warning("WP");
+        //                WPExpr->dump();
+        //                i->dump();
+        //                klee_warning("WP");
       }
     }
   }
@@ -2000,6 +2013,10 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
     ref<Expr> right = this->generateExprFromOperand(binOp->getOperand(1));
     if (left.isNull() || right.isNull())
       return result;
+    if (left->getWidth() > right->getWidth())
+      right = ZExtExpr::create(right, left->getWidth());
+    else if (left->getWidth() < right->getWidth())
+      left = ZExtExpr::create(left, right->getWidth());
     switch (binOp->getOpcode()) {
     case llvm::Instruction::And: {
       result = AndExpr::create(left, right);
@@ -2009,12 +2026,19 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
       result = OrExpr::create(left, right);
       break;
     }
-    default:
+    case llvm::Instruction::Xor: {
+      result = XorExpr::create(left, right);
+      break;
+    }
+    default: {
+      binOp->dump();
       klee_error("TxWeakestPreCondition::getCondition: Binary operator is not "
                  "implemented yet!");
     }
+    }
   } else {
-    klee_error("TxWeakestPreCondition::getCondition: Binary operator is not "
+    value->dump();
+    klee_error("TxWeakestPreCondition::getCondition: value is not "
                "implemented yet!");
   }
   return result;
@@ -2030,7 +2054,8 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
     llvm::ConstantInt *constInt = dyn_cast<llvm::ConstantInt>(val);
     ret = getConstantInt(constInt);
   } else if (isa<llvm::GlobalValue>(val)) {
-    klee_error("not implemented yet!");
+    llvm::GlobalValue *gv = dyn_cast<llvm::GlobalValue>(val);
+    ret = getGlobalValue(gv);
   } else if (isa<llvm::ConstantExpr>(val)) {
     llvm::ConstantExpr *constantExpr = dyn_cast<llvm::ConstantExpr>(val);
     ret = getConstantExpr(constantExpr);
@@ -2098,26 +2123,54 @@ ref<Expr> TxWeakestPreCondition::getConstantInt(llvm::ConstantInt *CI) {
 
 ref<Expr> TxWeakestPreCondition::getConstantExpr(llvm::ConstantExpr *ce) {
   ref<Expr> result;
-  //klee_warning("PUSHUP2");
+  klee_warning("PUSHUP2");
+  return result;
+}
+
+ref<Expr> TxWeakestPreCondition::getGlobalValue(llvm::GlobalValue *gv) {
+  unsigned width;
+  ref<Expr> index, result;
+  width = getGlobalVariabletSize(gv);
+  index = ConstantExpr::create(0, width);
+  result = WPVarExpr::create(gv, gv->getName(), index);
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
-  ref<Expr> result;
-  //klee_warning("PUSHUP3");
+  unsigned width;
+  ref<Expr> index, result;
+  width = getFunctionArgumentSize(arg);
+  index = ConstantExpr::create(0, width);
+  result = WPVarExpr::create(arg, arg->getName(), index);
   return result;
 }
 
 
 ref<Expr> TxWeakestPreCondition::getPointer(llvm::LoadInst *p) {
   ref<Expr> result;
-  //klee_warning("PUSHUP5");
+  /*p->dump();
+  llvm::GetElementPtrInst *gep =
+  dyn_cast<llvm::GetElementPtrInst>(p->getOperand(0));
+  gep->dump();
+  gep->getOperand(0)->dump();
+  gep->getOperand(2)->dump();
+  ref<Expr> offset = this->generateExprFromOperand(gep->getOperand(2));
+  result = this->generateExprFromOperand(gep->getOperand(0));
+  offset->dump();
+  result->dump();*/
+
+  //  width = getAllocaInstSize(ge);
+  //  index = ConstantExpr::create(0, width);
+  //  result =
+  //      WPVarExpr::create(p->getOperand(0), p->getOperand(0)->getName(),
+  //      index);
+  klee_warning("PUSHUP5");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getLoadGep(llvm::LoadInst *p) {
   ref<Expr> result;
-  //klee_warning("PUSHUP6");
+  klee_warning("PUSHUP6");
   return result;
 }
 
@@ -2130,8 +2183,15 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
     index = ConstantExpr::create(0, width);
     result =
         WPVarExpr::create(p->getOperand(0), p->getOperand(0)->getName(), index);
+  } else if (isa<llvm::GlobalValue>(p->getOperand(0))) {
+    llvm::GlobalValue *gv = dyn_cast<llvm::GlobalValue>(p->getOperand(0));
+    width = getGlobalVariabletSize(gv);
+    index = ConstantExpr::create(0, width);
+    result =
+        WPVarExpr::create(p->getOperand(0), p->getOperand(0)->getName(), index);
   } else {
-    //klee_warning("TxWeakestPreCondition::getLoad: Not implemented yet!");
+    p->getOperand(0)->dump();
+    klee_warning("TxWeakestPreCondition::getLoad: Not implemented yet!");
   }
   return result;
 }
@@ -2214,7 +2274,59 @@ ref<Expr> TxWeakestPreCondition::getBinaryInst(llvm::BinaryOperator *bo) {
 
 ref<Expr> TxWeakestPreCondition::getCastInst(llvm::CastInst *ci) {
   ref<Expr> result;
-  //klee_warning("PUSHUP9");
+  ref<Expr> arg1 = generateExprFromOperand(ci->getOperand(0));
+  if (arg1.isNull())
+    return result;
+
+  Expr::Width width = Expr::InvalidWidth;
+  if (ci->getDestTy()->isEmptyTy())
+    width = Expr::InvalidWidth;
+  else if (ci->getDestTy()->isIntegerTy(1))
+    width = Expr::Bool;
+  else if (ci->getDestTy()->isIntegerTy(8))
+    width = Expr::Int8;
+  else if (ci->getDestTy()->isIntegerTy(16))
+    width = Expr::Int16;
+  else if (ci->getDestTy()->isIntegerTy(32))
+    width = Expr::Int32;
+  else if (ci->getDestTy()->isIntegerTy(64))
+    width = Expr::Int64;
+  else {
+    ci->getDestTy()->dump();
+    klee_warning("TxWeakestPreCondition::getCastInst size not supported yet!");
+    return result;
+  }
+
+  switch (ci->getOpcode()) {
+  case llvm::Instruction::SExt: {
+    result = SExtExpr::create(arg1, width);
+    break;
+  }
+  case llvm::Instruction::ZExt: {
+    result = ZExtExpr::create(arg1, width);
+    break;
+  }
+  case llvm::Instruction::Trunc: {
+    result = ExtractExpr::create(arg1, 0, width);
+    break;
+  }
+  case llvm::Instruction::AddrSpaceCast:
+  case llvm::Instruction::BitCast:
+  case llvm::Instruction::FPExt:
+  case llvm::Instruction::FPToSI:
+  case llvm::Instruction::FPToUI:
+  case llvm::Instruction::FPTrunc:
+  case llvm::Instruction::IntToPtr:
+  case llvm::Instruction::PtrToInt:
+  case llvm::Instruction::SIToFP:
+  case llvm::Instruction::UIToFP:
+  default: {
+    ci->dump();
+    klee_warning("TxWeakestPreCondition::generateExprFromOperand Unary Operand "
+                 "not implemented...\n");
+    return result;
+  }
+  }
   return result;
 }
 
@@ -2226,6 +2338,10 @@ ref<Expr> TxWeakestPreCondition::getCmpCondition(llvm::CmpInst *cmp) {
 
   if (left.isNull() || right.isNull())
     return result;
+  if (left->getWidth() > right->getWidth())
+    right = ZExtExpr::create(right, left->getWidth());
+  else if (left->getWidth() < right->getWidth())
+    left = ZExtExpr::create(left, right->getWidth());
 
   // second step is to create the expression
   switch (cmp->getPredicate()) {
@@ -2319,57 +2435,117 @@ ref<Expr> TxWeakestPreCondition::getCmpCondition(llvm::CmpInst *cmp) {
 
 ref<Expr> TxWeakestPreCondition::getGepInst(llvm::GetElementPtrInst *gep) {
   ref<Expr> result;
-  //klee_warning("PUSHUP10");
+  /*
+  gep->dump();
+  if (gep->getNumOperands() == 2){
+          gep->getOperand(0)->dump();
+          gep->getOperand(1)->dump();
+          ref<Expr> offset = this->generateExprFromOperand(gep->getOperand(1));
+          offset->dump();
+          result = this->generateExprFromOperand(gep->getOperand(0));
+
+
+  }*/
+  klee_warning("PUSHUP10");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getSwitchInst(llvm::SwitchInst *si) {
   ref<Expr> result;
-  //klee_warning("PUSHUP11");
+  klee_warning("PUSHUP11");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getPhiInst(llvm::PHINode *phi) {
   ref<Expr> result;
-  //klee_warning("PUSHUP12");
+  klee_warning("PUSHUP12");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getCallInst(llvm::CallInst *ci) {
   ref<Expr> result;
-  //klee_warning("PUSHUP13: getCallInst");
+  klee_warning("PUSHUP13: getCallInst");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getCallAssume(llvm::CallInst *ci) {
   ref<Expr> result;
-  //klee_warning("PUSHUP14");
+  klee_warning("PUSHUP14");
   return result;
 }
 
 unsigned int TxWeakestPreCondition::getAllocaInstSize(llvm::AllocaInst *alc) {
   unsigned int size;
 
-  if (alc->getAllocatedType()->isIntegerTy(8) ) {
-	  size = Expr::Int8;
+  if (alc->getAllocatedType()->isIntegerTy(1)) {
+    size = Expr::Bool;
+  } else if (alc->getAllocatedType()->isIntegerTy(8)) {
+    size = Expr::Int8;
   }  else if (alc->getAllocatedType()->isIntegerTy(16) ) {
       size = Expr::Int16;
   }  else if (alc->getAllocatedType()->isIntegerTy(32) ) {
     size = Expr::Int32;
+  } else if (alc->getAllocatedType()->isIntegerTy(64)) {
+    size = Expr::Int64;
   } else {
     alc->dump();
     alc->getType()->dump();
     klee_error("TxWeakestPreCondition::getAllocaInstSize getting size is not "
-               "defined for this "
-               "type yet");
+               "defined for this type yet");
+  }
+  return size;
+}
+
+unsigned int
+TxWeakestPreCondition::getGlobalVariabletSize(llvm::GlobalValue *gv) {
+  unsigned int size;
+
+  if (gv->getType()->isIntegerTy(1)) {
+    size = Expr::Bool;
+  } else if (gv->getType()->isIntegerTy(8)) {
+    size = Expr::Int8;
+  } else if (gv->getType()->isIntegerTy(16)) {
+    size = Expr::Int16;
+  } else if (gv->getType()->isIntegerTy(32)) {
+    size = Expr::Int32;
+  } else if (gv->getType()->isPointerTy()) {
+    size = Expr::Int32;
+  } else {
+    gv->dump();
+    gv->getType()->dump();
+    klee_error(
+        "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
+        "defined for this type yet");
+  }
+  return size;
+}
+
+unsigned int
+TxWeakestPreCondition::getFunctionArgumentSize(llvm::Argument *arg) {
+  unsigned int size;
+
+  if (arg->getType()->isIntegerTy(1)) {
+    size = Expr::Bool;
+  } else if (arg->getType()->isIntegerTy(8)) {
+    size = Expr::Int8;
+  } else if (arg->getType()->isIntegerTy(16)) {
+    size = Expr::Int16;
+  } else if (arg->getType()->isIntegerTy(32)) {
+    size = Expr::Int32;
+  } else if (arg->getType()->isPointerTy()) {
+    size = Expr::Int32;
+  } else {
+    arg->dump();
+    arg->getType()->dump();
+    klee_error(
+        "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
+        "defined for this type yet");
   }
   return size;
 }
 
 /*
-
-
-  } else if (isa<llvm::LoadInst>(val)) {
+   if (isa<llvm::LoadInst>(val)) {
     llvm::LoadInst *inst = dyn_cast<llvm::LoadInst>(val);
     if (isa<llvm::GlobalValue>(inst->getOperand(0))) {
       ret = dependency->getAddress(inst->getOperand(0), &(wpStore->ac),
@@ -2398,61 +2574,7 @@ unsigned int TxWeakestPreCondition::getAllocaInstSize(llvm::AllocaInst *alc) {
       ret = dependency->getAddress(inst->getOperand(0), &(wpStore->ac),
                                    wpStore->array, this, offset);
     }
-  } else if (isa<llvm::CastInst>(val)) {
-    llvm::CastInst *op1 = dyn_cast<llvm::CastInst>(val);
-    ref<Expr> arg1 = generateExprFromOperand(op1, 0);
 
-    Expr::Width width = Expr::InvalidWidth;
-    if (op1->getDestTy()->isEmptyTy())
-      width = Expr::InvalidWidth;
-    else if (op1->getDestTy()->isIntegerTy(1))
-      width = Expr::Bool;
-    else if (op1->getDestTy()->isIntegerTy(8))
-      width = Expr::Int8;
-    else if (op1->getDestTy()->isHalfTy())
-      width = Expr::Int16;
-    else if (op1->getDestTy()->isIntegerTy())
-      width = Expr::Int32;
-    else if (op1->getDestTy()->isDoubleTy())
-      width = Expr::Int64;
-    else if (op1->getDestTy()->isFloatTy())
-      width = Expr::Fl80;
-
-    switch (op1->getOpcode()) {
-    case llvm::Instruction::SExt: {
-      ret = SExtExpr::create(arg1, width);
-      break;
-    }
-
-    case llvm::Instruction::ZExt: {
-      ret = ZExtExpr::create(arg1, width);
-      break;
-    }
-    case llvm::Instruction::AddrSpaceCast:
-    case llvm::Instruction::BitCast:
-    case llvm::Instruction::FPExt:
-    case llvm::Instruction::FPToSI:
-    case llvm::Instruction::FPToUI:
-    case llvm::Instruction::FPTrunc:
-    case llvm::Instruction::IntToPtr:
-    case llvm::Instruction::PtrToInt:
-    case llvm::Instruction::SIToFP:
-    case llvm::Instruction::Trunc:
-    case llvm::Instruction::UIToFP:
-    default: {
-      klee_error("TxWeakestPreCondition::generateExprFromOperand Unary Operand "
-                 "not implemented...\n");
-    }
-    }
-  } else if (isa<llvm::AllocaInst>(val)) {
-    ret = dependency->getAddress(val, &(wpStore->ac), wpStore->array, this,
-                                 offset);
-  } else if (llvm::isa<llvm::CmpInst>(val)) {
-    llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(val);
-    ret = getCmpCondition(cmp);
-  } else if (llvm::isa<llvm::GlobalVariable>(val)) {
-    ret = dependency->getAddress(val, &(wpStore->ac), wpStore->array, this,
-                                 offset);
   } else if (llvm::isa<llvm::Argument>(val)) {
     klee_error("llvm::isa<llvm::Argument>(operand1)");
 
@@ -2490,12 +2612,5 @@ unsigned int TxWeakestPreCondition::getAllocaInstSize(llvm::AllocaInst *alc) {
           AddExpr::create(MulExpr::create(newOffset, arraySize), offset);
     ret = this->generateExprFromOperand(gep, 0, newOffset);
 
-  } else {
-    llvm::errs() << "Value:";
-    val->dump();
-    llvm::errs() << "\nType:";
-    val->getType()->dump();
-    klee_error("TxWeakestPreCondition::generateExprFromOperand Remaining"
-               " cases not implemented yet\n");
   }
   return ret;*/
