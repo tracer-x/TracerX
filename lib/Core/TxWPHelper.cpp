@@ -291,9 +291,11 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
     }
 
     case Expr::WPVar: {
-      if (base.compare(lhs))
+      ref<WPVarExpr> wp1 = dyn_cast<WPVarExpr>(base);
+      ref<WPVarExpr> wp2 = dyn_cast<WPVarExpr>(lhs);
+      if (wp1->address == wp2->address) {
         return rhs;
-      else
+      } else
         return base;
     }
 

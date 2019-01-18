@@ -212,11 +212,10 @@ private:
   // \brief Handling ConstantExpr LLVM Value
   ref<Expr> getConstantExpr(llvm::ConstantExpr *ce);
 
+  ref<Expr> getGlobalValue(llvm::GlobalValue *gv);
+
   // \brief Handling Function Argument LLVM Value
   ref<Expr> getFunctionArgument(llvm::Argument *arg);
-
-  // \brief Retrieving Alloca LLVM Value size
-  unsigned int getAllocaInstSize(llvm::AllocaInst *alc);
 
   // \brief Handling Alloca LLVM Value
   ref<Expr> getAllocaInst(llvm::AllocaInst *alc);
@@ -253,6 +252,15 @@ private:
 
   // \brief Handling Call kLEE_assume
   ref<Expr> getCallAssume(llvm::CallInst *ci);
+
+  // \brief Retrieving Alloca LLVM Value size
+  unsigned int getAllocaInstSize(llvm::AllocaInst *alc);
+
+  // \brief Retrieving Global Variable LLVM Value size
+  unsigned int getGlobalVariabletSize(llvm::GlobalValue *gv);
+
+  // \brief Retrieving Function Argument size
+  unsigned int getFunctionArgumentSize(llvm::Argument *arg);
 };
 }
 #endif /* TXWP_H_ */
