@@ -1439,7 +1439,6 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
   }
 
   entry->setConcretelyAddressedStore(concretelyAddressedStore);
-
   return entry;
 }
 
@@ -1967,7 +1966,6 @@ ref<Expr> TxWeakestPreCondition::PushUp(
           negCond = ZExtExpr::create(negCond, WPExpr->getWidth());
         else if (WPExpr->getWidth() < negCond->getWidth())
           WPExpr = ZExtExpr::create(WPExpr, negCond->getWidth());
-
         WPExpr = AndExpr::create(WPExpr, negCond);
       }
     } else if (i->getOpcode() == llvm::Instruction::Store) {
@@ -1979,10 +1977,10 @@ ref<Expr> TxWeakestPreCondition::PushUp(
           return result;
         }
         WPExpr = TxWPHelper::substituteExpr(WPExpr, right, left);
-        //                klee_warning("WP");
-        //                WPExpr->dump();
-        //                i->dump();
-        //                klee_warning("WP");
+        //                        klee_warning("WP");
+        //                        WPExpr->dump();
+        //                        i->dump();
+        //                        klee_warning("WP");
       }
     }
   }
@@ -2047,9 +2045,9 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
 ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
                                                          ref<Expr> offset) {
   ref<Expr> ret;
-  //  klee_warning("TxWeakestPreCondition::generateExprFromOperand0");
-  //  val->dump();
-  //  klee_warning("TxWeakestPreCondition::generateExprFromOperand1");
+  //    klee_warning("TxWeakestPreCondition::generateExprFromOperand0");
+  //    val->dump();
+  //    klee_warning("TxWeakestPreCondition::generateExprFromOperand1");
   if (isa<llvm::ConstantInt>(val)) {
     llvm::ConstantInt *constInt = dyn_cast<llvm::ConstantInt>(val);
     ret = getConstantInt(constInt);
@@ -2102,9 +2100,10 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
     klee_error("\nTxWeakestPreCondition::generateExprFromOperand Remaining"
                " cases not implemented yet\n");
   }
-  //  klee_warning("TxWeakestPreCondition::generateExprFromOperand2");
-  //  ret->dump();
-  //  klee_warning("TxWeakestPreCondition::generateExprFromOperand3\n\n");
+  //    klee_warning("TxWeakestPreCondition::generateExprFromOperand2");
+  //    if(!ret.isNull())
+  //    	ret->dump();
+  //    klee_warning("TxWeakestPreCondition::generateExprFromOperand3\n\n");
   return ret;
 }
 
@@ -2211,6 +2210,11 @@ ref<Expr> TxWeakestPreCondition::getBinaryInst(llvm::BinaryOperator *bo) {
   ref<Expr> arg2 = generateExprFromOperand(bo->getOperand(1));
   if (arg1.isNull() || arg2.isNull())
     return ret;
+  if (arg1->getWidth() > arg2->getWidth())
+    arg2 = ZExtExpr::create(arg2, arg1->getWidth());
+  else if (arg1->getWidth() < arg2->getWidth())
+    arg1 = ZExtExpr::create(arg1, arg2->getWidth());
+
   switch (bo->getOpcode()) {
   case llvm::Instruction::Add: {
     ret = AddExpr::create(arg1, arg2);
