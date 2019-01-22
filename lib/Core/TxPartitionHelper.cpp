@@ -23,8 +23,12 @@ std::vector<ref<Expr> > TxPartitionHelper::getExprsFromAndExpr(ref<Expr> e) {
     if (e->getKind() == Expr::And) {
       std::vector<ref<Expr> > left = getExprsFromAndExpr(e->getKid(0));
       std::vector<ref<Expr> > right = getExprsFromAndExpr(e->getKid(1));
+      for (std::vector<ref<Expr> >::iterator it = right.begin(),
+                                             ie = right.end();
+           it != ie; ++it) {
+        left.push_back(*it);
+      }
       return left;
-      //      return left.insert(left.end(), right.begin(), right.end());
     } else {
       ret.push_back(e);
     }
@@ -140,13 +144,16 @@ bool TxPartitionHelper::isSubset(std::set<std::string> ss1,
                                  std::set<std::string> ss2) {
   for (std::set<std::string>::const_iterator it1 = ss1.begin(), ie1 = ss1.end();
        it1 != ie1; ++it1) {
+    int flag = false;
     for (std::set<std::string>::const_iterator it2 = ss2.begin(),
                                                ie2 = ss2.end();
          it2 != ie2; ++it2) {
-      if ((*it2).compare(*it1) != 0) {
-        return false;
+      if ((*it2).compare(*it1) == 0) {
+        flag = true;
       }
     }
+    if (flag == false)
+      return false;
   }
   return true;
 }

@@ -801,11 +801,13 @@ bool TxSubsumptionTableEntry::subsumed(
         state.txTreeNode->instantiateWPatSubsumption(
             wpInterpolant, state.txTreeNode->getDependency());
 
+    ref<Expr> wpBoolean =
+        ZExtExpr::create(wpInstantiatedInterpolant, Expr::Bool);
+
     Solver::Validity result;
     std::vector<ref<Expr> > unsatCore;
 
-    bool success =
-        solver->evaluate(state, wpInstantiatedInterpolant, result, unsatCore);
+    bool success = solver->evaluate(state, wpBoolean, result, unsatCore);
 
     if (!success || result != Solver::True) {
       if (debugSubsumptionLevel >= 1) {
