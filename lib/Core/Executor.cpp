@@ -1552,11 +1552,11 @@ void Executor::speculativeBackJump(ExecutionState &current) {
     txTree->removeSpeculationFailedNodes(*it);
   }
 
-  for (std::vector<ExecutionState *>::iterator it = removedSpeculationStates.begin(),
-                                               ie = removedSpeculationStates.end();
-       it != ie; ++it) {
-    delete *it;
-  }
+//  for (std::vector<ExecutionState *>::iterator it = removedSpeculationStates.begin(),
+//                                               ie = removedSpeculationStates.end();
+//       it != ie; ++it) {
+//    delete *it;
+//  }
 
   llvm::outs() << "=====Finish deletion====\n";
 }
@@ -4035,11 +4035,11 @@ void Executor::terminateStateOnError(ExecutionState &state,
                                      enum TerminateReason termReason,
                                      const char *suffix,
                                      const llvm::Twine &info) {
-//  if (INTERPOLATION_ENABLED && Speculation &&
-//      state.txTreeNode->isSpeculationNode()) {
-//    speculativeBackJump(state);
-//    return;
-//  }
+  if (INTERPOLATION_ENABLED && Speculation &&
+      state.txTreeNode->isSpeculationNode()) {
+    speculativeBackJump(state);
+    return;
+  }
 
   interpreterHandler->incErrorTermination();
   if (INTERPOLATION_ENABLED) {
