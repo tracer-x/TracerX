@@ -191,8 +191,7 @@ namespace klee {
 //  return e->rebuild(kids);
 //}
 
-bool TxWPHelper::isTargetDependent(TxWPArrayStore *wpStore, llvm::Value *inst,
-                                   ref<Expr> expr) {
+bool TxWPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
   //  llvm::outs() << "***********\n";
   //  expr->dump();
   //  llvm::outs() << expr->getKind() << "\n";
@@ -203,20 +202,6 @@ bool TxWPHelper::isTargetDependent(TxWPArrayStore *wpStore, llvm::Value *inst,
     return false;
   }
 
-  case Expr::WPVar: {
-    if (inst == dyn_cast<WPVarExpr>(expr)->address) {
-      return true;
-    }
-    return false;
-  }
-
-  case Expr::Concat: {
-    if (inst == wpStore->getValuePointer(expr)) {
-      return true;
-    }
-    return false;
-  }
-
   case Expr::NotOptimized:
   case Expr::Not:
   case Expr::Extract:
@@ -224,7 +209,7 @@ bool TxWPHelper::isTargetDependent(TxWPArrayStore *wpStore, llvm::Value *inst,
   case Expr::SExt: {
     ref<Expr> kids[1];
     kids[0] = expr->getKid(0);
-    return isTargetDependent(wpStore, inst, kids[0]);
+    return isTargetDependent(inst, kids[0]);
   }
 
   case Expr::Eq:
@@ -256,8 +241,8 @@ bool TxWPHelper::isTargetDependent(TxWPArrayStore *wpStore, llvm::Value *inst,
     kids[1] = expr->getKid(1);
     //    llvm::outs() << isTargetDependent(inst, kids[0]) << "\n";
     //    llvm::outs() << isTargetDependent(inst, kids[1]) << "\n";
-    return (isTargetDependent(wpStore, inst, kids[0]) ||
-            isTargetDependent(wpStore, inst, kids[1]));
+    return (isTargetDependent(inst, kids[0]) ||
+            isTargetDependent(inst, kids[1]));
   }
 
   case Expr::Select: {
@@ -265,14 +250,16 @@ bool TxWPHelper::isTargetDependent(TxWPArrayStore *wpStore, llvm::Value *inst,
     kids[0] = expr->getKid(0);
     kids[1] = expr->getKid(1);
     kids[2] = expr->getKid(2);
-    return (isTargetDependent(wpStore, inst, kids[0]) ||
-            isTargetDependent(wpStore, inst, kids[1]) ||
-            isTargetDependent(wpStore, inst, kids[2]));
+    return (isTargetDependent(inst, kids[0]) ||
+            isTargetDependent(inst, kids[1]) ||
+            isTargetDependent(inst, kids[2]));
+  }
+  default: {
+    // Sanity check
+    klee_error("Control should not reach here in "
+               "TxWPHelper::isTargetDependent!");
   }
   }
-  // Sanity check
-  klee_error("Control should not reach here in "
-             "TxWPHelper::isTargetDependent!");
   return false;
 }
 
@@ -465,11 +452,11 @@ ref<Expr> TxWPHelper::substituteArray(ref<Expr> base, const Array *lhs,
     kids[2] = substituteArray(base->getKid(1), lhs, rhs);
     return base->rebuild(kids);
   }
+  default: {
+    // Sanity check
+    klee_error("Control should not reach here in TxWPHelper::substituteArray!");
   }
-
-  // Sanity check
-  klee_error("Control should not reach here in TxWPHelper::substituteArray!");
-
+  }
   return base;
 }
 
@@ -567,10 +554,12 @@ std::set<ref<Expr> > TxWPHelper::extractVariables(ref<Expr> expr) {
     set1.insert(set3.begin(), set3.end());
     return set1;
   }
+  default: {
+    // Sanity check
+    klee_error("Control should not reach here in "
+               "TxWPHelper::isTargetDependent!");
   }
-  // Sanity check
-  klee_error("Control should not reach here in "
-             "TxWPHelper::isTargetDependent!");
+  }
   return set;
 }
 
