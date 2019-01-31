@@ -30,53 +30,6 @@
 
 namespace klee {
 
-typedef std::map<ref<TxAllocationContext>,
-                 std::pair<const Array *, ref<Expr> > >
-    ArrayStore;
-
-/// \brief Implements the replacement mechanism for replacing variables in WP
-/// Expr, used in replacing free with bound variables.
-class TxWPArrayStore {
-
-  friend class TxTree;
-
-  friend class ExecutionState;
-
-public:
-  /// \brief A mapping between TX addresses and the symbolic variable created
-  /// for them
-  /// in the reverse exploration and generation of the WP expression
-  ArrayStore arrayStore;
-
-  ArrayCache ac;
-  const Array *array;
-  ref<Expr> constValues;
-
-  void insert(ref<TxAllocationContext>, const Array *array, ref<Expr> expr);
-
-  std::pair<unsigned int, unsigned int> getSize(llvm::Value *value);
-
-  std::pair<unsigned int, unsigned int> getSize_aux(llvm::Type *type);
-
-  ref<Expr> createAndInsert(ref<TxAllocationContext> address,
-                            std::string arrayName, llvm::Value *value,
-                            ref<Expr> offset = NULL);
-
-  const Array *getArrayRef(llvm::Value *value);
-
-  llvm::Value *getValuePointer(ref<Expr> expr);
-
-  ref<TxAllocationContext> getAddress(ref<Expr> var);
-
-  ref<TxAllocationContext> getAddress(const Array *arr);
-
-  ref<TxAllocationContext> getAddress(llvm::Value *i);
-
-  ref<Expr> getExpr(ref<TxAllocationContext> address);
-
-  const Array *getArray(ref<TxAllocationContext> address);
-};
-
 /// \brief The class that implements weakest precondition interpolant.
 class TxWeakestPreCondition {
 
@@ -95,10 +48,6 @@ class TxWeakestPreCondition {
   /// node
   TxDependency *dependency;
 
-  /// \brief Performs the replacement mechanism for replacing variables in WP
-  /// Expr, used in replacing free with bound variables.
-  TxWPArrayStore *wpStore;
-
   int debugSubsumptionLevel;
 
 public:
@@ -116,19 +65,6 @@ public:
   void setWPExpr(ref<Expr> expr) { WPExpr = expr; }
 
   ref<Expr> getWPExpr() { return WPExpr; }
-
-  void setWPStore(TxWPArrayStore *_wpStore) { wpStore = _wpStore; }
-
-  std::pair<TxWPArrayStore *, std::pair<ref<Expr>, ref<Expr> > >
-  mergeWPArrayStore(TxWPArrayStore *childArrayStore1,
-                    TxWPArrayStore *childArrayStore2,
-                    ref<Expr> childWPInterpolant1,
-                    ref<Expr> childWPInterpolant2);
-
-  void sanityCheckWPArrayStore(TxWPArrayStore *childArrayStore,
-                               ref<Expr> childWPInterpolant);
-
-  TxWPArrayStore *getWPStore() { return wpStore; }
 
   // \brief Preprocessing phase: marking the instructions that contribute
   // to the target or an infeasible path.

@@ -57,8 +57,7 @@ public:
 
   static ref<ReadExpr> ExtractReadExpr(ref<Expr> expr);
 
-  static bool isTargetDependent(TxWPArrayStore *wpStore, llvm::Value *inst,
-                                ref<Expr> expr);
+  static bool isTargetDependent(llvm::Value *inst, ref<Expr> expr);
 
   static std::set<ref<Expr> > extractVariables(ref<Expr> expr);
 };

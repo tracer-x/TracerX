@@ -25,13 +25,14 @@
 #include "klee/TimerStatIncrementer.h"
 #include "klee/util/ExprVisitor.h"
 #include "klee/util/TxTreeGraph.h"
+
 #include "llvm/Support/raw_ostream.h"
 #include "TxDependency.h"
 #include "TxWP.h"
 
 namespace klee {
 
-class TxWPArrayStore;
+class TxWeakestPreCondition;
 
 /// \brief The subsumption table.
 ///
@@ -178,10 +179,6 @@ class TxSubsumptionTableEntry {
   TxStore::TopInterpolantStore symbolicallyAddressedStore;
 
   ref<Expr> wpInterpolant;
-
-  /// \brief Performs the replacement mechanism for replacing variables in WP
-  /// Expr, used in replacing free with bound variables.
-  TxWPArrayStore *wpStore;
 
   std::set<const Array *> existentials;
 
@@ -424,9 +421,6 @@ class TxTreeNode {
   /// \brief Child WP expressions
   ref<Expr> childWPInterpolant[2];
 
-  /// \brief Child WP Array Stores
-  TxWPArrayStore *childArrayStore[2];
-
   /// \brief An expressions representing branch condition (used in partitioning)
   ref<Expr> branchCondition;
 
@@ -545,15 +539,7 @@ public:
   /// \brief Get the stored child WP interpolants in the parent node
   ref<Expr> getChildWPInterpolant(int flag);
 
-
   llvm::Instruction *getPreviousInstruction(llvm::PHINode *phi);
-
-  /// \brief Store the child WP interpolants in the parent node
-  void setChildWPStore(TxWPArrayStore *arrayStore);
-
-  /// \brief Get the stored child WP Array Store in the parent node
-  TxWPArrayStore *getChildWPStore(int flag);
-
 
   /// \brief Store the BranchCondition in the parent node (used for WP
   /// intersection)
