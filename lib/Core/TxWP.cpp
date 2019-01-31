@@ -962,7 +962,7 @@ TxWeakestPreCondition::intersectExpr_aux(std::vector<ref<Expr> > expr1,
 //  else
 //    return expr2;
 //}
-//
+
 // ref<ConstantExpr>
 // TxWeakestPreCondition::getMaxOfConstExpr(ref<ConstantExpr> expr1,
 //                                         ref<ConstantExpr> expr2) {
@@ -1200,79 +1200,79 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
 //  return concretelyAddressedStore;
 //}
 
-ref<Expr> TxWeakestPreCondition::getVarFromExpr(ref<Expr> wp) {
-
-  switch (wp->getKind()) {
-  case Expr::InvalidKind:
-  case Expr::Read:
-  case Expr::Concat:
-  case Expr::Constant: {
-    return wp;
-  }
-
-  case Expr::NotOptimized:
-  case Expr::Not:
-  case Expr::Extract:
-  case Expr::ZExt:
-  case Expr::SExt: {
-    ref<Expr> kids[1];
-    kids[0] = getVarFromExpr(wp->getKid(0));
-    return kids[0];
-  }
-
-  case Expr::Eq:
-  case Expr::Ne:
-  case Expr::Ult:
-  case Expr::Ule:
-  case Expr::Ugt:
-  case Expr::Uge:
-  case Expr::Slt:
-  case Expr::Sle:
-  case Expr::Sgt:
-  case Expr::Sge:
-  case Expr::LastKind:
-  case Expr::Add:
-  case Expr::Sub:
-  case Expr::Mul:
-  case Expr::UDiv:
-  case Expr::SDiv:
-  case Expr::URem:
-  case Expr::SRem:
-  case Expr::And:
-  case Expr::Or:
-  case Expr::Xor:
-  case Expr::Shl:
-  case Expr::LShr:
-  case Expr::AShr: {
-    ref<Expr> kids[2];
-    kids[0] = getVarFromExpr(wp->getKid(0));
-    kids[1] = getVarFromExpr(wp->getKid(1));
-    if (isa<ReadExpr>(kids[0]) || isa<ConcatExpr>(kids[0]))
-      return kids[0];
-    else
-      return kids[1];
-  }
-
-  case Expr::Select: {
-    ref<Expr> kids[3];
-    kids[0] = getVarFromExpr(wp->getKid(0));
-    kids[1] = getVarFromExpr(wp->getKid(1));
-    kids[2] = getVarFromExpr(wp->getKid(2));
-    if (isa<ReadExpr>(kids[0]) || isa<ConcatExpr>(kids[0]))
-      return kids[0];
-    else if (isa<ReadExpr>(kids[1]) || isa<ConcatExpr>(kids[1]))
-      return kids[1];
-    else
-      return kids[1];
-  }
-  default: {
-    // Sanity check
-    klee_error("Control should not reach here in"
-               "TxWeakestPreCondition::getVarFromExpr");
-  }
-  }
-  return wp;
-}
+// ref<Expr> TxWeakestPreCondition::getVarFromExpr(ref<Expr> wp) {
+//
+//  switch (wp->getKind()) {
+//  case Expr::InvalidKind:
+//  case Expr::Read:
+//  case Expr::Concat:
+//  case Expr::Constant: {
+//    return wp;
+//  }
+//
+//  case Expr::NotOptimized:
+//  case Expr::Not:
+//  case Expr::Extract:
+//  case Expr::ZExt:
+//  case Expr::SExt: {
+//    ref<Expr> kids[1];
+//    kids[0] = getVarFromExpr(wp->getKid(0));
+//    return kids[0];
+//  }
+//
+//  case Expr::Eq:
+//  case Expr::Ne:
+//  case Expr::Ult:
+//  case Expr::Ule:
+//  case Expr::Ugt:
+//  case Expr::Uge:
+//  case Expr::Slt:
+//  case Expr::Sle:
+//  case Expr::Sgt:
+//  case Expr::Sge:
+//  case Expr::LastKind:
+//  case Expr::Add:
+//  case Expr::Sub:
+//  case Expr::Mul:
+//  case Expr::UDiv:
+//  case Expr::SDiv:
+//  case Expr::URem:
+//  case Expr::SRem:
+//  case Expr::And:
+//  case Expr::Or:
+//  case Expr::Xor:
+//  case Expr::Shl:
+//  case Expr::LShr:
+//  case Expr::AShr: {
+//    ref<Expr> kids[2];
+//    kids[0] = getVarFromExpr(wp->getKid(0));
+//    kids[1] = getVarFromExpr(wp->getKid(1));
+//    if (isa<ReadExpr>(kids[0]) || isa<ConcatExpr>(kids[0]))
+//      return kids[0];
+//    else
+//      return kids[1];
+//  }
+//
+//  case Expr::Select: {
+//    ref<Expr> kids[3];
+//    kids[0] = getVarFromExpr(wp->getKid(0));
+//    kids[1] = getVarFromExpr(wp->getKid(1));
+//    kids[2] = getVarFromExpr(wp->getKid(2));
+//    if (isa<ReadExpr>(kids[0]) || isa<ConcatExpr>(kids[0]))
+//      return kids[0];
+//    else if (isa<ReadExpr>(kids[1]) || isa<ConcatExpr>(kids[1]))
+//      return kids[1];
+//    else
+//      return kids[1];
+//  }
+//  default: {
+//    // Sanity check
+//    klee_error("Control should not reach here in"
+//               "TxWeakestPreCondition::getVarFromExpr");
+//  }
+//  }
+//  return wp;
+//}
 
 // ref<Expr> TxWeakestPreCondition::updateInterpolant(ref<Expr> interpolant,
 //                                                   ref<Expr> wp) {
@@ -1585,88 +1585,6 @@ ref<Expr> TxWeakestPreCondition::getVarFromExpr(ref<Expr> wp) {
 // Updated Version of Weakest PreCondition
 // =========================================================================
 
-// std::pair<TxWPArrayStore *, std::pair<ref<Expr>, ref<Expr> > >
-// TxWeakestPreCondition::mergeWPArrayStore(TxWPArrayStore *childArrayStore1,
-//                                         TxWPArrayStore *childArrayStore2,
-//                                         ref<Expr> childWPInterpolant1,
-//                                         ref<Expr> childWPInterpolant2) {
-//
-//  for (ArrayStore::const_iterator it = childArrayStore2->arrayStore.begin(),
-//                                  ie = childArrayStore2->arrayStore.end();
-//       it != ie; ++it) {
-//    if (childArrayStore1->arrayStore.find(it->first) ==
-//        childArrayStore1->arrayStore.end())
-//      childArrayStore1->arrayStore.insert(*it);
-//    else {
-//      ref<ReadExpr> re;
-//      if (isa<ReadExpr>(it->second.second))
-//        re = dyn_cast<ReadExpr>(it->second.second);
-//      else
-//        re = TxWPHelper::ExtractReadExpr(it->second.second);
-//
-//      ref<ReadExpr> re2;
-//      if (isa<ReadExpr>(
-//              childArrayStore1->arrayStore.find(it->first)->second.second))
-//        re2 = dyn_cast<ReadExpr>(
-//            childArrayStore1->arrayStore.find(it->first)->second.second);
-//      else
-//        re2 = TxWPHelper::ExtractReadExpr(
-//            childArrayStore1->arrayStore.find(it->first)->second.second);
-//
-//      childWPInterpolant2 = TxWPHelper::substituteArray(
-//          childWPInterpolant2, re->getArray(), re2->getArray());
-//    }
-//  }
-//  return std::make_pair(childArrayStore1, std::make_pair(childWPInterpolant1,
-//                                                         childWPInterpolant2));
-//}
-
-// void TxWeakestPreCondition::sanityCheckWPArrayStore(
-//    TxWPArrayStore *childArrayStore, ref<Expr> childWPInterpolant) {
-//  std::set<ref<Expr> > varsSet =
-//      TxWPHelper::extractVariables(childWPInterpolant);
-//  for (std::set<ref<Expr> >::const_iterator it = varsSet.begin(),
-//                                            ie = varsSet.end();
-//       it != ie; ++it) {
-//    int flag = false;
-//    for (ArrayStore::const_iterator it2 = childArrayStore->arrayStore.begin(),
-//                                    ie2 = childArrayStore->arrayStore.end();
-//         it2 != ie2; ++it2) {
-//      ref<ReadExpr> re;
-//      if (isa<ReadExpr>((*it)))
-//        re = dyn_cast<ReadExpr>((*it));
-//      else
-//        re = TxWPHelper::ExtractReadExpr((*it));
-//
-//      ref<ReadExpr> re2;
-//      if (isa<ReadExpr>(it2->second.second))
-//        re2 = dyn_cast<ReadExpr>(it2->second.second);
-//      else
-//        re2 = TxWPHelper::ExtractReadExpr(it2->second.second);
-//
-//      if (re2->getArray() == re->getArray()) {
-//        flag = true;
-//        continue;
-//      }
-//    }
-//    if (flag == false) {
-//      llvm::errs() << "Missing Item:";
-//      (*it)->dump();
-//      llvm::errs() << "Available Items:\n";
-//      for (ArrayStore::const_iterator it2 =
-//      childArrayStore->arrayStore.begin(),
-//                                      ie2 = childArrayStore->arrayStore.end();
-//           it2 != ie2; ++it2) {
-//        it2->second.second->dump();
-//      }
-//      klee_error(
-//          "TxWeakestPreCondition::sanityCheckWPArrayStore - Sanity Check: var
-//          "
-//          "not found!");
-//    }
-//  }
-//}
-
 /**
  * Push up expression to top of the  basic block
  */
@@ -1747,50 +1665,6 @@ ref<Expr> TxWeakestPreCondition::getBrCondition(llvm::Instruction *ins) {
   return result;
 }
 
-ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
-  ref<Expr> result;
-  if (llvm::isa<llvm::CmpInst>(value)) {
-    llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(value);
-    result = getCmpCondition(cmp);
-    if (result.isNull())
-      return result;
-  } else if (llvm::isa<llvm::BinaryOperator>(value)) {
-    llvm::Instruction *binOp = dyn_cast<llvm::Instruction>(value);
-    ref<Expr> left = this->generateExprFromOperand(binOp->getOperand(0));
-    ref<Expr> right = this->generateExprFromOperand(binOp->getOperand(1));
-    if (left.isNull() || right.isNull())
-      return result;
-    if (left->getWidth() > right->getWidth())
-      right = ZExtExpr::create(right, left->getWidth());
-    else if (left->getWidth() < right->getWidth())
-      left = ZExtExpr::create(left, right->getWidth());
-    switch (binOp->getOpcode()) {
-    case llvm::Instruction::And: {
-      result = AndExpr::create(left, right);
-      break;
-    }
-    case llvm::Instruction::Or: {
-      result = OrExpr::create(left, right);
-      break;
-    }
-    case llvm::Instruction::Xor: {
-      result = XorExpr::create(left, right);
-      break;
-    }
-    default: {
-      binOp->dump();
-      klee_error("TxWeakestPreCondition::getCondition: Binary operator is not "
-                 "implemented yet!");
-    }
-    }
-  } else {
-    value->dump();
-    klee_error("TxWeakestPreCondition::getCondition: value is not "
-               "implemented yet!");
-  }
-  return result;
-}
-
 ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
                                                          ref<Expr> offset) {
   ref<Expr> ret;
@@ -1856,6 +1730,50 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
   return ret;
 }
 
+ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
+  ref<Expr> result;
+  if (llvm::isa<llvm::CmpInst>(value)) {
+    llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(value);
+    result = getCmpCondition(cmp);
+    if (result.isNull())
+      return result;
+  } else if (llvm::isa<llvm::BinaryOperator>(value)) {
+    llvm::Instruction *binOp = dyn_cast<llvm::Instruction>(value);
+    ref<Expr> left = this->generateExprFromOperand(binOp->getOperand(0));
+    ref<Expr> right = this->generateExprFromOperand(binOp->getOperand(1));
+    if (left.isNull() || right.isNull())
+      return result;
+    if (left->getWidth() > right->getWidth())
+      right = ZExtExpr::create(right, left->getWidth());
+    else if (left->getWidth() < right->getWidth())
+      left = ZExtExpr::create(left, right->getWidth());
+    switch (binOp->getOpcode()) {
+    case llvm::Instruction::And: {
+      result = AndExpr::create(left, right);
+      break;
+    }
+    case llvm::Instruction::Or: {
+      result = OrExpr::create(left, right);
+      break;
+    }
+    case llvm::Instruction::Xor: {
+      result = XorExpr::create(left, right);
+      break;
+    }
+    default: {
+      binOp->dump();
+      klee_error("TxWeakestPreCondition::getCondition: Binary operator is not "
+                 "implemented yet!");
+    }
+    }
+  } else {
+    value->dump();
+    klee_error("TxWeakestPreCondition::getCondition: value is not "
+               "implemented yet!");
+  }
+  return result;
+}
+
 ref<Expr> TxWeakestPreCondition::getConstantInt(llvm::ConstantInt *CI) {
   ref<Expr> result;
   if (CI->getBitWidth() <= 8)
@@ -1892,7 +1810,6 @@ ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
   result = WPVarExpr::create(arg, arg->getName(), index);
   return result;
 }
-
 
 ref<Expr> TxWeakestPreCondition::getPointer(llvm::LoadInst *p) {
   ref<Expr> result;
@@ -2328,13 +2245,6 @@ TxWeakestPreCondition::getFunctionArgumentSize(llvm::Argument *arg) {
                                    wpStore->array, this, offset);
     }
 
-  } else if (llvm::isa<llvm::Argument>(val)) {
-    klee_error("llvm::isa<llvm::Argument>(operand1)");
-
-    // TODO: Argument is correct?
-    //    llvm::Argument arg = dyn_cast<llvm::Argument>(operand1);
-    ret = dependency->getAddress(val, &(wpStore->ac), wpStore->array, this,
-                                 offset);
   } else if (llvm::isa<llvm::PHINode>(val)) {
     llvm::PHINode *phi = dyn_cast<llvm::PHINode>(val);
     llvm::Instruction *prevInst = node->getPreviousInstruction(phi);

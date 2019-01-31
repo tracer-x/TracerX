@@ -32,34 +32,36 @@ class TxWPArrayStore;
 class TxWPHelper {
 
 public:
-  static ref<Expr> simplifyWPExpr(ref<Expr> e);
+  //  static ref<Expr> simplifyWPExpr(ref<Expr> e);
 
-  // \brief Simplify terms in the weakest precondition expression to canonical
-  // form
-  static std::map<ref<Expr>, uint64_t> *
-  simplifyWPTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
-                 ref<Expr> linearTerm);
+  //  // \brief Simplify terms in the weakest precondition expression to
+  //  canonical
+  //  // form
+  //  static std::map<ref<Expr>, uint64_t> *
+  //  simplifyWPTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
+  //                 ref<Expr> linearTerm);
 
-  // \brief Insert a variable with coefficient in newLinearTerm
-  static void insertTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
-                         uint64_t coeff, ref<Expr> variable);
+  //  // \brief Insert a variable with coefficient in newLinearTerm
+  //  static void insertTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
+  //                         uint64_t coeff, ref<Expr> variable);
 
-  // \brief Convert newLinearTerm to an expression (in
-  // canonical form)
-  static ref<Expr> convertToExpr(ref<Expr> e,
-                                 std::map<ref<Expr>, uint64_t> *newLinearTerm);
+  //  // \brief Convert newLinearTerm to an expression (in
+  //  // canonical form)
+  //  static ref<Expr> convertToExpr(ref<Expr> e,
+  //                                 std::map<ref<Expr>, uint64_t>
+  //                                 *newLinearTerm);
+
+  static bool isTargetDependent(llvm::Value *inst, ref<Expr> expr);
 
   static ref<Expr> substituteExpr(ref<Expr> base, const ref<Expr> lhs,
                                   const ref<Expr> rhs);
 
-  static ref<Expr> substituteArray(ref<Expr> base, const Array *lhs,
-                                   const Array *rhs);
-
-  static ref<ReadExpr> ExtractReadExpr(ref<Expr> expr);
-
-  static bool isTargetDependent(llvm::Value *inst, ref<Expr> expr);
-
-  static std::set<ref<Expr> > extractVariables(ref<Expr> expr);
+  //  static ref<Expr> substituteArray(ref<Expr> base, const Array *lhs,
+  //                                   const Array *rhs);
+  //
+  //  static ref<ReadExpr> ExtractReadExpr(ref<Expr> expr);
+  //
+  //  static std::set<ref<Expr> > extractVariables(ref<Expr> expr);
 };
 
 } /* namespace klee */

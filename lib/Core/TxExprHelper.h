@@ -43,33 +43,32 @@ private:
   static ref<Expr> CONST_REF;
 
 public:
-  TxExprHelper();
-  virtual ~TxExprHelper();
+  //  TxExprHelper();
+  //  virtual ~TxExprHelper();
 
   static ref<Expr> simplifyNot(ref<Expr> e);
-  static ref<Expr> simplifyLinear(ref<Expr> e);
-  static bool extractCoeff(ref<Expr> e, int mul,
-                           std::map<ref<Expr>, int> &ref2coeff);
-  static ref<Expr> makeExpr(ref<Expr> e, std::map<ref<Expr>, int> &ref2coeff);
+  //  static ref<Expr> simplifyLinear(ref<Expr> e);
+  //  static bool extractCoeff(ref<Expr> e, int mul,
+  //                           std::map<ref<Expr>, int> &ref2coeff);
+  //  static ref<Expr> makeExpr(ref<Expr> e, std::map<ref<Expr>, int>
+  //  &ref2coeff);
 
-  static ref<Expr> multipleSimplify(ref<Expr> expr);
+  //  static ref<Expr> rangSimplify(ref<Expr> e);
+  //  static std::vector<ref<Expr> >
+  //  rangeSimplifyFromExprs(std::vector<ref<Expr> > exprs);
+  //  static std::vector<ref<Expr> >
+  //  rangeSimplifyFromExprs(std::set<ref<Expr> > exprs);
+  //  static std::vector<ref<Expr> >
+  //  combineSharedSingleVarExprs(std::vector<ref<Expr> > exprs);
+  //  static Bound getBound(ref<Expr> expr);
+  //  static bool isaVar(ref<Expr> e);
+  //  static bool isFalse(ref<Expr> e);
 
-  static std::vector<ref<Expr> >
-  rangeSimplifyFromExprs(std::vector<ref<Expr> > exprs);
-  static std::vector<ref<Expr> >
-  rangeSimplifyFromExprs(std::set<ref<Expr> > exprs);
-  static ref<Expr> rangSimplify(ref<Expr> e);
-  static std::vector<ref<Expr> >
-  combineSharedSingleVarExprs(std::vector<ref<Expr> > exprs);
-  static Bound getBound(ref<Expr> expr);
-  static bool isaVar(ref<Expr> e);
-  static bool isFalse(ref<Expr> e);
+  //  static ref<Expr> removeShadowExprs(ref<Expr> e,
+  //                                     std::set<const Array *> shadowArrays);
 
-  //
-  static ref<Expr> removeShadowExprs(ref<Expr> e,
-                                     std::set<const Array *> shadowArrays);
-
-  static void extractArrays(ref<Expr> e, std::set<const Array *> &readArrays);
+  //  static void extractArrays(ref<Expr> e, std::set<const Array *>
+  //  &readArrays);
 };
 }
 #endif /* LIB_CORE_TXEXPRHELPER_H_ */
