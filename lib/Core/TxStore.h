@@ -78,6 +78,7 @@ public:
 
     ref<TxStoreEntry> find(ref<TxStateAddress> loc) const;
 
+    /// \brief Finds a store entry given an LLVM value
     ref<TxStoreEntry> find(ref<TxAllocationContext> alc) const;
 
     ref<TxStoreEntry> findConcrete(

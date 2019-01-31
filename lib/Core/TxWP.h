@@ -34,7 +34,6 @@ namespace klee {
 class TxWeakestPreCondition {
 
   friend class TxTree;
-
   friend class ExecutionState;
 
   std::set<llvm::Value *> markedVariables;
@@ -71,65 +70,74 @@ public:
   // std::vector<std::pair<KInstruction *, int> > markVariables(
   //      std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
 
-  // \brief Generate and return the weakest precondition expression.
-  ref<Expr> PushUp(
-      std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
+  // \brief Replace arguments passed to a call with the function arguments in
+  // the WPExpr
+  //  ref<Expr> replaceCallArguments(ref<Expr> wp, llvm::Value *funcArg,
+  //                                 llvm::Value *callArg);
 
   // \brief Return LHS of an instruction as a read expression
-  ref<Expr> getLHS(llvm::Instruction *i);
+  //  ref<Expr> getLHS(llvm::Instruction *i);
 
+  /*****************************************************************************/
   /// \brief Perform the intersection of two weakest precondition expressions
   /// with respect to the branchCondition
   ref<Expr> intersectWPExpr(ref<Expr> branchCondition, ref<Expr> expr1,
                             ref<Expr> expr2);
 
-  std::map<std::string, ref<Expr> >
-  extractExprs(TxStore::TopInterpolantStore concretelyAddressedStore);
-
-  std::vector<ref<Expr> > intersectExpr_aux(std::vector<ref<Expr> > expr1,
-                                            std::vector<ref<Expr> > expr2);
+  //  std::map<std::string, ref<Expr> >
+  //  extractExprs(TxStore::TopInterpolantStore concretelyAddressedStore);
+  //
+  //  std::vector<ref<Expr> > intersectExpr_aux(std::vector<ref<Expr> > expr1,
+  //                                            std::vector<ref<Expr> > expr2);
 
   // \brief Return the minimum of two constant expressions
-  ref<ConstantExpr> getMinOfConstExpr(ref<ConstantExpr> expr1,
-                                      ref<ConstantExpr> expr2);
+  //  ref<ConstantExpr> getMinOfConstExpr(ref<ConstantExpr> expr1,
+  //                                      ref<ConstantExpr> expr2);
 
   // \brief Return the maximum of two constant expressions
-  ref<ConstantExpr> getMaxOfConstExpr(ref<ConstantExpr> expr1,
-                                      ref<ConstantExpr> expr2);
+  //  ref<ConstantExpr> getMaxOfConstExpr(ref<ConstantExpr> expr1,
+  //                                      ref<ConstantExpr> expr2);
 
   // \brief Return true if the destination of the LLVM instruction appears in
   // the WP expression
-  bool isTargetDependent(llvm::Value *inst, ref<Expr> wp);
+  //  bool isTargetDependent(llvm::Value *inst, ref<Expr> wp);
+
+  // =========================================================================
+  // Functions Updating the Subsumption Table Entry
+  // =========================================================================
 
   // \brief Update subsumption table entry based on one Partition from WP Expr
   TxSubsumptionTableEntry *
   updateSubsumptionTableEntry(TxSubsumptionTableEntry *entry);
 
   // \brief Update concretelyAddressedStore based on the WP Expr
-  TxStore::TopInterpolantStore updateConcretelyAddressedStore(
-      TxStore::TopInterpolantStore concretelyAddressedStore, ref<Expr> wp);
-
+  //  TxStore::TopInterpolantStore updateConcretelyAddressedStore(
+  //      TxStore::TopInterpolantStore concretelyAddressedStore, ref<Expr> wp);
+  //
   // \brief Get variable stored in the Partition
-  ref<Expr> getVarFromExpr(ref<Expr> wp);
+  //  ref<Expr> getVarFromExpr(ref<Expr> wp);
 
   // \brief Update interpolant based on the WP Expr
-  ref<Expr> updateInterpolant(ref<Expr> interpolant, ref<Expr> wp);
+  //  ref<Expr> updateInterpolant(ref<Expr> interpolant, ref<Expr> wp);
 
   // \brief Extracts unrelated frames from interpolant to be passed in
   // conjunction with the WP Expr
-  ref<Expr> extractUnrelatedFrame(ref<Expr> interpolant, ref<Expr> var);
+  //  ref<Expr> extractUnrelatedFrame(ref<Expr> interpolant, ref<Expr> var);
 
   // \brief Replace array with shadow array in an expression
-  ref<Expr> replaceArrayWithShadow(ref<Expr> interpolant);
+  //  ref<Expr> replaceArrayWithShadow(ref<Expr> interpolant);
 
   // \brief Add new existential variables to the list
-  std::set<const Array *>
-  updateExistentials(std::set<const Array *> existentials, ref<Expr> wp);
+  //  std::set<const Array *>
+  //  updateExistentials(std::set<const Array *> existentials, ref<Expr> wp);
 
-  // \brief Replace arguments passed to a call with the function arguments in
-  // the WPExpr
-  ref<Expr> replaceCallArguments(ref<Expr> wp, llvm::Value *funcArg,
-                                 llvm::Value *callArg);
+  // =========================================================================
+  // Updated Version of Weakest PreCondition
+  // =========================================================================
+
+  // \brief Generate and return the weakest precondition expression.
+  ref<Expr>
+  PushUp(std::vector<std::pair<KInstruction *, int> > reverseInstructionList);
 
   ref<Expr> getBrCondition(llvm::Instruction *ins);
 
@@ -140,7 +148,6 @@ public:
 
 private:
   ref<Expr> getCondition(llvm::Value *value);
-  ref<Expr> getBinCondition(llvm::CmpInst *cmp);
 
   // \brief Handling ConstantInt LLVM Value
   ref<Expr> getConstantInt(llvm::ConstantInt *cmp);
@@ -153,9 +160,6 @@ private:
   // \brief Handling Function Argument LLVM Value
   ref<Expr> getFunctionArgument(llvm::Argument *arg);
 
-  // \brief Handling Alloca LLVM Value
-  ref<Expr> getAllocaInst(llvm::AllocaInst *alc);
-
   // \brief Handling Pointer LLVM Value
   ref<Expr> getPointer(llvm::LoadInst *p);
 
@@ -164,6 +168,9 @@ private:
 
   // \brief Handling Load LLVM Value
   ref<Expr> getLoad(llvm::LoadInst *p);
+
+  // \brief Handling Alloca LLVM Value
+  ref<Expr> getAllocaInst(llvm::AllocaInst *alc);
 
   // \brief Handling Binary Operator
   ref<Expr> getBinaryInst(llvm::BinaryOperator *bo);
@@ -174,14 +181,14 @@ private:
   // \brief Handling Cmp Instructions
   ref<Expr> getCmpCondition(llvm::CmpInst *cmp);
 
+  // \brief Handling GEP Instructions
+  ref<Expr> getGepInst(llvm::GetElementPtrInst *gep);
+
   // \brief Handling Switch Instructions
   ref<Expr> getSwitchInst(llvm::SwitchInst *si);
 
   // \brief Handling Phi Instructions
   ref<Expr> getPhiInst(llvm::PHINode *phi);
-
-  // \brief Handling GEP Instructions
-  ref<Expr> getGepInst(llvm::GetElementPtrInst *gep);
 
   // \brief Handling Call Instructions
   ref<Expr> getCallInst(llvm::CallInst *ci);
