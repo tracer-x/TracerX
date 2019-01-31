@@ -192,10 +192,6 @@ namespace klee {
 //}
 
 bool TxWPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
-  //  llvm::outs() << "***********\n";
-  //  expr->dump();
-  //  llvm::outs() << expr->getKind() << "\n";
-  //  llvm::outs() << "***********\n";
   switch (expr->getKind()) {
   case Expr::InvalidKind:
   case Expr::Constant: {
@@ -239,8 +235,6 @@ bool TxWPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
     ref<Expr> kids[2];
     kids[0] = expr->getKid(0);
     kids[1] = expr->getKid(1);
-    //    llvm::outs() << isTargetDependent(inst, kids[0]) << "\n";
-    //    llvm::outs() << isTargetDependent(inst, kids[1]) << "\n";
     return (isTargetDependent(inst, kids[0]) ||
             isTargetDependent(inst, kids[1]));
   }
@@ -370,197 +364,199 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
   return base;
 }
 
-ref<Expr> TxWPHelper::substituteArray(ref<Expr> base, const Array *lhs,
-                                      const Array *rhs) {
+// ref<Expr> TxWPHelper::substituteArray(ref<Expr> base, const Array *lhs,
+//                                      const Array *rhs) {
+//
+//  switch (base->getKind()) {
+//  case Expr::InvalidKind:
+//  case Expr::Constant: {
+//    return base;
+//  }
+//
+//  case Expr::Read: {
+//    ref<ReadExpr> re = dyn_cast<ReadExpr>(base);
+//    if (re->getArray() == lhs) {
+//      re->replaceArray(rhs);
+//      return re;
+//    } else
+//      return base;
+//  }
+//
+//  case Expr::NotOptimized:
+//  case Expr::Not:
+//  case Expr::Extract:
+//  case Expr::ZExt:
+//  case Expr::SExt: {
+//    ref<Expr> kids[1];
+//    kids[0] = substituteArray(base->getKid(0), lhs, rhs);
+//    return base->rebuild(kids);
+//  }
+//
+//  case Expr::Concat:
+//  case Expr::Eq:
+//  case Expr::Ne:
+//  case Expr::Ult:
+//  case Expr::Ule:
+//  case Expr::Ugt:
+//  case Expr::Uge:
+//  case Expr::Slt:
+//  case Expr::Sle:
+//  case Expr::Sgt:
+//  case Expr::Sge:
+//  case Expr::LastKind:
+//  case Expr::Add:
+//  case Expr::Sub:
+//  case Expr::Mul:
+//  case Expr::UDiv:
+//  case Expr::SDiv:
+//  case Expr::URem:
+//  case Expr::SRem:
+//  case Expr::And:
+//  case Expr::Or:
+//  case Expr::Xor:
+//  case Expr::Shl:
+//  case Expr::LShr:
+//  case Expr::AShr: {
+//    ref<Expr> kids[2];
+//    //      llvm::outs() << "--- Begin substitution - " << base->getKind()
+//    //                   << " ---\n";
+//    //      base->dump();
+//    //      llvm::outs() << "--------------------------\n";
+//
+//    kids[0] = substituteArray(base->getKid(0), lhs, rhs);
+//    //      kids[0]->dump();
+//    //      llvm::outs() << "--------------------------\n";
+//
+//    kids[1] = substituteArray(base->getKid(1), lhs, rhs);
+//    //      kids[1]->dump();
+//    //      llvm::outs() << "--------------------------\n";
+//
+//    base = base->rebuild(kids);
+//    //      base->dump();
+//    //      llvm::outs() << "--- End substitution - " << base->getKind() <<
+//    //      "---\n ";
+//
+//    return base;
+//  }
+//
+//  case Expr::Select: {
+//    ref<Expr> kids[3];
+//    kids[0] = substituteArray(base->getKid(0), lhs, rhs);
+//    kids[1] = substituteArray(base->getKid(1), lhs, rhs);
+//    kids[2] = substituteArray(base->getKid(1), lhs, rhs);
+//    return base->rebuild(kids);
+//  }
+//  default: {
+//    // Sanity check
+//    klee_error("Control should not reach here in
+//    TxWPHelper::substituteArray!");
+//  }
+//  }
+//  return base;
+//}
 
-  switch (base->getKind()) {
-  case Expr::InvalidKind:
-  case Expr::Constant: {
-    return base;
-  }
-
-  case Expr::Read: {
-    ref<ReadExpr> re = dyn_cast<ReadExpr>(base);
-    if (re->getArray() == lhs) {
-      re->replaceArray(rhs);
-      return re;
-    } else
-      return base;
-  }
-
-  case Expr::NotOptimized:
-  case Expr::Not:
-  case Expr::Extract:
-  case Expr::ZExt:
-  case Expr::SExt: {
-    ref<Expr> kids[1];
-    kids[0] = substituteArray(base->getKid(0), lhs, rhs);
-    return base->rebuild(kids);
-  }
-
-  case Expr::Concat:
-  case Expr::Eq:
-  case Expr::Ne:
-  case Expr::Ult:
-  case Expr::Ule:
-  case Expr::Ugt:
-  case Expr::Uge:
-  case Expr::Slt:
-  case Expr::Sle:
-  case Expr::Sgt:
-  case Expr::Sge:
-  case Expr::LastKind:
-  case Expr::Add:
-  case Expr::Sub:
-  case Expr::Mul:
-  case Expr::UDiv:
-  case Expr::SDiv:
-  case Expr::URem:
-  case Expr::SRem:
-  case Expr::And:
-  case Expr::Or:
-  case Expr::Xor:
-  case Expr::Shl:
-  case Expr::LShr:
-  case Expr::AShr: {
-    ref<Expr> kids[2];
-    //      llvm::outs() << "--- Begin substitution - " << base->getKind()
-    //                   << " ---\n";
-    //      base->dump();
-    //      llvm::outs() << "--------------------------\n";
-
-    kids[0] = substituteArray(base->getKid(0), lhs, rhs);
-    //      kids[0]->dump();
-    //      llvm::outs() << "--------------------------\n";
-
-    kids[1] = substituteArray(base->getKid(1), lhs, rhs);
-    //      kids[1]->dump();
-    //      llvm::outs() << "--------------------------\n";
-
-    base = base->rebuild(kids);
-    //      base->dump();
-    //      llvm::outs() << "--- End substitution - " << base->getKind() <<
-    //      "---\n ";
-
-    return base;
-  }
-
-  case Expr::Select: {
-    ref<Expr> kids[3];
-    kids[0] = substituteArray(base->getKid(0), lhs, rhs);
-    kids[1] = substituteArray(base->getKid(1), lhs, rhs);
-    kids[2] = substituteArray(base->getKid(1), lhs, rhs);
-    return base->rebuild(kids);
-  }
-  default: {
-    // Sanity check
-    klee_error("Control should not reach here in TxWPHelper::substituteArray!");
-  }
-  }
-  return base;
-}
-
-ref<ReadExpr> TxWPHelper::ExtractReadExpr(ref<Expr> expr) {
-
-  switch (expr->getKind()) {
-
-  case Expr::Concat: {
-    if (isa<ReadExpr>(expr->getKid(0)))
-      return dyn_cast<ReadExpr>(expr->getKid(0));
-    else if (isa<ReadExpr>(expr->getKid(1)))
-      return dyn_cast<ReadExpr>(expr->getKid(1));
-    else
-      klee_error(
-          "Control should not reach here in TxWPHelper::ExtractReadExpr!");
-  }
-  default: {
-    klee_error("Control should not reach here in TxWPHelper::ExtractReadExpr!");
-    return dyn_cast<ReadExpr>(expr);
-  }
-  }
-
-  // Sanity check
-  klee_error("Control should not reach here in TxWPHelper::ExtractReadExpr!");
-  return dyn_cast<ReadExpr>(expr);
-}
-
-std::set<ref<Expr> > TxWPHelper::extractVariables(ref<Expr> expr) {
-
-  std::set<ref<Expr> > set;
-
-  switch (expr->getKind()) {
-  case Expr::InvalidKind:
-  case Expr::Constant: {
-    return set;
-  }
-
-  case Expr::WPVar: {
-    set.insert(expr);
-    return set;
-  }
-
-  case Expr::NotOptimized:
-  case Expr::Not:
-  case Expr::Extract:
-  case Expr::ZExt:
-  case Expr::SExt: {
-    ref<Expr> kids[1];
-    kids[0] = expr->getKid(0);
-    return extractVariables(kids[0]);
-  }
-
-  case Expr::Eq:
-  case Expr::Ne:
-  case Expr::Ult:
-  case Expr::Ule:
-  case Expr::Ugt:
-  case Expr::Uge:
-  case Expr::Slt:
-  case Expr::Sle:
-  case Expr::Sgt:
-  case Expr::Sge:
-  case Expr::LastKind:
-  case Expr::Add:
-  case Expr::Sub:
-  case Expr::Mul:
-  case Expr::UDiv:
-  case Expr::SDiv:
-  case Expr::URem:
-  case Expr::SRem:
-  case Expr::And:
-  case Expr::Or:
-  case Expr::Xor:
-  case Expr::Shl:
-  case Expr::LShr:
-  case Expr::AShr: {
-    ref<Expr> kids[2];
-    kids[0] = expr->getKid(0);
-    kids[1] = expr->getKid(1);
-    std::set<ref<Expr> > set1 = extractVariables(kids[0]);
-    std::set<ref<Expr> > set2 = extractVariables(kids[1]);
-    set1.insert(set2.begin(), set2.end());
-    return set1;
-  }
-
-  case Expr::Select: {
-    ref<Expr> kids[3];
-    kids[0] = expr->getKid(0);
-    kids[1] = expr->getKid(1);
-    kids[2] = expr->getKid(2);
-    std::set<ref<Expr> > set1 = extractVariables(kids[0]);
-    std::set<ref<Expr> > set2 = extractVariables(kids[1]);
-    std::set<ref<Expr> > set3 = extractVariables(kids[2]);
-    set1.insert(set2.begin(), set2.end());
-    set1.insert(set3.begin(), set3.end());
-    return set1;
-  }
-  default: {
-    // Sanity check
-    klee_error("Control should not reach here in "
-               "TxWPHelper::isTargetDependent!");
-  }
-  }
-  return set;
-}
+// ref<ReadExpr> TxWPHelper::ExtractReadExpr(ref<Expr> expr) {
+//
+//  switch (expr->getKind()) {
+//
+//  case Expr::Concat: {
+//    if (isa<ReadExpr>(expr->getKid(0)))
+//      return dyn_cast<ReadExpr>(expr->getKid(0));
+//    else if (isa<ReadExpr>(expr->getKid(1)))
+//      return dyn_cast<ReadExpr>(expr->getKid(1));
+//    else
+//      klee_error(
+//          "Control should not reach here in TxWPHelper::ExtractReadExpr!");
+//  }
+//  default: {
+//    klee_error("Control should not reach here in
+//    TxWPHelper::ExtractReadExpr!");
+//    return dyn_cast<ReadExpr>(expr);
+//  }
+//  }
+//
+//  // Sanity check
+//  klee_error("Control should not reach here in TxWPHelper::ExtractReadExpr!");
+//  return dyn_cast<ReadExpr>(expr);
+//}
+//
+// std::set<ref<Expr> > TxWPHelper::extractVariables(ref<Expr> expr) {
+//
+//  std::set<ref<Expr> > set;
+//
+//  switch (expr->getKind()) {
+//  case Expr::InvalidKind:
+//  case Expr::Constant: {
+//    return set;
+//  }
+//
+//  case Expr::WPVar: {
+//    set.insert(expr);
+//    return set;
+//  }
+//
+//  case Expr::NotOptimized:
+//  case Expr::Not:
+//  case Expr::Extract:
+//  case Expr::ZExt:
+//  case Expr::SExt: {
+//    ref<Expr> kids[1];
+//    kids[0] = expr->getKid(0);
+//    return extractVariables(kids[0]);
+//  }
+//
+//  case Expr::Eq:
+//  case Expr::Ne:
+//  case Expr::Ult:
+//  case Expr::Ule:
+//  case Expr::Ugt:
+//  case Expr::Uge:
+//  case Expr::Slt:
+//  case Expr::Sle:
+//  case Expr::Sgt:
+//  case Expr::Sge:
+//  case Expr::LastKind:
+//  case Expr::Add:
+//  case Expr::Sub:
+//  case Expr::Mul:
+//  case Expr::UDiv:
+//  case Expr::SDiv:
+//  case Expr::URem:
+//  case Expr::SRem:
+//  case Expr::And:
+//  case Expr::Or:
+//  case Expr::Xor:
+//  case Expr::Shl:
+//  case Expr::LShr:
+//  case Expr::AShr: {
+//    ref<Expr> kids[2];
+//    kids[0] = expr->getKid(0);
+//    kids[1] = expr->getKid(1);
+//    std::set<ref<Expr> > set1 = extractVariables(kids[0]);
+//    std::set<ref<Expr> > set2 = extractVariables(kids[1]);
+//    set1.insert(set2.begin(), set2.end());
+//    return set1;
+//  }
+//
+//  case Expr::Select: {
+//    ref<Expr> kids[3];
+//    kids[0] = expr->getKid(0);
+//    kids[1] = expr->getKid(1);
+//    kids[2] = expr->getKid(2);
+//    std::set<ref<Expr> > set1 = extractVariables(kids[0]);
+//    std::set<ref<Expr> > set2 = extractVariables(kids[1]);
+//    std::set<ref<Expr> > set3 = extractVariables(kids[2]);
+//    set1.insert(set2.begin(), set2.end());
+//    set1.insert(set3.begin(), set3.end());
+//    return set1;
+//  }
+//  default: {
+//    // Sanity check
+//    klee_error("Control should not reach here in "
+//               "TxWPHelper::isTargetDependent!");
+//  }
+//  }
+//  return set;
+//}
 
 } /* namespace klee */
