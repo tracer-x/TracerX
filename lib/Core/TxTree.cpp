@@ -2004,7 +2004,7 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
 }
 
 void TxTree::setCurrentINode(ExecutionState &state) {
-   llvm::outs() << state.txTreeNode->isSpeculationNode() << "-" << state.txTreeNode->isSpeculationFailedNode()<< "\n";
+//   llvm::outs() << state.txTreeNode->isSpeculationNode() << "-" << state.txTreeNode->isSpeculationFailedNode()<< "\n";
 	TimerStatIncrementer t(setCurrentINodeTime);
   currentTxTreeNode = state.txTreeNode;
   currentTxTreeNode->setProgramPoint(state.pc->inst);
