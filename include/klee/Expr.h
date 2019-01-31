@@ -167,7 +167,7 @@ public:
     Sge, ///< Not used in canonical form
     Exists,
     LastKind = Exists,
-	WPVar,
+    WPVar,
     CastKindFirst = ZExt,
     CastKindLast = SExt,
     BinaryKindFirst = Add,
