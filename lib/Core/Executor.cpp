@@ -1005,8 +1005,8 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
   }
 }
 
-Executor::StatePair
-Executor::branchFork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
+Executor::StatePair Executor::branchFork(ExecutionState &current,
+                                         ref<Expr> condition, bool isInternal) {
   // The current node is in the speculation node
   if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode()) {
     return speculationFork(current, condition, isInternal);
@@ -1140,25 +1140,25 @@ Executor::branchFork(ExecutionState &current, ref<Expr> condition, bool isIntern
     }
   }
 
-	llvm::outs() << "====begin branchFork\n";
-	condition->dump();
-	llvm::outs() << "res=" << res << "\n";
-	for(ConstraintManager::const_iterator it = current.constraints.begin(),ie=current.constraints.end();it!=ie;++it){
-		(*it)->dump();
-	}
-
-
-	llvm::outs() << "====end branchFork\n";
-
-
-//  llvm::outs() << "******************\n";
-//  condition->dump();
-  if(condition->isTrue()) {
-	  return StatePair(&current, 0);
-  } else if (condition->isFalse()) {
-	  return StatePair(0, &current);
+  llvm::outs() << "====begin branchFork\n";
+  condition->dump();
+  llvm::outs() << "res=" << res << "\n";
+  for (ConstraintManager::const_iterator it = current.constraints.begin(),
+                                         ie = current.constraints.end();
+       it != ie; ++it) {
+    (*it)->dump();
   }
-//  llvm::outs() << "******************\n";
+
+  llvm::outs() << "====end branchFork\n";
+
+  //  llvm::outs() << "******************\n";
+  //  condition->dump();
+  if (condition->isTrue()) {
+    return StatePair(&current, 0);
+  } else if (condition->isFalse()) {
+    return StatePair(0, &current);
+  }
+  //  llvm::outs() << "******************\n";
 
   // XXX - even if the constraint is provable one way or the other we
   // can probably benefit by adding this constraint and allowing it to
@@ -1345,7 +1345,8 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
         txTree->split(current.txTreeNode, speculationFalseState, trueState);
     speculationFalseState->txTreeNode = ires.first;
     speculationFalseState->txTreeNode->setSpeculationFlag();
-    speculationFalseState->txTreeNode->visitedProgramPoints = new std::set<uintptr_t>();
+    speculationFalseState->txTreeNode->visitedProgramPoints =
+        new std::set<uintptr_t>();
     trueState->txTreeNode = ires.second;
 
     addConstraint(*trueState, condition);
@@ -1388,7 +1389,8 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
         txTree->split(current.txTreeNode, speculationTrueState, falseState);
     speculationTrueState->txTreeNode = ires.first;
     speculationTrueState->txTreeNode->setSpeculationFlag();
-    speculationTrueState->txTreeNode->visitedProgramPoints = new std::set<uintptr_t>();
+    speculationTrueState->txTreeNode->visitedProgramPoints =
+        new std::set<uintptr_t>();
     falseState->txTreeNode = ires.second;
 
     addConstraint(*falseState, Expr::createIsZero(condition));
@@ -1405,10 +1407,9 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   // speculation wouldn't be linear then)
   // Back jumping to the parent node
 
-
   bool isPPVisited = (current.txTreeNode->visitedProgramPoints->find(
-                      current.txTreeNode->getProgramPoint()) !=
-                  current.txTreeNode->visitedProgramPoints->end());
+                          current.txTreeNode->getProgramPoint()) !=
+                      current.txTreeNode->visitedProgramPoints->end());
   if (isPPVisited) {
     speculativeBackJump(current);
     return StatePair(0, 0);
@@ -1436,13 +1437,15 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     return StatePair(0, 0);
   }
 
-  llvm::outs() << "====begin SpeculationFork\n";
-  	condition->dump();
-  	llvm::outs() << "res=" << res << "\n";
-  	for(ConstraintManager::const_iterator it = current.constraints.begin(),ie=current.constraints.end();it!=ie;++it){
-  		(*it)->dump();
-  	}
-  	llvm::outs() << "====end SpeculationFork\n";
+  //  llvm::outs() << "====begin SpeculationFork\n";
+  //  condition->dump();
+  //  llvm::outs() << "res=" << res << "\n";
+  //  for (ConstraintManager::const_iterator it = current.constraints.begin(),
+  //                                         ie = current.constraints.end();
+  //       it != ie; ++it) {
+  //    (*it)->dump();
+  //  }
+  //  llvm::outs() << "====end SpeculationFork\n";
 
   // XXX - even if the constraint is provable one way or the other we
   // can probably benefit by adding this constraint and allowing it to
@@ -1452,7 +1455,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   // hint to just use the single constraint instead of all the binary
   // search ones. If that makes sense.
   if (res == Solver::True) {
-	  if (!isInternal) {
+    if (!isInternal) {
       if (pathWriter) {
         current.pathOS << "1";
       }
@@ -1520,7 +1523,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 
 void Executor::speculativeBackJump(ExecutionState &current) {
   // marking the speculation nodes to be terminated
-    llvm::outs() << "States in worklist = " << searcher->getStates().size() << "\n";
+  //    llvm::outs() << "States in worklist = " << searcher->getStates().size()
+  // << "\n";
   std::vector<TxTreeNode *> deletedNodes;
   TxTreeNode *tmp = current.txTreeNode;
   tmp->setSpeculationFailed();
@@ -1550,17 +1554,19 @@ void Executor::speculativeBackJump(ExecutionState &current) {
        it != ie; ++it) {
     ExecutionState *tmp = (*it);
     if (tmp->txTreeNode->isSpeculationFailedNode()) {
-        removedSpeculationStates.push_back(tmp);
+      removedSpeculationStates.push_back(tmp);
     }
   }
-  //  llvm::outs() << "=========\n";
 
-  llvm::outs() << "Nodes to be deleted = " << deletedNodes.size() << "\n";
-  llvm::outs() << "States to be deleted = " << removedSpeculationStates.size() << "\n";
+  //  llvm::outs() << "Nodes to be deleted = " << deletedNodes.size() << "\n";
+  //  llvm::outs() << "States to be deleted = " <<
+  // removedSpeculationStates.size() << "\n";
 
   searcher->update(0, emptySpeculationStates, removedSpeculationStates);
 
-  llvm::outs() << "Remaining states in worklist = " << searcher->getStates().size() << "\n";
+  //  llvm::outs() << "Remaining states in worklist = " <<
+  // searcher->getStates().size() << "\n";
+  //  llvm::outs() << "Remaining addedStates = " << addedStates.size() << "\n";
 
   for (std::vector<TxTreeNode *>::iterator it = deletedNodes.begin(),
                                            ie = deletedNodes.end();
@@ -1568,13 +1574,13 @@ void Executor::speculativeBackJump(ExecutionState &current) {
     txTree->removeSpeculationFailedNodes(*it);
   }
 
-//  for (std::vector<ExecutionState *>::iterator it = removedSpeculationStates.begin(),
-//                                               ie = removedSpeculationStates.end();
-//       it != ie; ++it) {
-//    delete *it;
-//  }
-
-//  llvm::outs() << "=====Finish deletion====\n";
+  for (std::vector<ExecutionState *>::iterator
+           it = removedSpeculationStates.begin(),
+           ie = removedSpeculationStates.end();
+       it != ie; ++it) {
+    states.erase(*it);
+    delete *it;
+  }
 }
 
 void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
@@ -2394,7 +2400,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       assert(bi->getCondition() == bi->getOperand(0) && "Wrong operand index!");
       ref<Expr> cond = eval(ki, 0, state).value;
 
-
       Executor::StatePair branches = branchFork(state, cond, false);
 
       // NOTE: There is a hidden dependency here, markBranchVisited
@@ -2404,10 +2409,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       if (statsTracker && state.stack.back().kf->trackCoverage)
         statsTracker->markBranchVisited(branches.first, branches.second);
 
-//      int brcount = branches.first? 1: 0;
-//      brcount = branches.second? brcount+1: brcount;
-//      llvm::outs() << "branches size=" << brcount << "\n";
-
+      //      int brcount = branches.first? 1: 0;
+      //      brcount = branches.second? brcount+1: brcount;
+      //      llvm::outs() << "branches size=" << brcount << "\n";
 
       if (branches.first)
         transferToBasicBlock(bi->getSuccessor(0), bi->getParent(),
@@ -3803,6 +3807,8 @@ void Executor::run(ExecutionState &initialState) {
   while (!states.empty() && !haltExecution) {
     ExecutionState &state = searcher->selectState();
 
+    llvm::outs() << "states size 1 = " << states.size() << "\n";
+
 #ifdef ENABLE_Z3
     if (INTERPOLATION_ENABLED) {
       // We synchronize the node id to that of the state. The node id
@@ -3854,7 +3860,10 @@ void Executor::run(ExecutionState &initialState) {
 
       checkMemoryUsage();
     }
+
+    llvm::outs() << "states size 2 = " << states.size() << "\n";
     updateStates(&state);
+    llvm::outs() << "states size 3 = " << states.size() << "\n";
   }
 
   delete searcher;
@@ -4060,9 +4069,9 @@ void Executor::terminateStateOnError(ExecutionState &state,
   if (INTERPOLATION_ENABLED && Speculation &&
       state.txTreeNode->isSpeculationNode()) {
     llvm::outs() << "=== start jumpback because of error \n";
-	speculativeBackJump(state);
-	llvm::outs() << "=== end jumpback because of error \n";
-	return;
+    speculativeBackJump(state);
+    llvm::outs() << "=== end jumpback because of error \n";
+    return;
   }
 
   interpreterHandler->incErrorTermination();
