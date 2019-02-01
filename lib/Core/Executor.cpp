@@ -1140,16 +1140,16 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     }
   }
 
-//  llvm::outs() << "====begin branchFork\n";
-//  condition->dump();
-//  llvm::outs() << "res=" << res << "\n";
-//  for (ConstraintManager::const_iterator it = current.constraints.begin(),
-//                                         ie = current.constraints.end();
-//       it != ie; ++it) {
-//    (*it)->dump();
-//  }
-//
-//  llvm::outs() << "====end branchFork\n";
+  //  llvm::outs() << "====begin branchFork\n";
+  //  condition->dump();
+  //  llvm::outs() << "res=" << res << "\n";
+  //  for (ConstraintManager::const_iterator it = current.constraints.begin(),
+  //                                         ie = current.constraints.end();
+  //       it != ie; ++it) {
+  //    (*it)->dump();
+  //  }
+  //
+  //  llvm::outs() << "====end branchFork\n";
 
   //  llvm::outs() << "******************\n";
   //  condition->dump();
@@ -4061,13 +4061,20 @@ void Executor::terminateStateOnError(ExecutionState &state,
                                      enum TerminateReason termReason,
                                      const char *suffix,
                                      const llvm::Twine &info) {
+  std::string message = messaget.str();
+  static std::set<std::pair<Instruction *, std::string> > emittedErrors;
+  Instruction *lastInst;
+  const InstructionInfo &ii =
+      getLastNonKleeInternalInstruction(state, &lastInst);
+
   if (INTERPOLATION_ENABLED && Speculation &&
       state.txTreeNode->isSpeculationNode()) {
-//    llvm::outs() << "=== start jumpback because of error \n";
+    //    llvm::outs() << "=== start jumpback because of error \n";
     speculativeBackJump(state);
-//    klee_message("SPECULATION FAIL: %s:%d: %s", ii.file.c_str(), ii.line,
-//                       message.c_str());
-//    llvm::outs() << "=== end jumpback because of error \n";
+    klee_message("ERROR: %s:%d: %s", ii.file.c_str(), ii.line, message.c_str());
+    //    llvm::outs() << "=== end jumpback because of error \n";.
+    // llvm::outs() << messaget << "\n";
+
     return;
   }
 
@@ -4087,12 +4094,6 @@ void Executor::terminateStateOnError(ExecutionState &state,
       TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
     }
   }
-
-  std::string message = messaget.str();
-  static std::set<std::pair<Instruction *, std::string> > emittedErrors;
-  Instruction *lastInst;
-  const InstructionInfo &ii =
-      getLastNonKleeInternalInstruction(state, &lastInst);
 
   if (EmitAllErrors ||
       emittedErrors.insert(std::make_pair(lastInst, message)).second) {
