@@ -1140,16 +1140,16 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     }
   }
 
-  llvm::outs() << "====begin branchFork\n";
-  condition->dump();
-  llvm::outs() << "res=" << res << "\n";
-  for (ConstraintManager::const_iterator it = current.constraints.begin(),
-                                         ie = current.constraints.end();
-       it != ie; ++it) {
-    (*it)->dump();
-  }
-
-  llvm::outs() << "====end branchFork\n";
+//  llvm::outs() << "====begin branchFork\n";
+//  condition->dump();
+//  llvm::outs() << "res=" << res << "\n";
+//  for (ConstraintManager::const_iterator it = current.constraints.begin(),
+//                                         ie = current.constraints.end();
+//       it != ie; ++it) {
+//    (*it)->dump();
+//  }
+//
+//  llvm::outs() << "====end branchFork\n";
 
   //  llvm::outs() << "******************\n";
   //  condition->dump();
@@ -3807,8 +3807,6 @@ void Executor::run(ExecutionState &initialState) {
   while (!states.empty() && !haltExecution) {
     ExecutionState &state = searcher->selectState();
 
-    llvm::outs() << "states size 1 = " << states.size() << "\n";
-
 #ifdef ENABLE_Z3
     if (INTERPOLATION_ENABLED) {
       // We synchronize the node id to that of the state. The node id
@@ -3860,10 +3858,7 @@ void Executor::run(ExecutionState &initialState) {
 
       checkMemoryUsage();
     }
-
-    llvm::outs() << "states size 2 = " << states.size() << "\n";
     updateStates(&state);
-    llvm::outs() << "states size 3 = " << states.size() << "\n";
   }
 
   delete searcher;
@@ -4068,9 +4063,11 @@ void Executor::terminateStateOnError(ExecutionState &state,
                                      const llvm::Twine &info) {
   if (INTERPOLATION_ENABLED && Speculation &&
       state.txTreeNode->isSpeculationNode()) {
-    llvm::outs() << "=== start jumpback because of error \n";
+//    llvm::outs() << "=== start jumpback because of error \n";
     speculativeBackJump(state);
-    llvm::outs() << "=== end jumpback because of error \n";
+//    klee_message("SPECULATION FAIL: %s:%d: %s", ii.file.c_str(), ii.line,
+//                       message.c_str());
+//    llvm::outs() << "=== end jumpback because of error \n";
     return;
   }
 
