@@ -52,16 +52,15 @@
 #include "klee/util/TxPrintUtil.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-#include "llvm/IR/Function.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/TypeBuilder.h"
 #else
 #include "llvm/Attributes.h"
@@ -82,11 +81,11 @@
 #endif
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Analysis/MemoryDependenceAnalysis.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Analysis/MemoryDependenceAnalysis.h"
 
 #if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
 #include "llvm/Support/CallSite.h"
@@ -98,19 +97,19 @@
 #include "klee/Internal/Support/CompressionStream.h"
 #endif
 
-#include <cassert>
 #include <algorithm>
+#include <cassert>
+#include <fstream>
 #include <iomanip>
 #include <iosfwd>
-#include <fstream>
 #include <sstream>
-#include <vector>
 #include <string>
+#include <vector>
 
 #include <sys/mman.h>
 
-#include <errno.h>
 #include <cxxabi.h>
+#include <errno.h>
 
 using namespace llvm;
 using namespace klee;
@@ -302,7 +301,7 @@ cl::opt<bool> MaxMemoryInhibit(
     cl::desc(
         "Inhibit forking at memory cap (vs. random terminate) (default=on)"),
     cl::init(true));
-}
+} // namespace
 
 namespace klee {
 RNG theRNG;
@@ -1523,8 +1522,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 
 void Executor::speculativeBackJump(ExecutionState &current) {
   // marking the speculation nodes to be terminated
-  //    llvm::outs() << "States in worklist = " << searcher->getStates().size()
-  // << "\n";
   std::vector<TxTreeNode *> deletedNodes;
   TxTreeNode *tmp = current.txTreeNode;
   tmp->setSpeculationFailed();
@@ -1546,27 +1543,24 @@ void Executor::speculativeBackJump(ExecutionState &current) {
     parent = parent->getParent();
   }
   // collect removed states
-  std::vector<ExecutionState *> worklist = searcher->getStates();
-  std::vector<ExecutionState *> emptySpeculationStates;
   std::vector<ExecutionState *> removedSpeculationStates;
-  for (std::vector<ExecutionState *>::const_iterator it = worklist.begin(),
-                                                     ie = worklist.end();
+  for (std::set<ExecutionState *>::const_iterator it = states.begin(),
+                                                  ie = states.end();
        it != ie; ++it) {
     ExecutionState *tmp = (*it);
     if (tmp->txTreeNode->isSpeculationFailedNode()) {
       removedSpeculationStates.push_back(tmp);
     }
   }
+//  llvm::outs() << "States in worklist 1 = " << states.size() << "\n";
+//  llvm::outs() << "States in worklist 2 = " << searcher->getStates().size()
+//               << "\n";
+//  llvm::outs() << "Nodes to be deleted = " << deletedNodes.size() << "\n";
+//  llvm::outs() << "States to be deleted = " << removedSpeculationStates.size()
+//               << "\n";
 
-  //  llvm::outs() << "Nodes to be deleted = " << deletedNodes.size() << "\n";
-  //  llvm::outs() << "States to be deleted = " <<
-  // removedSpeculationStates.size() << "\n";
-
-  searcher->update(0, emptySpeculationStates, removedSpeculationStates);
-
-  //  llvm::outs() << "Remaining states in worklist = " <<
-  // searcher->getStates().size() << "\n";
-  //  llvm::outs() << "Remaining addedStates = " << addedStates.size() << "\n";
+  searcher->update(0, std::vector<ExecutionState *>(),
+                   removedSpeculationStates);
 
   for (std::vector<TxTreeNode *>::iterator it = deletedNodes.begin(),
                                            ie = deletedNodes.end();
@@ -1579,8 +1573,13 @@ void Executor::speculativeBackJump(ExecutionState &current) {
            ie = removedSpeculationStates.end();
        it != ie; ++it) {
     states.erase(*it);
-    delete *it;
+    if(&current != *it) delete *it;
   }
+
+//  llvm::outs() << "Remaining states in worklist 1= " << states.size() << "\n";
+//  llvm::outs() << "Remaining states in worklist 2 = "
+//               << searcher->getStates().size() << "\n";
+//  llvm::outs() << "Remaining addedStates = " << addedStates.size() << "\n";
 }
 
 void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
