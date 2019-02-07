@@ -1644,6 +1644,7 @@ ref<Expr> TxWeakestPreCondition::PushUp(
           return result;
         }
         WPExpr = TxWPHelper::substituteExpr(WPExpr, right, left);
+        WPExpr = TxWPHelper::simplifyWPExpr(WPExpr);
         //                        klee_warning("WP");
         //                        WPExpr->dump();
         //                        i->dump();
