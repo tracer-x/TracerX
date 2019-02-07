@@ -32,7 +32,7 @@ class TxWPArrayStore;
 class TxWPHelper {
 
 public:
-  //  static ref<Expr> simplifyWPExpr(ref<Expr> e);
+  static ref<Expr> simplifyWPExpr(ref<Expr> e);
 
   //  // \brief Simplify terms in the weakest precondition expression to
   //  canonical

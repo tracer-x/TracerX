@@ -19,85 +19,86 @@
 
 namespace klee {
 
-// ref<Expr> TxWPHelper::simplifyWPExpr(ref<Expr> e) {
-//  klee_error("TxWPHelper::simplifyWPExpr\n");
-//
-//  ref<Expr> result = e;
-//  switch (e->getKind()) {
-//  case Expr::And: {
-//    ref<Expr> kids[2];
-//    kids[0] = e->getKid(0);
-//    kids[1] = e->getKid(1);
-//    kids[0] = simplifyWPExpr(kids[0]);
-//    kids[1] = simplifyWPExpr(kids[1]);
-//    return e->rebuild(kids);
-//  }
-//  case Expr::Eq:
-//  case Expr::Ne: {
-//    ref<Expr> kids[2];
-//    kids[0] = e->getKid(0);
-//    kids[1] = e->getKid(1);
-//    if (kids[0]->getKind() == Expr::Eq || kids[0]->getKind() == Expr::Ne ||
-//        kids[1]->getKind() == Expr::Eq || kids[1]->getKind() == Expr::Ne) {
-//      return e;
-//    }
-//    std::map<ref<Expr>, uint64_t> *newLinearTerm =
-//        new std::map<ref<Expr>, uint64_t>;
-//    if (isa<ConstantExpr>(kids[1])) {
-//      ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[1]);
-//      // TODO: uncomment
-//      //      insertTerm(newLinearTerm, constant->getZExtValue(),
-//      //                 TxWPArrayStore::constValues);
-//    } else {
-//      newLinearTerm = simplifyWPTerm(newLinearTerm, kids[1]);
-//    }
-//    newLinearTerm = simplifyWPTerm(newLinearTerm, kids[0]);
-//    result = convertToExpr(e, newLinearTerm);
-//
-//    delete newLinearTerm;
-//    break;
-//  }
-//  case Expr::Ult:
-//  case Expr::Ule:
-//  case Expr::Ugt:
-//  case Expr::Uge:
-//  case Expr::Slt:
-//  case Expr::Sle:
-//  case Expr::Sgt:
-//  case Expr::Sge: {
-//    ref<Expr> kids[2];
-//    kids[0] = e->getKid(0);
-//    kids[1] = e->getKid(1);
-//    std::map<ref<Expr>, uint64_t> *newLinearTerm =
-//        new std::map<ref<Expr>, uint64_t>;
-//    if (isa<ConstantExpr>(kids[1])) {
-//      ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[1]);
-//      // TODO: uncomment
-//      //      insertTerm(newLinearTerm, constant->getZExtValue(),
-//      //                 TxWPArrayStore::constValues);
-//    } else {
-//      newLinearTerm = simplifyWPTerm(newLinearTerm, kids[1]);
-//    }
-//    newLinearTerm = simplifyWPTerm(newLinearTerm, kids[0]);
-//    result = convertToExpr(e, newLinearTerm);
-//
-//    delete newLinearTerm;
-//    break;
-//  }
-//  case Expr::Constant: {
-//    // Do nothing. The expression is in the form of True or False
-//    break;
-//  }
-//
-//  default: {
-//    klee_message("Error while parsing WP Expression:");
-//    e->dump();
-//    klee_error("All WP Expressions should be in the form LinearTerm CMP "
-//               "Constant. Ex. X + 2Y < 5");
-//  }
-//  }
-//  return result;
-//}
+ref<Expr> TxWPHelper::simplifyWPExpr(ref<Expr> e) {
+  return e;
+  //  klee_error("TxWPHelper::simplifyWPExpr\n");
+  //
+  //  ref<Expr> result = e;
+  //  switch (e->getKind()) {
+  //  case Expr::And: {
+  //    ref<Expr> kids[2];
+  //    kids[0] = e->getKid(0);
+  //    kids[1] = e->getKid(1);
+  //    kids[0] = simplifyWPExpr(kids[0]);
+  //    kids[1] = simplifyWPExpr(kids[1]);
+  //    return e->rebuild(kids);
+  //  }
+  //  case Expr::Eq:
+  //  case Expr::Ne: {
+  //    ref<Expr> kids[2];
+  //    kids[0] = e->getKid(0);
+  //    kids[1] = e->getKid(1);
+  //    if (kids[0]->getKind() == Expr::Eq || kids[0]->getKind() == Expr::Ne ||
+  //        kids[1]->getKind() == Expr::Eq || kids[1]->getKind() == Expr::Ne) {
+  //      return e;
+  //    }
+  //    std::map<ref<Expr>, uint64_t> *newLinearTerm =
+  //        new std::map<ref<Expr>, uint64_t>;
+  //    if (isa<ConstantExpr>(kids[1])) {
+  //      ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[1]);
+  //      // TODO: uncomment
+  //      //      insertTerm(newLinearTerm, constant->getZExtValue(),
+  //      //                 TxWPArrayStore::constValues);
+  //    } else {
+  //      newLinearTerm = simplifyWPTerm(newLinearTerm, kids[1]);
+  //    }
+  //    newLinearTerm = simplifyWPTerm(newLinearTerm, kids[0]);
+  //    result = convertToExpr(e, newLinearTerm);
+  //
+  //    delete newLinearTerm;
+  //    break;
+  //  }
+  //  case Expr::Ult:
+  //  case Expr::Ule:
+  //  case Expr::Ugt:
+  //  case Expr::Uge:
+  //  case Expr::Slt:
+  //  case Expr::Sle:
+  //  case Expr::Sgt:
+  //  case Expr::Sge: {
+  //    ref<Expr> kids[2];
+  //    kids[0] = e->getKid(0);
+  //    kids[1] = e->getKid(1);
+  //    std::map<ref<Expr>, uint64_t> *newLinearTerm =
+  //        new std::map<ref<Expr>, uint64_t>;
+  //    if (isa<ConstantExpr>(kids[1])) {
+  //      ref<ConstantExpr> constant = dyn_cast<ConstantExpr>(kids[1]);
+  //      // TODO: uncomment
+  //      //      insertTerm(newLinearTerm, constant->getZExtValue(),
+  //      //                 TxWPArrayStore::constValues);
+  //    } else {
+  //      newLinearTerm = simplifyWPTerm(newLinearTerm, kids[1]);
+  //    }
+  //    newLinearTerm = simplifyWPTerm(newLinearTerm, kids[0]);
+  //    result = convertToExpr(e, newLinearTerm);
+  //
+  //    delete newLinearTerm;
+  //    break;
+  //  }
+  //  case Expr::Constant: {
+  //    // Do nothing. The expression is in the form of True or False
+  //    break;
+  //  }
+  //
+  //  default: {
+  //    klee_message("Error while parsing WP Expression:");
+  //    e->dump();
+  //    klee_error("All WP Expressions should be in the form LinearTerm CMP "
+  //               "Constant. Ex. X + 2Y < 5");
+  //  }
+  //  }
+  //  return result;
+}
 
 // std::map<ref<Expr>, uint64_t> *
 // TxWPHelper::simplifyWPTerm(std::map<ref<Expr>, uint64_t> *newLinearTerm,
@@ -198,6 +199,14 @@ bool TxWPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
     return false;
   }
 
+  case Expr::WPVar: {
+    ref<WPVarExpr> wp1 = dyn_cast<WPVarExpr>(expr);
+    if (wp1->address == inst) {
+      return true;
+    } else
+      return false;
+  }
+
   case Expr::NotOptimized:
   case Expr::Not:
   case Expr::Extract:
@@ -250,6 +259,7 @@ bool TxWPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
   }
   default: {
     // Sanity check
+    expr->dump();
     klee_error("Control should not reach here in "
                "TxWPHelper::isTargetDependent!");
   }
