@@ -402,7 +402,7 @@ ref<Expr> TxSubsumptionTableEntry::replaceExpr(ref<Expr> originalExpr,
 
   if (originalExpr->getKid(0) == replacedExpr)
     return TxShadowArray::createBinaryOfSameKind(originalExpr, replacementExpr,
-                                               originalExpr->getKid(1));
+                                                 originalExpr->getKid(1));
 
   if (originalExpr->getKid(1) == replacedExpr)
     return TxShadowArray::createBinaryOfSameKind(
@@ -1078,13 +1078,13 @@ bool TxSubsumptionTableEntry::subsumed(
               e->getAddress()->getOffset(), coreValues, corePointerValues,
               unifiedBases, debugSubsumptionLevel);
           if (constraint.isNull())
-              return false;
-            if (stateEqualityConstraints.isNull()) {
-              stateEqualityConstraints = constraint;
-            } else {
-              stateEqualityConstraints =
-                  AndExpr::create(constraint, stateEqualityConstraints);
-            }
+            return false;
+          if (stateEqualityConstraints.isNull()) {
+            stateEqualityConstraints = constraint;
+          } else {
+            stateEqualityConstraints =
+                AndExpr::create(constraint, stateEqualityConstraints);
+          }
         } else {
           // Match not found
           return false;
@@ -1248,10 +1248,10 @@ bool TxSubsumptionTableEntry::subsumed(
             stateEqualityConstraints =
                 AndExpr::create(constraint, stateEqualityConstraints);
           }
-          } else {
-            // Match not found
-            return false;
-          }
+        } else {
+          // Match not found
+          return false;
+        }
       } else {
         ref<TxStoreEntry> e = mIt->second;
         bool leftUse =
@@ -1942,9 +1942,9 @@ std::string TxTree::inTwoDecimalPoints(const double n) {
 std::string TxTree::getInterpolationStat() {
   std::stringstream stream;
   stream << "KLEE: done: Total reduced symbolic execution tree nodes = "
-		 << TxTreeGraph::nodeCount  << "\n";
-  stream << "KLEE: done: Total number of visited basic blocks = "
-		 << blockCount  << "\n";
+         << TxTreeGraph::nodeCount << "\n";
+  stream << "KLEE: done: Total number of visited basic blocks = " << blockCount
+         << "\n";
   stream << "\nKLEE: done: Subsumption statistics\n";
   printTableStat(stream);
   stream << "\nKLEE: done: TxTree method execution times (ms):\n";
@@ -2004,8 +2004,9 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
 }
 
 void TxTree::setCurrentINode(ExecutionState &state) {
-//   llvm::outs() << state.txTreeNode->isSpeculationNode() << "-" << state.txTreeNode->isSpeculationFailedNode()<< "\n";
-	TimerStatIncrementer t(setCurrentINodeTime);
+  //   llvm::outs() << state.txTreeNode->isSpeculationNode() << "-" <<
+  // state.txTreeNode->isSpeculationFailedNode()<< "\n";
+  TimerStatIncrementer t(setCurrentINodeTime);
   currentTxTreeNode = state.txTreeNode;
   currentTxTreeNode->setProgramPoint(state.pc->inst);
   if (!currentTxTreeNode->nodeSequenceNumber)
@@ -2129,6 +2130,40 @@ void TxTree::markPathCondition(ExecutionState &state,
   currentTxTreeNode->unsatCoreInterpolation(unsatCore);
 }
 
+void TxTree::markPathConditionWithBrInst(llvm::BranchInst *binst,
+                                         std::vector<ref<Expr> > &unsatCore) {
+  TimerStatIncrementer t(markPathConditionTime);
+  int debugSubsumptionLevel =
+      currentTxTreeNode->dependency->debugSubsumptionLevel;
+
+  //  llvm::BranchInst *binst =
+  //      llvm::dyn_cast<llvm::BranchInst>(state.prevPC->inst);
+  if (binst) {
+    ref<Expr> unknownExpression;
+    std::string reason = "";
+    if (debugSubsumptionLevel >= 1) {
+      llvm::raw_string_ostream stream(reason);
+      stream << "branch infeasibility [";
+      if (binst->getParent()->getParent()) {
+        stream << binst->getParent()->getParent()->getName().str() << ": ";
+      }
+      if (llvm::MDNode *n = binst->getMetadata("dbg")) {
+        llvm::DILocation loc(n);
+        stream << "Line " << loc.getLineNumber();
+      } else {
+        binst->print(stream);
+      }
+      stream << "]";
+      stream.flush();
+    }
+    currentTxTreeNode->dependency->markAllValues(binst->getCondition(),
+                                                 unknownExpression, reason);
+  }
+
+  // We create path condition marking structure and mark core constraints
+  currentTxTreeNode->unsatCoreInterpolation(unsatCore);
+}
+
 void TxTree::executePHI(llvm::Instruction *instr, unsigned incomingBlock,
                         ref<Expr> valueExpr) {
   currentTxTreeNode->dependency->executePHI(instr, incomingBlock,
@@ -2149,8 +2184,9 @@ bool TxTree::isSpeculationNode() {
 }
 
 void TxTree::storeSpeculationUnsatCore(TimingSolver *solver,
-                                       std::vector<ref<Expr> > unsatCore) {
-  currentTxTreeNode->storeSpeculationUnsatCore(solver, unsatCore);
+                                       std::vector<ref<Expr> > unsatCore,
+                                       llvm::BranchInst *binst) {
+  currentTxTreeNode->storeSpeculationUnsatCore(solver, unsatCore, binst);
 }
 
 void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
@@ -2278,9 +2314,11 @@ bool TxTreeNode::isSpeculationFailedNode() { return speculationFailed; }
 void TxTreeNode::setSpeculationFailed() { speculationFailed = 1; }
 
 void TxTreeNode::storeSpeculationUnsatCore(TimingSolver *solver,
-                                           std::vector<ref<Expr> > unsatCore) {
+                                           std::vector<ref<Expr> > unsatCore,
+                                           llvm::BranchInst *binst) {
   speculationSolver = solver;
   speculationUnsatCore = unsatCore;
+  speculationBInst = binst;
 }
 
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
@@ -2325,8 +2363,8 @@ void TxTreeNode::bindReturnValue(llvm::CallInst *site, llvm::Instruction *inst,
 }
 
 void TxTreeNode::getStoredExpressions(
-    const std::vector<llvm::Instruction *> &_callHistory,
-    bool &leftRetrieval, TxStore::TopStateStore &__internalStore,
+    const std::vector<llvm::Instruction *> &_callHistory, bool &leftRetrieval,
+    TxStore::TopStateStore &__internalStore,
     TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) const {
   TimerStatIncrementer t(getStoredExpressionsTime);

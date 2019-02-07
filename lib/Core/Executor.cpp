@@ -1178,7 +1178,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
-      txTree->storeSpeculationUnsatCore(solver, unsatCore);
+      llvm::BranchInst *binst =
+          llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
       return addSpeculationNode(current, condition, isInternal, true);
 
     } else if (INTERPOLATION_ENABLED) {
@@ -1201,7 +1203,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
-      txTree->storeSpeculationUnsatCore(solver, unsatCore);
+      llvm::BranchInst *binst =
+          llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
 
       return addSpeculationNode(current, condition, isInternal, false);
 
@@ -1552,12 +1556,13 @@ void Executor::speculativeBackJump(ExecutionState &current) {
       removedSpeculationStates.push_back(tmp);
     }
   }
-//  llvm::outs() << "States in worklist 1 = " << states.size() << "\n";
-//  llvm::outs() << "States in worklist 2 = " << searcher->getStates().size()
-//               << "\n";
-//  llvm::outs() << "Nodes to be deleted = " << deletedNodes.size() << "\n";
-//  llvm::outs() << "States to be deleted = " << removedSpeculationStates.size()
-//               << "\n";
+  //  llvm::outs() << "States in worklist 1 = " << states.size() << "\n";
+  //  llvm::outs() << "States in worklist 2 = " << searcher->getStates().size()
+  //               << "\n";
+  //  llvm::outs() << "Nodes to be deleted = " << deletedNodes.size() << "\n";
+  //  llvm::outs() << "States to be deleted = " <<
+  // removedSpeculationStates.size()
+  //               << "\n";
 
   searcher->update(0, std::vector<ExecutionState *>(),
                    removedSpeculationStates);
@@ -1573,13 +1578,15 @@ void Executor::speculativeBackJump(ExecutionState &current) {
            ie = removedSpeculationStates.end();
        it != ie; ++it) {
     states.erase(*it);
-    if(&current != *it) delete *it;
+    if (&current != *it)
+      delete *it;
   }
 
-//  llvm::outs() << "Remaining states in worklist 1= " << states.size() << "\n";
-//  llvm::outs() << "Remaining states in worklist 2 = "
-//               << searcher->getStates().size() << "\n";
-//  llvm::outs() << "Remaining addedStates = " << addedStates.size() << "\n";
+  //  llvm::outs() << "Remaining states in worklist 1= " << states.size() <<
+  // "\n";
+  //  llvm::outs() << "Remaining states in worklist 2 = "
+  //               << searcher->getStates().size() << "\n";
+  //  llvm::outs() << "Remaining addedStates = " << addedStates.size() << "\n";
 }
 
 void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
