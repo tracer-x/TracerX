@@ -1525,27 +1525,19 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 }
 
 void Executor::speculativeBackJump(ExecutionState &current) {
-  // marking the speculation nodes to be terminated
-  std::vector<TxTreeNode *> deletedNodes;
-  TxTreeNode *tmp = current.txTreeNode;
-  tmp->setSpeculationFailed();
-  deletedNodes.push_back(tmp);
-  TxTreeNode *parent = tmp->getParent();
+  // identify the speculation root
+  TxTreeNode *currentNode = current.txTreeNode;
+  TxTreeNode *parent = currentNode->getParent();
   while (parent && parent->isSpeculationNode()) {
-    parent->setSpeculationFailed();
-    // add sibling
-    if (parent->getLeft() && parent->getLeft() != tmp) {
-      parent->getLeft()->setSpeculationFailed();
-      deletedNodes.push_back(parent->getLeft());
-    }
-    if (parent->getRight() && parent->getRight() != tmp) {
-      parent->getRight()->setSpeculationFailed();
-      deletedNodes.push_back(parent->getRight());
-    }
-    deletedNodes.push_back(parent);
-    tmp = parent;
+    currentNode = parent;
     parent = parent->getParent();
   }
+
+  // interpolant marking
+  currentNode->mark();
+
+  std::vector<TxTreeNode *> deletedNodes = collectSpeculationNodes(currentNode);
+
   // collect removed states
   std::vector<ExecutionState *> removedSpeculationStates;
   for (std::set<ExecutionState *>::const_iterator it = states.begin(),
@@ -1582,11 +1574,27 @@ void Executor::speculativeBackJump(ExecutionState &current) {
       delete *it;
   }
 
-  //  llvm::outs() << "Remaining states in worklist 1= " << states.size() <<
+  //  llvm::outs() << "Remaining states in worklist 1 = " << states.size() <<
   // "\n";
   //  llvm::outs() << "Remaining states in worklist 2 = "
   //               << searcher->getStates().size() << "\n";
   //  llvm::outs() << "Remaining addedStates = " << addedStates.size() << "\n";
+}
+
+std::vector<TxTreeNode *> Executor::collectSpeculationNodes(TxTreeNode *root) {
+  if (!root)
+    return std::vector<TxTreeNode *>();
+  std::vector<TxTreeNode *> leftNodes =
+      collectSpeculationNodes(root->getLeft());
+  std::vector<TxTreeNode *> rightNodes =
+      collectSpeculationNodes(root->getRight());
+  std::vector<TxTreeNode *> result;
+  result.insert(result.end(), leftNodes.begin(), leftNodes.end());
+  result.insert(result.end(), rightNodes.begin(), rightNodes.end());
+  // mark root fail & add to result
+  root->setSpeculationFailed();
+  result.insert(result.end(), root);
+  return result;
 }
 
 void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {

@@ -17,18 +17,18 @@
 
 #include "TimingSolver.h"
 
+#include "TxDependency.h"
+#include "TxShadowArray.h"
+#include <fstream>
 #include <klee/CommandLine.h>
 #include <klee/Expr.h>
+#include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/Solver.h>
 #include <klee/SolverStats.h>
-#include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ExprPPrinter.h>
 #include <klee/util/TxExprUtil.h>
 #include <klee/util/TxPrintUtil.h>
-#include <fstream>
 #include <vector>
-#include "TxDependency.h"
-#include "TxShadowArray.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
@@ -2130,40 +2130,6 @@ void TxTree::markPathCondition(ExecutionState &state,
   currentTxTreeNode->unsatCoreInterpolation(unsatCore);
 }
 
-void TxTree::markPathConditionWithBrInst(llvm::BranchInst *binst,
-                                         std::vector<ref<Expr> > &unsatCore) {
-  TimerStatIncrementer t(markPathConditionTime);
-  int debugSubsumptionLevel =
-      currentTxTreeNode->dependency->debugSubsumptionLevel;
-
-  //  llvm::BranchInst *binst =
-  //      llvm::dyn_cast<llvm::BranchInst>(state.prevPC->inst);
-  if (binst) {
-    ref<Expr> unknownExpression;
-    std::string reason = "";
-    if (debugSubsumptionLevel >= 1) {
-      llvm::raw_string_ostream stream(reason);
-      stream << "branch infeasibility [";
-      if (binst->getParent()->getParent()) {
-        stream << binst->getParent()->getParent()->getName().str() << ": ";
-      }
-      if (llvm::MDNode *n = binst->getMetadata("dbg")) {
-        llvm::DILocation loc(n);
-        stream << "Line " << loc.getLineNumber();
-      } else {
-        binst->print(stream);
-      }
-      stream << "]";
-      stream.flush();
-    }
-    currentTxTreeNode->dependency->markAllValues(binst->getCondition(),
-                                                 unknownExpression, reason);
-  }
-
-  // We create path condition marking structure and mark core constraints
-  currentTxTreeNode->unsatCoreInterpolation(unsatCore);
-}
-
 void TxTree::executePHI(llvm::Instruction *instr, unsigned incomingBlock,
                         ref<Expr> valueExpr) {
   currentTxTreeNode->dependency->executePHI(instr, incomingBlock,
@@ -2319,6 +2285,36 @@ void TxTreeNode::storeSpeculationUnsatCore(TimingSolver *solver,
   speculationSolver = solver;
   speculationUnsatCore = unsatCore;
   speculationBInst = binst;
+}
+
+void TxTreeNode::mark() {
+  int debugSubsumptionLevel = this->dependency->debugSubsumptionLevel;
+
+  llvm::BranchInst *binst = speculationBInst;
+  if (binst) {
+    ref<Expr> unknownExpression;
+    std::string reason = "";
+    if (debugSubsumptionLevel >= 1) {
+      llvm::raw_string_ostream stream(reason);
+      stream << "branch infeasibility [";
+      if (binst->getParent()->getParent()) {
+        stream << binst->getParent()->getParent()->getName().str() << ": ";
+      }
+      if (llvm::MDNode *n = binst->getMetadata("dbg")) {
+        llvm::DILocation loc(n);
+        stream << "Line " << loc.getLineNumber();
+      } else {
+        binst->print(stream);
+      }
+      stream << "]";
+      stream.flush();
+    }
+    this->dependency->markAllValues(binst->getCondition(), unknownExpression,
+                                    reason);
+  }
+
+  // We create path condition marking structure and mark core constraints
+  this->unsatCoreInterpolation(this->speculationUnsatCore);
 }
 
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {

@@ -460,6 +460,8 @@ class TxTreeNode {
 public:
   bool isSubsumed;
 
+  void mark();
+
   /// \brief The entry call history
   std::vector<llvm::Instruction *> entryCallHistory;
 
