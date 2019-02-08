@@ -1534,7 +1534,9 @@ void Executor::speculativeBackJump(ExecutionState &current) {
   }
 
   // interpolant marking
-  currentNode->mark();
+  if (!currentNode->speculationUnsatCore.empty()) {
+    currentNode->mark();
+  }
 
   std::vector<TxTreeNode *> deletedNodes = collectSpeculationNodes(currentNode);
 

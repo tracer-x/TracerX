@@ -370,11 +370,6 @@ class TxTreeNode {
   /// \brief Value dependencies
   TxDependency *dependency;
 
-  // \brief The unsat core from a infeasible path is temporarily stored here
-  // and in case speculation is failed it's used to do marking related to
-  // the infeasible path
-  std::vector<ref<Expr> > speculationUnsatCore;
-
   // \brief The pointer to solver is temporarily stored here and in case
   // speculation is failed it's used to do marking related to the infeasible
   // path
@@ -460,6 +455,10 @@ class TxTreeNode {
 public:
   bool isSubsumed;
 
+  // \brief The unsat core from a infeasible path is temporarily stored here
+  // and in case speculation is failed it's used to do marking related to
+  // the infeasible path
+  std::vector<ref<Expr> > speculationUnsatCore;
   void mark();
 
   /// \brief The entry call history
