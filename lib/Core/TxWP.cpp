@@ -35,9 +35,9 @@
 using namespace klee;
 
 typedef std::map<ref<TxVariable>, ref<TxInterpolantValue> >
-    LowerInterpolantStore;
+LowerInterpolantStore;
 typedef std::map<ref<TxAllocationContext>, LowerInterpolantStore>
-    TopInterpolantStore;
+TopInterpolantStore;
 
 TxWeakestPreCondition::TxWeakestPreCondition(TxTreeNode *_node,
                                              TxDependency *_dependency) {
@@ -1602,7 +1602,7 @@ ref<Expr> TxWeakestPreCondition::PushUp(
       // 2- create and expression from the condition and this->WPExpr
       ref<Expr> result = getBrCondition(i);
       if (result.isNull()) {
-      	WPExpr = result;
+        WPExpr = result;
         return WPExpr;
       }
       ref<Expr> cond = TxExprHelper::simplifyNot(result);
@@ -1622,7 +1622,7 @@ ref<Expr> TxWeakestPreCondition::PushUp(
       // 3- create and expression from the condition and this->WPExpr
       ref<Expr> result = getBrCondition(i);
       if (result.isNull()) {
-    	WPExpr = result;
+        WPExpr = result;
         return WPExpr;
       }
       ref<Expr> negCond = TxExprHelper::simplifyNot(NotExpr::create(result));
@@ -1644,11 +1644,16 @@ ref<Expr> TxWeakestPreCondition::PushUp(
           return result;
         }
         WPExpr = TxWPHelper::substituteExpr(WPExpr, right, left);
-        WPExpr = TxWPHelper::simplifyWPExpr(WPExpr);
-        //                        klee_warning("WP");
-        //                        WPExpr->dump();
-        //                        i->dump();
-        //                        klee_warning("WP");
+
+        //        klee_warning("WP");
+        //        WPExpr->dump();
+        //        llvm::outs() << "------------\n";
+        WPExpr =
+            TxExprHelper::rangSimplify(TxExprHelper::simplifyLinear(WPExpr));
+
+        //                                WPExpr->dump();
+        //                                i->dump();
+        //                                klee_warning("WP");
       }
     }
   }
@@ -2152,9 +2157,9 @@ unsigned int TxWeakestPreCondition::getAllocaInstSize(llvm::AllocaInst *alc) {
     size = Expr::Bool;
   } else if (alc->getAllocatedType()->isIntegerTy(8)) {
     size = Expr::Int8;
-  }  else if (alc->getAllocatedType()->isIntegerTy(16) ) {
-      size = Expr::Int16;
-  }  else if (alc->getAllocatedType()->isIntegerTy(32) ) {
+  } else if (alc->getAllocatedType()->isIntegerTy(16)) {
+    size = Expr::Int16;
+  } else if (alc->getAllocatedType()->isIntegerTy(32)) {
     size = Expr::Int32;
   } else if (alc->getAllocatedType()->isIntegerTy(64)) {
     size = Expr::Int64;
