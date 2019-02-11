@@ -822,6 +822,148 @@ bool TxSubsumptionTableEntry::subsumed(
                    state.txTreeNode->getNodeSequenceNumber(),
                    nodeSequenceNumber);
     }
+    if (wpInterpolant == ConstantExpr::alloc(1, Expr::Bool)) {
+      //////////////////////////////////////////////////////
+
+      // Translation of allocation in the current state into an allocation in
+      // the
+      // tabled interpolant. This translation is used to equate absolute address
+      // values for allocations of matching sizes.
+      std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > unifiedBases;
+
+      std::set<std::string> specialVars;
+
+      // Build constraints from concrete-address interpolant store
+      for (TxStore::TopInterpolantStore::const_iterator
+               it1 = concretelyAddressedStore.begin(),
+               ie1 = concretelyAddressedStore.end();
+           it1 != ie1; ++it1) {
+        assert(!it1->second.empty() && "empty table entry with real index");
+
+        std::string name = (*it1).first->getValue()->getName();
+        if (name != "conflict" && name != "posx" && name != "posy" &&
+            name != "current_q" && name != "current_r") {
+          klee_error("Var name not seen!");
+          continue;
+        }
+
+        const TxStore::LowerInterpolantStore &tabledConcreteMap = it1->second;
+        TxStore::TopStateStore::iterator mIt = __internalStore.find(it1->first);
+        if (mIt == __internalStore.end()) {
+          if (debugSubsumptionLevel >= 1) {
+            std::string msg;
+            std::string padding(makeTabs(1));
+            llvm::raw_string_ostream stream(msg);
+            it1->first->print(stream, padding);
+            stream.flush();
+            klee_message("#%lu=>#%lu: Check failure as allocated memory region "
+                         "in the table does not exist in the state:\n%s",
+                         state.txTreeNode->getNodeSequenceNumber(),
+                         nodeSequenceNumber, msg.c_str());
+          }
+          return false;
+        }
+
+        TxStore::MiddleStateStore &m = mIt->second;
+
+        for (TxStore::LowerInterpolantStore::const_iterator
+                 it2 = tabledConcreteMap.begin(),
+                 ie2 = tabledConcreteMap.end();
+             it2 != ie2; ++it2) {
+          ref<TxInterpolantValue> stateValue;
+
+          ref<TxStoreEntry> e = m.findConcrete(it2->first, unifiedBases);
+
+          if (e.isNull()) {
+            // Fail the subsumption, since the address was not found in the
+            // state,
+            // and we could not translate the addresses
+            if (debugSubsumptionLevel >= 1) {
+              std::string msg;
+              std::string padding(makeTabs(1));
+              llvm::raw_string_ostream stream(msg);
+              it2->first->print(stream, padding);
+              stream.flush();
+              klee_message("#%lu=>#%lu: Check failure as memory region in the "
+                           "table does not exist in the state:\n%s",
+                           state.txTreeNode->getNodeSequenceNumber(),
+                           nodeSequenceNumber, msg.c_str());
+            }
+            return false;
+          } else {
+            bool leftUse =
+                state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+            stateValue = e->getInterpolantStyleValue(leftUse);
+          }
+
+          const ref<TxInterpolantValue> tabledValue = it2->second;
+          ref<Expr> res;
+
+          if (!stateValue.isNull()) {
+            // There is the corresponding concrete allocation
+            if (tabledValue->getExpression()->getWidth() !=
+                stateValue->getExpression()->getWidth()) {
+              // We conservatively fail the subsumption in case the sizes do not
+              // match.
+              return false;
+            } else {
+              if (name == "posx" || name == "posy") {
+                res = EqExpr::create(tabledValue->getExpression(),
+                                     stateValue->getExpression());
+                if (res->isFalse()) {
+                  return false;
+                } else if (res->isTrue()) {
+                  specialVars.insert(name);
+                }
+                // tabledValue->getExpression()->dump();
+                // stateValue->getExpression()->dump();
+                // llvm::errs()  << name << "\n";
+              } else if (name == "conflict") {
+                ref<ConstantExpr> tv =
+                    dyn_cast<ConstantExpr>(tabledValue->getExpression());
+                ref<ConstantExpr> sv =
+                    dyn_cast<ConstantExpr>(stateValue->getExpression());
+                uint64_t tv2 = tv->getAPValue().getSExtValue();
+                uint64_t sv2 = sv->getAPValue().getSExtValue();
+                int flag = 1;
+                for (int mask = 1; mask < 256; mask = mask * 2) {
+                  if ((tv2 & mask) > (sv2 & mask))
+                    flag = 0;
+                }
+                if (flag == 1)
+                  specialVars.insert(name);
+                // llvm::errs() << tv2 << " " << sv2 << " " << name << "\n";
+              } else if (name == "current_q" || name == "current_r") {
+                ref<ConstantExpr> tv =
+                    dyn_cast<ConstantExpr>(tabledValue->getExpression());
+                ref<ConstantExpr> sv =
+                    dyn_cast<ConstantExpr>(stateValue->getExpression());
+                uint64_t tv2 = tv->getAPValue().getSExtValue();
+                uint64_t sv2 = sv->getAPValue().getSExtValue();
+                if (tv2 >= sv2)
+                  specialVars.insert(name);
+                // llvm::errs() << tv2 << " " << sv2 << " " << name << "\n";
+              } else {
+                (*it1).first->getValue()->dump();
+                llvm::errs() << name << "\n";
+                klee_error("TxSubsumptionTableEntry::subsumed Custom "
+                           "interpolant should not reach here!");
+              }
+            }
+          }
+        }
+      }
+      if (specialVars.size() == 5) {
+        /*for (std::set<std::string>::iterator
+                         it1 = specialVars.begin(),
+                         ie1 = specialVars.end();
+                 it1 != ie1; ++it1) {
+          llvm::errs() << (*it1) << "\n";
+        }*/
+        klee_warning("custom SUBSUMED!");
+        return true;
+      }
+    }
   }
 
   // Tell the solver implementation that we are checking for subsumption for
