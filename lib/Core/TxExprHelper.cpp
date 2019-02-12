@@ -219,6 +219,18 @@ bool TxExprHelper::extractCoeff(ref<Expr> e, int mul,
 
 ref<Expr> TxExprHelper::makeExpr(ref<Expr> e,
                                  std::map<ref<Expr>, int> &ref2coeff) {
+
+//  llvm::outs() << "********\n";
+//  e->dump();
+//  for (std::map<ref<Expr>, int>::iterator it = ref2coeff.begin(),
+//                                          ie = ref2coeff.end();
+//       it != ie; ++it) {
+//    it->first->dump();
+//    llvm::outs() << it->second << "\n---\n";
+//  }
+//
+//  llvm::outs() << "========\n";
+
   std::vector<ref<Expr> > pos;
   std::vector<ref<Expr> > neg;
   int c = 0;
@@ -259,7 +271,7 @@ ref<Expr> TxExprHelper::makeExpr(ref<Expr> e,
     std::vector<ref<Expr> >::const_iterator it = neg.begin();
     kids[1] = *(it);
     std::advance(it, 1);
-    if (neg.size() >= 1) {
+    if (neg.size() > 1) {
       for (; it != neg.end(); ++it) {
         kids[1] = AddExpr::create(kids[1], (*it));
       }
@@ -269,11 +281,12 @@ ref<Expr> TxExprHelper::makeExpr(ref<Expr> e,
     std::vector<ref<Expr> >::const_iterator it = pos.begin();
     kids[0] = *(it);
     std::advance(it, 1);
-    if (neg.size() >= 1) {
+    if (neg.size() > 1) {
       for (; it != neg.end(); ++it) {
         kids[0] = AddExpr::create(kids[0], (*it));
       }
     }
+
     // sub neg to the left hand side
     for (std::vector<ref<Expr> >::const_iterator it = neg.begin(),
                                                  ie = neg.end();
@@ -297,7 +310,6 @@ ref<Expr> TxExprHelper::makeExpr(ref<Expr> e,
   if (kids[1].isNull()) {
     kids[1] = ConstantExpr::create(0, Expr::Int32);
   }
-
   return e->rebuild(kids);
 }
 
@@ -540,13 +552,13 @@ Bound TxExprHelper::getBound(ref<Expr> e) {
 bool TxExprHelper::isaVar(ref<Expr> e) {
   bool ret = false;
   if (e->getKind() == Expr::Concat) {
-    if (isa<ReadExpr>(e->getKid(0))) {
+    if (isa<ReadExpr>(e->getKid(0)) || isa<WPVarExpr>(e->getKid(0))) {
       ret = true;
     }
   }
-  if (e->getKind() == Expr::WPVar) {
-    ret = true;
-  }
+//  if (e->getKind() == Expr::WPVar) {
+//    ret = true;
+//  }
 
   return ret;
 }
