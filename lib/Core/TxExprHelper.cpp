@@ -146,6 +146,16 @@ ref<Expr> TxExprHelper::simplifyLinear(ref<Expr> e) {
       return e;
     }
 
+    //    llvm::outs() << "== begin simplifyLinear ==\n";
+    //    e->dump();
+    //    llvm::outs() << "---\n";
+    //    for (std::map<ref<Expr>, int>::iterator it = ref2coeff.begin(),
+    //                                            ie = ref2coeff.end();
+    //         it != ie; ++it) {
+    //      it->first->dump();
+    //      llvm::outs() << it->second << "\n";
+    //    }
+    //    llvm::outs() << "== end simplifyLinear ==\n";
     return makeExpr(e, ref2coeff);
   }
   default:
@@ -220,16 +230,16 @@ bool TxExprHelper::extractCoeff(ref<Expr> e, int mul,
 ref<Expr> TxExprHelper::makeExpr(ref<Expr> e,
                                  std::map<ref<Expr>, int> &ref2coeff) {
 
-//  llvm::outs() << "********\n";
-//  e->dump();
-//  for (std::map<ref<Expr>, int>::iterator it = ref2coeff.begin(),
-//                                          ie = ref2coeff.end();
-//       it != ie; ++it) {
-//    it->first->dump();
-//    llvm::outs() << it->second << "\n---\n";
-//  }
-//
-//  llvm::outs() << "========\n";
+  //  llvm::outs() << "********\n";
+  //  e->dump();
+  //  for (std::map<ref<Expr>, int>::iterator it = ref2coeff.begin(),
+  //                                          ie = ref2coeff.end();
+  //       it != ie; ++it) {
+  //    it->first->dump();
+  //    llvm::outs() << it->second << "\n---\n";
+  //  }
+  //
+  //  llvm::outs() << "========\n";
 
   std::vector<ref<Expr> > pos;
   std::vector<ref<Expr> > neg;
@@ -556,9 +566,9 @@ bool TxExprHelper::isaVar(ref<Expr> e) {
       ret = true;
     }
   }
-//  if (e->getKind() == Expr::WPVar) {
-//    ret = true;
-//  }
+  if (e->getKind() == Expr::WPVar) {
+    ret = true;
+  }
 
   return ret;
 }
@@ -749,4 +759,4 @@ bool TxExprHelper::isaVar(ref<Expr> e) {
 //    break;
 //  }
 //}
-}
+} // namespace klee
