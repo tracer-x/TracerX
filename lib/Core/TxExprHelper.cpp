@@ -146,16 +146,16 @@ ref<Expr> TxExprHelper::simplifyLinear(ref<Expr> e) {
       return e;
     }
 
-    //    llvm::outs() << "== begin simplifyLinear ==\n";
-    //    e->dump();
-    //    llvm::outs() << "---\n";
-    //    for (std::map<ref<Expr>, int>::iterator it = ref2coeff.begin(),
-    //                                            ie = ref2coeff.end();
-    //         it != ie; ++it) {
-    //      it->first->dump();
-    //      llvm::outs() << it->second << "\n";
-    //    }
-    //    llvm::outs() << "== end simplifyLinear ==\n";
+    llvm::outs() << "== begin simplifyLinear ==\n";
+    e->dump();
+    llvm::outs() << "---\n";
+    for (std::map<ref<Expr>, int>::iterator it = ref2coeff.begin(),
+                                            ie = ref2coeff.end();
+         it != ie; ++it) {
+      it->first->dump();
+      llvm::outs() << it->second << "\n";
+    }
+    llvm::outs() << "== end simplifyLinear ==\n";
     return makeExpr(e, ref2coeff);
   }
   default:
@@ -171,6 +171,13 @@ ref<Expr> TxExprHelper::simplifyLinear(ref<Expr> e) {
 bool TxExprHelper::extractCoeff(ref<Expr> e, int mul,
                                 std::map<ref<Expr>, int> &ref2coeff) {
 
+  //  llvm::outs() << "star extractCoeff\n";
+  //  e->dump();
+  //  llvm::outs() << "isaVar(e)=" << isaVar(e) << "\n";
+  //  llvm::outs() << "end extractCoeff\n";
+  if (e->getWidth() != Expr::Bool) {
+    return false;
+  }
   if (isaVar(e)) {
     ref2coeff[e] = ref2coeff[e] + mul;
     return true;
@@ -179,6 +186,7 @@ bool TxExprHelper::extractCoeff(ref<Expr> e, int mul,
     switch (e->getKind()) {
     case Expr::Constant: {
       ref<ConstantExpr> coeff = dyn_cast<ConstantExpr>(e);
+      llvm::outs() << coeff->getWidth() << "\n";
       ref2coeff[CONST_REF] = ref2coeff[CONST_REF] + coeff->getZExtValue() * mul;
       return true;
     }
@@ -273,8 +281,9 @@ ref<Expr> TxExprHelper::makeExpr(ref<Expr> e,
   // if no positive coeff then use for kids[1]
   if (pos.size() == 0) {
     if (neg.size() == 0) {
-      klee_warning(
-          "TxExprHelper::makeExpr: There is no variable in expression!");
+      //      klee_warning(
+      //          "TxExprHelper::makeExpr: There is no variable in
+      // expression!");
       return e;
     }
     // add all neg to the right hand side
@@ -504,7 +513,8 @@ Bound TxExprHelper::getBound(ref<Expr> e) {
     return b;
   }
   if (coeff == 0.0) {
-    klee_warning("TxExprHelper::getBound: There is no var in the expression!");
+    //    klee_warning("TxExprHelper::getBound: There is no var in the
+    // expression!");
     b.type = Bound::invalid;
     return b;
   }
