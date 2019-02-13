@@ -112,7 +112,6 @@ ref<Expr> TxExprHelper::simplifyNot(ref<Expr> e) {
 }
 
 ref<Expr> TxExprHelper::simplifyLinear(ref<Expr> e) {
-
   switch (e->getKind()) {
   case Expr::And: {
     ref<Expr> kids[2];
@@ -186,7 +185,7 @@ bool TxExprHelper::extractCoeff(ref<Expr> e, int mul,
     switch (e->getKind()) {
     case Expr::Constant: {
       ref<ConstantExpr> coeff = dyn_cast<ConstantExpr>(e);
-      llvm::outs() << coeff->getWidth() << "\n";
+//      llvm::outs() << coeff->getWidth() << "\n";
       ref2coeff[CONST_REF] = ref2coeff[CONST_REF] + coeff->getZExtValue() * mul;
       return true;
     }

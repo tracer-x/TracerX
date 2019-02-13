@@ -1605,8 +1605,8 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         WPExpr = result;
         return WPExpr;
       }
-      ref<Expr> cond = TxExprHelper::rangSimplify(
-          TxExprHelper::simplifyLinear(TxExprHelper::simplifyNot(result)));
+      ref<Expr> cond = TxExprHelper::simplifyNot(result);
+//      cond = TxExprHelper::rangSimplify(TxExprHelper::simplifyLinear(cond));
 
       //      llvm::outs() << "------ Flag = 1 ------\n";
       //      cond->dump();
@@ -1620,8 +1620,8 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         else if (WPExpr->getWidth() < cond->getWidth())
           WPExpr = ZExtExpr::create(WPExpr, cond->getWidth());
 
-        WPExpr = TxExprHelper::rangSimplify(
-            TxExprHelper::simplifyLinear(AndExpr::create(WPExpr, cond)));
+        WPExpr = AndExpr::create(WPExpr, cond);
+//        WPExpr = TxExprHelper::rangSimplify(TxExprHelper::simplifyLinear(WPExpr));
       }
 
     } else if (flag == 2) {
@@ -1634,9 +1634,8 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         return WPExpr;
       }
 
-      ref<Expr> negCond =
-          TxExprHelper::rangSimplify(TxExprHelper::simplifyLinear(
-              TxExprHelper::simplifyNot(NotExpr::create(result))));
+      ref<Expr> negCond = TxExprHelper::simplifyNot(NotExpr::create(result));
+//      negCond = TxExprHelper::rangSimplify(TxExprHelper::simplifyLinear(negCond));
 
       //      llvm::outs() << "------ Flag = 2 ------\n";
       //      negCond->dump();
@@ -1649,8 +1648,9 @@ ref<Expr> TxWeakestPreCondition::PushUp(
           negCond = ZExtExpr::create(negCond, WPExpr->getWidth());
         else if (WPExpr->getWidth() < negCond->getWidth())
           WPExpr = ZExtExpr::create(WPExpr, negCond->getWidth());
-        WPExpr = TxExprHelper::rangSimplify(
-            TxExprHelper::simplifyLinear(AndExpr::create(WPExpr, negCond)));
+
+        WPExpr = AndExpr::create(WPExpr, negCond);
+//        WPExpr = TxExprHelper::rangSimplify(TxExprHelper::simplifyLinear(WPExpr));
       }
 
     } else if (i->getOpcode() == llvm::Instruction::Store) {
