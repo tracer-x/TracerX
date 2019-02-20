@@ -1605,12 +1605,11 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         WPExpr = result;
         return WPExpr;
       }
-      ref<Expr> cond = TxExprHelper::simplifyNot(result);
-//      cond = TxExprHelper::rangSimplify(TxExprHelper::simplifyLinear(cond));
+      ref<Expr> cond = result;
 
-      //      llvm::outs() << "------ Flag = 1 ------\n";
+      //      llvm::outs() << "****** Flag = 1 ******\n";
       //      cond->dump();
-      //      llvm::outs() << "------ End Flag = 1 ------\n";
+      //      llvm::outs() << "****** End Flag = 1 ******\n";
 
       if (True() == WPExpr) {
         WPExpr = cond;
@@ -1621,7 +1620,6 @@ ref<Expr> TxWeakestPreCondition::PushUp(
           WPExpr = ZExtExpr::create(WPExpr, cond->getWidth());
 
         WPExpr = AndExpr::create(WPExpr, cond);
-//        WPExpr = TxExprHelper::rangSimplify(TxExprHelper::simplifyLinear(WPExpr));
       }
 
     } else if (flag == 2) {
@@ -1633,13 +1631,10 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         WPExpr = result;
         return WPExpr;
       }
-
-      ref<Expr> negCond = TxExprHelper::simplifyNot(NotExpr::create(result));
-//      negCond = TxExprHelper::rangSimplify(TxExprHelper::simplifyLinear(negCond));
-
-      //      llvm::outs() << "------ Flag = 2 ------\n";
+      ref<Expr> negCond = NotExpr::create(result);
+      //      llvm::outs() << "****** Flag = 2 ******\n";
       //      negCond->dump();
-      //      llvm::outs() << "------ End Flag = 2 ------\n";
+      //      llvm::outs() << "****** End Flag = 2 ******\n";
 
       if (True() == WPExpr) {
         WPExpr = negCond;
@@ -1650,7 +1645,6 @@ ref<Expr> TxWeakestPreCondition::PushUp(
           WPExpr = ZExtExpr::create(WPExpr, negCond->getWidth());
 
         WPExpr = AndExpr::create(WPExpr, negCond);
-//        WPExpr = TxExprHelper::rangSimplify(TxExprHelper::simplifyLinear(WPExpr));
       }
 
     } else if (i->getOpcode() == llvm::Instruction::Store) {
@@ -1662,18 +1656,15 @@ ref<Expr> TxWeakestPreCondition::PushUp(
           ref<Expr> result;
           return result;
         }
-        //        llvm::outs() << "------ Flag = 0 ------\n";
 
         WPExpr = TxWPHelper::substituteExpr(WPExpr, right, left);
-
+        //        llvm::outs() << "****** Flag = 0 *******\n";
         //        WPExpr->dump();
         //        llvm::outs() << "------\n";
-
-        WPExpr =
-            TxExprHelper::rangSimplify(TxExprHelper::simplifyLinear(WPExpr));
-
+        WPExpr = Z3Simplification::simplify(WPExpr);
+        //        Z3Simplification::test();
         //        WPExpr->dump();
-        //        llvm::outs() << "------ End Flag = 0 ------\n";
+        //        llvm::outs() << "******* End Flag = 0 *******\n";
       }
     }
   }

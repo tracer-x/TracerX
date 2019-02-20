@@ -19,6 +19,7 @@
 #include "TxDependency.h"
 #include "TxExprHelper.h"
 #include "TxPartitionHelper.h"
+#include "Z3Simplification.h"
 #include "TxTree.h"
 #include "TxWPHelper.h"
 #include "klee/ExecutionState.h"
@@ -54,8 +55,12 @@ public:
 
   ~TxWeakestPreCondition();
 
-  ref<Expr> True() { return ConstantExpr::alloc(1, Expr::Bool); };
-  ref<Expr> False() { return ConstantExpr::alloc(0, Expr::Bool); };
+  ref<Expr> True() {
+    return ConstantExpr::alloc(1, Expr::Bool);
+  };
+  ref<Expr> False() {
+    return ConstantExpr::alloc(0, Expr::Bool);
+  };
 
   void resetFalseWPExpr() { WPExpr = False(); }
 
