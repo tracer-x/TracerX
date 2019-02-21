@@ -13,10 +13,11 @@ void Z3Simplification::test() {
   std::cout << "Start test!\n";
   z3::context c;
   z3::goal g(c);
-  z3::expr x = c.int_const("x");
-  z3::expr y = c.int_const("y");
+  z3::expr x = c.bool_const("x");
+  z3::expr y = c.bool_const("y");
   z3::expr z = c.int_const("z");
-  z3::expr e = (rem(x, 3) == y);
+  z3::expr e = not(not(x) && not(y));
+  std::cout << "e = " << e << "\n";
   visit(e);
   std::cout << "End test!\n";
 }
@@ -67,23 +68,31 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
     if (symbol == "+") {
       ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
       ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
-
+      unsigned max =
+          l->getWidth() > r->getWidth() ? l->getWidth() : r->getWidth();
+      l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
+      r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
       return AddExpr::create(l, r);
     } else if (symbol == "-") {
       ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
       ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
-
+      unsigned max =
+          l->getWidth() > r->getWidth() ? l->getWidth() : r->getWidth();
+      l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
+      r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
       return SubExpr::create(l, r);
     } else if (symbol == "*") {
       ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
       ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
-
+      unsigned max =
+          l->getWidth() > r->getWidth() ? l->getWidth() : r->getWidth();
+      l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
+      r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
       return MulExpr::create(l, r);
     } else if (symbol == "div") {
       ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
       ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
-
-      return AddExpr::create(l, r);
+      return SDivExpr::create(l, r);
     } else if (symbol == "=") {
       ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
       ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
@@ -93,21 +102,37 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
       r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
       return EqExpr::create(l, r);
     } else if (symbol == "<=") {
-      ref<Expr> left = z3Expr2TxExpr(e.arg(0), emap);
-      ref<Expr> right = z3Expr2TxExpr(e.arg(1), emap);
-      return SleExpr::create(left, right);
+      ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
+      ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
+      unsigned max =
+          l->getWidth() > r->getWidth() ? l->getWidth() : r->getWidth();
+      l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
+      r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
+      return SleExpr::create(l, r);
     } else if (symbol == "<") {
-      ref<Expr> left = z3Expr2TxExpr(e.arg(0), emap);
-      ref<Expr> right = z3Expr2TxExpr(e.arg(1), emap);
-      return SltExpr::create(left, right);
+      ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
+      ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
+      unsigned max =
+          l->getWidth() > r->getWidth() ? l->getWidth() : r->getWidth();
+      l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
+      r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
+      return SltExpr::create(l, r);
     } else if (symbol == ">=") {
-      ref<Expr> left = z3Expr2TxExpr(e.arg(0), emap);
-      ref<Expr> right = z3Expr2TxExpr(e.arg(1), emap);
-      return SgeExpr::create(left, right);
+      ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
+      ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
+      unsigned max =
+          l->getWidth() > r->getWidth() ? l->getWidth() : r->getWidth();
+      l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
+      r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
+      return SgeExpr::create(l, r);
     } else if (symbol == ">") {
-      ref<Expr> left = z3Expr2TxExpr(e.arg(0), emap);
-      ref<Expr> right = z3Expr2TxExpr(e.arg(1), emap);
-      return SgtExpr::create(left, right);
+      ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
+      ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
+      unsigned max =
+          l->getWidth() > r->getWidth() ? l->getWidth() : r->getWidth();
+      l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
+      r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
+      return SgtExpr::create(l, r);
     } else if (symbol == "not") {
       ref<Expr> left = z3Expr2TxExpr(e.arg(0), emap);
       return NotExpr::create(left);
@@ -168,14 +193,14 @@ Z3Simplification::txExpr2z3Expr(z3::context &c, ref<Expr> expr,
     unsigned int val = dyn_cast<ConstantExpr>(expr)->getZExtValue();
     unsigned int size = expr->getWidth();
     switch (size) {
-    case Expr::Bool: {
+    case Expr::Bool:
+    case Expr::Int8: {
       if (val == 0) {
         return c.bool_val(false);
       } else {
         return c.bool_val(true);
       }
     }
-    case Expr::Int8:
     case Expr::Int16:
     case Expr::Int32:
     case Expr::Int64: { return c.int_val(val); }
@@ -257,8 +282,10 @@ Z3Simplification::txExpr2z3Expr(z3::context &c, ref<Expr> expr,
             txExpr2z3Expr(c, expr->getKid(1), emap));
   }
   case Expr::Xor: {
-    return (txExpr2z3Expr(c, expr->getKid(0), emap) ^
-            txExpr2z3Expr(c, expr->getKid(1), emap));
+    z3::expr l = txExpr2z3Expr(c, expr->getKid(0), emap);
+    z3::expr r = txExpr2z3Expr(c, expr->getKid(1), emap);
+    z3::expr ret = not(not(l) && not(r));
+    return ret;
   }
 
   case Expr::Shl:
