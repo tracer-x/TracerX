@@ -51,6 +51,7 @@ private:
     //      assert(e.is_var());
     //      // do something
     //    }
+    std::cout << "Begin visit " << e << "\n";
     if (e.is_const()) {
       std::string name = e.decl().name().str();
       if (name == "Int") {
