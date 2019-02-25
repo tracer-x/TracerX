@@ -1073,6 +1073,7 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
   std::set<std::string> pimiuVars;
   if (!entry->getInterpolant().isNull())
     pimiuVars = TxPartitionHelper::getExprVars(entry->getInterpolant());
+
   // vars(miu)
   TxStore::TopInterpolantStore concretelyAddressedStore =
       entry->getConcretelyAddressedStore();
@@ -1088,8 +1089,22 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
     }
   }
 
+  // revmoving __shadow__ from var names
+  std::set<std::string> pimiuVars2;
+  for (std::set<std::string>::iterator it1 = pimiuVars.begin(),
+                                       ie1 = pimiuVars.end();
+       it1 != ie1; ++it1) {
+    std::string toErase = "__shadow__";
+    size_t pos = (*it1).find(toErase);
+    if (pos != std::string::npos) {
+      std::string str = (*it1);
+      str.erase(pos, toErase.length());
+      pimiuVars2.insert(str);
+    }
+  }
+
   // get v1 = vars(pi,miu) - vars(w)
-  std::set<std::string> v1 = TxPartitionHelper::diff(pimiuVars, wpVars);
+  std::set<std::string> v1 = TxPartitionHelper::diff(pimiuVars2, wpVars);
 
   // closure(pi,miu,v1)
   std::set<std::string> v1star = v1;
