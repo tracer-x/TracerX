@@ -2451,7 +2451,7 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
   } else if (assertionFail) {
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
-    expr = wp->PushUp(reverseInstructionList);
+    expr = wp->True();
   } else if (childWPInterpolant[0].isNull() || childWPInterpolant[1].isNull()) {
     expr = childWPInterpolant[0];
   } else if (childWPInterpolant[0] == wp->False() ||
