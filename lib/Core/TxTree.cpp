@@ -2043,7 +2043,7 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
     // This is because a generic error returns no information (true), which
     // should not be used for subsuming.
     if (!dumping && !node->isSubsumed && node->storable &&
-        !node->genericEarlyTermination) {
+        !node->genericEarlyTermination && !node->speculationFlag) {
       int debugSubsumptionLevel = node->dependency->debugSubsumptionLevel;
 
       if (debugSubsumptionLevel >= 2) {
