@@ -2255,6 +2255,7 @@ TxTreeNode::TxTreeNode(
 
   // Set speculation flag to false
   speculationFlag = 0;
+  speculationFailed = 0;
   visitedProgramPoints = NULL;
 }
 
