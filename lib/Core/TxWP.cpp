@@ -1073,6 +1073,7 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
   std::set<std::string> pimiuVars;
   if (!entry->getInterpolant().isNull())
     pimiuVars = TxPartitionHelper::getExprVars(entry->getInterpolant());
+
   // vars(miu)
   TxStore::TopInterpolantStore concretelyAddressedStore =
       entry->getConcretelyAddressedStore();
@@ -1088,8 +1089,22 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
     }
   }
 
+  // revmoving __shadow__ from var names
+  std::set<std::string> pimiuVars2;
+  for (std::set<std::string>::iterator it1 = pimiuVars.begin(),
+                                       ie1 = pimiuVars.end();
+       it1 != ie1; ++it1) {
+    std::string toErase = "__shadow__";
+    size_t pos = (*it1).find(toErase);
+    if (pos != std::string::npos) {
+      std::string str = (*it1);
+      str.erase(pos, toErase.length());
+      pimiuVars2.insert(str);
+    }
+  }
+
   // get v1 = vars(pi,miu) - vars(w)
-  std::set<std::string> v1 = TxPartitionHelper::diff(pimiuVars, wpVars);
+  std::set<std::string> v1 = TxPartitionHelper::diff(pimiuVars2, wpVars);
 
   // closure(pi,miu,v1)
   std::set<std::string> v1star = v1;
@@ -1652,6 +1667,7 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 
         ref<Expr> left = this->generateExprFromOperand(i->getOperand(0));
         ref<Expr> right = this->generateExprFromOperand(i->getOperand(1));
+
         if (left.isNull() || right.isNull()) {
           ref<Expr> result;
           return result;
@@ -1662,7 +1678,6 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         //        WPExpr->dump();
         //        llvm::outs() << "------\n";
         WPExpr = Z3Simplification::simplify(WPExpr);
-        //        Z3Simplification::test();
         //        WPExpr->dump();
         //        llvm::outs() << "******* End Flag = 0 *******\n";
       }
@@ -1702,7 +1717,10 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
     if (isa<llvm::ConstantExpr>(inst->getOperand(0))) {
       ret = getLoadGep(inst);
     } else if (isa<llvm::GetElementPtrInst>(inst->getOperand(0))) {
-      ret = getPointer(inst);
+      llvm::GetElementPtrInst *parentGEP =
+          dyn_cast<llvm::GetElementPtrInst>(inst->getOperand(0));
+      std::pair<ref<Expr>, ref<Expr> > pair = getPointer(parentGEP);
+      ret = SelExpr::create(pair.second, pair.first);
     } else {
       ret = getLoad(inst);
     }
@@ -1816,6 +1834,7 @@ ref<Expr> TxWeakestPreCondition::getGlobalValue(llvm::GlobalValue *gv) {
   width = getGlobalVariabletSize(gv);
   index = ConstantExpr::create(0, width);
   result = WPVarExpr::create(gv, gv->getName(), index);
+
   return result;
 }
 
@@ -1828,26 +1847,30 @@ ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
   return result;
 }
 
-ref<Expr> TxWeakestPreCondition::getPointer(llvm::LoadInst *p) {
-  ref<Expr> result;
-  /*p->dump();
-  llvm::GetElementPtrInst *gep =
-  dyn_cast<llvm::GetElementPtrInst>(p->getOperand(0));
-  gep->dump();
-  gep->getOperand(0)->dump();
-  gep->getOperand(2)->dump();
-  ref<Expr> offset = this->generateExprFromOperand(gep->getOperand(2));
-  result = this->generateExprFromOperand(gep->getOperand(0));
-  offset->dump();
-  result->dump();*/
-
-  //  width = getAllocaInstSize(ge);
-  //  index = ConstantExpr::create(0, width);
-  //  result =
-  //      WPVarExpr::create(p->getOperand(0), p->getOperand(0)->getName(),
-  //      index);
-  klee_warning("PUSHUP5");
-  return result;
+std::pair<ref<Expr>, ref<Expr> >
+TxWeakestPreCondition::getPointer(llvm::GetElementPtrInst *gep) {
+  std::pair<ref<Expr>, ref<Expr> > pair;
+  if (isa<llvm::GetElementPtrInst>(gep->getOperand(0))) {
+    llvm::GetElementPtrInst *parentGEP =
+        dyn_cast<llvm::GetElementPtrInst>(gep->getOperand(0));
+    std::pair<ref<Expr>, ref<Expr> > parentPair = getPointer(parentGEP);
+    ref<Expr> offset = this->generateExprFromOperand(gep->getOperand(2));
+    unsigned width = getGepSize(gep->getType());
+    llvm::PointerType *pt =
+        dyn_cast<llvm::PointerType>(gep->getOperand(0)->getType());
+    llvm::ArrayType *at = dyn_cast<llvm::ArrayType>(pt->getElementType());
+    ref<Expr> size = ConstantExpr::create(at->getNumElements(), width);
+    pair.first = AddExpr::create(
+        MulExpr::create(parentPair.first->getKid(0), size), offset->getKid(0));
+    ref<Expr> kids[1];
+    kids[0] = pair.first;
+    pair.first = offset->rebuild(kids);
+    pair.second = parentPair.second;
+  } else {
+    pair.first = this->generateExprFromOperand(gep->getOperand(2));
+    pair.second = this->generateExprFromOperand(gep->getOperand(0));
+  }
+  return pair;
 }
 
 ref<Expr> TxWeakestPreCondition::getLoadGep(llvm::LoadInst *p) {
@@ -2150,8 +2173,40 @@ ref<Expr> TxWeakestPreCondition::getPhiInst(llvm::PHINode *phi) {
 }
 
 ref<Expr> TxWeakestPreCondition::getCallInst(llvm::CallInst *ci) {
-  ref<Expr> result;
-  klee_warning("PUSHUP13: getCallInst");
+  llvm::Function *function = ci->getCalledFunction();
+
+  // TODO: This loop can further be optimized if we had access to the
+  // iterator pointing to the call instruction. That way, we could
+  // find the respective return instruction much faster. The iterator
+  // can be accessed from the pushup function. We leave this optimization
+  // as future work.
+  llvm::Instruction *ret = 0;
+  for (std::vector<std::pair<KInstruction *, int> >::reverse_iterator
+           it = this->node->reverseInstructionList.rbegin(),
+           ie = this->node->reverseInstructionList.rend();
+       it != ie; ++it) {
+    if (isa<llvm::ReturnInst>(it->first->inst) &&
+        inFunction(it->first->inst, function)) {
+      ret = it->first->inst;
+    }
+  }
+  assert(ret && "Return instruction is null!");
+  ref<Expr> result = this->generateExprFromOperand(ret->getOperand(0));
+  return result;
+}
+
+bool TxWeakestPreCondition::inFunction(llvm::Instruction *ins,
+                                       llvm::Function *function) {
+  bool result = false;
+  for (llvm::Function::iterator bbit = function->begin(),
+                                bbie = function->end();
+       bbit != bbie; ++bbit) {
+    for (llvm::BasicBlock::iterator it = bbit->begin(), ie = bbit->end();
+         it != ie; ++it) {
+      if (ins == it)
+        return true;
+    }
+  }
   return result;
 }
 
@@ -2185,26 +2240,27 @@ unsigned int TxWeakestPreCondition::getAllocaInstSize(llvm::AllocaInst *alc) {
 
 unsigned int
 TxWeakestPreCondition::getGlobalVariabletSize(llvm::GlobalValue *gv) {
-  unsigned int size;
-
-  if (gv->getType()->isIntegerTy(1)) {
-    size = Expr::Bool;
-  } else if (gv->getType()->isIntegerTy(8)) {
-    size = Expr::Int8;
-  } else if (gv->getType()->isIntegerTy(16)) {
-    size = Expr::Int16;
-  } else if (gv->getType()->isIntegerTy(32)) {
-    size = Expr::Int32;
-  } else if (gv->getType()->isPointerTy()) {
-    size = Expr::Int32;
-  } else {
-    gv->dump();
-    gv->getType()->dump();
-    klee_error(
-        "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
-        "defined for this type yet");
-  }
-  return size;
+  return gv->getType()->getElementType()->getIntegerBitWidth();
+  //  unsigned int size;
+  //
+  //  if (gv->getType()->isIntegerTy(1)) {
+  //    size = Expr::Bool;
+  //  } else if (gv->getType()->isIntegerTy(8)) {
+  //    size = Expr::Int8;
+  //  } else if (gv->getType()->isIntegerTy(16)) {
+  //    size = Expr::Int16;
+  //  } else if (gv->getType()->isIntegerTy(32)) {
+  //    size = Expr::Int32;
+  //  } else if (gv->getType()->isPointerTy()) {
+  //    size = Expr::Int32;
+  //  } else {
+  //    gv->dump();
+  //    gv->getType()->dump();
+  //    klee_error(
+  //        "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
+  //        "defined for this type yet");
+  //  }
+  //  return size;
 }
 
 unsigned int
@@ -2224,6 +2280,28 @@ TxWeakestPreCondition::getFunctionArgumentSize(llvm::Argument *arg) {
   } else {
     arg->dump();
     arg->getType()->dump();
+    klee_error(
+        "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
+        "defined for this type yet");
+  }
+  return size;
+}
+
+unsigned int TxWeakestPreCondition::getGepSize(llvm::Type *ty) {
+  unsigned int size;
+
+  if (ty->isIntegerTy(1)) {
+    size = Expr::Bool;
+  } else if (ty->isIntegerTy(8)) {
+    size = Expr::Int8;
+  } else if (ty->isIntegerTy(16)) {
+    size = Expr::Int16;
+  } else if (ty->isIntegerTy(32)) {
+    size = Expr::Int32;
+  } else if (ty->isPointerTy()) {
+    size = getGepSize(ty->getPointerElementType());
+  } else {
+    ty->dump();
     klee_error(
         "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
         "defined for this type yet");

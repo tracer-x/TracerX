@@ -2554,7 +2554,7 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
   } else if (assertionFail) {
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
-    expr = wp->PushUp(reverseInstructionList);
+    expr = wp->True();
   } else if (childWPInterpolant[0].isNull() || childWPInterpolant[1].isNull()) {
     expr = childWPInterpolant[0];
   } else if (childWPInterpolant[0] == wp->False() ||
@@ -2712,9 +2712,23 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), dependency);
     return wpInterpolant->rebuild(kids);
   }
+  case Expr::Upd: {
+    ref<Expr> kids[3];
+    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
+    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
+    kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), dependency);
+    return wpInterpolant->rebuild(kids);
+  }
+  case Expr::Sel: {
+    ref<Expr> kids[2];
+    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
+    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
+    return wpInterpolant->rebuild(kids);
+  }
   default: {
     wpInterpolant->dump();
-    klee_error("TxWPHelper::substituteExpr: Expression not supported yet!");
+    klee_error("TxWPHelper::instantiateWPatSubsumption: Expression not "
+               "supported yet!");
     return wpInterpolant;
   }
   }
