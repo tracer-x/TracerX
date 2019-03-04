@@ -118,6 +118,28 @@ std::set<std::string> TxPartitionHelper::getExprVars(ref<Expr> expr) {
     vars1.insert(vars3.begin(), vars3.end());
     return vars1;
   }
+
+  case Expr::Upd: {
+    ref<Expr> kids[3];
+    kids[0] = expr->getKid(0);
+    kids[1] = expr->getKid(1);
+    kids[2] = expr->getKid(2);
+    std::set<std::string> vars1 = getExprVars(kids[0]);
+    std::set<std::string> vars2 = getExprVars(kids[1]);
+    std::set<std::string> vars3 = getExprVars(kids[2]);
+    vars1.insert(vars2.begin(), vars2.end());
+    vars1.insert(vars3.begin(), vars3.end());
+    return vars1;
+  }
+  case Expr::Sel: {
+    ref<Expr> kids[2];
+    kids[0] = expr->getKid(0);
+    kids[1] = expr->getKid(1);
+    std::set<std::string> vars1 = getExprVars(kids[0]);
+    std::set<std::string> vars2 = getExprVars(kids[1]);
+    vars1.insert(vars2.begin(), vars2.end());
+    return vars1;
+  }
   default: {
     // Sanity check
     expr->dump();

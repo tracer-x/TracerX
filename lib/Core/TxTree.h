@@ -455,14 +455,6 @@ class TxTreeNode {
   std::map<llvm::Value *, std::vector<ref<Expr> > > phiValues;
   bool phiValuesFlag;
 
-  /// \brief List of the instructions in the node in a reverse order (used only
-  /// in WP interpolation)
-  /// Second argument is 0 means instruction is not dependent to any target
-  /// Second argument is 1 means instruction is dependent to a target
-  /// Second argument is 2 means negation of the instruction is dependent to a
-  /// target
-  std::vector<std::pair<KInstruction *, int> > reverseInstructionList;
-
   uint64_t nodeSequenceNumber;
 
   bool storable;
@@ -544,6 +536,14 @@ public:
   llvm::BranchInst *speculationBInst;
   llvm::Instruction *secondCheckInst;
   void mark();
+
+  /// \brief List of the instructions in the node in a reverse order (used only
+  /// in WP interpolation)
+  /// Second argument is 0 means instruction is not dependent to any target
+  /// Second argument is 1 means instruction is dependent to a target
+  /// Second argument is 2 means negation of the instruction is dependent to a
+  /// target
+  std::vector<std::pair<KInstruction *, int> > reverseInstructionList;
 
   /// \brief The entry call history
   std::vector<llvm::Instruction *> entryCallHistory;

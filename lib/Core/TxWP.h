@@ -147,6 +147,8 @@ public:
   // first the offset is computed.
   ref<Expr> generateExprFromOperand(llvm::Value *val, ref<Expr> offset = NULL);
 
+  bool inFunction(llvm::Instruction *ins, llvm::Function *function);
+
 private:
   ref<Expr> getCondition(llvm::Value *value);
 
@@ -162,7 +164,7 @@ private:
   ref<Expr> getFunctionArgument(llvm::Argument *arg);
 
   // \brief Handling Pointer LLVM Value
-  ref<Expr> getPointer(llvm::LoadInst *p);
+  std::pair<ref<Expr>, ref<Expr> > getPointer(llvm::GetElementPtrInst *gep);
 
   // \brief Handling Load GEP LLVM Value
   ref<Expr> getLoadGep(llvm::LoadInst *p);
@@ -205,6 +207,9 @@ private:
 
   // \brief Retrieving Function Argument size
   unsigned int getFunctionArgumentSize(llvm::Argument *arg);
+
+  // \brief Retrieving GEP size
+  unsigned int getGepSize(llvm::Type *ty);
 };
 }
 #endif /* TXWP_H_ */
