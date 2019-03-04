@@ -22,14 +22,281 @@ void Z3Simplification::test() {
   std::cout << "End test!\n";
 }
 
-ref<Expr> Z3Simplification::simplify(ref<Expr> expr) {
+ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
   z3::context c;
   std::map<std::string, ref<Expr> > emap;
-  z3::expr z3expr = txExpr2z3Expr(c, expr, emap);
-  z3expr = applyTactic(c, "simplify", z3expr);
-  z3expr = applyTactic(c, "ctx-solver-simplify", z3expr);
-  ref<Expr> ret = z3Expr2TxExpr(z3expr, emap);
-  return ret;
+  z3::expr z3e = c.bool_val(false);
+  bool succ = txExpr2z3Expr(z3e, c, txe, emap);
+  if (succ) {
+    z3e = applyTactic(c, "simplify", z3e);
+    z3e = applyTactic(c, "ctx-solver-simplify", z3e);
+    ref<Expr> ret = z3Expr2TxExpr(z3e, emap);
+    return ret;
+  }
+  return txe;
+}
+
+bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
+                                     ref<Expr> txe,
+                                     std::map<std::string, ref<Expr> > &emap) {
+  if (isaVar(txe)) {
+    std::string name = extractVarName(txe);
+    unsigned int size = txe->getWidth();
+    emap.insert(std::pair<std::string, ref<Expr> >(name, txe));
+    switch (size) {
+    case Expr::Bool:
+    case Expr::Int8: {
+      z3e = c.bool_const(name.c_str());
+      return true;
+    }
+    case Expr::Int16:
+    case Expr::Int32:
+    case Expr::Int64: {
+      z3e = c.int_const(name.c_str());
+      return true;
+    }
+    default: {
+      txe->dump();
+      klee_error(
+          "Z3Simplification::txExpr2z3Expr does not support for this type!");
+      return false;
+    }
+    }
+  }
+
+  switch (txe->getKind()) {
+  case Expr::Constant: {
+    unsigned int val = dyn_cast<ConstantExpr>(txe)->getZExtValue();
+    unsigned int size = txe->getWidth();
+    switch (size) {
+    case Expr::Bool:
+    case Expr::Int8: {
+      if (val == 0) {
+        z3e = c.bool_val(false);
+      } else {
+        z3e = c.bool_val(true);
+      }
+      return true;
+    }
+    case Expr::Int16:
+    case Expr::Int32:
+    case Expr::Int64: {
+      z3e = c.int_val(val);
+      return true;
+    }
+    default: {
+      txe->dump();
+      return false;
+    }
+    }
+    break;
+  }
+
+  case Expr::Not: {
+    z3::expr t = c.bool_val(false);
+    bool r = txExpr2z3Expr(t, c, txe->getKid(0), emap);
+    if (r) {
+      z3e = not(t);
+      return true;
+    }
+    return false;
+  }
+  case Expr::Eq: {
+    z3::expr t1 = c.bool_val(false);
+    bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+    if (r1) {
+      z3::expr t2 = c.bool_val(false);
+      bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if (r2) {
+        z3e = (t1 == t2);
+        return true;
+      }
+    }
+    return false;
+  }
+  case Expr::Ne: {
+    z3::expr t1 = c.bool_val(false);
+    bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+    if (r1) {
+      z3::expr t2 = c.bool_val(false);
+      bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if (r2) {
+        z3e = (t1 != t2);
+        return true;
+      }
+    }
+    return false;
+  }
+  case Expr::Ult:
+  case Expr::Slt: {
+    z3::expr t1 = c.bool_val(false);
+    bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+    if (r1) {
+      z3::expr t2 = c.bool_val(false);
+      bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if (r2) {
+        z3e = (t1 < t2);
+        return true;
+      }
+    }
+    return false;
+  }
+  case Expr::Ule:
+  case Expr::Sle: {
+    z3::expr t1 = c.bool_val(false);
+    bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+    if (r1) {
+      z3::expr t2 = c.bool_val(false);
+      bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if (r2) {
+        z3e = (t1 <= t2);
+        return true;
+      }
+    }
+    return false;
+  }
+  case Expr::Ugt:
+  case Expr::Sgt: {
+    z3::expr t1 = c.bool_val(false);
+    bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+    if (r1) {
+      z3::expr t2 = c.bool_val(false);
+      bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if (r2) {
+        z3e = (t1 > t2);
+        return true;
+      }
+    }
+    return false;
+  }
+  case Expr::Uge:
+  case Expr::Sge: {
+    z3::expr t1 = c.bool_val(false);
+    bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+    if (r1) {
+      z3::expr t2 = c.bool_val(false);
+      bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if (r2) {
+        z3e = (t1 >= t2);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  case Expr::Add: {
+    z3::expr t1 = c.bool_val(false);
+    bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+    if (r1) {
+      z3::expr t2 = c.bool_val(false);
+      bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if (r2) {
+        z3e = (t1 + t2);
+        return true;
+      }
+    }
+    return false;
+  }
+  case Expr::Sub: {
+    z3::expr t1 = c.bool_val(false);
+    bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+    if (r1) {
+      z3::expr t2 = c.bool_val(false);
+      bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if (r2) {
+        z3e = (t1 - t2);
+        return true;
+      }
+    }
+    return false;
+  }
+  case Expr::Mul: {
+    z3::expr t1 = c.bool_val(false);
+    bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+    if (r1) {
+      z3::expr t2 = c.bool_val(false);
+      bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if (r2) {
+        z3e = (t1 * t2);
+        return true;
+      }
+    }
+    return false;
+  }
+  case Expr::UDiv:
+  case Expr::SDiv: {
+    z3::expr t1 = c.bool_val(false);
+    bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+    if (r1) {
+      z3::expr t2 = c.bool_val(false);
+      bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if (r2) {
+        z3e = (t1 / t2);
+        return true;
+      }
+    }
+    return false;
+  }
+  case Expr::URem:
+  case Expr::SRem: {
+    z3::expr t1 = c.bool_val(false);
+    bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+    if (r1) {
+      z3::expr t2 = c.bool_val(false);
+      bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if (r2) {
+        z3e = rem(t1, t2);
+        return true;
+      }
+    }
+    return false;
+  }
+  case Expr::And: {
+    z3::expr t1 = c.bool_val(false);
+    bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+    if (r1) {
+      z3::expr t2 = c.bool_val(false);
+      bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if (r2) {
+        z3e = (t1 && t2);
+        return true;
+      }
+    }
+    return false;
+  }
+  case Expr::Or: {
+    z3::expr t1 = c.bool_val(false);
+    bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+    if (r1) {
+      z3::expr t2 = c.bool_val(false);
+      bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if (r2) {
+        z3e = (t1 || t2);
+        return true;
+      }
+    }
+    return false;
+  }
+  case Expr::Xor: {
+    z3::expr t1 = c.bool_val(false);
+    bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+    if (r1) {
+      z3::expr t2 = c.bool_val(false);
+      bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if (r2) {
+        z3e = not(not(t2) && not(t1));
+        return true;
+      }
+    }
+    return false;
+  }
+
+  default: {
+    // Sanity check
+    //    klee_warning("Cannot convert to z3 with type: %d", txe->getKind());
+    return false;
+  }
+  }
 }
 
 ref<Expr>
@@ -166,146 +433,6 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
   return ret;
 }
 
-z3::expr
-Z3Simplification::txExpr2z3Expr(z3::context &c, ref<Expr> expr,
-                                std::map<std::string, ref<Expr> > &emap) {
-  if (isaVar(expr)) {
-    std::string name = extractVarName(expr);
-    unsigned int size = expr->getWidth();
-    emap.insert(std::pair<std::string, ref<Expr> >(name, expr));
-    switch (size) {
-    case Expr::Bool:
-      return c.bool_const(name.c_str());
-    case Expr::Int8:
-    case Expr::Int16:
-    case Expr::Int32:
-    case Expr::Int64: { return c.int_const(name.c_str()); }
-    default: {
-      expr->dump();
-      klee_error(
-          "Z3Simplification::txExpr2z3Expr does not support for this type!");
-    }
-    }
-  }
-
-  switch (expr->getKind()) {
-  case Expr::Constant: {
-    unsigned int val = dyn_cast<ConstantExpr>(expr)->getZExtValue();
-    unsigned int size = expr->getWidth();
-    switch (size) {
-    case Expr::Bool:
-    case Expr::Int8: {
-      if (val == 0) {
-        return c.bool_val(false);
-      } else {
-        return c.bool_val(true);
-      }
-    }
-    case Expr::Int16:
-    case Expr::Int32:
-    case Expr::Int64: { return c.int_val(val); }
-    default: {
-      expr->dump();
-      klee_error("Control should not reach here: "
-                 "Z3Simplification::txExpr2z3Expr:Expr::Constant!");
-    }
-    }
-    break;
-  }
-  case Expr::ZExt:
-  case Expr::SExt: { return txExpr2z3Expr(c, expr->getKid(0), emap); }
-  case Expr::Not: { return not(txExpr2z3Expr(c, expr->getKid(0), emap)); }
-  case Expr::Eq: {
-    z3::expr l = txExpr2z3Expr(c, expr->getKid(0), emap);
-    z3::expr r = txExpr2z3Expr(c, expr->getKid(1), emap);
-    //    expr->getKid(0)->dump();
-    //    std::cout << "Size = " << expr->getKid(0)->getWidth() << "\n";
-    //    std::cout << l << "\n";
-    //    expr->getKid(1)->dump();
-    //    std::cout << "Size = " << expr->getKid(1)->getWidth() << "\n";
-    //    std::cout << r << "\n";
-    return l == r;
-  }
-  case Expr::Ne: {
-    return (txExpr2z3Expr(c, expr->getKid(0), emap) !=
-            txExpr2z3Expr(c, expr->getKid(1), emap));
-  }
-  case Expr::Ult:
-  case Expr::Slt: {
-    return (txExpr2z3Expr(c, expr->getKid(0), emap) <
-            txExpr2z3Expr(c, expr->getKid(1), emap));
-  }
-  case Expr::Ule:
-  case Expr::Sle: {
-    return (txExpr2z3Expr(c, expr->getKid(0), emap) <=
-            txExpr2z3Expr(c, expr->getKid(1), emap));
-  }
-  case Expr::Ugt:
-  case Expr::Sgt: {
-    return (txExpr2z3Expr(c, expr->getKid(0), emap) >
-            txExpr2z3Expr(c, expr->getKid(1), emap));
-  }
-  case Expr::Uge:
-  case Expr::Sge: {
-    return (txExpr2z3Expr(c, expr->getKid(0), emap) >=
-            txExpr2z3Expr(c, expr->getKid(1), emap));
-  }
-
-  case Expr::Add: {
-    return (txExpr2z3Expr(c, expr->getKid(0), emap) +
-            txExpr2z3Expr(c, expr->getKid(1), emap));
-  }
-  case Expr::Sub: {
-    return (txExpr2z3Expr(c, expr->getKid(0), emap) -
-            txExpr2z3Expr(c, expr->getKid(1), emap));
-  }
-  case Expr::Mul: {
-    return (txExpr2z3Expr(c, expr->getKid(0), emap) *
-            txExpr2z3Expr(c, expr->getKid(1), emap));
-  }
-  case Expr::UDiv:
-  case Expr::SDiv: {
-    return (txExpr2z3Expr(c, expr->getKid(0), emap) /
-            txExpr2z3Expr(c, expr->getKid(1), emap));
-  }
-  case Expr::URem:
-  case Expr::SRem: {
-    return rem(txExpr2z3Expr(c, expr->getKid(0), emap),
-               txExpr2z3Expr(c, expr->getKid(1), emap));
-  }
-  case Expr::And: {
-    return (txExpr2z3Expr(c, expr->getKid(0), emap) &&
-            txExpr2z3Expr(c, expr->getKid(1), emap));
-  }
-  case Expr::Or: {
-    return (txExpr2z3Expr(c, expr->getKid(0), emap) ||
-            txExpr2z3Expr(c, expr->getKid(1), emap));
-  }
-  case Expr::Xor: {
-    z3::expr l = txExpr2z3Expr(c, expr->getKid(0), emap);
-    z3::expr r = txExpr2z3Expr(c, expr->getKid(1), emap);
-    z3::expr ret = not(not(l) && not(r));
-    return ret;
-  }
-
-  case Expr::Shl:
-  case Expr::LShr:
-  case Expr::AShr:
-  case Expr::NotOptimized:
-  case Expr::Extract: { return txExpr2z3Expr(c, expr->getKid(0), emap); }
-  default: {
-    // Sanity check
-    expr->dump();
-    llvm::outs() << expr->getKind() << "\n";
-    klee_error("Control should not reach here: "
-               "Z3Simplification::txExpr2z3Expr:default case!");
-  }
-  }
-  klee_error("Control should not reach here: "
-             "Z3Simplification::txExpr2z3Expr: not in switch!");
-  return c.int_val(0);
-}
-
 z3::expr Z3Simplification::applyTactic(z3::context &c, std::string tactic,
                                        z3::expr e) {
   z3::goal g(c);
@@ -333,10 +460,6 @@ bool Z3Simplification::isaVar(ref<Expr> e) {
       return false;
     }
   }
-  //  case Expr::ZExt:
-  //  case Expr::SExt: {
-  //    return isaVar(e->getKid(0));
-  //  }
   default:
     return false;
   }
@@ -351,10 +474,6 @@ std::string Z3Simplification::extractVarName(ref<Expr> e) {
     return dyn_cast<ReadExpr>(e)->getName();
   case Expr::Concat:
     return dyn_cast<ReadExpr>(e->getKid(0))->getName();
-  //  case Expr::ZExt:
-  //  case Expr::SExt: {
-  //    return extractVarName(e->getKid(0));
-  //  }
   default:
     return "";
   }
