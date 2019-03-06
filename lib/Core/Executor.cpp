@@ -1414,6 +1414,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
                           current.txTreeNode->getProgramPoint()) !=
                       current.txTreeNode->visitedProgramPoints->end());
   if (isPPVisited) {
+	klee_warning("SPECULATION_FAIL: Program point %lu is revisted!", current.txTreeNode->getProgramPoint());
     speculativeBackJump(current);
     return StatePair(0, 0);
   }
