@@ -1677,7 +1677,6 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         //        WPExpr->dump();
         //        llvm::outs() << "------\n";
         WPExpr = Z3Simplification::simplify(WPExpr);
-        //        Z3Simplification::test();
         //        WPExpr->dump();
         //        llvm::outs() << "******* End Flag = 0 *******\n";
       }
@@ -2165,8 +2164,38 @@ ref<Expr> TxWeakestPreCondition::getPhiInst(llvm::PHINode *phi) {
 }
 
 ref<Expr> TxWeakestPreCondition::getCallInst(llvm::CallInst *ci) {
-  ref<Expr> result;
   klee_warning("PUSHUP13: getCallInst");
+  llvm::Function *function = ci->getCalledFunction();
+
+  // TODO: get the correct return value from function
+  llvm::Instruction *ret = 0;
+  for (std::vector<std::pair<KInstruction *, int> >::reverse_iterator
+           it = this->node->reverseInstructionList.rbegin(),
+           ie = this->node->reverseInstructionList.rend();
+       it != ie; ++it) {
+    if (isa<llvm::ReturnInst>(it->first->inst) &&
+        inFunction(it->first->inst, function)) {
+      ret = it->first->inst;
+    }
+  }
+  assert(ret && "Return instruction is null!");
+  ref<Expr> result = this->generateExprFromOperand(ret->getOperand(0));
+  result->dump();
+  return result;
+}
+
+bool TxWeakestPreCondition::inFunction(llvm::Instruction *ins,
+                                       llvm::Function *function) {
+  bool result = false;
+  for (llvm::Function::iterator bbit = function->begin(),
+                                bbie = function->end();
+       bbit != bbie; ++bbit) {
+    for (llvm::BasicBlock::iterator it = bbit->begin(), ie = bbit->end();
+         it != ie; ++it) {
+      if (ins == it)
+        return true;
+    }
+  }
   return result;
 }
 

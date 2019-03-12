@@ -151,6 +151,8 @@ public:
   // first the offset is computed.
   ref<Expr> generateExprFromOperand(llvm::Value *val, ref<Expr> offset = NULL);
 
+  bool inFunction(llvm::Instruction *ins, llvm::Function *function);
+
 private:
   ref<Expr> getCondition(llvm::Value *value);
 
