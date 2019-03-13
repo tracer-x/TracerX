@@ -1011,6 +1011,19 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     return speculationFork(current, condition, isInternal);
   }
 
+  // fork on a non-speculation node
+  // turn off speculation flag for successful case
+  if (isSpecution) {
+    time_t now = time(0);
+    double diff;
+    diff = now - specStartingTime;
+    std::ostringstream ss;
+    ss.precision(2);
+    ss << std::fixed << diff;
+    llvm::outs() << "Time for SUCCESSFUL speculation: " << ss.str() << "\n";
+    isSpecution = false;
+  }
+
   Solver::Validity res;
   std::map<ExecutionState *, std::vector<SeedInfo> >::iterator it =
       seedMap.find(&current);
@@ -1405,6 +1418,11 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
 Executor::StatePair Executor::speculationFork(ExecutionState &current,
                                               ref<Expr> condition,
                                               bool isInternal) {
+  if (!isSpecution) {
+    isSpecution = true;
+    specStartingTime = time(0);
+  }
+
   klee_warning("Speculation node");
   // Checking not revisiting the same program point twice (should fail since
   // speculation wouldn't be linear then)
@@ -1414,7 +1432,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
                           current.txTreeNode->getProgramPoint()) !=
                       current.txTreeNode->visitedProgramPoints->end());
   if (isPPVisited) {
-	klee_warning("SPECULATION_FAIL: Program point %lu is revisted!", current.txTreeNode->getProgramPoint());
+    klee_warning("SPECULATION_FAIL: Program point %lu is revisted!",
+                 current.txTreeNode->getProgramPoint());
     speculativeBackJump(current);
     return StatePair(0, 0);
   }
@@ -1582,6 +1601,17 @@ void Executor::speculativeBackJump(ExecutionState &current) {
   //  llvm::outs() << "Remaining states in worklist 2 = "
   //               << searcher->getStates().size() << "\n";
   //  llvm::outs() << "Remaining addedStates = " << addedStates.size() << "\n";
+
+  if (isSpecution) {
+    time_t now = time(0);
+    double diff;
+    diff = now - specStartingTime;
+    std::ostringstream ss;
+    ss.precision(2);
+    ss << std::fixed << diff;
+    llvm::outs() << "Time for FAIL speculation: " << ss.str() << "\n";
+    isSpecution = false;
+  }
 }
 
 std::vector<TxTreeNode *> Executor::collectSpeculationNodes(TxTreeNode *root) {
@@ -3730,6 +3760,8 @@ void Executor::doDumpStates() {
 }
 
 void Executor::run(ExecutionState &initialState) {
+
+  isSpecution = false;
 
   bindModuleConstants();
 
