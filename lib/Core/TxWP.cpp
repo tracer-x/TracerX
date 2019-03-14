@@ -2164,10 +2164,13 @@ ref<Expr> TxWeakestPreCondition::getPhiInst(llvm::PHINode *phi) {
 }
 
 ref<Expr> TxWeakestPreCondition::getCallInst(llvm::CallInst *ci) {
-  klee_warning("PUSHUP13: getCallInst");
   llvm::Function *function = ci->getCalledFunction();
 
-  // TODO: get the correct return value from function
+  // TODO: This loop can further be optimized if we had access to the
+  // iterator pointing to the call instruction. That way, we could
+  // find the respective return instruction much faster. The iterator
+  // can be accessed from the pushup function. We leave this optimization
+  // as future work.
   llvm::Instruction *ret = 0;
   for (std::vector<std::pair<KInstruction *, int> >::reverse_iterator
            it = this->node->reverseInstructionList.rbegin(),
@@ -2180,7 +2183,6 @@ ref<Expr> TxWeakestPreCondition::getCallInst(llvm::CallInst *ci) {
   }
   assert(ret && "Return instruction is null!");
   ref<Expr> result = this->generateExprFromOperand(ret->getOperand(0));
-  result->dump();
   return result;
 }
 
