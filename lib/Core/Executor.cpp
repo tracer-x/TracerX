@@ -1013,15 +1013,11 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
   // fork on a non-speculation node
   // turn off speculation flag for successful case
-  if (isSpecution) {
+  if (isSpeculation) {
     time_t now = time(0);
-    double diff;
-    diff = now - specStartingTime;
-    std::ostringstream ss;
-    ss.precision(2);
-    ss << std::fixed << diff;
-    llvm::outs() << "Time for SUCCESSFUL speculation: " << ss.str() << "\n";
-    isSpecution = false;
+    specTime = specTime + (now - specStartingTime);
+    isSpeculation = false;
+    specSuccessCount++;
   }
 
   Solver::Validity res;
@@ -1418,8 +1414,8 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
 Executor::StatePair Executor::speculationFork(ExecutionState &current,
                                               ref<Expr> condition,
                                               bool isInternal) {
-  if (!isSpecution) {
-    isSpecution = true;
+  if (!isSpeculation) {
+    isSpeculation = true;
     specStartingTime = time(0);
   }
 
@@ -1602,15 +1598,11 @@ void Executor::speculativeBackJump(ExecutionState &current) {
   //               << searcher->getStates().size() << "\n";
   //  llvm::outs() << "Remaining addedStates = " << addedStates.size() << "\n";
 
-  if (isSpecution) {
+  if (isSpeculation) {
     time_t now = time(0);
-    double diff;
-    diff = now - specStartingTime;
-    std::ostringstream ss;
-    ss.precision(2);
-    ss << std::fixed << diff;
-    llvm::outs() << "Time for FAIL speculation: " << ss.str() << "\n";
-    isSpecution = false;
+    specTime = specTime + (now - specStartingTime);
+    isSpeculation = false;
+    specFailCount++;
   }
 }
 
@@ -3761,7 +3753,9 @@ void Executor::doDumpStates() {
 
 void Executor::run(ExecutionState &initialState) {
 
-  isSpecution = false;
+  isSpeculation = false;
+  specSuccessCount = 0;
+  specFailCount = 0;
 
   bindModuleConstants();
 
@@ -4872,6 +4866,17 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     interpreterHandler->assignSubsumptionStats(TxTree::getInterpolationStat());
 #endif
   }
+
+  std::string outSpecFile =
+          interpreterHandler->getOutputFilename("spec.txt");
+  std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
+  std::ostringstream ss;
+  ss.precision(2);
+  ss << std::fixed << specTime;
+  outSpec << "Time for Speculation: " << ss.str() << "\n";
+  outSpec << "Total Speculation Success: " << specSuccessCount << "\n";
+  outSpec << "Total Speculation Failures: " << specFailCount << "\n";
+
   if (BBCoverage >= 1) {
     llvm::errs()
         << "************Basic Block Coverage Report Starts****************"

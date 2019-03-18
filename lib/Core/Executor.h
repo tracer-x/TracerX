@@ -96,8 +96,11 @@ public:
   std::set<llvm::BasicBlock *> visitedBlocks;
   float blockCoverage;
 
-  bool isSpecution;
+  bool isSpeculation;
   time_t specStartingTime;
+  double specTime;
+  unsigned int specSuccessCount;
+  unsigned int specFailCount;
 
   class Timer {
   public:
