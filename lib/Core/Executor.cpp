@@ -4867,6 +4867,9 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 #endif
   }
 
+
+  if(Speculation)
+  {
   std::string outSpecFile =
           interpreterHandler->getOutputFilename("spec.txt");
   std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
@@ -4876,6 +4879,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
   outSpec << "Time for Speculation: " << ss.str() << "\n";
   outSpec << "Total Speculation Success: " << specSuccessCount << "\n";
   outSpec << "Total Speculation Failures: " << specFailCount << "\n";
+  }
 
   if (BBCoverage >= 1) {
     llvm::errs()
