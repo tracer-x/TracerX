@@ -1005,7 +1005,8 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
 }
 
 Executor::StatePair Executor::branchFork(ExecutionState &current,
-                                         ref<Expr> condition, bool isInternal) {
+                                    ref<Expr> condition, bool isInternal) {
+
   // The current node is in the speculation node
   if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode()) {
     return speculationFork(current, condition, isInternal);
@@ -3756,6 +3757,7 @@ void Executor::run(ExecutionState &initialState) {
   isSpeculation = false;
   specSuccessCount = 0;
   specFailCount = 0;
+  specTime = 0;
 
   bindModuleConstants();
 
