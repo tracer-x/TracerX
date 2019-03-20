@@ -3258,8 +3258,7 @@ void Executor::run(ExecutionState &initialState) {
       }
     }
 #endif
-
-    if (INTERPOLATION_ENABLED &&
+    if (INTERPOLATION_ENABLED && !isa<llvm::PHINode>(state.pc->inst) &&
         txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
       terminateStateOnSubsumption(state);
     } else {
