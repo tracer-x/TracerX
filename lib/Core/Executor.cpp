@@ -1479,6 +1479,9 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         current.pathOS << "1";
       }
     }
+
+    txTree->markPathCondition(current, unsatCore);
+
     return StatePair(&current, 0);
   } else if (res == Solver::False) {
     if (!isInternal) {
@@ -1486,6 +1489,9 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         current.pathOS << "0";
       }
     }
+
+    txTree->markPathCondition(current, unsatCore);
+
     return StatePair(0, &current);
   } else {
     TimerStatIncrementer timer(stats::forkTime);
@@ -4867,8 +4873,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 #endif
   }
 
-  std::string outSpecFile =
-          interpreterHandler->getOutputFilename("spec.txt");
+  std::string outSpecFile = interpreterHandler->getOutputFilename("spec.txt");
   std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
   std::ostringstream ss;
   ss.precision(2);
