@@ -1429,8 +1429,19 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
                           current.txTreeNode->getProgramPoint()) !=
                       current.txTreeNode->visitedProgramPoints->end());
   if (isPPVisited) {
-    klee_warning("SPECULATION_FAIL: Program point %lu is revisted!",
-                 current.txTreeNode->getProgramPoint());
+
+    // check interpolation at is program point
+    bool hasInterpolation = TxSubsumptionTable::hasInterpolation(current);
+
+    if (hasInterpolation) {
+      klee_warning("SPECULATION_FAIL: Program point %lu is revisted - EXISTS "
+                   "INTERPOLATION!",
+                   current.txTreeNode->getProgramPoint());
+    } else {
+      klee_warning(
+          "SPECULATION_FAIL: Program point %lu is revisted - NO INTERPOLATION!",
+          current.txTreeNode->getProgramPoint());
+    }
     speculativeBackJump(current);
     return StatePair(0, 0);
   }

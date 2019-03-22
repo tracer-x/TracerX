@@ -1858,6 +1858,28 @@ bool TxSubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
   return false;
 }
 
+bool TxSubsumptionTable::hasInterpolation(ExecutionState &state) {
+
+  CallHistoryIndexedTable *subTable = 0;
+  TxTreeNode *txTreeNode = state.txTreeNode;
+
+  std::map<uintptr_t, CallHistoryIndexedTable *>::iterator it =
+      instance.find(state.txTreeNode->getProgramPoint());
+  if (it == instance.end()) {
+    return false;
+  }
+  subTable = it->second;
+
+  bool found;
+  std::pair<EntryIterator, EntryIterator> iterPair =
+      subTable->find(txTreeNode->entryCallHistory, found);
+  if (!found) {
+    return false;
+  }
+
+  return true;
+}
+
 void TxSubsumptionTable::clear() {
   for (std::map<uintptr_t, CallHistoryIndexedTable *>::iterator
            it = instance.begin(),

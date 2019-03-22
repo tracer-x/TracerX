@@ -109,6 +109,8 @@ public:
   static bool check(TimingSolver *solver, ExecutionState &state, double timeout,
                     int debugSubsumptionLevel);
 
+  static bool hasInterpolation(ExecutionState &state);
+
   static void clear();
 
   static void print(llvm::raw_ostream &stream) {
