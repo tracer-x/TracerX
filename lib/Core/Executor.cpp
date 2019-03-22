@@ -1006,6 +1006,7 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
 
 Executor::StatePair Executor::branchFork(ExecutionState &current,
                                          ref<Expr> condition, bool isInternal) {
+
   // The current node is in the speculation node
   if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode()) {
     return speculationFork(current, condition, isInternal);
@@ -3762,6 +3763,7 @@ void Executor::run(ExecutionState &initialState) {
   isSpeculation = false;
   specSuccessCount = 0;
   specFailCount = 0;
+  specTime = 0;
 
   bindModuleConstants();
 
@@ -3892,7 +3894,7 @@ void Executor::run(ExecutionState &initialState) {
     }
 #endif
 
-    if (INTERPOLATION_ENABLED &&
+    if (INTERPOLATION_ENABLED && !isa<llvm::PHINode>(state.pc->inst) &&
         txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
       terminateStateOnSubsumption(state);
     } else {
@@ -4873,14 +4875,16 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 #endif
   }
 
-  std::string outSpecFile = interpreterHandler->getOutputFilename("spec.txt");
-  std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
-  std::ostringstream ss;
-  ss.precision(2);
-  ss << std::fixed << specTime;
-  outSpec << "Time for Speculation: " << ss.str() << "\n";
-  outSpec << "Total Speculation Success: " << specSuccessCount << "\n";
-  outSpec << "Total Speculation Failures: " << specFailCount << "\n";
+  if (Speculation) {
+    std::string outSpecFile = interpreterHandler->getOutputFilename("spec.txt");
+    std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
+    std::ostringstream ss;
+    ss.precision(2);
+    ss << std::fixed << specTime;
+    outSpec << "Time for Speculation: " << ss.str() << "\n";
+    outSpec << "Total Speculation Success: " << specSuccessCount << "\n";
+    outSpec << "Total Speculation Failures: " << specFailCount << "\n";
+  }
 
   if (BBCoverage >= 1) {
     llvm::errs()
