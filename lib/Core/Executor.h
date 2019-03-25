@@ -101,6 +101,8 @@ public:
   double specTime;
   unsigned int specSuccessCount;
   unsigned int specFailCount;
+  unsigned int specFailRevisted;
+  unsigned int specFailRevistedWithNoInterpolation;
 
   class Timer {
   public:

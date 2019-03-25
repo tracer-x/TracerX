@@ -1429,7 +1429,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
                           current.txTreeNode->getProgramPoint()) !=
                       current.txTreeNode->visitedProgramPoints->end());
   if (isPPVisited) {
-
+    specFailRevisted++;
     // check interpolation at is program point
     bool hasInterpolation = TxSubsumptionTable::hasInterpolation(current);
 
@@ -1438,6 +1438,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
                    "INTERPOLATION!",
                    current.txTreeNode->getProgramPoint());
     } else {
+      specFailRevistedWithNoInterpolation++;
       klee_warning(
           "SPECULATION_FAIL: Program point %lu is revisted - NO INTERPOLATION!",
           current.txTreeNode->getProgramPoint());
@@ -3775,6 +3776,8 @@ void Executor::run(ExecutionState &initialState) {
   specSuccessCount = 0;
   specFailCount = 0;
   specTime = 0;
+  specFailRevisted = 0;
+  specFailRevistedWithNoInterpolation = 0;
 
   bindModuleConstants();
 
@@ -4895,6 +4898,11 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     outSpec << "Time for Speculation: " << ss.str() << "\n";
     outSpec << "Total Speculation Success: " << specSuccessCount << "\n";
     outSpec << "Total Speculation Failures: " << specFailCount << "\n";
+    outSpec << "Total Speculation Revisited Failures: " << specFailRevisted
+            << "\n";
+    outSpec
+        << "Total Speculation Revisited Failures Without Any Interpolation: "
+        << specFailRevistedWithNoInterpolation << "\n";
   }
 
   if (BBCoverage >= 1) {
