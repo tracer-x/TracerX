@@ -1716,7 +1716,9 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
     if (isa<llvm::ConstantExpr>(inst->getOperand(0))) {
       ret = getLoadGep(inst);
     } else if (isa<llvm::GetElementPtrInst>(inst->getOperand(0))) {
-      ret = getPointer(inst);
+      llvm::GetElementPtrInst *parentGEP =
+          dyn_cast<llvm::GetElementPtrInst>(inst->getOperand(0));
+      std::pair<ref<Expr>, ref<Expr> > pair = getPointer(parentGEP);
     } else {
       ret = getLoad(inst);
     }
@@ -1842,26 +1844,30 @@ ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
   return result;
 }
 
-ref<Expr> TxWeakestPreCondition::getPointer(llvm::LoadInst *p) {
-  ref<Expr> result;
-  /*p->dump();
-  llvm::GetElementPtrInst *gep =
-  dyn_cast<llvm::GetElementPtrInst>(p->getOperand(0));
-  gep->dump();
-  gep->getOperand(0)->dump();
-  gep->getOperand(2)->dump();
-  ref<Expr> offset = this->generateExprFromOperand(gep->getOperand(2));
-  result = this->generateExprFromOperand(gep->getOperand(0));
-  offset->dump();
-  result->dump();*/
-
-  //  width = getAllocaInstSize(ge);
-  //  index = ConstantExpr::create(0, width);
-  //  result =
-  //      WPVarExpr::create(p->getOperand(0), p->getOperand(0)->getName(),
-  //      index);
-  klee_warning("PUSHUP5");
-  return result;
+std::pair<ref<Expr>, ref<Expr> >
+TxWeakestPreCondition::getPointer(llvm::GetElementPtrInst *gep) {
+  std::pair<ref<Expr>, ref<Expr> > pair;
+  if (isa<llvm::GetElementPtrInst>(gep->getOperand(0))) {
+    llvm::GetElementPtrInst *parentGEP =
+        dyn_cast<llvm::GetElementPtrInst>(gep->getOperand(0));
+    std::pair<ref<Expr>, ref<Expr> > parentPair = getPointer(parentGEP);
+    ref<Expr> offset = this->generateExprFromOperand(gep->getOperand(2));
+    unsigned width = getGepSize(gep->getType());
+    llvm::PointerType *pt =
+        dyn_cast<llvm::PointerType>(gep->getOperand(0)->getType());
+    llvm::ArrayType *at = dyn_cast<llvm::ArrayType>(pt->getElementType());
+    ref<Expr> size = ConstantExpr::create(at->getNumElements(), width);
+    pair.first = AddExpr::create(
+        MulExpr::create(parentPair.first->getKid(0), size), offset->getKid(0));
+    ref<Expr> kids[1];
+    kids[0] = pair.first;
+    pair.first = offset->rebuild(kids);
+    pair.second = parentPair.second;
+  } else {
+    pair.first = this->generateExprFromOperand(gep->getOperand(2));
+    pair.second = this->generateExprFromOperand(gep->getOperand(0));
+  }
+  return pair;
 }
 
 ref<Expr> TxWeakestPreCondition::getLoadGep(llvm::LoadInst *p) {
@@ -2270,6 +2276,28 @@ TxWeakestPreCondition::getFunctionArgumentSize(llvm::Argument *arg) {
   } else {
     arg->dump();
     arg->getType()->dump();
+    klee_error(
+        "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
+        "defined for this type yet");
+  }
+  return size;
+}
+
+unsigned int TxWeakestPreCondition::getGepSize(llvm::Type *ty) {
+  unsigned int size;
+
+  if (ty->isIntegerTy(1)) {
+    size = Expr::Bool;
+  } else if (ty->isIntegerTy(8)) {
+    size = Expr::Int8;
+  } else if (ty->isIntegerTy(16)) {
+    size = Expr::Int16;
+  } else if (ty->isIntegerTy(32)) {
+    size = Expr::Int32;
+  } else if (ty->isPointerTy()) {
+    size = getGepSize(ty->getPointerElementType());
+  } else {
+    ty->dump();
     klee_error(
         "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
         "defined for this type yet");
