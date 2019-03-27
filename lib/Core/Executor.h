@@ -101,8 +101,8 @@ public:
   double specTime;
   unsigned int specSuccessCount;
   unsigned int specFailCount;
-  unsigned int specFailRevisted;
-  unsigned int specFailRevistedWithNoInterpolation;
+  std::map<uintptr_t, unsigned int> specRevisted;
+  std::map<uintptr_t, unsigned int> specRevistedNoInter;
 
   class Timer {
   public:
@@ -333,6 +333,7 @@ private:
                                bool isInternal, bool falseBranchIsInfeasible);
 
   void speculativeBackJump(ExecutionState &current);
+  bool checkSpeculation(ExecutionState &current);
 
   std::vector<TxTreeNode *> collectSpeculationNodes(TxTreeNode *);
 

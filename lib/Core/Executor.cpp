@@ -1188,19 +1188,25 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
-      llvm::BranchInst *binst =
-          llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
-      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-      return addSpeculationNode(current, condition, isInternal, true);
+      bool sp = checkSpeculation(current);
+      if (sp) {
+        llvm::BranchInst *binst =
+            llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        return addSpeculationNode(current, condition, isInternal, true);
+      } else {
+        txTree->markPathCondition(current, unsatCore);
+        return StatePair(&current, 0);
+      }
 
     } else if (INTERPOLATION_ENABLED) {
       // Validity proof succeeded of a query: antecedent -> consequent.
       // We then extract the unsatisfiability core of antecedent and not
       // consequent as the Craig interpolant.
       txTree->markPathCondition(current, unsatCore);
+      return StatePair(&current, 0);
     }
 
-    return StatePair(&current, 0);
   } else if (res == Solver::False) {
     if (!isInternal) {
       if (pathWriter) {
@@ -1213,20 +1219,23 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
-      llvm::BranchInst *binst =
-          llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
-      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-
-      return addSpeculationNode(current, condition, isInternal, false);
-
+      bool sp = checkSpeculation(current);
+      if (sp) {
+        llvm::BranchInst *binst =
+            llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        return addSpeculationNode(current, condition, isInternal, false);
+      } else {
+        txTree->markPathCondition(current, unsatCore);
+        return StatePair(0, &current);
+      }
     } else if (INTERPOLATION_ENABLED) {
       // Falsity proof succeeded of a query: antecedent -> consequent,
       // which means that antecedent -> not(consequent) is valid. In this
       // case also we extract the unsat core of the proof
       txTree->markPathCondition(current, unsatCore);
+      return StatePair(0, &current);
     }
-
-    return StatePair(0, &current);
   } else {
 
     TimerStatIncrementer timer(stats::forkTime);
@@ -1316,6 +1325,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     return StatePair(trueState, falseState);
   }
 }
+
+bool Executor::checkSpeculation(ExecutionState &current) { return true; }
 
 Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
                                                  ref<Expr> condition,
@@ -1420,28 +1431,36 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     specStartingTime = time(0);
   }
 
-  klee_warning("Speculation node");
+  //  klee_warning("Speculation node");
   // Checking not revisiting the same program point twice (should fail since
   // speculation wouldn't be linear then)
   // Back jumping to the parent node
-
-  bool isPPVisited = (current.txTreeNode->visitedProgramPoints->find(
-                          current.txTreeNode->getProgramPoint()) !=
+  uintptr_t pp = current.txTreeNode->getProgramPoint();
+  bool isPPVisited = (current.txTreeNode->visitedProgramPoints->find(pp) !=
                       current.txTreeNode->visitedProgramPoints->end());
   if (isPPVisited) {
-    specFailRevisted++;
+    if (specRevisted.find(pp) != specRevisted.end()) {
+      specRevisted[pp] = specRevisted[pp] + 1;
+    } else {
+      specRevisted[pp] = 1;
+    }
     // check interpolation at is program point
     bool hasInterpolation = TxSubsumptionTable::hasInterpolation(current);
 
     if (hasInterpolation) {
-      klee_warning("SPECULATION_FAIL: Program point %lu is revisted - EXISTS "
-                   "INTERPOLATION!",
-                   current.txTreeNode->getProgramPoint());
+      //      klee_warning("SPECULATION_FAIL: Program point %lu is revisted -
+      //      EXISTS "
+      //                   "INTERPOLATION!",
+      //                   current.txTreeNode->getProgramPoint());
     } else {
-      specFailRevistedWithNoInterpolation++;
-      klee_warning(
-          "SPECULATION_FAIL: Program point %lu is revisted - NO INTERPOLATION!",
-          current.txTreeNode->getProgramPoint());
+      if (specRevistedNoInter.find(pp) != specRevistedNoInter.end()) {
+        specRevistedNoInter[pp] = specRevistedNoInter[pp] + 1;
+      } else {
+        specRevistedNoInter[pp] = 1;
+      }
+      //      klee_warning(
+      //          "SPECULATION_FAIL: Program point %lu is revisted - NO
+      //          INTERPOLATION!", current.txTreeNode->getProgramPoint());
     }
     speculativeBackJump(current);
     return StatePair(0, 0);
@@ -3776,8 +3795,8 @@ void Executor::run(ExecutionState &initialState) {
   specSuccessCount = 0;
   specFailCount = 0;
   specTime = 0;
-  specFailRevisted = 0;
-  specFailRevistedWithNoInterpolation = 0;
+  //  specFailRevisted = 0;
+  //  specFailRevistedWithNoInterpolation = 0;
 
   bindModuleConstants();
 
@@ -4898,11 +4917,25 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     outSpec << "Time for Speculation: " << ss.str() << "\n";
     outSpec << "Total Speculation Success: " << specSuccessCount << "\n";
     outSpec << "Total Speculation Failures: " << specFailCount << "\n";
-    outSpec << "Total Speculation Revisited Failures: " << specFailRevisted
-            << "\n";
+    unsigned int tmp = 0;
+    for (std::map<uintptr_t, unsigned int>::iterator it = specRevisted.begin(),
+                                                     ie = specRevisted.end();
+         it != ie; ++it) {
+      tmp += it->second;
+      outSpec << it->first << ": " << it->second << "\n";
+    }
+    outSpec << "Total Speculation Revisited Failures: " << tmp << "\n";
+    tmp = 0;
+    for (std::map<uintptr_t, unsigned int>::iterator
+             it = specRevistedNoInter.begin(),
+             ie = specRevistedNoInter.end();
+         it != ie; ++it) {
+      tmp += it->second;
+      outSpec << it->first << ": " << it->second << "\n";
+    }
     outSpec
         << "Total Speculation Revisited Failures Without Any Interpolation: "
-        << specFailRevistedWithNoInterpolation << "\n";
+        << tmp << "\n";
   }
 
   if (BBCoverage >= 1) {

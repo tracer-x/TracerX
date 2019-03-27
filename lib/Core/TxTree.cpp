@@ -1871,8 +1871,7 @@ bool TxSubsumptionTable::hasInterpolation(ExecutionState &state) {
   subTable = it->second;
 
   bool found;
-  std::pair<EntryIterator, EntryIterator> iterPair =
-      subTable->find(txTreeNode->entryCallHistory, found);
+  subTable->find(txTreeNode->entryCallHistory, found);
   if (!found) {
     return false;
   }
