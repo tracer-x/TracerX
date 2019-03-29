@@ -4914,28 +4914,41 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     std::ostringstream ss;
     ss.precision(2);
     ss << std::fixed << specTime;
-    outSpec << "Time for Speculation: " << ss.str() << "\n";
-    outSpec << "Total Speculation Success: " << specSuccessCount << "\n";
-    outSpec << "Total Speculation Failures: " << specFailCount << "\n";
+    //    outSpec << "Time for Speculation: " << ss.str() << "\n";
+    outSpec << "Total speculation success: " << specSuccessCount << "\n";
+    outSpec << "Total speculation failures: " << specFailCount << "\n";
     unsigned int tmp = 0;
     for (std::map<uintptr_t, unsigned int>::iterator it = specRevisted.begin(),
                                                      ie = specRevisted.end();
          it != ie; ++it) {
       tmp += it->second;
-      outSpec << it->first << ": " << it->second << "\n";
     }
-    outSpec << "Total Speculation Revisited Failures: " << tmp << "\n";
+    outSpec << "Total speculation non-linear failures: " << tmp << "\n";
     tmp = 0;
     for (std::map<uintptr_t, unsigned int>::iterator
              it = specRevistedNoInter.begin(),
              ie = specRevistedNoInter.end();
          it != ie; ++it) {
       tmp += it->second;
+    }
+    outSpec << "Total speculation non-linear failures with no interpolation: "
+            << tmp << "\n";
+    // print frequency of failure at each program point
+    outSpec << "Frequency of non-linear failures:\n";
+    //    TxSpeculativeRun::sort(specRevisted);
+    for (std::map<uintptr_t, unsigned int>::iterator it = specRevisted.begin(),
+                                                     ie = specRevisted.end();
+         it != ie; ++it) {
       outSpec << it->first << ": " << it->second << "\n";
     }
-    outSpec
-        << "Total Speculation Revisited Failures Without Any Interpolation: "
-        << tmp << "\n";
+    outSpec << "Frequency of non-linear failures with no interpolation:\n";
+    //    TxSpeculativeRun::sort(specRevistedNoInter);
+    for (std::map<uintptr_t, unsigned int>::iterator
+             it = specRevistedNoInter.begin(),
+             ie = specRevistedNoInter.end();
+         it != ie; ++it) {
+      outSpec << it->first << ": " << it->second << "\n";
+    }
   }
 
   if (BBCoverage >= 1) {

@@ -18,6 +18,9 @@
 #define TXSPECULATION_H_
 
 #include "klee/ExecutionState.h"
+#include <iostream>
+#include <map>
+#include <vector>
 
 namespace klee {
 
@@ -25,7 +28,8 @@ namespace klee {
 class TxSpeculativeRun {
 public:
   static bool isSpeculable(ExecutionState &current);
+  static void sort(std::map<uintptr_t, unsigned int> m) {};
 };
-}
+} // namespace klee
 
 #endif /* TXSPECULATION_H_ */
