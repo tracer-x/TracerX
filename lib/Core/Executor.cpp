@@ -1012,15 +1012,6 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     return speculationFork(current, condition, isInternal);
   }
 
-  // fork on a non-speculation node
-  // turn off speculation flag for successful case
-  if (isSpeculation) {
-    time_t now = time(0);
-    specTime = specTime + (now - specStartingTime);
-    isSpeculation = false;
-    specSuccessCount++;
-  }
-
   Solver::Validity res;
   std::map<ExecutionState *, std::vector<SeedInfo> >::iterator it =
       seedMap.find(&current);
@@ -1190,9 +1181,12 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // be used to perform markings.
       bool sp = checkSpeculation(current);
       if (sp) {
+        // keep unsat core & increase spec counting
         llvm::BranchInst *binst =
             llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        specCount++;
+
         return addSpeculationNode(current, condition, isInternal, true);
       } else {
         txTree->markPathCondition(current, unsatCore);
@@ -1221,9 +1215,11 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // be used to perform markings.
       bool sp = checkSpeculation(current);
       if (sp) {
+        // keep unsat core & increase spec counting
         llvm::BranchInst *binst =
             llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        specCount++;
         return addSpeculationNode(current, condition, isInternal, false);
       } else {
         txTree->markPathCondition(current, unsatCore);
@@ -1426,11 +1422,6 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
 Executor::StatePair Executor::speculationFork(ExecutionState &current,
                                               ref<Expr> condition,
                                               bool isInternal) {
-  if (!isSpeculation) {
-    isSpeculation = true;
-    specStartingTime = time(0);
-  }
-
   //  klee_warning("Speculation node");
   // Checking not revisiting the same program point twice (should fail since
   // speculation wouldn't be linear then)
@@ -1635,13 +1626,6 @@ void Executor::speculativeBackJump(ExecutionState &current) {
   //  llvm::outs() << "Remaining states in worklist 2 = "
   //               << searcher->getStates().size() << "\n";
   //  llvm::outs() << "Remaining addedStates = " << addedStates.size() << "\n";
-
-  if (isSpeculation) {
-    time_t now = time(0);
-    specTime = specTime + (now - specStartingTime);
-    isSpeculation = false;
-    specFailCount++;
-  }
 }
 
 std::vector<TxTreeNode *> Executor::collectSpeculationNodes(TxTreeNode *root) {
@@ -3791,12 +3775,8 @@ void Executor::doDumpStates() {
 
 void Executor::run(ExecutionState &initialState) {
 
-  isSpeculation = false;
-  specSuccessCount = 0;
-  specFailCount = 0;
-  specTime = 0;
-  //  specFailRevisted = 0;
-  //  specFailRevistedWithNoInterpolation = 0;
+  specCount = 0;
+  specAssertFail = 0;
 
   bindModuleConstants();
 
@@ -4155,6 +4135,7 @@ void Executor::terminateStateOnError(ExecutionState &state,
       state.txTreeNode->isSpeculationNode()) {
     //    llvm::outs() << "=== start jumpback because of error \n";
     speculativeBackJump(state);
+    specAssertFail++;
     klee_message("ERROR: %s:%d: %s", ii.file.c_str(), ii.line, message.c_str());
     //    llvm::outs() << "=== end jumpback because of error \n";.
     // llvm::outs() << messaget << "\n";
@@ -4911,12 +4892,11 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
   if (Speculation) {
     std::string outSpecFile = interpreterHandler->getOutputFilename("spec.txt");
     std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
-    std::ostringstream ss;
-    ss.precision(2);
-    ss << std::fixed << specTime;
-    //    outSpec << "Time for Speculation: " << ss.str() << "\n";
-    outSpec << "Total speculation success: " << specSuccessCount << "\n";
-    outSpec << "Total speculation failures: " << specFailCount << "\n";
+
+    outSpec << "Total speculation: " << specCount << "\n";
+    outSpec << "Total speculation assertion failures: " << specAssertFail
+            << "\n";
+
     unsigned int tmp = 0;
     for (std::map<uintptr_t, unsigned int>::iterator it = specRevisted.begin(),
                                                      ie = specRevisted.end();

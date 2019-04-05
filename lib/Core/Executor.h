@@ -96,11 +96,8 @@ public:
   std::set<llvm::BasicBlock *> visitedBlocks;
   float blockCoverage;
 
-  bool isSpeculation;
-  time_t specStartingTime;
-  double specTime;
-  unsigned int specSuccessCount;
-  unsigned int specFailCount;
+  int specCount;
+  int specAssertFail;
   std::map<uintptr_t, unsigned int> specRevisted;
   std::map<uintptr_t, unsigned int> specRevistedNoInter;
 
