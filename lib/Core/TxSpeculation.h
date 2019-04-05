@@ -21,6 +21,9 @@
 #include <iostream>
 #include <map>
 #include <vector>
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Function.h"
 
 namespace klee {
 
@@ -28,7 +31,6 @@ namespace klee {
 class TxSpeculativeRun {
 public:
   static bool isSpeculable(ExecutionState &current);
-  static void sort(std::map<uintptr_t, unsigned int> m) {};
 };
 } // namespace klee
 

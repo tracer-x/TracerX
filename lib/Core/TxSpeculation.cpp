@@ -19,10 +19,21 @@
 using namespace klee;
 
 bool TxSpeculativeRun::isSpeculable(ExecutionState &current) {
-
-  if (isa<llvm::BranchInst>(current.prevPC->inst) &&
-      (current.prevPC->inst->getOperand(1)->getName() != "cond.false")) {
-    return true;
+  if (isa<llvm::BranchInst>(current.prevPC->inst)) {
+    llvm::BranchInst *bi = dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+    llvm::BasicBlock *bb = dyn_cast<llvm::BasicBlock>(bi->getOperand(1));
+    if (isa<llvm::CallInst>(bb->getInstList().front())) {
+      llvm::CallInst *ci = dyn_cast<llvm::CallInst>(&bb->getInstList().front());
+      std::string str;
+      llvm::raw_string_ostream os(str);
+      ci->getCalledValue()->print(os);
+      //      llvm::outs() << "os: " << os.str() << "\n";
+      //      llvm::outs() << "assert fail = " <<
+      //      (os.str().find("@__assert_fail") != std::string::npos) << "\n";
+      if (os.str().find("@__assert_fail") != std::string::npos) {
+        return false;
+      }
+    }
   }
-  return false;
+  return true;
 }
