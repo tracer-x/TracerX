@@ -4894,25 +4894,31 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
 
     outSpec << "Total speculation: " << specCount << "\n";
-    outSpec << "Total speculation assertion failures: " << specAssertFail
-            << "\n";
 
-    unsigned int tmp = 0;
+    unsigned int revisted = 0;
     for (std::map<uintptr_t, unsigned int>::iterator it = specRevisted.begin(),
                                                      ie = specRevisted.end();
          it != ie; ++it) {
-      tmp += it->second;
+      revisted += it->second;
     }
-    outSpec << "Total speculation non-linear failures: " << tmp << "\n";
-    tmp = 0;
+    outSpec << "Total speculation success: "
+            << (specCount - specAssertFail - revisted) << "\n";
+    outSpec << "Total speculation failures: " << (specAssertFail + revisted)
+            << "\n";
+    outSpec << "Total speculation assertion failures: " << specAssertFail
+            << "\n";
+    outSpec << "Total speculation non-linear failures: " << revisted << "\n";
+    unsigned int revistedNoInter = 0;
     for (std::map<uintptr_t, unsigned int>::iterator
              it = specRevistedNoInter.begin(),
              ie = specRevistedNoInter.end();
          it != ie; ++it) {
-      tmp += it->second;
+      revistedNoInter += it->second;
     }
+    outSpec << "Total speculation non-linear failures with interpolation: "
+            << (revisted - revistedNoInter) << "\n";
     outSpec << "Total speculation non-linear failures with no interpolation: "
-            << tmp << "\n";
+            << revistedNoInter << "\n";
     // print frequency of failure at each program point
     outSpec << "Frequency of non-linear failures:\n";
     //    TxSpeculativeRun::sort(specRevisted);
