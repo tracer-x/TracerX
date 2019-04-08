@@ -1179,19 +1179,13 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
-      bool sp = checkSpeculation(current);
-      if (sp) {
-        // keep unsat core & increase spec counting
-        llvm::BranchInst *binst =
-            llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
-        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-        specCount++;
+      // keep unsat core & increase spec counting
+      llvm::BranchInst *binst =
+          llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+      specCount++;
 
-        return addSpeculationNode(current, condition, isInternal, true);
-      } else {
-        txTree->markPathCondition(current, unsatCore);
-        return StatePair(&current, 0);
-      }
+      return addSpeculationNode(current, condition, isInternal, true);
 
     } else if (INTERPOLATION_ENABLED) {
       // Validity proof succeeded of a query: antecedent -> consequent.
@@ -1213,18 +1207,12 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
-      bool sp = checkSpeculation(current);
-      if (sp) {
-        // keep unsat core & increase spec counting
-        llvm::BranchInst *binst =
-            llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
-        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-        specCount++;
-        return addSpeculationNode(current, condition, isInternal, false);
-      } else {
-        txTree->markPathCondition(current, unsatCore);
-        return StatePair(0, &current);
-      }
+      // keep unsat core & increase spec counting
+      llvm::BranchInst *binst =
+          llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+      specCount++;
+      return addSpeculationNode(current, condition, isInternal, false);
     } else if (INTERPOLATION_ENABLED) {
       // Falsity proof succeeded of a query: antecedent -> consequent,
       // which means that antecedent -> not(consequent) is valid. In this
@@ -1321,8 +1309,6 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     return StatePair(trueState, falseState);
   }
 }
-
-bool Executor::checkSpeculation(ExecutionState &current) { return true; }
 
 Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
                                                  ref<Expr> condition,
@@ -1438,12 +1424,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     // check interpolation at is program point
     bool hasInterpolation = TxSubsumptionTable::hasInterpolation(current);
 
-    if (hasInterpolation) {
-      //      klee_warning("SPECULATION_FAIL: Program point %lu is revisted -
-      //      EXISTS "
-      //                   "INTERPOLATION!",
-      //                   current.txTreeNode->getProgramPoint());
-    } else {
+    if (!hasInterpolation) {
       if (specRevistedNoInter.find(pp) != specRevistedNoInter.end()) {
         specRevistedNoInter[pp] = specRevistedNoInter[pp] + 1;
       } else {
@@ -1453,6 +1434,13 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       //          "SPECULATION_FAIL: Program point %lu is revisted - NO
       //          INTERPOLATION!", current.txTreeNode->getProgramPoint());
     }
+    speculativeBackJump(current);
+    return StatePair(0, 0);
+  }
+
+  // terminate speculation if there was more than N visited failures at this
+  // program point
+  if (specRevisted[pp] >= specLimit) {
     speculativeBackJump(current);
     return StatePair(0, 0);
   }
@@ -3777,6 +3765,7 @@ void Executor::run(ExecutionState &initialState) {
 
   specCount = 0;
   specAssertFail = 0;
+  specLimit = 10;
 
   bindModuleConstants();
 
