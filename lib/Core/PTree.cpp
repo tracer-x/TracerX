@@ -30,6 +30,13 @@ PTree::split(Node *n,
   assert(n && !n->left && !n->right);
   n->left = new Node(n, leftData);
   n->right = new Node(n, rightData);
+
+//  llvm::errs() << "--- PTree::split Begin ---\n";
+//  StackFrameUtils::printLocals(&leftData->stack.back());
+//  llvm::outs() << "------------\n";
+//  StackFrameUtils::printLocals(&rightData->stack.back());
+//  llvm::errs() << "--- PTree::split End ---\n";
+
   return std::make_pair(n->left, n->right);
 }
 

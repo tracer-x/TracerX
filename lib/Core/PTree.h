@@ -11,6 +11,7 @@
 #define __UTIL_PTREE_H__
 
 #include <klee/Expr.h>
+#include "StackFrameUtils.h"
 
 namespace klee {
   class ExecutionState;

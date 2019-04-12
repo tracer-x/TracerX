@@ -55,6 +55,7 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   std::map<ref<Expr>, ref<Expr> > substitution;
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
+  valuesMap = node->getDependency()->getValuesMap();
 
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
@@ -2064,6 +2065,21 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
         p->right = 0;
       }
     }
+
+    llvm::errs() << "--- PTree::remove Begin ---\n";
+    std::map<llvm::Value *, std::vector<ref<TxStateValue> > >* vm = node->dependency->getValuesMap();
+    for(std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator it=vm->begin(),ie=vm->end();
+    		it != ie; ++it) {
+    	llvm::errs() << "----\n";
+    	it->second.front()->getValue()->dump();
+    	for(std::vector<ref<TxStateValue> >::iterator it1=it->second.begin(), ie1=it->second.end();
+    			it1 != ie1; ++it1) {
+    		(*it1)->getExpression()->dump();
+    	}
+    	llvm::errs() << "----\n";
+    }
+    llvm::errs() << "--- PTree::remove End ---\n";
+
     delete node;
     node = p;
   } while (node && !node->left && !node->right);
