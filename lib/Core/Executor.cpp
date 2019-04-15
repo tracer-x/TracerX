@@ -1183,9 +1183,12 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       llvm::BranchInst *binst =
           llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
       txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-      specCount++;
 
-      return addSpeculationNode(current, condition, isInternal, true);
+      uintptr_t pp = current.txTreeNode->getProgramPoint();
+      if (specRevisted[pp] < specLimit) {
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, true);
+      }
 
     } else if (INTERPOLATION_ENABLED) {
       // Validity proof succeeded of a query: antecedent -> consequent.
@@ -1211,8 +1214,12 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       llvm::BranchInst *binst =
           llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
       txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-      specCount++;
-      return addSpeculationNode(current, condition, isInternal, false);
+
+      uintptr_t pp = current.txTreeNode->getProgramPoint();
+      if (specRevisted[pp] < specLimit) {
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, false);
+      }
     } else if (INTERPOLATION_ENABLED) {
       // Falsity proof succeeded of a query: antecedent -> consequent,
       // which means that antecedent -> not(consequent) is valid. In this
@@ -1434,14 +1441,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       //          "SPECULATION_FAIL: Program point %lu is revisted - NO
       //          INTERPOLATION!", current.txTreeNode->getProgramPoint());
     }
-    specFail++;
-    speculativeBackJump(current);
-    return StatePair(0, 0);
-  }
-
-  // terminate speculation if there was more than N visited failures at this
-  // program point
-  if (specRevisted[pp] >= specLimit) {
     specFail++;
     speculativeBackJump(current);
     return StatePair(0, 0);
