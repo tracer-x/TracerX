@@ -97,6 +97,7 @@ public:
   float blockCoverage;
 
   int specCount;
+  int specFail;
   int specAssertFail;
   std::map<uintptr_t, unsigned int> specRevisted;
   std::map<uintptr_t, unsigned int> specRevistedNoInter;

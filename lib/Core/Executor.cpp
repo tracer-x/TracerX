@@ -1434,6 +1434,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       //          "SPECULATION_FAIL: Program point %lu is revisted - NO
       //          INTERPOLATION!", current.txTreeNode->getProgramPoint());
     }
+    specFail++;
     speculativeBackJump(current);
     return StatePair(0, 0);
   }
@@ -1441,6 +1442,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   // terminate speculation if there was more than N visited failures at this
   // program point
   if (specRevisted[pp] >= specLimit) {
+    specFail++;
     speculativeBackJump(current);
     return StatePair(0, 0);
   }
@@ -3764,6 +3766,7 @@ void Executor::doDumpStates() {
 void Executor::run(ExecutionState &initialState) {
 
   specCount = 0;
+  specFail = 0;
   specAssertFail = 0;
   specLimit = 10;
 
@@ -4124,6 +4127,7 @@ void Executor::terminateStateOnError(ExecutionState &state,
       state.txTreeNode->isSpeculationNode()) {
     //    llvm::outs() << "=== start jumpback because of error \n";
     speculativeBackJump(state);
+    specFail++;
     specAssertFail++;
     klee_message("ERROR: %s:%d: %s", ii.file.c_str(), ii.line, message.c_str());
     //    llvm::outs() << "=== end jumpback because of error \n";.
@@ -4883,19 +4887,17 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
 
     outSpec << "Total speculation: " << specCount << "\n";
-
+    outSpec << "Total speculation success: " << (specCount - specFail) << "\n";
+    outSpec << "Total speculation failures: " << specFail << "\n";
+    outSpec << "Total speculation assertion failures: " << specAssertFail
+            << "\n";
     unsigned int revisted = 0;
     for (std::map<uintptr_t, unsigned int>::iterator it = specRevisted.begin(),
                                                      ie = specRevisted.end();
          it != ie; ++it) {
       revisted += it->second;
     }
-    outSpec << "Total speculation success: "
-            << (specCount - specAssertFail - revisted) << "\n";
-    outSpec << "Total speculation failures: " << (specAssertFail + revisted)
-            << "\n";
-    outSpec << "Total speculation assertion failures: " << specAssertFail
-            << "\n";
+
     outSpec << "Total speculation non-linear failures: " << revisted << "\n";
     unsigned int revistedNoInter = 0;
     for (std::map<uintptr_t, unsigned int>::iterator
