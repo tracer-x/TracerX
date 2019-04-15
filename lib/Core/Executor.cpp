@@ -1180,17 +1180,21 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
-      llvm::BranchInst *binst =
-          llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
-      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
 
       uintptr_t pp = current.txTreeNode->getProgramPoint();
-      if (specRevisted[pp] < specLimit) {
-        specCount++;
+
+      if (specRevisted.find(pp) == specRevisted.end() || specRevisted[pp] < specLimit) {
+    	  llvm::BranchInst *binst =
+    	            llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+    	        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+
+    	  specCount++;
         return addSpeculationNode(current, condition, isInternal, true);
       }
 
-    } else if (INTERPOLATION_ENABLED) {
+    }
+
+    if (INTERPOLATION_ENABLED) {
       // Validity proof succeeded of a query: antecedent -> consequent.
       // We then extract the unsatisfiability core of antecedent and not
       // consequent as the Craig interpolant.
@@ -1211,16 +1215,17 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
-      llvm::BranchInst *binst =
-          llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
-      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-
       uintptr_t pp = current.txTreeNode->getProgramPoint();
-      if (specRevisted[pp] < specLimit) {
-        specCount++;
+      if (specRevisted.find(pp) == specRevisted.end() || specRevisted[pp] < specLimit) {
+          llvm::BranchInst *binst =
+              llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+    	  specCount++;
         return addSpeculationNode(current, condition, isInternal, false);
       }
-    } else if (INTERPOLATION_ENABLED) {
+    }
+
+    if (INTERPOLATION_ENABLED) {
       // Falsity proof succeeded of a query: antecedent -> consequent,
       // which means that antecedent -> not(consequent) is valid. In this
       // case also we extract the unsat core of the proof
