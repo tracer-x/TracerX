@@ -25,6 +25,8 @@
 #include "klee/TimerStatIncrementer.h"
 #include "klee/util/ExprVisitor.h"
 #include "klee/util/TxTreeGraph.h"
+#include "klee/Internal/Module/KModule.h"
+#include "klee/Internal/Module/Cell.h"
 
 #include "llvm/Support/raw_ostream.h"
 #include "TxDependency.h"
@@ -165,7 +167,7 @@ class TxSubsumptionTableEntry {
   static Statistic symbolicallyAddressedStoreExpressionBuildTime;
   static Statistic solverAccessTime;
 
-  std::map<llvm::Value *, std::vector<ref<TxStateValue> > >* valuesMap;
+  std::map<llvm::Value *, std::vector<ref<TxStateValue> > > phiValuesMap;
 
   ref<Expr> interpolant;
 

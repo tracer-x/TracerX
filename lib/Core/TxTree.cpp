@@ -55,7 +55,7 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   std::map<ref<Expr>, ref<Expr> > substitution;
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
-  valuesMap = node->getDependency()->getValuesMap();
+  phiValuesMap = node->getDependency()->getPhiValuesMap();
 
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
@@ -403,7 +403,7 @@ ref<Expr> TxSubsumptionTableEntry::replaceExpr(ref<Expr> originalExpr,
 
   if (originalExpr->getKid(0) == replacedExpr)
     return TxShadowArray::createBinaryOfSameKind(originalExpr, replacementExpr,
-                                               originalExpr->getKid(1));
+                                                 originalExpr->getKid(1));
 
   if (originalExpr->getKid(1) == replacedExpr)
     return TxShadowArray::createBinaryOfSameKind(
@@ -793,6 +793,26 @@ bool TxSubsumptionTableEntry::subsumed(
     TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
+  for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
+           it = phiValuesMap.begin(),
+           ie = phiValuesMap.end();
+       it != ie; ++it) {
+    llvm::Value *phiInst = it->first;
+    StackFrame sf = state.stack.back();
+    for (unsigned int i = 0; i < sf.kf->numInstructions; i++) {
+      if (sf.kf->instructions[i]->inst == phiInst) {
+        ref<Expr> fromEntry = it->second.back()->getExpression();
+        ref<Expr> fromStack = sf.locals[sf.kf->instructions[i]->dest].value;
+        //        llvm::errs() << "Start comparing Phi Node\n";
+        //        fromEntry->dump();
+        //        fromStack->dump();
+        //        llvm::errs() << "End comparing Phi Node\n";
+        if (fromEntry != fromStack) {
+          return false;
+        }
+      }
+    }
+  }
 #ifdef ENABLE_Z3
   // Tell the solver implementation that we are checking for subsumption for
   // collecting statistics of solver calls.
@@ -1079,13 +1099,13 @@ bool TxSubsumptionTableEntry::subsumed(
               e->getAddress()->getOffset(), coreValues, corePointerValues,
               unifiedBases, debugSubsumptionLevel);
           if (constraint.isNull())
-              return false;
-            if (stateEqualityConstraints.isNull()) {
-              stateEqualityConstraints = constraint;
-            } else {
-              stateEqualityConstraints =
-                  AndExpr::create(constraint, stateEqualityConstraints);
-            }
+            return false;
+          if (stateEqualityConstraints.isNull()) {
+            stateEqualityConstraints = constraint;
+          } else {
+            stateEqualityConstraints =
+                AndExpr::create(constraint, stateEqualityConstraints);
+          }
         } else {
           // Match not found
           return false;
@@ -1249,10 +1269,10 @@ bool TxSubsumptionTableEntry::subsumed(
             stateEqualityConstraints =
                 AndExpr::create(constraint, stateEqualityConstraints);
           }
-          } else {
-            // Match not found
-            return false;
-          }
+        } else {
+          // Match not found
+          return false;
+        }
       } else {
         ref<TxStoreEntry> e = mIt->second;
         bool leftUse =
@@ -1943,9 +1963,9 @@ std::string TxTree::inTwoDecimalPoints(const double n) {
 std::string TxTree::getInterpolationStat() {
   std::stringstream stream;
   stream << "KLEE: done: Total reduced symbolic execution tree nodes = "
-		 << TxTreeGraph::nodeCount  << "\n";
-  stream << "KLEE: done: Total number of visited basic blocks = "
-		 << blockCount  << "\n";
+         << TxTreeGraph::nodeCount << "\n";
+  stream << "KLEE: done: Total number of visited basic blocks = " << blockCount
+         << "\n";
   stream << "\nKLEE: done: Subsumption statistics\n";
   printTableStat(stream);
   stream << "\nKLEE: done: TxTree method execution times (ms):\n";
@@ -2066,19 +2086,22 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
       }
     }
 
-    llvm::errs() << "--- PTree::remove Begin ---\n";
-    std::map<llvm::Value *, std::vector<ref<TxStateValue> > >* vm = node->dependency->getValuesMap();
-    for(std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator it=vm->begin(),ie=vm->end();
-    		it != ie; ++it) {
-    	llvm::errs() << "----\n";
-    	it->second.front()->getValue()->dump();
-    	for(std::vector<ref<TxStateValue> >::iterator it1=it->second.begin(), ie1=it->second.end();
-    			it1 != ie1; ++it1) {
-    		(*it1)->getExpression()->dump();
-    	}
-    	llvm::errs() << "----\n";
-    }
-    llvm::errs() << "--- PTree::remove End ---\n";
+    //    llvm::errs() << "--- PTree::remove Begin ---\n";
+    //    std::map<llvm::Value *, std::vector<ref<TxStateValue> > > vm =
+    // node->dependency->getPhiValuesMap();
+    //    for(std::map<llvm::Value *, std::vector<ref<TxStateValue> >
+    // >::iterator it=vm.begin(),ie=vm.end();
+    //    		it != ie; ++it) {
+    //    	llvm::errs() << "----\n";
+    //    	it->second.front()->getValue()->dump();
+    //    	for(std::vector<ref<TxStateValue> >::iterator it1=it->second.begin(),
+    // ie1=it->second.end();
+    //    			it1 != ie1; ++it1) {
+    //    		(*it1)->getExpression()->dump();
+    //    	}
+    //    	llvm::errs() << "----\n";
+    //    }
+    //    llvm::errs() << "--- PTree::remove End ---\n";
 
     delete node;
     node = p;
@@ -2292,8 +2315,8 @@ void TxTreeNode::bindReturnValue(llvm::CallInst *site, llvm::Instruction *inst,
 }
 
 void TxTreeNode::getStoredExpressions(
-    const std::vector<llvm::Instruction *> &_callHistory,
-    bool &leftRetrieval, TxStore::TopStateStore &__internalStore,
+    const std::vector<llvm::Instruction *> &_callHistory, bool &leftRetrieval,
+    TxStore::TopStateStore &__internalStore,
     TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) const {
   TimerStatIncrementer t(getStoredExpressionsTime);

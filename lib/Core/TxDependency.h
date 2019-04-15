@@ -320,8 +320,18 @@ class TxDependency {
   }
 
 public:
-  std::map<llvm::Value *, std::vector<ref<TxStateValue> > >* getValuesMap() {
-    return &valuesMap;
+  std::map<llvm::Value *, std::vector<ref<TxStateValue> > > getPhiValuesMap() {
+    std::map<llvm::Value *, std::vector<ref<TxStateValue> > > res;
+    for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
+             it = valuesMap.begin(),
+             ie = valuesMap.end();
+         it != ie; ++it) {
+      if (isa<llvm::PHINode>(it->first)) {
+        res.insert(std::pair<llvm::Value *, std::vector<ref<TxStateValue> > >(
+            it->first, it->second));
+      }
+    }
+    return res;
   }
   /// \brief This is for dynamic setting up of debug messages.
   int debugSubsumptionLevel;

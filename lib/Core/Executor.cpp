@@ -3260,8 +3260,8 @@ void Executor::run(ExecutionState &initialState) {
 #endif
     if (INTERPOLATION_ENABLED &&
         txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
-      klee_warning("PhiBug instruction");
-      state.pc->inst->dump();
+      //      klee_warning("PhiBug instruction");
+      //      state.pc->inst->dump();
       terminateStateOnSubsumption(state);
     } else {
       KInstruction *ki = state.pc;
