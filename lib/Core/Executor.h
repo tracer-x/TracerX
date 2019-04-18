@@ -102,6 +102,7 @@ public:
   std::map<uintptr_t, unsigned int> specRevisted;
   std::map<uintptr_t, unsigned int> specRevistedNoInter;
   unsigned int specLimit;
+  uintptr_t prevNodeSequence;
 
   class Timer {
   public:

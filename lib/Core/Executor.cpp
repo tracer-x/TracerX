@@ -1183,15 +1183,15 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
       uintptr_t pp = current.txTreeNode->getProgramPoint();
 
-      if (specRevisted.find(pp) == specRevisted.end() || specRevisted[pp] < specLimit) {
-    	  llvm::BranchInst *binst =
-    	            llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
-    	        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+      if (specRevisted.find(pp) == specRevisted.end() ||
+          specRevisted[pp] < specLimit) {
+        llvm::BranchInst *binst =
+            llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
 
-    	  specCount++;
+        specCount++;
         return addSpeculationNode(current, condition, isInternal, true);
       }
-
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -1216,11 +1216,12 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // be used to perform markings.
       // keep unsat core & increase spec counting
       uintptr_t pp = current.txTreeNode->getProgramPoint();
-      if (specRevisted.find(pp) == specRevisted.end() || specRevisted[pp] < specLimit) {
-          llvm::BranchInst *binst =
-              llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
-          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-    	  specCount++;
+      if (specRevisted.find(pp) == specRevisted.end() ||
+          specRevisted[pp] < specLimit) {
+        llvm::BranchInst *binst =
+            llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        specCount++;
         return addSpeculationNode(current, condition, isInternal, false);
       }
     }
@@ -1421,39 +1422,45 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
                                               ref<Expr> condition,
                                               bool isInternal) {
   //  klee_warning("Speculation node");
-  // Checking not revisiting the same program point twice (should fail since
-  // speculation wouldn't be linear then)
-  // Back jumping to the parent node
-  uintptr_t pp = current.txTreeNode->getProgramPoint();
-  bool isPPVisited = (current.txTreeNode->visitedProgramPoints->find(pp) !=
-                      current.txTreeNode->visitedProgramPoints->end());
-  if (isPPVisited) {
-    if (specRevisted.find(pp) != specRevisted.end()) {
-      specRevisted[pp] = specRevisted[pp] + 1;
-    } else {
-      specRevisted[pp] = 1;
-    }
-    // check interpolation at is program point
-    bool hasInterpolation = TxSubsumptionTable::hasInterpolation(current);
+  if (current.txTreeNode->getNodeSequenceNumber() != prevNodeSequence) {
+    //    llvm::errs() << "Prev node sequence = " << prevNodeSequence << "\n";
+    //    llvm::errs() << "Curr node sequence = "
+    //                 << current.txTreeNode->getNodeSequenceNumber() << "\n";
+    // update last node sequence
+    prevNodeSequence = current.txTreeNode->getNodeSequenceNumber();
 
-    if (!hasInterpolation) {
-      if (specRevistedNoInter.find(pp) != specRevistedNoInter.end()) {
-        specRevistedNoInter[pp] = specRevistedNoInter[pp] + 1;
+    // check program point of the current node is visited before or not
+    uintptr_t pp = current.txTreeNode->getProgramPoint();
+    bool isPPVisited = (current.txTreeNode->visitedProgramPoints->find(pp) !=
+                        current.txTreeNode->visitedProgramPoints->end());
+    if (isPPVisited) {
+      if (specRevisted.find(pp) != specRevisted.end()) {
+        specRevisted[pp] = specRevisted[pp] + 1;
       } else {
-        specRevistedNoInter[pp] = 1;
+        specRevisted[pp] = 1;
       }
-      //      klee_warning(
-      //          "SPECULATION_FAIL: Program point %lu is revisted - NO
-      //          INTERPOLATION!", current.txTreeNode->getProgramPoint());
-    }
-    specFail++;
-    speculativeBackJump(current);
-    return StatePair(0, 0);
-  }
+      // check interpolation at is program point
+      bool hasInterpolation = TxSubsumptionTable::hasInterpolation(current);
 
-  // Storing the visited program points.
-  current.txTreeNode->visitedProgramPoints->insert(
-      current.txTreeNode->getProgramPoint());
+      if (!hasInterpolation) {
+        if (specRevistedNoInter.find(pp) != specRevistedNoInter.end()) {
+          specRevistedNoInter[pp] = specRevistedNoInter[pp] + 1;
+        } else {
+          specRevistedNoInter[pp] = 1;
+        }
+        //      klee_warning(
+        //          "SPECULATION_FAIL: Program point %lu is revisted - NO
+        //          INTERPOLATION!", current.txTreeNode->getProgramPoint());
+      }
+      specFail++;
+      speculativeBackJump(current);
+      return StatePair(0, 0);
+    }
+
+    // Storing the visited program points.
+    current.txTreeNode->visitedProgramPoints->insert(
+        current.txTreeNode->getProgramPoint());
+  }
 
   Solver::Validity res;
 
@@ -3773,6 +3780,7 @@ void Executor::run(ExecutionState &initialState) {
   specFail = 0;
   specAssertFail = 0;
   specLimit = 10;
+  prevNodeSequence = 0;
 
   bindModuleConstants();
 
