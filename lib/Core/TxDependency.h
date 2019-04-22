@@ -320,6 +320,21 @@ class TxDependency {
   }
 
 public:
+  std::map<llvm::Value *, std::vector<ref<TxStateValue> > >
+  getTopPhiValuesMap(std::vector<llvm::Value *> topPhis) {
+
+    std::map<llvm::Value *, std::vector<ref<TxStateValue> > > res;
+
+    for (std::vector<llvm::Value *>::iterator it = topPhis.begin(),
+                                              ie = topPhis.end();
+         it != ie; ++it) {
+      if (valuesMap.find(*it) != valuesMap.end()) {
+        res[*it] = valuesMap[*it];
+      }
+    }
+    return res;
+  }
+
   std::map<llvm::Value *, std::vector<ref<TxStateValue> > > getPhiValuesMap() {
     std::map<llvm::Value *, std::vector<ref<TxStateValue> > > res;
     for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator

@@ -453,6 +453,9 @@ public:
   /// \brief The current call history
   std::vector<llvm::Instruction *> callHistory;
 
+  llvm::Instruction *prevPC;
+  llvm::Instruction *startPC;
+
   uintptr_t getProgramPoint() { return programPoint; }
 
   uint64_t getNodeSequenceNumber() { return nodeSequenceNumber; }

@@ -55,7 +55,25 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   std::map<ref<Expr>, ref<Expr> > substitution;
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
-  phiValuesMap = node->getDependency()->getPhiValuesMap();
+
+  llvm::errs() << "Start Remove\n";
+  // extract PHINode in the basic block
+  std::vector<llvm::Value *> topPhis;
+  if (node->startPC != 0) {
+    llvm::BasicBlock *b = node->startPC->getParent();
+    //    b->dump();
+    for (llvm::BasicBlock::iterator it = b->begin(), ie = b->end(); it != ie;
+         ++it) {
+      //      it->dump();
+      if (isa<llvm::PHINode>(it)) {
+        topPhis.push_back(it);
+      } else {
+        break;
+      }
+    }
+  }
+  phiValuesMap = node->getDependency()->getTopPhiValuesMap(topPhis);
+  llvm::errs() << "End Remove\n";
 
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
@@ -2094,7 +2112,8 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
     //    		it != ie; ++it) {
     //    	llvm::errs() << "----\n";
     //    	it->second.front()->getValue()->dump();
-    //    	for(std::vector<ref<TxStateValue> >::iterator it1=it->second.begin(),
+    //    	for(std::vector<ref<TxStateValue> >::iterator
+    // it1=it->second.begin(),
     // ie1=it->second.end();
     //    			it1 != ie1; ++it1) {
     //    		(*it1)->getExpression()->dump();
@@ -2114,7 +2133,12 @@ TxTree::split(TxTreeNode *parent, ExecutionState *left, ExecutionState *right) {
   TimerStatIncrementer t(splitTime);
   parent->split(left, right);
   TxTreeGraph::addChildren(parent, parent->left, parent->right);
+  parent->left->prevPC = left->prevPC->inst;
+  parent->left->startPC = left->pc->inst;
+  parent->right->prevPC = right->prevPC->inst;
+  parent->right->startPC = right->pc->inst;
   std::pair<TxTreeNode *, TxTreeNode *> ret(parent->left, parent->right);
+
   return ret;
 }
 
@@ -2264,6 +2288,8 @@ TxTreeNode::TxTreeNode(
   // Inherit the abstract dependency or NULL
   dependency = new TxDependency(_parent ? _parent->dependency : 0, _targetData,
                                 _globalAddresses);
+  prevPC = 0;
+  startPC = 0;
 }
 
 TxTreeNode::~TxTreeNode() {
