@@ -167,7 +167,8 @@ class TxSubsumptionTableEntry {
   static Statistic symbolicallyAddressedStoreExpressionBuildTime;
   static Statistic solverAccessTime;
 
-  std::map<llvm::Value *, std::vector<ref<TxStateValue> > > phiValuesMap;
+  llvm::Instruction *prevInst;
+  llvm::Instruction *startingInst;
 
   ref<Expr> interpolant;
 

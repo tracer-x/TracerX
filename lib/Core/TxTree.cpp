@@ -17,18 +17,18 @@
 
 #include "TimingSolver.h"
 
+#include "TxDependency.h"
+#include "TxShadowArray.h"
+#include <fstream>
 #include <klee/CommandLine.h>
 #include <klee/Expr.h>
+#include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/Solver.h>
 #include <klee/SolverStats.h>
-#include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ExprPPrinter.h>
 #include <klee/util/TxExprUtil.h>
 #include <klee/util/TxPrintUtil.h>
-#include <fstream>
 #include <vector>
-#include "TxDependency.h"
-#include "TxShadowArray.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
@@ -56,24 +56,9 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
 
-  llvm::errs() << "Start Remove\n";
-  // extract PHINode in the basic block
-  std::vector<llvm::Value *> topPhis;
-  if (node->startPC != 0) {
-    llvm::BasicBlock *b = node->startPC->getParent();
-    //    b->dump();
-    for (llvm::BasicBlock::iterator it = b->begin(), ie = b->end(); it != ie;
-         ++it) {
-      //      it->dump();
-      if (isa<llvm::PHINode>(it)) {
-        topPhis.push_back(it);
-      } else {
-        break;
-      }
-    }
-  }
-  phiValuesMap = node->getDependency()->getTopPhiValuesMap(topPhis);
-  llvm::errs() << "End Remove\n";
+  // save previous & starting instruction of the current node
+  prevInst = node->prevPC;
+  startingInst = node->startPC;
 
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
@@ -811,26 +796,13 @@ bool TxSubsumptionTableEntry::subsumed(
     TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
-  for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
-           it = phiValuesMap.begin(),
-           ie = phiValuesMap.end();
-       it != ie; ++it) {
-    llvm::Value *phiInst = it->first;
-    StackFrame sf = state.stack.back();
-    for (unsigned int i = 0; i < sf.kf->numInstructions; i++) {
-      if (sf.kf->instructions[i]->inst == phiInst) {
-        ref<Expr> fromEntry = it->second.back()->getExpression();
-        ref<Expr> fromStack = sf.locals[sf.kf->instructions[i]->dest].value;
-        //        llvm::errs() << "Start comparing Phi Node\n";
-        //        fromEntry->dump();
-        //        fromStack->dump();
-        //        llvm::errs() << "End comparing Phi Node\n";
-        if (fromEntry != fromStack) {
-          return false;
-        }
-      }
-    }
+
+  llvm::errs() << "Same prev = " << (state.prevPC->inst == prevInst) << "\n";
+  if (isa<llvm::PHINode>(startingInst)) {
+    if (state.prevPC->inst != prevInst)
+      return false;
   }
+
 #ifdef ENABLE_Z3
   // Tell the solver implementation that we are checking for subsumption for
   // collecting statistics of solver calls.
@@ -2133,12 +2105,21 @@ TxTree::split(TxTreeNode *parent, ExecutionState *left, ExecutionState *right) {
   TimerStatIncrementer t(splitTime);
   parent->split(left, right);
   TxTreeGraph::addChildren(parent, parent->left, parent->right);
-  parent->left->prevPC = left->prevPC->inst;
-  parent->left->startPC = left->pc->inst;
-  parent->right->prevPC = right->prevPC->inst;
-  parent->right->startPC = right->pc->inst;
-  std::pair<TxTreeNode *, TxTreeNode *> ret(parent->left, parent->right);
 
+  // get starting pc of TxTreeNode
+  llvm::BranchInst *bi = cast<llvm::BranchInst>(left->prevPC->inst);
+  KFunction *kf = left->stack.back().kf;
+
+  parent->left->prevPC = left->prevPC->inst;
+  parent->left->startPC =
+      kf->instructions[kf->basicBlockEntry[bi->getSuccessor(1)]]
+          ->inst; // false state
+
+  parent->right->prevPC = right->prevPC->inst;
+  parent->right->startPC =
+      kf->instructions[kf->basicBlockEntry[bi->getSuccessor(0)]]
+          ->inst; // true state
+  std::pair<TxTreeNode *, TxTreeNode *> ret(parent->left, parent->right);
   return ret;
 }
 
