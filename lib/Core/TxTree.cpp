@@ -797,7 +797,7 @@ bool TxSubsumptionTableEntry::subsumed(
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
 
-  llvm::errs() << "Same prev = " << (state.prevPC->inst == prevInst) << "\n";
+//  llvm::errs() << "Same prev = " << (state.prevPC->inst == prevInst) << "\n";
   if (isa<llvm::PHINode>(startingInst)) {
     if (state.prevPC->inst != prevInst)
       return false;
