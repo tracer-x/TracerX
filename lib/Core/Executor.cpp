@@ -1202,6 +1202,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       return StatePair(&current, 0);
     }
 
+    return StatePair(&current, 0);
+
   } else if (res == Solver::False) {
     if (!isInternal) {
       if (pathWriter) {
@@ -1233,6 +1235,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       txTree->markPathCondition(current, unsatCore);
       return StatePair(0, &current);
     }
+
+    return StatePair(0, &current);
   } else {
 
     TimerStatIncrementer timer(stats::forkTime);
