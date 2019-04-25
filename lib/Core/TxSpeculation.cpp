@@ -19,12 +19,11 @@
 using namespace klee;
 
 bool TxSpeculativeRun::isSpeculable(ExecutionState &current) {
-  if (current.pc->inst->getParent()->getParent()->getName().substr(0, 5) ==
-          "klee_" ||
-      current.pc->inst->getParent()->getParent()->getName().substr(0, 3) ==
-          "tx_") {
+  if (current.stack.back().kf->function->getName().substr(0, 5) == "klee_" ||
+      current.stack.back().kf->function->getName().substr(0, 3) == "tx_") {
     return false;
   }
+
   if (isa<llvm::BranchInst>(current.prevPC->inst)) {
     llvm::BranchInst *bi = dyn_cast<llvm::BranchInst>(current.prevPC->inst);
     llvm::BasicBlock *bb = dyn_cast<llvm::BasicBlock>(bi->getOperand(1));
