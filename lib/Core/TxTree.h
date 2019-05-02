@@ -169,6 +169,7 @@ class TxSubsumptionTableEntry {
 
   llvm::Instruction *prevInst;
   llvm::Instruction *startingInst;
+  std::map<llvm::Value *, std::vector<ref<TxStateValue> > > phiValuesMap;
 
   ref<Expr> interpolant;
 

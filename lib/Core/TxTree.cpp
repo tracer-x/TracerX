@@ -59,6 +59,20 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   // save previous & starting instruction of the current node
   prevInst = node->prevPC;
   startingInst = node->startPC;
+  // extract PHINode in the basic block
+  std::vector<llvm::Value *> topPhis;
+  if (node->startPC != 0) {
+    llvm::BasicBlock *b = node->startPC->getParent();
+    for (llvm::BasicBlock::iterator it = b->begin(), ie = b->end(); it != ie;
+         ++it) {
+      if (isa<llvm::PHINode>(it)) {
+        topPhis.push_back(it);
+      } else {
+        break;
+      }
+    }
+  }
+  phiValuesMap = node->getDependency()->getTopPhiValuesMap(topPhis);
 
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
