@@ -74,6 +74,25 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   }
   phiValuesMap = node->getDependency()->getTopPhiValuesMap(topPhis);
 
+  llvm::errs() << "=== PHI Start ===\n";
+  prevInst->dump();
+  for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
+           it = phiValuesMap.begin(),
+           ie = phiValuesMap.end();
+       it != ie; ++it) {
+    llvm::PHINode *phi = dyn_cast<llvm::PHINode>(it->first);
+    unsigned int incomings = phi->getNumIncomingValues();
+    for (unsigned int i = 0; i < incomings; i++) {
+      if (prevInst->getParent() == phi->getIncomingBlock(i)) {
+        llvm::Value *v = phi->getIncomingValue(i);
+        v->dump();
+      }
+    }
+
+    llvm::errs() << "----\n";
+  }
+  llvm::errs() << "=== PHI End ===\n";
+
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
@@ -811,7 +830,8 @@ bool TxSubsumptionTableEntry::subsumed(
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
 
-//  llvm::errs() << "Same prev = " << (state.prevPC->inst == prevInst) << "\n";
+  //  llvm::errs() << "Same prev = " << (state.prevPC->inst == prevInst) <<
+  //  "\n";
   if (isa<llvm::PHINode>(startingInst)) {
     if (state.prevPC->inst != prevInst)
       return false;
