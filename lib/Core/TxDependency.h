@@ -320,6 +320,10 @@ class TxDependency {
   }
 
 public:
+  std::map<llvm::Value *, std::vector<ref<TxStateValue> > > &getValuesMap() {
+    return valuesMap;
+  }
+
   std::map<llvm::Value *, std::vector<ref<TxStateValue> > >
   getTopPhiValuesMap(std::vector<llvm::Value *> topPhis) {
 
