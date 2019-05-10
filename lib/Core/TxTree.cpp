@@ -43,8 +43,8 @@ using namespace klee;
 Statistic TxSubsumptionTableEntry::concretelyAddressedStoreExpressionBuildTime(
     "concretelyAddressedStoreExpressionBuildTime", "concreteStoreTime");
 Statistic
-    TxSubsumptionTableEntry::symbolicallyAddressedStoreExpressionBuildTime(
-        "symbolicallyAddressedStoreExpressionBuildTime", "symbolicStoreTime");
+TxSubsumptionTableEntry::symbolicallyAddressedStoreExpressionBuildTime(
+    "symbolicallyAddressedStoreExpressionBuildTime", "symbolicStoreTime");
 Statistic TxSubsumptionTableEntry::solverAccessTime("solverAccessTime",
                                                     "solverAccessTime");
 
@@ -106,40 +106,51 @@ void TxSubsumptionTableEntry::markValuesMap(TxTreeNode *node,
   // mark values map on parent
   std::map<llvm::Value *, std::vector<ref<TxStateValue> > > vsm =
       node->getDependency()->getPhiValuesMap();
+  std::vector<llvm::Value *> inVSM;
   std::vector<llvm::Value *> notInVSM;
+
   for (std::vector<llvm::Value *>::iterator it = instrs.begin(),
                                             ie = instrs.end();
        it != ie; ++it) {
-	  // if in the current values map then mark
+    // if in the current values map then mark
     if (vsm.find(*it) != vsm.end()) {
       node->markedValuesMap[*it] = vsm[*it];
-    } else{
-    	notInVSM.push_back(*it);
+      inVSM.push_back((*it));
+    } else {
+      notInVSM.push_back(*it);
     }
   }
 
-  // collect all dependants no in current values map
-
-
+  if (node->getParent()) {
+    std::vector<llvm::Value *> replacements = replaceByDependants(vsm, inVSM);
+    notInVSM.insert(notInVSM.end(), replacements.begin(), replacements.end());
+    // mark values map on parent
+    if (!replacements.empty()) {
+      markValuesMap(node->getParent(), notInVSM);
+    }
+  }
 }
 
-std::vector<llvm::Value *>
-TxSubsumptionTableEntry::collectDependants(std::map<llvm::Value *, std::vector<ref<TxStateValue> > > *vsm, llvm::Value *v) {
-  std::vector<llvm::Value *> res;
-  res.push_back(v);
-  llvm::Instruction *instr = dyn_cast<llvm::Instruction>(v);
-
-  for (unsigned int i = 0; i < instr->getNumOperands(); i++) {
-    llvm::Instruction *op = dyn_cast<llvm::Instruction>(instr->getOperand(i));
-    //    op->dump();
-    if (op && !isa<llvm::Constant>(op)) {
-      op->dump();
-      //    	if (op && !isa<llvm::Constant>(op)) {
-//      std::vector<llvm::Value *> cd = collectDependants(op);
-      //      res.insert(res.begin(), cd.begin(), cd.end());
-    }
-  }
-  return res;
+std::vector<llvm::Value *> TxSubsumptionTableEntry::replaceByDependants(
+    std::map<llvm::Value *, std::vector<ref<TxStateValue> > > &vsm,
+    std::vector<llvm::Value *> instrs) {
+  //  std::vector<llvm::Value *> res;
+  //  res.push_back(v);
+  //  llvm::Instruction *instr = dyn_cast<llvm::Instruction>(v);
+  //
+  //  for (unsigned int i = 0; i < instr->getNumOperands(); i++) {
+  //    llvm::Instruction *op =
+  //    dyn_cast<llvm::Instruction>(instr->getOperand(i));
+  //    //    op->dump();
+  //    if (op && !isa<llvm::Constant>(op)) {
+  //      op->dump();
+  //      //    	if (op && !isa<llvm::Constant>(op)) {
+  //      //      std::vector<llvm::Value *> cd = collectDependants(op);
+  //      //      res.insert(res.begin(), cd.begin(), cd.end());
+  //    }
+  //  }
+  //  return res;
+  return instrs;
 }
 
 TxSubsumptionTableEntry::~TxSubsumptionTableEntry() {}
@@ -224,8 +235,9 @@ ref<Expr> TxSubsumptionTableEntry::makeConstraint(
   return constraint;
 }
 
-bool TxSubsumptionTableEntry::hasVariableInSet(
-    std::set<const Array *> &existentials, ref<Expr> expr) {
+bool
+TxSubsumptionTableEntry::hasVariableInSet(std::set<const Array *> &existentials,
+                                          ref<Expr> expr) {
   for (int i = 0, numKids = expr->getNumKids(); i < numKids; ++i) {
     if (llvm::isa<ReadExpr>(expr)) {
       ReadExpr *readExpr = llvm::dyn_cast<ReadExpr>(expr);
@@ -631,9 +643,10 @@ ref<Expr> TxSubsumptionTableEntry::simplifyEqualityExpr(
   assert(!"Invalid expression type.");
 }
 
-void TxSubsumptionTableEntry::getSubstitution(
-    std::set<const Array *> &existentials, ref<Expr> equalities,
-    std::map<ref<Expr>, ref<Expr> > &map) {
+void
+TxSubsumptionTableEntry::getSubstitution(std::set<const Array *> &existentials,
+                                         ref<Expr> equalities,
+                                         std::map<ref<Expr>, ref<Expr> > &map) {
   // It is assumed the rhs is an expression on the free variables.
   if (llvm::isa<EqExpr>(equalities)) {
     ref<Expr> lhs = equalities->getKid(0);
@@ -1427,8 +1440,7 @@ bool TxSubsumptionTableEntry::subsumed(
       if (debugSubsumptionLevel >= 2) {
         klee_message("Before simplification:\n%s",
                      TxPrettyExpressionBuilder::constructQuery(
-                         state.constraints, existsExpr)
-                         .c_str());
+                         state.constraints, existsExpr).c_str());
       }
       expr = simplifyExistsExpr(existsExpr, exprHasNoFreeVariables);
     }
@@ -1503,8 +1515,7 @@ bool TxSubsumptionTableEntry::subsumed(
           if (debugSubsumptionLevel >= 2) {
             klee_message("Querying for subsumption check:\n%s",
                          TxPrettyExpressionBuilder::constructQuery(
-                             state.constraints, expr)
-                             .c_str());
+                             state.constraints, expr).c_str());
           }
 
           if (llvm::isa<ExistsExpr>(expr)) {
@@ -1538,10 +1549,9 @@ bool TxSubsumptionTableEntry::subsumed(
 
       } else {
         if (debugSubsumptionLevel >= 2) {
-          klee_message(
-              "Querying for subsumption check:\n%s",
-              TxPrettyExpressionBuilder::constructQuery(state.constraints, expr)
-                  .c_str());
+          klee_message("Querying for subsumption check:\n%s",
+                       TxPrettyExpressionBuilder::constructQuery(
+                           state.constraints, expr).c_str());
         }
         // We call the solver in the standard way if the
         // formula is unquantified.
@@ -1739,20 +1749,17 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
 
 void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
   stream << "KLEE: done:     Time for actual solver calls in subsumption check "
-            "(ms) = "
-         << ((double)stats::subsumptionQueryTime.getValue()) / 1000 << "\n";
+            "(ms) = " << ((double)stats::subsumptionQueryTime.getValue()) / 1000
+         << "\n";
   stream << "KLEE: done:     Number of solver calls for subsumption check "
-            "(failed) = "
-         << stats::subsumptionQueryCount.getValue() << " ("
+            "(failed) = " << stats::subsumptionQueryCount.getValue() << " ("
          << stats::subsumptionQueryFailureCount.getValue() << ")\n";
   stream << "KLEE: done:     Concrete store expression build time (ms) = "
          << ((double)concretelyAddressedStoreExpressionBuildTime.getValue()) /
-                1000
-         << "\n";
+                1000 << "\n";
   stream << "KLEE: done:     Symbolic store expression build time (ms) = "
          << ((double)symbolicallyAddressedStoreExpressionBuildTime.getValue()) /
-                1000
-         << "\n";
+                1000 << "\n";
   stream << "KLEE: done:     Solver access time (ms) = "
          << ((double)solverAccessTime.getValue()) / 1000 << "\n";
 }
@@ -1883,11 +1890,12 @@ void TxSubsumptionTable::CallHistoryIndexedTable::print(
 /**/
 
 std::map<uintptr_t, TxSubsumptionTable::CallHistoryIndexedTable *>
-    TxSubsumptionTable::instance;
+TxSubsumptionTable::instance;
 
-void TxSubsumptionTable::insert(
-    uintptr_t id, const std::vector<llvm::Instruction *> &callHistory,
-    TxSubsumptionTableEntry *entry) {
+void
+TxSubsumptionTable::insert(uintptr_t id,
+                           const std::vector<llvm::Instruction *> &callHistory,
+                           TxSubsumptionTableEntry *entry) {
   CallHistoryIndexedTable *subTable = 0;
 
   TxTree::entryNumber++; // Count of entries in the table
@@ -2010,8 +2018,8 @@ uint64_t TxTree::blockCount = 1;
 void TxTree::printTimeStat(std::stringstream &stream) {
   stream << "KLEE: done:     setCurrentINode = "
          << ((double)setCurrentINodeTime.getValue()) / 1000 << "\n";
-  stream << "KLEE: done:     remove = "
-         << ((double)removeTime.getValue()) / 1000 << "\n";
+  stream << "KLEE: done:     remove = " << ((double)removeTime.getValue()) /
+                                               1000 << "\n";
   stream << "KLEE: done:     subsumptionCheck = "
          << ((double)subsumptionCheckTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     markPathCondition = "
@@ -2036,8 +2044,7 @@ void TxTree::printTableStat(std::stringstream &stream) {
 
   stream << "KLEE: done:     Average solver calls per subsumption check = "
          << inTwoDecimalPoints((double)stats::subsumptionQueryCount /
-                               (double)subsumptionCheckCount)
-         << "\n";
+                               (double)subsumptionCheckCount) << "\n";
 }
 
 std::string TxTree::inTwoDecimalPoints(const double n) {
@@ -2331,8 +2338,8 @@ Statistic TxTreeNode::bindReturnValueTime("BindReturnValueTime",
 Statistic TxTreeNode::getStoredExpressionsTime("GetStoredExpressionsTime",
                                                "GetStoredExpressionsTime");
 Statistic
-    TxTreeNode::getStoredCoreExpressionsTime("GetStoredCoreExpressionsTime",
-                                             "GetStoredCoreExpressionsTime");
+TxTreeNode::getStoredCoreExpressionsTime("GetStoredCoreExpressionsTime",
+                                         "GetStoredCoreExpressionsTime");
 
 // The interpolation tree node sequence number
 uint64_t TxTreeNode::nextNodeSequenceNumber = 1;
@@ -2342,10 +2349,10 @@ void TxTreeNode::printTimeStat(std::stringstream &stream) {
          << ((double)getInterpolantTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     addConstraintTime = "
          << ((double)addConstraintTime.getValue()) / 1000 << "\n";
-  stream << "KLEE: done:     splitTime = "
-         << ((double)splitTime.getValue()) / 1000 << "\n";
-  stream << "KLEE: done:     execute = "
-         << ((double)executeTime.getValue()) / 1000 << "\n";
+  stream << "KLEE: done:     splitTime = " << ((double)splitTime.getValue()) /
+                                                  1000 << "\n";
+  stream << "KLEE: done:     execute = " << ((double)executeTime.getValue()) /
+                                                1000 << "\n";
   stream << "KLEE: done:     bindCallArguments = "
          << ((double)bindCallArgumentsTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     bindReturnValue = "
@@ -2472,8 +2479,8 @@ uint64_t TxTreeNode::getInstructionsDepth() { return instructionsDepth; }
 
 void TxTreeNode::incInstructionsDepth() { ++instructionsDepth; }
 
-void TxTreeNode::unsatCoreInterpolation(
-    const std::vector<ref<Expr> > &unsatCore) {
+void
+TxTreeNode::unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore) {
   dependency->unsatCoreInterpolation(unsatCore);
 }
 

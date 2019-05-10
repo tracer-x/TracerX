@@ -16,20 +16,20 @@
 #ifndef TXTREE_H_
 #define TXTREE_H_
 
-#include <klee/Expr.h>
 #include "klee/CommandLine.h"
 #include "klee/Config/Version.h"
 #include "klee/ExecutionState.h"
+#include "klee/Internal/Module/Cell.h"
+#include "klee/Internal/Module/KModule.h"
 #include "klee/Solver.h"
 #include "klee/Statistic.h"
 #include "klee/TimerStatIncrementer.h"
 #include "klee/util/ExprVisitor.h"
 #include "klee/util/TxTreeGraph.h"
-#include "klee/Internal/Module/KModule.h"
-#include "klee/Internal/Module/Cell.h"
+#include <klee/Expr.h>
 
-#include "llvm/Support/raw_ostream.h"
 #include "TxDependency.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace klee {
 
@@ -185,7 +185,9 @@ class TxSubsumptionTableEntry {
   std::set<const Array *> existentials;
 
   void markValuesMap(TxTreeNode *node, std::vector<llvm::Value *> instrs);
-  std::vector<llvm::Value *> collectDependants(std::map<llvm::Value *, std::vector<ref<TxStateValue> > > *vsm, llvm::Value *);
+  std::vector<llvm::Value *> replaceByDependants(
+      std::map<llvm::Value *, std::vector<ref<TxStateValue> > > &vsm,
+      std::vector<llvm::Value *> instrs);
 
   /// \brief A procedure for building subsumption check constraints using
   /// symbolically-addressed store elements
@@ -449,9 +451,7 @@ class TxTreeNode {
   }
 
 public:
-  TxTreeNode *getParent() {
-	  return parent;
-  }
+  TxTreeNode *getParent() { return parent; }
   TxDependency *getDependency() { return dependency; }
 
   bool isSubsumed;
@@ -901,5 +901,5 @@ public:
     return currentTxTreeNode->dependency->debugStateLevel;
   }
 };
-}
+} // namespace klee
 #endif /* TXTREE_H_ */
