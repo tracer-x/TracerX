@@ -170,6 +170,7 @@ class TxSubsumptionTableEntry {
   llvm::Instruction *prevInst;
   llvm::Instruction *startingInst;
   std::map<llvm::Value *, std::vector<ref<TxStateValue> > > phiValuesMap;
+  std::map<llvm::Value *, std::vector<ref<TxStateValue> > > valuesMap;
 
   ref<Expr> interpolant;
 
@@ -182,6 +183,9 @@ class TxSubsumptionTableEntry {
   TxStore::TopInterpolantStore symbolicallyAddressedStore;
 
   std::set<const Array *> existentials;
+
+  void markValuesMap(TxTreeNode *node, std::vector<llvm::Value *> instrs);
+  std::vector<llvm::Value *> collectDependants(std::map<llvm::Value *, std::vector<ref<TxStateValue> > > *vsm, llvm::Value *);
 
   /// \brief A procedure for building subsumption check constraints using
   /// symbolically-addressed store elements
@@ -445,6 +449,9 @@ class TxTreeNode {
   }
 
 public:
+  TxTreeNode *getParent() {
+	  return parent;
+  }
   TxDependency *getDependency() { return dependency; }
 
   bool isSubsumed;
@@ -457,6 +464,7 @@ public:
 
   llvm::Instruction *prevPC;
   llvm::Instruction *startPC;
+  std::map<llvm::Value *, std::vector<ref<TxStateValue> > > markedValuesMap;
 
   uintptr_t getProgramPoint() { return programPoint; }
 
