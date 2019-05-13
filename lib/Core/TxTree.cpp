@@ -56,11 +56,7 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
 
-  // save previous & starting instruction of the current node
-  prevInst = node->prevPC;
-  startingInst = node->startPC;
-
-  // extract PHINode in the basic block
+  // process top phi nodes
   std::vector<llvm::Value *> topPhis;
   if (node->startPC != 0) {
     llvm::BasicBlock *b = node->startPC->getParent();
@@ -74,26 +70,23 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
     }
   }
   if (!topPhis.empty()) {
-    phiValuesMap = node->getDependency()->getTopPhiValuesMap(topPhis);
-    // backward to root
-    llvm::errs() << "--- START backward marking ---\n";
-    std::vector<llvm::Value *> phiValues;
-    for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
-             it = phiValuesMap.begin(),
-             ie = phiValuesMap.end();
+    std::map<llvm::Value *, std::vector<ref<TxStateValue> > > nodeValuesMap =
+        node->getDependency()->getValuesMap();
+    for (std::vector<llvm::Value *>::iterator it = topPhis.begin(),
+                                              ie = topPhis.end();
          it != ie; ++it) {
-      llvm::PHINode *phi = dyn_cast<llvm::PHINode>(it->first);
-      for (unsigned int i = 0; i < phi->getNumIncomingValues(); i++) {
-        if (prevInst->getParent() == phi->getIncomingBlock(i)) {
-          phiValues.push_back(phi->getIncomingValue(i));
-        }
+      // save values map of phi node
+      if (nodeValuesMap.find(*it) != nodeValuesMap.end()) {
+        phiValuesMap[*it] = nodeValuesMap[*it];
       }
+
+      // upward marking for each phi node
+      upwardMarking(node, (*it));
     }
-    markValuesMap(node->getParent(), phiValues);
-    llvm::errs() << "--- END backward marking ---\n";
-  } else {
-    valuesMap = node->markedValuesMap;
   }
+
+  // save marked values map
+  valuesMap = node->getDependency()->extractValuesMap(node->markedValues);
 
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
@@ -101,56 +94,89 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
       symbolicallyAddressedHistoricalStore);
 }
 
-void TxSubsumptionTableEntry::markValuesMap(TxTreeNode *node,
-                                            std::vector<llvm::Value *> instrs) {
-  // mark values map on parent
-  std::map<llvm::Value *, std::vector<ref<TxStateValue> > > vsm =
-      node->getDependency()->getPhiValuesMap();
-  std::vector<llvm::Value *> inVSM;
-  std::vector<llvm::Value *> notInVSM;
-
-  for (std::vector<llvm::Value *>::iterator it = instrs.begin(),
-                                            ie = instrs.end();
-       it != ie; ++it) {
-    // if in the current values map then mark
-    if (vsm.find(*it) != vsm.end()) {
-      node->markedValuesMap[*it] = vsm[*it];
-      inVSM.push_back((*it));
-    } else {
-      notInVSM.push_back(*it);
-    }
-  }
-
-  if (node->getParent()) {
-    std::vector<llvm::Value *> replacements = replaceByDependants(vsm, inVSM);
-    notInVSM.insert(notInVSM.end(), replacements.begin(), replacements.end());
-    // mark values map on parent
-    if (!replacements.empty()) {
-      markValuesMap(node->getParent(), notInVSM);
+void TxSubsumptionTableEntry::upwardMarking(TxTreeNode *node,
+                                            llvm::Value *phi) {
+  std::set<llvm::Value *> marked;
+  marked.insert(phi);
+  std::vector<llvm::Value *> insts;
+  llvm::PHINode *phiNode = dyn_cast<llvm::PHINode>(phi);
+  for (unsigned int i = 0; i < phiNode->getNumIncomingValues(); i++) {
+    if (node->prevPC->getParent() == phiNode->getIncomingBlock(i)) {
+      llvm::Value *phiValue = phiNode->getIncomingValue(i);
+      marked.insert(phiValue);
+      insts.push_back(phiValue);
+      markValuesMap(node->getParent(), insts, marked);
     }
   }
 }
 
-std::vector<llvm::Value *> TxSubsumptionTableEntry::replaceByDependants(
-    std::map<llvm::Value *, std::vector<ref<TxStateValue> > > &vsm,
-    std::vector<llvm::Value *> instrs) {
-  //  std::vector<llvm::Value *> res;
-  //  res.push_back(v);
-  //  llvm::Instruction *instr = dyn_cast<llvm::Instruction>(v);
-  //
-  //  for (unsigned int i = 0; i < instr->getNumOperands(); i++) {
-  //    llvm::Instruction *op =
-  //    dyn_cast<llvm::Instruction>(instr->getOperand(i));
-  //    //    op->dump();
-  //    if (op && !isa<llvm::Constant>(op)) {
-  //      op->dump();
-  //      //    	if (op && !isa<llvm::Constant>(op)) {
-  //      //      std::vector<llvm::Value *> cd = collectDependants(op);
-  //      //      res.insert(res.begin(), cd.begin(), cd.end());
-  //    }
-  //  }
-  //  return res;
-  return instrs;
+void TxSubsumptionTableEntry::markValuesMap(TxTreeNode *node,
+                                            std::vector<llvm::Value *> insts,
+                                            std::set<llvm::Value *> marked) {
+  // mark values map in the current node
+  std::map<llvm::Value *, std::vector<ref<TxStateValue> > > currentValuesMap =
+      node->getDependency()->getValuesMap();
+  std::vector<llvm::Value *> inValues;
+  std::vector<llvm::Value *> notInValues;
+  for (std::vector<llvm::Value *>::iterator it = insts.begin(),
+                                            ie = insts.end();
+       it != ie; ++it) {
+    // if in the current values map then mark
+    if (currentValuesMap.find(*it) != currentValuesMap.end()) {
+      node->markedValues.push_back(*it);
+      inValues.push_back((*it));
+    } else {
+      notInValues.push_back(*it);
+    }
+  }
+
+  // mark values in parent node
+  if (node->getParent()) {
+    // replace values in current node with dependants not exist in current node
+    std::vector<llvm::Value *> replacements;
+    for (std::vector<llvm::Value *>::iterator it = inValues.begin(),
+                                              ie = inValues.end();
+         it != ie; ++it) {
+      // get dependants not in current values map
+      std::vector<llvm::Value *> dependants =
+          getDependants(*it, currentValuesMap, marked);
+      replacements.insert(replacements.begin(), dependants.begin(),
+                          dependants.end());
+    }
+    // keep previous values not in current node
+    replacements.insert(replacements.end(), notInValues.begin(),
+                        notInValues.end());
+    // pass to mark values map on parent node
+    if (!replacements.empty()) {
+      markValuesMap(node->getParent(), replacements, marked);
+    }
+  }
+}
+
+/**
+ * Get dependants that are not in the current values map & not marked before
+ */
+std::vector<llvm::Value *> TxSubsumptionTableEntry::getDependants(
+    llvm::Value *ins,
+    std::map<llvm::Value *, std::vector<ref<TxStateValue> > > &currentValuesMap,
+    std::set<llvm::Value *> &marked) {
+  std::vector<llvm::Value *> res;
+  llvm::Instruction *instr = dyn_cast<llvm::Instruction>(ins);
+  for (unsigned int i = 0; i < instr->getNumOperands(); i++) {
+    llvm::Instruction *op = dyn_cast<llvm::Instruction>(instr->getOperand(i));
+    if (op && !isa<llvm::Constant>(op) && marked.find(op) == marked.end()) {
+      marked.insert(op);
+      // if not in current values map then push up
+      if (currentValuesMap.find(op) == currentValuesMap.end()) {
+        res.push_back(op);
+      } else {
+        std::vector<llvm::Value *> tmp =
+            getDependants(op, currentValuesMap, marked);
+        res.insert(res.end(), tmp.begin(), tmp.end());
+      }
+    }
+  }
+  return res;
 }
 
 TxSubsumptionTableEntry::~TxSubsumptionTableEntry() {}
@@ -889,29 +915,29 @@ bool TxSubsumptionTableEntry::subsumed(
   //  llvm::errs() << "=== Subsumption Check Start ===\n";
   std::map<llvm::Value *, std::vector<ref<TxStateValue> > > &nodeValuesMap =
       state.txTreeNode->getDependency()->getValuesMap();
-  //  for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
-  //           it = nodeValuesMap.begin(),
-  //           ie = nodeValuesMap.end();
-  //       it != ie; ++it) {
-  //	  it->first->dump();
-  //    it->second.back()->getExpression()->dump();
-  //  }
-  //  llvm::errs() << "--end node values map--\n";
+  // check values map with phi nodes
   for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
            it = phiValuesMap.begin(),
            ie = phiValuesMap.end();
        it != ie; ++it) {
     std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator it1 =
         nodeValuesMap.find(it->first);
-    //    it->second.back()->getExpression()->dump();
-    //    if (it1 != nodeValuesMap.end()) {
-    //      it1->second.back()->getExpression()->dump();
-    //    }
     if (it1 == nodeValuesMap.end() || it1->second.back()->getExpression() !=
                                           it->second.back()->getExpression()) {
       return false;
     }
-    //    llvm::errs() << "----\n";
+  }
+  // check values map with non-phi nodes
+  for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
+           it = valuesMap.begin(),
+           ie = valuesMap.end();
+       it != ie; ++it) {
+    std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator it1 =
+        nodeValuesMap.find(it->first);
+    if (it1 == nodeValuesMap.end() || it1->second.back()->getExpression() !=
+                                          it->second.back()->getExpression()) {
+      return false;
+    }
   }
   //  llvm::errs() << "=== Subsumption Check End ===\n";
 

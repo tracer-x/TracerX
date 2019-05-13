@@ -325,12 +325,10 @@ public:
   }
 
   std::map<llvm::Value *, std::vector<ref<TxStateValue> > >
-  getTopPhiValuesMap(std::vector<llvm::Value *> topPhis) {
-
+  extractValuesMap(std::vector<llvm::Value *> values) {
     std::map<llvm::Value *, std::vector<ref<TxStateValue> > > res;
-
-    for (std::vector<llvm::Value *>::iterator it = topPhis.begin(),
-                                              ie = topPhis.end();
+    for (std::vector<llvm::Value *>::iterator it = values.begin(),
+                                              ie = values.end();
          it != ie; ++it) {
       if (valuesMap.find(*it) != valuesMap.end()) {
         res[*it] = valuesMap[*it];
@@ -339,19 +337,6 @@ public:
     return res;
   }
 
-  std::map<llvm::Value *, std::vector<ref<TxStateValue> > > getPhiValuesMap() {
-    std::map<llvm::Value *, std::vector<ref<TxStateValue> > > res;
-    for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
-             it = valuesMap.begin(),
-             ie = valuesMap.end();
-         it != ie; ++it) {
-      if (isa<llvm::PHINode>(it->first)) {
-        res.insert(std::pair<llvm::Value *, std::vector<ref<TxStateValue> > >(
-            it->first, it->second));
-      }
-    }
-    return res;
-  }
   /// \brief This is for dynamic setting up of debug messages.
   int debugSubsumptionLevel;
 

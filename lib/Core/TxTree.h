@@ -184,10 +184,19 @@ class TxSubsumptionTableEntry {
 
   std::set<const Array *> existentials;
 
-  void markValuesMap(TxTreeNode *node, std::vector<llvm::Value *> instrs);
+  void upwardMarking(TxTreeNode *node, llvm::Value *phi);
+  void markValuesMap(TxTreeNode *node, std::vector<llvm::Value *> insts,
+                     std::set<llvm::Value *> marked);
   std::vector<llvm::Value *> replaceByDependants(
-      std::map<llvm::Value *, std::vector<ref<TxStateValue> > > &vsm,
-      std::vector<llvm::Value *> instrs);
+      std::vector<llvm::Value *> instrs,
+      std::map<llvm::Value *, std::vector<ref<TxStateValue> > > &
+          currentValuesMap,
+      std::set<llvm::Value *> &markedValues);
+  std::vector<llvm::Value *>
+  getDependants(llvm::Value *instrs,
+                std::map<llvm::Value *, std::vector<ref<TxStateValue> > > &
+                    currentValuesMap,
+                std::set<llvm::Value *> &markedValues);
 
   /// \brief A procedure for building subsumption check constraints using
   /// symbolically-addressed store elements
@@ -464,7 +473,7 @@ public:
 
   llvm::Instruction *prevPC;
   llvm::Instruction *startPC;
-  std::map<llvm::Value *, std::vector<ref<TxStateValue> > > markedValuesMap;
+  std::vector<llvm::Value *> markedValues;
 
   uintptr_t getProgramPoint() { return programPoint; }
 
