@@ -103,9 +103,11 @@ void TxSubsumptionTableEntry::upwardMarking(TxTreeNode *node,
   for (unsigned int i = 0; i < phiNode->getNumIncomingValues(); i++) {
     if (node->prevPC->getParent() == phiNode->getIncomingBlock(i)) {
       llvm::Value *phiValue = phiNode->getIncomingValue(i);
-      marked.insert(phiValue);
-      insts.push_back(phiValue);
-      markValuesMap(node->getParent(), insts, marked);
+      if (isa<llvm::Instruction>(phiValue)) {
+        marked.insert(phiValue);
+        insts.push_back(phiValue);
+        markValuesMap(node->getParent(), insts, marked);
+      }
     }
   }
 }
@@ -160,6 +162,7 @@ std::vector<llvm::Value *> TxSubsumptionTableEntry::getDependants(
     llvm::Value *ins,
     std::map<llvm::Value *, std::vector<ref<TxStateValue> > > &currentValuesMap,
     std::set<llvm::Value *> &marked) {
+
   std::vector<llvm::Value *> res;
   llvm::Instruction *instr = dyn_cast<llvm::Instruction>(ins);
   for (unsigned int i = 0; i < instr->getNumOperands(); i++) {
@@ -2270,20 +2273,19 @@ TxTree::split(TxTreeNode *parent, ExecutionState *left, ExecutionState *right) {
   TimerStatIncrementer t(splitTime);
   parent->split(left, right);
   TxTreeGraph::addChildren(parent, parent->left, parent->right);
-
   // get starting pc of TxTreeNode
-  llvm::BranchInst *bi = cast<llvm::BranchInst>(left->prevPC->inst);
-  KFunction *kf = left->stack.back().kf;
-
-  parent->left->prevPC = left->prevPC->inst;
-  parent->left->startPC =
-      kf->instructions[kf->basicBlockEntry[bi->getSuccessor(1)]]
-          ->inst; // false state
-
-  parent->right->prevPC = right->prevPC->inst;
-  parent->right->startPC =
-      kf->instructions[kf->basicBlockEntry[bi->getSuccessor(0)]]
-          ->inst; // true state
+  if (isa<llvm::BranchInst>(left->prevPC->inst)) {
+    llvm::BranchInst *bi = dyn_cast<llvm::BranchInst>(left->prevPC->inst);
+    KFunction *kf = left->stack.back().kf;
+    parent->left->prevPC = left->prevPC->inst;
+    parent->left->startPC =
+        kf->instructions[kf->basicBlockEntry[bi->getSuccessor(1)]]
+            ->inst; // false state
+    parent->right->prevPC = right->prevPC->inst;
+    parent->right->startPC =
+        kf->instructions[kf->basicBlockEntry[bi->getSuccessor(0)]]
+            ->inst; // true state
+  }
   std::pair<TxTreeNode *, TxTreeNode *> ret(parent->left, parent->right);
   return ret;
 }
