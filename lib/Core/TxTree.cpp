@@ -1771,6 +1771,34 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     }
   }
   stream << "]";
+
+  stream << "\n" << prefix << "phi values map = [\n";
+  for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::const_iterator
+           it = phiValuesMap.begin(),
+           ie = phiValuesMap.end();
+       it != ie; ++it) {
+    stream << "	key:\n		";
+    it->first->print(stream);
+    stream << "\n";
+    stream << "	last value:\n		";
+    it->second.back()->getExpression()->print(stream);
+    stream << "\n	------------------------------------------\n";
+  }
+  stream << "]";
+
+  stream << "\n" << prefix << "non-phi values map = [\n";
+  for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::const_iterator
+           it = valuesMap.begin(),
+           ie = valuesMap.end();
+       it != ie; ++it) {
+    stream << "	key:\n		";
+    it->first->print(stream);
+    stream << "\n";
+    stream << "	last value:\n		";
+    it->second.back()->getExpression()->print(stream);
+    stream << "\n	------------------------------------------\n";
+  }
+  stream << "]";
 }
 
 void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
