@@ -167,8 +167,13 @@ public:
     Sge, ///< Not used in canonical form
     Exists,
     LastKind = Exists,
-    WPVar,
-    CastKindFirst = ZExt,
+
+	// Expressions for WP Interpolation
+	WPVar,
+    Upd,  // Array Update
+    Sel,  // Array Select
+
+	CastKindFirst = ZExt,
     CastKindLast = SExt,
     BinaryKindFirst = Add,
     BinaryKindLast = Sge,
@@ -466,6 +471,97 @@ public:
   }
   static bool classof(const WPVarExpr *) { return true; }
 };
+
+/// Class representing the update operation in array theory
+class UpdExpr : public NonConstantExpr {
+public:
+  ref<Expr> array;
+  ref<Expr> index;
+  ref<Expr> value;
+
+public:
+  static ref<Expr> alloc(const ref<Expr> &_array, const ref<Expr> &_index, const ref<Expr> &_value) {
+    ref<Expr> r(new UpdExpr(_array, _index, _value));
+    r->computeHash();
+    return r;
+  }
+
+  static ref<Expr> create(ref<Expr> array, ref<Expr> index, ref<Expr> update);
+
+  Width getWidth() const { return array->getWidth(); }
+  Kind getKind() const { return Upd; }
+
+  unsigned getNumKids() const { return 3; }
+  ref<Expr> getKid(unsigned i) const {
+	  if(i==2) return value;
+	  else if(i==1) return index;
+	  else return array;
+  }
+
+  int compareContents(const Expr &b) const;
+
+  virtual ref<Expr> rebuild(ref<Expr> kids[]) const {
+    return create(kids[0],kids[1],kids[2]);
+  }
+
+  void print(llvm::raw_ostream &os) const;
+
+  virtual unsigned computeHash();
+
+private:
+  UpdExpr(const ref<Expr> &_array, const ref<Expr> &_index, const ref<Expr> &_value) :
+	  array(_array) {index = _index; value = _value;}
+
+public:
+  static bool classof(const Expr *E) {
+    return E->getKind() == Expr::Upd;
+  }
+  static bool classof(const UpdExpr *) { return true; }
+};
+
+
+/// Class representing the select operation in array theory
+class SelExpr : public NonConstantExpr {
+public:
+  ref<Expr> array;
+  ref<Expr> index;
+
+public:
+  static ref<Expr> alloc(const ref<Expr> &_array, const ref<Expr> &_index) {
+    ref<Expr> r(new SelExpr(_array, _index));
+    r->computeHash();
+    return r;
+  }
+
+  static ref<Expr> create(ref<Expr> array, ref<Expr> index);
+
+  Width getWidth() const { return array->getWidth(); }
+  Kind getKind() const { return Sel; }
+
+  unsigned getNumKids() const { return 2; }
+  ref<Expr> getKid(unsigned i) const { return !i ? index : array; }
+
+  int compareContents(const Expr &b) const;
+
+  virtual ref<Expr> rebuild(ref<Expr> kids[]) const {
+    return create(kids[0],kids[1]);
+  }
+
+  void print(llvm::raw_ostream &os) const;
+
+  virtual unsigned computeHash();
+
+private:
+  SelExpr(const ref<Expr> &_array, const ref<Expr> &_index) :
+	  array(_array) {index = _index;}
+
+public:
+  static bool classof(const Expr *E) {
+    return E->getKind() == Expr::Sel;
+  }
+  static bool classof(const SelExpr *) { return true; }
+};
+
 
 // Special
 

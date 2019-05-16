@@ -1719,6 +1719,7 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
       llvm::GetElementPtrInst *parentGEP =
           dyn_cast<llvm::GetElementPtrInst>(inst->getOperand(0));
       std::pair<ref<Expr>, ref<Expr> > pair = getPointer(parentGEP);
+      ret = SelExpr::create(pair.second, pair.first);
     } else {
       ret = getLoad(inst);
     }
