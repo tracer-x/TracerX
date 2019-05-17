@@ -56,34 +56,9 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
 
-  // process top phi nodes
-  std::vector<llvm::Value *> topPhis;
-  if (node->startPC != 0) {
-    llvm::BasicBlock *b = node->startPC->getParent();
-    for (llvm::BasicBlock::iterator it = b->begin(), ie = b->end(); it != ie;
-         ++it) {
-      if (isa<llvm::PHINode>(it)) {
-        topPhis.push_back(it);
-      } else {
-        break;
-      }
-    }
-  }
-  if (!topPhis.empty()) {
-    std::map<llvm::Value *, std::vector<ref<TxStateValue> > > nodeValuesMap =
-        node->getDependency()->getValuesMap();
-    for (std::vector<llvm::Value *>::iterator it = topPhis.begin(),
-                                              ie = topPhis.end();
-         it != ie; ++it) {
-      // save values map of phi node
-      if (nodeValuesMap.find(*it) != nodeValuesMap.end()) {
-        phiValuesMap[*it] = nodeValuesMap[*it];
-      }
+  phiValuesMap = node->getDependency()->extractPhiValuesMap();
 
-      // upward marking for each phi node
-      upwardMarking(node, (*it));
-    }
-  }
+  // TODO:: marked dependencies of phi instructions
 
   // save marked values map
   valuesMap = node->getDependency()->extractValuesMap(node->markedValues);
@@ -96,7 +71,8 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
 
 void TxSubsumptionTableEntry::upwardMarking(TxTreeNode *node,
                                             llvm::Value *phi) {
-  std::set<llvm::Value *> marked;
+  /*
+        std::set<llvm::Value *> marked;
   marked.insert(phi);
   std::vector<llvm::Value *> insts;
   llvm::PHINode *phiNode = dyn_cast<llvm::PHINode>(phi);
@@ -110,6 +86,7 @@ void TxSubsumptionTableEntry::upwardMarking(TxTreeNode *node,
       }
     }
   }
+  */
 }
 
 void TxSubsumptionTableEntry::markValuesMap(TxTreeNode *node,
@@ -2273,19 +2250,6 @@ TxTree::split(TxTreeNode *parent, ExecutionState *left, ExecutionState *right) {
   TimerStatIncrementer t(splitTime);
   parent->split(left, right);
   TxTreeGraph::addChildren(parent, parent->left, parent->right);
-  // get starting pc of TxTreeNode
-  if (isa<llvm::BranchInst>(left->prevPC->inst)) {
-    llvm::BranchInst *bi = dyn_cast<llvm::BranchInst>(left->prevPC->inst);
-    KFunction *kf = left->stack.back().kf;
-    parent->left->prevPC = left->prevPC->inst;
-    parent->left->startPC =
-        kf->instructions[kf->basicBlockEntry[bi->getSuccessor(1)]]
-            ->inst; // false state
-    parent->right->prevPC = right->prevPC->inst;
-    parent->right->startPC =
-        kf->instructions[kf->basicBlockEntry[bi->getSuccessor(0)]]
-            ->inst; // true state
-  }
   std::pair<TxTreeNode *, TxTreeNode *> ret(parent->left, parent->right);
   return ret;
 }
@@ -2436,8 +2400,6 @@ TxTreeNode::TxTreeNode(
   // Inherit the abstract dependency or NULL
   dependency = new TxDependency(_parent ? _parent->dependency : 0, _targetData,
                                 _globalAddresses);
-  prevPC = 0;
-  startPC = 0;
 }
 
 TxTreeNode::~TxTreeNode() {

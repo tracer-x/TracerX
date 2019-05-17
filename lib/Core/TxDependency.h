@@ -325,6 +325,20 @@ public:
   }
 
   std::map<llvm::Value *, std::vector<ref<TxStateValue> > >
+  extractPhiValuesMap() {
+    std::map<llvm::Value *, std::vector<ref<TxStateValue> > > res;
+    for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
+             it = valuesMap.begin(),
+             ie = valuesMap.end();
+         it != ie; ++it) {
+      if (isa<llvm::PHINode>(it->first)) {
+        res[it->first] = valuesMap[it->first];
+      }
+    }
+    return res;
+  }
+
+  std::map<llvm::Value *, std::vector<ref<TxStateValue> > >
   extractValuesMap(std::vector<llvm::Value *> values) {
     std::map<llvm::Value *, std::vector<ref<TxStateValue> > > res;
     for (std::vector<llvm::Value *>::iterator it = values.begin(),
@@ -582,6 +596,6 @@ public:
   /// line.
   void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
 };
-}
+} // namespace klee
 
 #endif

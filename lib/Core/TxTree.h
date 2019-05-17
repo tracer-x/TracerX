@@ -167,8 +167,6 @@ class TxSubsumptionTableEntry {
   static Statistic symbolicallyAddressedStoreExpressionBuildTime;
   static Statistic solverAccessTime;
 
-  llvm::Instruction *prevInst;
-  llvm::Instruction *startingInst;
   std::map<llvm::Value *, std::vector<ref<TxStateValue> > > phiValuesMap;
   std::map<llvm::Value *, std::vector<ref<TxStateValue> > > valuesMap;
 
@@ -471,8 +469,6 @@ public:
   /// \brief The current call history
   std::vector<llvm::Instruction *> callHistory;
 
-  llvm::Instruction *prevPC;
-  llvm::Instruction *startPC;
   std::vector<llvm::Value *> markedValues;
 
   uintptr_t getProgramPoint() { return programPoint; }
