@@ -182,7 +182,6 @@ class TxSubsumptionTableEntry {
 
   std::set<const Array *> existentials;
 
-  void upwardMarking(TxTreeNode *node, llvm::Value *phi);
   void markValuesMap(TxTreeNode *node, std::vector<llvm::Value *> insts,
                      std::set<llvm::Value *> marked);
   std::vector<llvm::Value *> replaceByDependants(

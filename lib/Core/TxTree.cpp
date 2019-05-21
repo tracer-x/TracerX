@@ -59,6 +59,27 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   phiValuesMap = node->getDependency()->extractPhiValuesMap();
 
   // TODO:: marked dependencies of phi instructions
+  for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
+           it = phiValuesMap.begin(),
+           ie = phiValuesMap.end();
+       it != ie; ++it) {
+    // maintain marked values and collect dependent instructions
+    std::set<llvm::Value *> marked;
+    std::vector<llvm::Value *> dependentInsts;
+
+    marked.insert(it->first);
+    llvm::PHINode *phiNode = dyn_cast<llvm::PHINode>(it->first);
+    for (unsigned int i = 0; i < phiNode->getNumIncomingValues(); i++) {
+      llvm::Value *phiVal = phiNode->getIncomingValue(i);
+      if (isa<llvm::Instruction>(phiVal)) {
+        marked.insert(phiVal);
+        dependentInsts.push_back(phiVal);
+      }
+    }
+
+    // start upward marking
+    markValuesMap(node, dependentInsts, marked);
+  }
 
   // save marked values map
   valuesMap = node->getDependency()->extractValuesMap(node->markedValues);
@@ -67,26 +88,6 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
       callHistory, substitution, existentials, concretelyAddressedStore,
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
       symbolicallyAddressedHistoricalStore);
-}
-
-void TxSubsumptionTableEntry::upwardMarking(TxTreeNode *node,
-                                            llvm::Value *phi) {
-  /*
-        std::set<llvm::Value *> marked;
-  marked.insert(phi);
-  std::vector<llvm::Value *> insts;
-  llvm::PHINode *phiNode = dyn_cast<llvm::PHINode>(phi);
-  for (unsigned int i = 0; i < phiNode->getNumIncomingValues(); i++) {
-    if (node->prevPC->getParent() == phiNode->getIncomingBlock(i)) {
-      llvm::Value *phiValue = phiNode->getIncomingValue(i);
-      if (isa<llvm::Instruction>(phiValue)) {
-        marked.insert(phiValue);
-        insts.push_back(phiValue);
-        markValuesMap(node->getParent(), insts, marked);
-      }
-    }
-  }
-  */
 }
 
 void TxSubsumptionTableEntry::markValuesMap(TxTreeNode *node,
