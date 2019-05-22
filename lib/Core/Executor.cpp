@@ -2117,6 +2117,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
     // Update dependency
     if (INTERPOLATION_ENABLED) {
+      txTree->getCurrentTxTreeNode()->phiNodes.push_back(i);
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
       txTree->executePHI(i, state.incomingBBIndex, result);
 #else
@@ -3261,7 +3262,7 @@ void Executor::run(ExecutionState &initialState) {
     if (INTERPOLATION_ENABLED &&
         txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
       //      klee_warning("PhiBug instruction");
-      //      state.pc->inst->dump();
+      //      state.pc->inrust->dump();
       terminateStateOnSubsumption(state);
     } else {
       KInstruction *ki = state.pc;

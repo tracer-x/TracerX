@@ -468,6 +468,7 @@ public:
   /// \brief The current call history
   std::vector<llvm::Instruction *> callHistory;
 
+  std::vector<llvm::Value *> phiNodes;
   std::vector<llvm::Value *> markedValues;
 
   uintptr_t getProgramPoint() { return programPoint; }
@@ -713,6 +714,7 @@ class TxTree {
   static std::string inTwoDecimalPoints(const double n);
 
 public:
+  TxTreeNode *getCurrentTxTreeNode() { return currentTxTreeNode; }
   // Several static member variables for profiling the execution time of
   // this class's member functions.
   static Statistic setCurrentINodeTime;

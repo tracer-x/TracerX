@@ -56,19 +56,19 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
 
-  phiValuesMap = node->getDependency()->extractPhiValuesMap();
+  phiValuesMap = node->getDependency()->extractValuesMap(node->phiNodes);
 
-  // TODO:: marked dependencies of phi instructions
-  for (std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::iterator
-           it = phiValuesMap.begin(),
-           ie = phiValuesMap.end();
+  // Marked dependencies of phi nodes
+  for (std::vector<llvm::Value *>::iterator it = node->phiNodes.begin(),
+                                            ie = node->phiNodes.end();
        it != ie; ++it) {
+
     // maintain marked values and collect dependent instructions
     std::set<llvm::Value *> marked;
     std::vector<llvm::Value *> dependentInsts;
 
-    marked.insert(it->first);
-    llvm::PHINode *phiNode = dyn_cast<llvm::PHINode>(it->first);
+    marked.insert(*it);
+    llvm::PHINode *phiNode = dyn_cast<llvm::PHINode>(*it);
     for (unsigned int i = 0; i < phiNode->getNumIncomingValues(); i++) {
       llvm::Value *phiVal = phiNode->getIncomingValue(i);
       if (isa<llvm::Instruction>(phiVal)) {
