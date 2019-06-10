@@ -167,13 +167,10 @@ public:
     Sge, ///< Not used in canonical form
     Exists,
     LastKind = Exists,
-
-	// Expressions for WP Interpolation
-	WPVar,
-    Upd,  // Array Update
-    Sel,  // Array Select
-
-	CastKindFirst = ZExt,
+    WPVar, // Expressions for WP Interpolation
+    Upd,   // Array Update
+    Sel,   // Array Select
+    CastKindFirst = ZExt,
     CastKindLast = SExt,
     BinaryKindFirst = Add,
     BinaryKindLast = Sge,

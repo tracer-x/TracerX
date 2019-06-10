@@ -234,6 +234,12 @@ unsigned SelExpr::computeHash() {
   return hashValue;
 }
 
+unsigned UpdExpr::computeHash() {
+  hashValue =
+      array->hash() * index->hash() * value->hash() * Expr::MAGIC_HASH_CONSTANT;
+  return hashValue;
+}
+
 unsigned NotExpr::computeHash() {
   hashValue = expr->hash() * Expr::MAGIC_HASH_CONSTANT * Expr::Not;
   return hashValue;
@@ -608,6 +614,31 @@ void SelExpr::print(llvm::raw_ostream &os) const {
     os << "] )";
 }
 
+ref<Expr> UpdExpr::create(ref<Expr> array, ref<Expr> index, ref<Expr> value) {
+  return UpdExpr::alloc(array, index, value);
+}
+
+int UpdExpr::compareContents(const Expr &b) const {
+  const UpdExpr &ub = static_cast<const UpdExpr &>(b);
+  if (array != ub.array)
+    return array < ub.array ? -1 : 1;
+  if (index != ub.index)
+    return index < ub.index ? -1 : 1;
+  if (value != ub.value)
+    return value < ub.value ? -1 : 1;
+  return 0;
+}
+
+void UpdExpr::print(llvm::raw_ostream &os) const {
+  os << "(Upd < ";
+  array->print(os);
+  os << "> [ ";
+  index->print(os);
+  os << "] = ";
+  value->print(os);
+  os << " )";
+}
+
 ref<Expr> SelectExpr::create(ref<Expr> c, ref<Expr> t, ref<Expr> f) {
   Expr::Width kt = t->getWidth();
 
@@ -619,7 +650,7 @@ ref<Expr> SelectExpr::create(ref<Expr> c, ref<Expr> t, ref<Expr> f) {
   } else if (t==f) {
     return t;
   } else if (kt==Expr::Bool) { // c ? t : f  <=> (c and t) or (not c and f)
-    if (ConstantExpr *CE = dyn_cast<ConstantExpr>(t)) {      
+    if (ConstantExpr *CE = dyn_cast<ConstantExpr>(t)) {
       if (CE->isTrue()) {
         return OrExpr::create(c, f);
       } else {
@@ -633,7 +664,7 @@ ref<Expr> SelectExpr::create(ref<Expr> c, ref<Expr> t, ref<Expr> f) {
       }
     }
   }
-  
+
   return SelectExpr::alloc(c, t, f);
 }
 
