@@ -1667,6 +1667,7 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 
         ref<Expr> left = this->generateExprFromOperand(i->getOperand(0));
         ref<Expr> right = this->generateExprFromOperand(i->getOperand(1));
+
         if (left.isNull() || right.isNull()) {
           ref<Expr> result;
           return result;
@@ -1833,6 +1834,7 @@ ref<Expr> TxWeakestPreCondition::getGlobalValue(llvm::GlobalValue *gv) {
   width = getGlobalVariabletSize(gv);
   index = ConstantExpr::create(0, width);
   result = WPVarExpr::create(gv, gv->getName(), index);
+
   return result;
 }
 
@@ -2238,26 +2240,27 @@ unsigned int TxWeakestPreCondition::getAllocaInstSize(llvm::AllocaInst *alc) {
 
 unsigned int
 TxWeakestPreCondition::getGlobalVariabletSize(llvm::GlobalValue *gv) {
-  unsigned int size;
-
-  if (gv->getType()->isIntegerTy(1)) {
-    size = Expr::Bool;
-  } else if (gv->getType()->isIntegerTy(8)) {
-    size = Expr::Int8;
-  } else if (gv->getType()->isIntegerTy(16)) {
-    size = Expr::Int16;
-  } else if (gv->getType()->isIntegerTy(32)) {
-    size = Expr::Int32;
-  } else if (gv->getType()->isPointerTy()) {
-    size = Expr::Int32;
-  } else {
-    gv->dump();
-    gv->getType()->dump();
-    klee_error(
-        "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
-        "defined for this type yet");
-  }
-  return size;
+  return gv->getType()->getElementType()->getIntegerBitWidth();
+  //  unsigned int size;
+  //
+  //  if (gv->getType()->isIntegerTy(1)) {
+  //    size = Expr::Bool;
+  //  } else if (gv->getType()->isIntegerTy(8)) {
+  //    size = Expr::Int8;
+  //  } else if (gv->getType()->isIntegerTy(16)) {
+  //    size = Expr::Int16;
+  //  } else if (gv->getType()->isIntegerTy(32)) {
+  //    size = Expr::Int32;
+  //  } else if (gv->getType()->isPointerTy()) {
+  //    size = Expr::Int32;
+  //  } else {
+  //    gv->dump();
+  //    gv->getType()->dump();
+  //    klee_error(
+  //        "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
+  //        "defined for this type yet");
+  //  }
+  //  return size;
 }
 
 unsigned int
