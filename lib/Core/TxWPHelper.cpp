@@ -195,9 +195,7 @@ ref<Expr> TxWPHelper::simplifyWPExpr(ref<Expr> e) {
 bool TxWPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
   switch (expr->getKind()) {
   case Expr::InvalidKind:
-  case Expr::Constant: {
-    return false;
-  }
+  case Expr::Constant: { return false; }
 
   case Expr::WPVar: {
     ref<WPVarExpr> wp1 = dyn_cast<WPVarExpr>(expr);
@@ -257,6 +255,22 @@ bool TxWPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
             isTargetDependent(inst, kids[1]) ||
             isTargetDependent(inst, kids[2]));
   }
+  case Expr::Upd: {
+    ref<Expr> kids[3];
+    kids[0] = expr->getKid(0);
+    kids[1] = expr->getKid(1);
+    kids[2] = expr->getKid(2);
+    return (isTargetDependent(inst, kids[0]) ||
+            isTargetDependent(inst, kids[1]) ||
+            isTargetDependent(inst, kids[2]));
+  }
+  case Expr::Sel: {
+    ref<Expr> kids[2];
+    kids[0] = expr->getKid(0);
+    kids[1] = expr->getKid(1);
+    return (isTargetDependent(inst, kids[0]) ||
+            isTargetDependent(inst, kids[1]));
+  }
   default: {
     // Sanity check
     expr->dump();
@@ -277,9 +291,7 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
   } else {
     switch (base->getKind()) {
     case Expr::InvalidKind:
-    case Expr::Constant: {
-      return base;
-    }
+    case Expr::Constant: { return base; }
 
     case Expr::WPVar: {
       ref<WPVarExpr> wp1 = dyn_cast<WPVarExpr>(base);
@@ -328,6 +340,7 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
       ref<Expr> kids[2];
       kids[0] = substituteExpr(base->getKid(0), lhs, rhs);
       kids[1] = substituteExpr(base->getKid(1), lhs, rhs);
+
       if (kids[0].isNull())
         return kids[0];
       else if (kids[1].isNull())
@@ -364,8 +377,27 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
       else
         return base->rebuild(kids);
     }
+    case Expr::Upd: {
+      ref<Expr> kids[3];
+      kids[0] = substituteExpr(base->getKid(0), lhs, rhs);
+      kids[0]->dump();
+      kids[1] = substituteExpr(base->getKid(1), lhs, rhs);
+      kids[1]->dump();
+      kids[2] = substituteExpr(base->getKid(2), lhs, rhs);
+      kids[2]->dump();
+      return base->rebuild(kids);
+    }
+    case Expr::Sel: {
+      ref<Expr> kids[2];
+      kids[0] = substituteExpr(base->getKid(0), lhs, rhs);
+      kids[1] = substituteExpr(base->getKid(1), lhs, rhs);
+      ref<Expr> res = base->rebuild(kids);
+      return res;
+    }
     default: {
       base->dump();
+      lhs->dump();
+      rhs->dump();
       klee_error("TxWPHelper::substituteExpr: Expression not supported yet!");
     }
     }
