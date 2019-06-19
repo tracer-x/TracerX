@@ -315,6 +315,7 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
         return base->rebuild(kids);
     }
 
+    case Expr::Sel:
     case Expr::Concat:
     case Expr::Eq:
     case Expr::Ne:
@@ -363,6 +364,7 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
         return base->rebuild(kids);
     }
 
+    case Expr::Upd:
     case Expr::Select: {
       ref<Expr> kids[3];
       kids[0] = substituteExpr(base->getKid(0), lhs, rhs);
@@ -377,23 +379,7 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
       else
         return base->rebuild(kids);
     }
-    case Expr::Upd: {
-      ref<Expr> kids[3];
-      kids[0] = substituteExpr(base->getKid(0), lhs, rhs);
-      kids[0]->dump();
-      kids[1] = substituteExpr(base->getKid(1), lhs, rhs);
-      kids[1]->dump();
-      kids[2] = substituteExpr(base->getKid(2), lhs, rhs);
-      kids[2]->dump();
-      return base->rebuild(kids);
-    }
-    case Expr::Sel: {
-      ref<Expr> kids[2];
-      kids[0] = substituteExpr(base->getKid(0), lhs, rhs);
-      kids[1] = substituteExpr(base->getKid(1), lhs, rhs);
-      ref<Expr> res = base->rebuild(kids);
-      return res;
-    }
+
     default: {
       base->dump();
       lhs->dump();

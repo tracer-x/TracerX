@@ -1760,7 +1760,7 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
   }
   //    klee_warning("TxWeakestPreCondition::generateExprFromOperand2");
   //    if(!ret.isNull())
-  //    	ret->dump();
+  //           ret->dump();
   //    klee_warning("TxWeakestPreCondition::generateExprFromOperand3\n\n");
   return ret;
 }
@@ -2240,27 +2240,41 @@ unsigned int TxWeakestPreCondition::getAllocaInstSize(llvm::AllocaInst *alc) {
 
 unsigned int
 TxWeakestPreCondition::getGlobalVariabletSize(llvm::GlobalValue *gv) {
-  return gv->getType()->getElementType()->getIntegerBitWidth();
-  //  unsigned int size;
-  //
-  //  if (gv->getType()->isIntegerTy(1)) {
-  //    size = Expr::Bool;
-  //  } else if (gv->getType()->isIntegerTy(8)) {
-  //    size = Expr::Int8;
-  //  } else if (gv->getType()->isIntegerTy(16)) {
-  //    size = Expr::Int16;
-  //  } else if (gv->getType()->isIntegerTy(32)) {
-  //    size = Expr::Int32;
-  //  } else if (gv->getType()->isPointerTy()) {
-  //    size = Expr::Int32;
-  //  } else {
-  //    gv->dump();
-  //    gv->getType()->dump();
-  //    klee_error(
-  //        "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
-  //        "defined for this type yet");
-  //  }
-  //  return size;
+  unsigned int size;
+
+  if (gv->getType()->getElementType()->isIntegerTy(1)) {
+    size = Expr::Int8;
+  } else if (gv->getType()->getElementType()->isIntegerTy(8)) {
+    size = Expr::Int8;
+  } else if (gv->getType()->getElementType()->isIntegerTy(16)) {
+    size = Expr::Int16;
+  } else if (gv->getType()->getElementType()->isIntegerTy(32)) {
+    size = Expr::Int32;
+  } else if (gv->getType()->getElementType()->isPointerTy()) {
+    size = Expr::Int32;
+  } else if (gv->getType()->getElementType()->isArrayTy()) {
+    size = Expr::Int32;
+  } else if (gv->getType()->isIntegerTy(1)) {
+    size = Expr::Bool;
+  } else if (gv->getType()->isIntegerTy(8)) {
+    size = Expr::Int8;
+  } else if (gv->getType()->isIntegerTy(16)) {
+    size = Expr::Int16;
+  } else if (gv->getType()->isIntegerTy(32)) {
+    size = Expr::Int32;
+  } else if (gv->getType()->isPointerTy()) {
+    size = Expr::Int32;
+  } else if (gv->getType()->isArrayTy()) {
+    size = Expr::Int32;
+  } else {
+    gv->dump();
+    gv->getType()->dump();
+    gv->getType()->getElementType()->dump();
+    klee_error(
+        "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
+        "defined for this type yet");
+  }
+  return size;
 }
 
 unsigned int
