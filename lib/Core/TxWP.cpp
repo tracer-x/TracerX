@@ -40,13 +40,15 @@ typedef std::map<ref<TxAllocationContext>, LowerInterpolantStore>
     TopInterpolantStore;
 
 TxWeakestPreCondition::TxWeakestPreCondition(TxTreeNode *_node,
-                                             TxDependency *_dependency) {
+                                             TxDependency *_dependency,
+                                             llvm::DataLayout *_targetData) {
   WPExpr = True();
 
   // Used to represent constants during the simplification of WPExpr to
   // canonical form
   node = _node;
   dependency = _dependency;
+  targetData = _targetData;
   if (dependency)
     debugSubsumptionLevel = dependency->debugSubsumptionLevel;
 }
@@ -1664,7 +1666,6 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 
     } else if (i->getOpcode() == llvm::Instruction::Store) {
       if (TxWPHelper::isTargetDependent(i->getOperand(1), WPExpr)) {
-
         ref<Expr> left = this->generateExprFromOperand(i->getOperand(0));
         ref<Expr> right = this->generateExprFromOperand(i->getOperand(1));
 
@@ -1680,6 +1681,32 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         WPExpr = Z3Simplification::simplify(WPExpr);
         //        WPExpr->dump();
         //        llvm::outs() << "******* End Flag = 0 *******\n";
+      } else if (isa<llvm::GetElementPtrInst>(
+                     i->getOperand(1))) { // Update Array
+        llvm::GetElementPtrInst *parentGEP =
+            dyn_cast<llvm::GetElementPtrInst>(i->getOperand(1));
+        std::pair<ref<Expr>, ref<Expr> > pair = getPointer(parentGEP);
+        if (pair.first.isNull()) {
+          WPExpr = pair.first;
+          return WPExpr;
+        }
+        if (pair.second.isNull()) {
+          WPExpr = pair.second;
+          return WPExpr;
+        }
+
+        // If WPExpr has connection with array, replace by the UpdateExpr
+        ref<Expr> val = this->generateExprFromOperand(i->getOperand(0));
+        if (val.isNull())
+          return val;
+        ref<Expr> update = UpdExpr::create(pair.second, pair.first, val);
+        //        llvm::outs() << "****** Flag = 0 for Update Array *******\n";
+        //        i->dump();
+        //        WPExpr->dump();
+        WPExpr = TxWPHelper::substituteExpr(WPExpr, pair.second, update);
+        //        WPExpr->dump();
+        //        llvm::outs() << "****** End Flag = 0 for Update Array
+        // *******\n";
       }
     }
   }
@@ -1715,12 +1742,19 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
   } else if (isa<llvm::LoadInst>(val)) {
     llvm::LoadInst *inst = dyn_cast<llvm::LoadInst>(val);
     if (isa<llvm::ConstantExpr>(inst->getOperand(0))) {
-      ret = getLoadGep(inst);
+      llvm::ConstantExpr *ce =
+          dyn_cast<llvm::ConstantExpr>(inst->getOperand(0));
+      ret = getConstantExpr(ce);
+      //      ret = getLoadGep(inst);
     } else if (isa<llvm::GetElementPtrInst>(inst->getOperand(0))) {
       llvm::GetElementPtrInst *parentGEP =
           dyn_cast<llvm::GetElementPtrInst>(inst->getOperand(0));
       std::pair<ref<Expr>, ref<Expr> > pair = getPointer(parentGEP);
-      ret = SelExpr::create(pair.second, pair.first);
+
+      if (!pair.first.isNull())
+        ret = SelExpr::create(pair.second, pair.first);
+      else
+        ret = pair.first;
     } else {
       ret = getLoad(inst);
     }
@@ -1760,7 +1794,7 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
   }
   //    klee_warning("TxWeakestPreCondition::generateExprFromOperand2");
   //    if(!ret.isNull())
-  //    	ret->dump();
+  //           ret->dump();
   //    klee_warning("TxWeakestPreCondition::generateExprFromOperand3\n\n");
   return ret;
 }
@@ -1824,7 +1858,44 @@ ref<Expr> TxWeakestPreCondition::getConstantInt(llvm::ConstantInt *CI) {
 
 ref<Expr> TxWeakestPreCondition::getConstantExpr(llvm::ConstantExpr *ce) {
   ref<Expr> result;
-  klee_warning("PUSHUP2");
+  klee_warning("PUSHUP1");
+  return result;
+
+  switch (ce->getOpcode()) {
+  case llvm::Instruction::GetElementPtr: {
+    // generate index expression
+    ref<Expr> idx = generateExprFromOperand(ce->getOperand(2));
+    if (idx.isNull())
+      return idx;
+    unsigned width = idx->getWidth();
+    unsigned dimension = ce->getNumOperands() - 2;
+    llvm::ArrayType *at = dyn_cast<llvm::ArrayType>(
+        dyn_cast<llvm::PointerType>(ce->getOperand(0)->getType())
+            ->getElementType());
+    for (unsigned i = 0; i < dimension - 1; i++) {
+      at = dyn_cast<llvm::ArrayType>(at->getElementType());
+      ref<Expr> tmp1 = ConstantExpr::create(at->getNumElements(), width);
+      ref<Expr> tmp2 = generateExprFromOperand(ce->getOperand(3 + i));
+      if (tmp2.isNull())
+        return tmp2;
+      idx = AddExpr::create(MulExpr::create(tmp1, idx), tmp2);
+    }
+
+    // generate array expression
+    ref<Expr> arr = generateExprFromOperand(ce->getOperand(0));
+    if (arr.isNull())
+      return arr;
+    result = SelExpr::create(arr, idx);
+    //    result->dump();
+    break;
+  }
+  default: {
+    klee_warning(
+        "TxWeakestPreCondition::getConstantExpr: ConstantExpr is not support");
+    ce->dump();
+  }
+  }
+
   return result;
 }
 
@@ -1841,6 +1912,8 @@ ref<Expr> TxWeakestPreCondition::getGlobalValue(llvm::GlobalValue *gv) {
 ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
   unsigned width;
   ref<Expr> index, result;
+  klee_warning("PUSHUP2");
+  return result;
   width = getFunctionArgumentSize(arg);
   index = ConstantExpr::create(0, width);
   result = WPVarExpr::create(arg, arg->getName(), index);
@@ -1850,11 +1923,15 @@ ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
 std::pair<ref<Expr>, ref<Expr> >
 TxWeakestPreCondition::getPointer(llvm::GetElementPtrInst *gep) {
   std::pair<ref<Expr>, ref<Expr> > pair;
+  klee_warning("PUSHUP3");
+  return pair;
   if (isa<llvm::GetElementPtrInst>(gep->getOperand(0))) {
     llvm::GetElementPtrInst *parentGEP =
         dyn_cast<llvm::GetElementPtrInst>(gep->getOperand(0));
     std::pair<ref<Expr>, ref<Expr> > parentPair = getPointer(parentGEP);
     ref<Expr> offset = this->generateExprFromOperand(gep->getOperand(2));
+    if (offset.isNull())
+      return pair;
     unsigned width = getGepSize(gep->getType());
     llvm::PointerType *pt =
         dyn_cast<llvm::PointerType>(gep->getOperand(0)->getType());
@@ -1867,15 +1944,33 @@ TxWeakestPreCondition::getPointer(llvm::GetElementPtrInst *gep) {
     pair.first = offset->rebuild(kids);
     pair.second = parentPair.second;
   } else {
-    pair.first = this->generateExprFromOperand(gep->getOperand(2));
-    pair.second = this->generateExprFromOperand(gep->getOperand(0));
+    bool isFirstZero = false;
+    if (llvm::ConstantInt *c =
+            dyn_cast<llvm::ConstantInt>(gep->getOperand(1))) {
+      if (c->getZExtValue() == 0) {
+        isFirstZero = true;
+      }
+    }
+    unsigned opsNo = gep->getNumOperands();
+    if (opsNo == 2) {
+      pair.first = this->generateExprFromOperand(gep->getOperand(1));
+      pair.second = this->generateExprFromOperand(gep->getOperand(0));
+    } else if (opsNo > 2) {
+      if (isFirstZero) {
+        pair.first = this->generateExprFromOperand(gep->getOperand(2));
+        pair.second = this->generateExprFromOperand(gep->getOperand(0));
+      } else {
+        pair.first = this->generateExprFromOperand(gep->getOperand(1));
+        pair.second = this->generateExprFromOperand(gep->getOperand(0));
+      }
+    }
   }
   return pair;
 }
 
 ref<Expr> TxWeakestPreCondition::getLoadGep(llvm::LoadInst *p) {
   ref<Expr> result;
-  klee_warning("PUSHUP6");
+  klee_warning("PUSHUP4");
   return result;
 }
 
@@ -2045,9 +2140,9 @@ ref<Expr> TxWeakestPreCondition::getCmpCondition(llvm::CmpInst *cmp) {
   ref<Expr> result;
   ref<Expr> left = this->generateExprFromOperand(cmp->getOperand(0));
   ref<Expr> right = this->generateExprFromOperand(cmp->getOperand(1));
-
   if (left.isNull() || right.isNull())
     return result;
+
   if (left->getWidth() > right->getWidth())
     right = ZExtExpr::create(right, left->getWidth());
   else if (left->getWidth() < right->getWidth())
@@ -2156,19 +2251,19 @@ ref<Expr> TxWeakestPreCondition::getGepInst(llvm::GetElementPtrInst *gep) {
 
 
   }*/
-  klee_warning("PUSHUP10");
+  klee_warning("PUSHUP5");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getSwitchInst(llvm::SwitchInst *si) {
   ref<Expr> result;
-  klee_warning("PUSHUP11");
+  klee_warning("PUSHUP6");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getPhiInst(llvm::PHINode *phi) {
   ref<Expr> result;
-  klee_warning("PUSHUP12");
+  klee_warning("PUSHUP7");
   return result;
 }
 
@@ -2212,7 +2307,7 @@ bool TxWeakestPreCondition::inFunction(llvm::Instruction *ins,
 
 ref<Expr> TxWeakestPreCondition::getCallAssume(llvm::CallInst *ci) {
   ref<Expr> result;
-  klee_warning("PUSHUP14");
+  klee_warning("PUSHUP8");
   return result;
 }
 
@@ -2230,37 +2325,55 @@ unsigned int TxWeakestPreCondition::getAllocaInstSize(llvm::AllocaInst *alc) {
   } else if (alc->getAllocatedType()->isIntegerTy(64)) {
     size = Expr::Int64;
   } else {
-    alc->dump();
-    alc->getType()->dump();
-    klee_error("TxWeakestPreCondition::getAllocaInstSize getting size is not "
-               "defined for this type yet");
+    size = Expr::Int32;
+    //    llvm::errs() << "Size = " <<
+    // dependency->getTargetData()->getTypeStoreSize(alc->getType()->getElementType())
+    // << "\n";
+
+    //    klee_error("TxWeakestPreCondition::getAllocaInstSize getting size is
+    // not "
+    //               "defined for this type yet");
   }
   return size;
 }
 
 unsigned int
 TxWeakestPreCondition::getGlobalVariabletSize(llvm::GlobalValue *gv) {
-  return gv->getType()->getElementType()->getIntegerBitWidth();
-  //  unsigned int size;
-  //
-  //  if (gv->getType()->isIntegerTy(1)) {
-  //    size = Expr::Bool;
-  //  } else if (gv->getType()->isIntegerTy(8)) {
-  //    size = Expr::Int8;
-  //  } else if (gv->getType()->isIntegerTy(16)) {
-  //    size = Expr::Int16;
-  //  } else if (gv->getType()->isIntegerTy(32)) {
-  //    size = Expr::Int32;
-  //  } else if (gv->getType()->isPointerTy()) {
-  //    size = Expr::Int32;
-  //  } else {
-  //    gv->dump();
-  //    gv->getType()->dump();
-  //    klee_error(
-  //        "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
-  //        "defined for this type yet");
-  //  }
-  //  return size;
+  unsigned int size;
+
+  if (gv->getType()->getElementType()->isIntegerTy(1)) {
+    size = Expr::Int8;
+  } else if (gv->getType()->getElementType()->isIntegerTy(8)) {
+    size = Expr::Int8;
+  } else if (gv->getType()->getElementType()->isIntegerTy(16)) {
+    size = Expr::Int16;
+  } else if (gv->getType()->getElementType()->isIntegerTy(32)) {
+    size = Expr::Int32;
+  } else if (gv->getType()->getElementType()->isPointerTy()) {
+    size = Expr::Int32;
+  } else if (gv->getType()->getElementType()->isArrayTy()) {
+    size = Expr::Int32;
+  } else if (gv->getType()->isIntegerTy(1)) {
+    size = Expr::Bool;
+  } else if (gv->getType()->isIntegerTy(8)) {
+    size = Expr::Int8;
+  } else if (gv->getType()->isIntegerTy(16)) {
+    size = Expr::Int16;
+  } else if (gv->getType()->isIntegerTy(32)) {
+    size = Expr::Int32;
+  } else if (gv->getType()->isPointerTy()) {
+    size = Expr::Int32;
+  } else if (gv->getType()->isArrayTy()) {
+    size = Expr::Int32;
+  } else {
+    gv->dump();
+    gv->getType()->dump();
+    gv->getType()->getElementType()->dump();
+    klee_error(
+        "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
+        "defined for this type yet");
+  }
+  return size;
 }
 
 unsigned int

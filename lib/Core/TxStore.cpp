@@ -237,6 +237,32 @@ ref<TxStoreEntry> TxStore::find(ref<TxAllocationContext> alc) const {
   return nullEntry;
 }
 
+ref<TxStoreEntry> TxStore::find(ref<TxAllocationContext> alc,
+                                ref<Expr> offset) const {
+  assert(isa<ConstantExpr>(offset) &&
+         "TxStore::find, offset is not a constant value");
+  TopStateStore::const_iterator storeIter = internalStore.find(alc);
+  if (storeIter != internalStore.end()) {
+    MiddleStateStore array = storeIter->second;
+    for (LowerStateStore::const_iterator it = array.concreteBegin(),
+                                         ie = array.concreteEnd();
+         it != ie; ++it) {
+      ref<TxStoreEntry> tmp = (*it).second;
+      if (offset.compare(tmp->getIndex()->getOffset()) == 0)
+        return tmp;
+    }
+    for (LowerStateStore::const_iterator it = array.symbolicBegin(),
+                                         ie = array.symbolicBegin();
+         it != ie; ++it) {
+      ref<TxStoreEntry> tmp = (*it).second;
+      if (offset.compare(tmp->getIndex()->getOffset()) == 0)
+        return tmp;
+    }
+  }
+  ref<TxStoreEntry> nullEntry;
+  return nullEntry;
+}
+
 void TxStore::getStoredExpressions(
     const TxStore *referenceStore,
     const std::vector<llvm::Instruction *> &callHistory,
