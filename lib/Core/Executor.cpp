@@ -1513,7 +1513,6 @@ void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb) {
                             << allBlockCount << "," << percent << "]\n";
       livePercentCovFileOut.close();
     }
-
     // print live BB
     if (BBCoverage >= 3 && isNew) {
       std::string liveBBFile =
@@ -3034,7 +3033,6 @@ void Executor::doDumpStates() {
 }
 
 void Executor::run(ExecutionState &initialState) {
-
   startingBBPlottingTime = time(0);
   // get interested source code
   size_t lastindex = InputFile.find_last_of(".");
@@ -3075,6 +3073,7 @@ void Executor::run(ExecutionState &initialState) {
           fBBOrder[firstBB->getParent()].end()) {
     processBBCoverage(BBCoverage, ki->inst->getParent());
   }
+
   bindModuleConstants();
 
   // Delay init till now so that ticks don't accrue during

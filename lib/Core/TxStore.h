@@ -213,6 +213,9 @@ public:
   /// \brief Finds a store entry given an LLVM value
   ref<TxStoreEntry> find(ref<TxAllocationContext> alc) const;
 
+  /// \brief Finds a store entry given an LLVM value
+  ref<TxStoreEntry> find(ref<TxAllocationContext> alc, ref<Expr> offset) const;
+
   /// \brief This retrieves the locations known at this state, and the
   /// expressions stored in the locations. Returns as the last argument a pair
   /// of the store part indexed by constants, and the store part indexed by

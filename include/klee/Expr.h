@@ -543,7 +543,7 @@ public:
   Kind getKind() const { return Sel; }
 
   unsigned getNumKids() const { return 2; }
-  ref<Expr> getKid(unsigned i) const { return !i ? index : array; }
+  ref<Expr> getKid(unsigned i) const { return i ? index : array; }
 
   int compareContents(const Expr &b) const;
 

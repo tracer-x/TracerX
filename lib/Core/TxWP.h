@@ -23,6 +23,7 @@
 #include "TxWPHelper.h"
 #include "Z3Simplification.h"
 #include "klee/ExecutionState.h"
+#include "llvm/IR/DataLayout.h"
 #include <klee/Expr.h>
 #include <klee/ExprBuilder.h>
 #include <klee/Internal/Support/ErrorHandling.h>
@@ -50,8 +51,11 @@ class TxWeakestPreCondition {
 
   int debugSubsumptionLevel;
 
+  llvm::DataLayout *targetData;
+
 public:
-  TxWeakestPreCondition(TxTreeNode *_node, TxDependency *_dependency);
+  TxWeakestPreCondition(TxTreeNode *_node, TxDependency *_dependency,
+                        llvm::DataLayout *_targetData);
 
   ~TxWeakestPreCondition();
 
