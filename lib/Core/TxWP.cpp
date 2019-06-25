@@ -40,13 +40,15 @@ typedef std::map<ref<TxAllocationContext>, LowerInterpolantStore>
 TopInterpolantStore;
 
 TxWeakestPreCondition::TxWeakestPreCondition(TxTreeNode *_node,
-                                             TxDependency *_dependency) {
+                                             TxDependency *_dependency,
+                                             llvm::DataLayout *_targetData) {
   WPExpr = True();
 
   // Used to represent constants during the simplification of WPExpr to
   // canonical form
   node = _node;
   dependency = _dependency;
+  targetData = _targetData;
   if (dependency)
     debugSubsumptionLevel = dependency->debugSubsumptionLevel;
 }
@@ -1664,7 +1666,6 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 
     } else if (i->getOpcode() == llvm::Instruction::Store) {
       if (TxWPHelper::isTargetDependent(i->getOperand(1), WPExpr)) {
-
         ref<Expr> left = this->generateExprFromOperand(i->getOperand(0));
         ref<Expr> right = this->generateExprFromOperand(i->getOperand(1));
 
@@ -1680,6 +1681,21 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         WPExpr = Z3Simplification::simplify(WPExpr);
         //        WPExpr->dump();
         //        llvm::outs() << "******* End Flag = 0 *******\n";
+      } else if (isa<llvm::GetElementPtrInst>(
+                     i->getOperand(1))) { // Update Array
+        llvm::GetElementPtrInst *parentGEP =
+            dyn_cast<llvm::GetElementPtrInst>(i->getOperand(1));
+        std::pair<ref<Expr>, ref<Expr> > pair = getPointer(parentGEP);
+        // If WPExpr has connection with array, replace by the UpdateExpr
+        ref<Expr> val = this->generateExprFromOperand(i->getOperand(0));
+        ref<Expr> update = UpdExpr::create(pair.second, pair.first, val);
+        //        llvm::outs() << "****** Flag = 0 for Update Array *******\n";
+        //        i->dump();
+        //        WPExpr->dump();
+        WPExpr = TxWPHelper::substituteExpr(WPExpr, pair.second, update);
+        //        WPExpr->dump();
+        //        llvm::outs() << "****** End Flag = 0 for Update Array
+        // *******\n";
       }
     }
   }

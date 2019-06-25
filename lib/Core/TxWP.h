@@ -28,6 +28,7 @@
 #include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ArrayCache.h>
 #include <vector>
+#include "llvm/IR/DataLayout.h"
 
 namespace klee {
 
@@ -50,8 +51,11 @@ class TxWeakestPreCondition {
 
   int debugSubsumptionLevel;
 
+  llvm::DataLayout *targetData;
+
 public:
-  TxWeakestPreCondition(TxTreeNode *_node, TxDependency *_dependency);
+  TxWeakestPreCondition(TxTreeNode *_node, TxDependency *_dependency,
+                        llvm::DataLayout *_targetData);
 
   ~TxWeakestPreCondition();
 
