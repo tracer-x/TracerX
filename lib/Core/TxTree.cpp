@@ -2416,7 +2416,7 @@ TxTreeNode::TxTreeNode(
                                 _globalAddresses);
 
   // Set the child WP Interpolants to false
-  wp = new TxWeakestPreCondition(this, dependency);
+  wp = new TxWeakestPreCondition(this, dependency, _targetData);
   childWPInterpolant[0] = wp->True();
   childWPInterpolant[1] = wp->True();
 }
