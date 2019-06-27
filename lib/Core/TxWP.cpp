@@ -1731,7 +1731,10 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
   } else if (isa<llvm::LoadInst>(val)) {
     llvm::LoadInst *inst = dyn_cast<llvm::LoadInst>(val);
     if (isa<llvm::ConstantExpr>(inst->getOperand(0))) {
-      ret = getLoadGep(inst);
+      llvm::ConstantExpr *ce =
+          dyn_cast<llvm::ConstantExpr>(inst->getOperand(0));
+      ret = getConstantExpr(ce);
+      //      ret = getLoadGep(inst);
     } else if (isa<llvm::GetElementPtrInst>(inst->getOperand(0))) {
       llvm::GetElementPtrInst *parentGEP =
           dyn_cast<llvm::GetElementPtrInst>(inst->getOperand(0));
@@ -1840,7 +1843,36 @@ ref<Expr> TxWeakestPreCondition::getConstantInt(llvm::ConstantInt *CI) {
 
 ref<Expr> TxWeakestPreCondition::getConstantExpr(llvm::ConstantExpr *ce) {
   ref<Expr> result;
-  klee_warning("PUSHUP2");
+  //  klee_warning("PUSHUP2");
+  switch (ce->getOpcode()) {
+  case llvm::Instruction::GetElementPtr: {
+    // generate index expression
+    ref<Expr> idx = generateExprFromOperand(ce->getOperand(2));
+    unsigned width = idx->getWidth();
+    unsigned dimension = ce->getNumOperands() - 2;
+    llvm::ArrayType *at = dyn_cast<llvm::ArrayType>(dyn_cast<llvm::PointerType>(
+        ce->getOperand(0)->getType())->getElementType());
+    for (unsigned i = 0; i < dimension - 1; i++) {
+      at = dyn_cast<llvm::ArrayType>(at->getElementType());
+      ref<Expr> tmp1 = ConstantExpr::create(at->getNumElements(), width);
+      ref<Expr> tmp2 = generateExprFromOperand(ce->getOperand(3 + i));
+      idx = AddExpr::create(MulExpr::create(tmp1, idx), tmp2);
+    }
+
+    // generate array expression
+    ref<Expr> arr = generateExprFromOperand(ce->getOperand(0));
+    result = SelExpr::create(arr, idx);
+    //    result->dump();
+    //    klee_warning("PUSHUP2");
+    break;
+  }
+  default: {
+    klee_warning(
+        "TxWeakestPreCondition::getConstantExpr: ConstantExpr is not support");
+    ce->dump();
+  }
+  }
+
   return result;
 }
 
