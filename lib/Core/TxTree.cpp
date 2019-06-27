@@ -2469,6 +2469,12 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
         return branchCondition;
       }
     }
+    //    llvm::errs() << "START branchCondition\n";
+    //    branchCondition->dump();
+    //    childWPInterpolant[0]->dump();
+    //    childWPInterpolant[1]->dump();
+    //    llvm::errs() << "END branchCondition\n";
+
     expr = wp->intersectWPExpr(branchCondition, childWPInterpolant[0],
                                childWPInterpolant[1]);
     if (expr.isNull()) {
