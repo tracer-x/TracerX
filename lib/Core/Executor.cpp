@@ -1154,8 +1154,29 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
   //  llvm::outs() << "******************\n";
   //  condition->dump();
   if (condition->isTrue()) {
+    if (INTERPOLATION_ENABLED && Speculation &&
+        TxSpeculativeRun::isSpeculable(current)) {
+      // create a new speculation execution node
+      uintptr_t pp = current.txTreeNode->getProgramPoint();
+      if (specRevisted.find(pp) == specRevisted.end() ||
+          specRevisted[pp] < specLimit) {
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, true);
+      }
+    }
     return StatePair(&current, 0);
   } else if (condition->isFalse()) {
+    if (INTERPOLATION_ENABLED && Speculation &&
+        TxSpeculativeRun::isSpeculable(current)) {
+      // create a new speculation execution node
+      uintptr_t pp = current.txTreeNode->getProgramPoint();
+      if (specRevisted.find(pp) == specRevisted.end() ||
+          specRevisted[pp] < specLimit) {
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, false);
+      }
+    } else {
+    }
     return StatePair(0, &current);
   }
   //  llvm::outs() << "******************\n";
@@ -1372,7 +1393,9 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
         new std::set<uintptr_t>();
     trueState->txTreeNode = ires.second;
 
-    addConstraint(*trueState, condition);
+    if (!condition->isTrue() && !condition->isFalse()) {
+      addConstraint(*trueState, condition);
+    }
 
     return StatePair(trueState, speculationFalseState);
   } else {
@@ -1416,7 +1439,9 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
         new std::set<uintptr_t>();
     falseState->txTreeNode = ires.second;
 
-    addConstraint(*falseState, Expr::createIsZero(condition));
+    if (!condition->isTrue() && !condition->isFalse()) {
+      addConstraint(*falseState, Expr::createIsZero(condition));
+    }
 
     return StatePair(speculationTrueState, falseState);
   }
