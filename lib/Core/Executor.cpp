@@ -1385,12 +1385,15 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
       }
     }
 
+    bool isCurrentSpec = current.txTreeNode->isSpeculationNode();
     std::pair<TxTreeNode *, TxTreeNode *> ires =
         txTree->split(current.txTreeNode, speculationFalseState, trueState);
     speculationFalseState->txTreeNode = ires.first;
     speculationFalseState->txTreeNode->setSpeculationFlag();
-    speculationFalseState->txTreeNode->visitedProgramPoints =
-        new std::set<uintptr_t>();
+    if (!isCurrentSpec) {
+      speculationFalseState->txTreeNode->visitedProgramPoints =
+          new std::set<uintptr_t>();
+    }
     trueState->txTreeNode = ires.second;
 
     if (!condition->isTrue() && !condition->isFalse()) {
@@ -1430,13 +1433,17 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
         falseState->symPathOS << "0";
       }
     }
-
+    bool isCurrentSpec = current.txTreeNode->isSpeculationNode();
     std::pair<TxTreeNode *, TxTreeNode *> ires =
         txTree->split(current.txTreeNode, speculationTrueState, falseState);
     speculationTrueState->txTreeNode = ires.first;
     speculationTrueState->txTreeNode->setSpeculationFlag();
-    speculationTrueState->txTreeNode->visitedProgramPoints =
-        new std::set<uintptr_t>();
+
+    if (!isCurrentSpec) {
+      speculationTrueState->txTreeNode->visitedProgramPoints =
+          new std::set<uintptr_t>();
+    }
+
     falseState->txTreeNode = ires.second;
 
     if (!condition->isTrue() && !condition->isFalse()) {
@@ -1487,8 +1494,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     }
 
     // Storing the visited program points.
-    current.txTreeNode->visitedProgramPoints->insert(
-        current.txTreeNode->getProgramPoint());
+    current.txTreeNode->visitedProgramPoints->insert(pp);
   }
 
   Solver::Validity res;
@@ -1519,6 +1525,32 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   //  }
   //  llvm::outs() << "====end SpeculationFork\n";
 
+  if (condition->isTrue()) {
+    if (INTERPOLATION_ENABLED && Speculation &&
+        TxSpeculativeRun::isSpeculable(current)) {
+      // create a new speculation execution node
+      uintptr_t pp = current.txTreeNode->getProgramPoint();
+      if (specRevisted.find(pp) == specRevisted.end() ||
+          specRevisted[pp] < specLimit) {
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, true);
+      }
+    }
+    return StatePair(&current, 0);
+  } else if (condition->isFalse()) {
+    if (INTERPOLATION_ENABLED && Speculation &&
+        TxSpeculativeRun::isSpeculable(current)) {
+      // create a new speculation execution node
+      uintptr_t pp = current.txTreeNode->getProgramPoint();
+      if (specRevisted.find(pp) == specRevisted.end() ||
+          specRevisted[pp] < specLimit) {
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, false);
+      }
+    } else {
+    }
+    return StatePair(0, &current);
+  }
   // XXX - even if the constraint is provable one way or the other we
   // can probably benefit by adding this constraint and allowing it to
   // reduce the other constraints. For example, if we do a binary
@@ -1532,10 +1564,38 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         current.pathOS << "1";
       }
     }
+    if (INTERPOLATION_ENABLED && Speculation &&
+        TxSpeculativeRun::isSpeculable(current)) {
+      // Storing the unsatCore and pointer to the solver
+      // so, in case speculation fails the unsatcore can
+      // be used to perform markings.
+      // keep unsat core & increase spec counting
 
-    txTree->markPathCondition(current, unsatCore);
+      uintptr_t pp = current.txTreeNode->getProgramPoint();
+
+      if (specRevisted.find(pp) == specRevisted.end() ||
+          specRevisted[pp] < specLimit) {
+        llvm::BranchInst *binst =
+            llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, true);
+      }
+    }
+
+    if (INTERPOLATION_ENABLED) {
+      // Validity proof succeeded of a query: antecedent -> consequent.
+      // We then extract the unsatisfiability core of antecedent and not
+      // consequent as the Craig interpolant.
+      txTree->markPathCondition(current, unsatCore);
+      return StatePair(&current, 0);
+    }
 
     return StatePair(&current, 0);
+
+    //    txTree->markPathCondition(current, unsatCore);
+    //    return StatePair(&current, 0);
   } else if (res == Solver::False) {
     if (!isInternal) {
       if (pathWriter) {
@@ -1543,9 +1603,35 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       }
     }
 
-    txTree->markPathCondition(current, unsatCore);
+    if (INTERPOLATION_ENABLED && Speculation &&
+        TxSpeculativeRun::isSpeculable(current)) {
+      // Storing the unsatCore and pointer to the solver
+      // so, in case speculation fails the unsatcore can
+      // be used to perform markings.
+      // keep unsat core & increase spec counting
+      uintptr_t pp = current.txTreeNode->getProgramPoint();
+      if (specRevisted.find(pp) == specRevisted.end() ||
+          specRevisted[pp] < specLimit) {
+        llvm::BranchInst *binst =
+            llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, false);
+      }
+    }
+
+    if (INTERPOLATION_ENABLED) {
+      // Falsity proof succeeded of a query: antecedent -> consequent,
+      // which means that antecedent -> not(consequent) is valid. In this
+      // case also we extract the unsat core of the proof
+      txTree->markPathCondition(current, unsatCore);
+      return StatePair(0, &current);
+    }
 
     return StatePair(0, &current);
+
+    //    txTree->markPathCondition(current, unsatCore);
+    //    return StatePair(0, &current);
   } else {
     TimerStatIncrementer timer(stats::forkTime);
     ExecutionState *falseState, *trueState = &current;
