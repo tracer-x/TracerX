@@ -1532,7 +1532,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       uintptr_t pp = current.txTreeNode->getProgramPoint();
       if (specRevisted.find(pp) == specRevisted.end() ||
           specRevisted[pp] < specLimit) {
-        specCount++;
         return addSpeculationNode(current, condition, isInternal, true);
       }
     }
@@ -1544,7 +1543,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       uintptr_t pp = current.txTreeNode->getProgramPoint();
       if (specRevisted.find(pp) == specRevisted.end() ||
           specRevisted[pp] < specLimit) {
-        specCount++;
         return addSpeculationNode(current, condition, isInternal, false);
       }
     } else {
@@ -1578,8 +1576,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         llvm::BranchInst *binst =
             llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-
-        specCount++;
         return addSpeculationNode(current, condition, isInternal, true);
       }
     }
@@ -1615,7 +1611,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         llvm::BranchInst *binst =
             llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-        specCount++;
         return addSpeculationNode(current, condition, isInternal, false);
       }
     }
