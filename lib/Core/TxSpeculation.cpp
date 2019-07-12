@@ -18,6 +18,8 @@
 
 using namespace klee;
 
+std::string TxSpeculativeRun::WHITESPACE = " \n\r\t\f\v";
+
 bool TxSpeculativeRun::isSpeculable(ExecutionState &current) {
   if (current.stack.back().kf->function->getName().substr(0, 5) == "klee_" ||
       current.stack.back().kf->function->getName().substr(0, 3) == "tx_") {
@@ -41,4 +43,18 @@ bool TxSpeculativeRun::isSpeculable(ExecutionState &current) {
     }
   }
   return true;
+}
+
+bool TxSpeculativeRun::isOverlap(std::set<std::string> s1,
+                                 std::set<std::string> s2) {
+  for (std::set<std::string>::iterator it1 = s1.begin(), ie1 = s1.end();
+       it1 != ie1; ++it1) {
+    for (std::set<std::string>::iterator it2 = s2.begin(), ie2 = s2.end();
+         it2 != ie2; ++it2) {
+      if (*it1 == *it2) {
+        return true;
+      }
+    }
+  }
+  return false;
 }

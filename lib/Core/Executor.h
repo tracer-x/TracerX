@@ -102,6 +102,7 @@ public:
   std::map<uintptr_t, unsigned int> specRevisted;
   std::map<uintptr_t, unsigned int> specRevistedNoInter;
   unsigned int specLimit;
+  std::set<std::string> specAvoid;
   uintptr_t prevNodeSequence;
 
   class Timer {
@@ -236,6 +237,8 @@ private:
 
   void run(ExecutionState &initialState);
 
+  std::set<std::string> readSpecAvoid(std::string fileName);
+
   // Given a concrete object in our [klee's] address space, add it to
   // objects checked code can reference.
   MemoryObject *addExternalObject(ExecutionState &state, void *addr,
@@ -324,6 +327,9 @@ private:
   StatePair fork(ExecutionState &current, ref<Expr> condition, bool isInternal);
   StatePair branchFork(ExecutionState &current, ref<Expr> condition,
                        bool isInternal);
+
+  std::set<std::string> extractVarNames(ExecutionState &current,
+                                        llvm::Value *v);
 
   // Generally the nodes are in normal mode. In case an infeasible path
   // is found, an speculation node is generated for the infeasible path

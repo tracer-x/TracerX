@@ -1004,6 +1004,28 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
   }
 }
 
+std::set<std::string> Executor::extractVarNames(ExecutionState &current,
+                                                llvm::Value *v) {
+  std::set<std::string> res;
+  if (!isa<Instruction>(v))
+    return res;
+  Instruction *ins = dyn_cast<Instruction>(v);
+  switch (ins->getOpcode()) {
+  case Instruction::Alloca: {
+    AllocaInst *ai = cast<AllocaInst>(ins);
+    res.insert(ai->getName().data());
+    break;
+  }
+  default: {
+    for (unsigned i = 0u; i < ins->getNumOperands(); i++) {
+      std::set<std::string> tmp = extractVarNames(current, ins->getOperand(i));
+      res.insert(tmp.begin(), tmp.end());
+    }
+  }
+  }
+  return res;
+}
+
 Executor::StatePair Executor::branchFork(ExecutionState &current,
                                          ref<Expr> condition, bool isInternal) {
 
@@ -1152,14 +1174,16 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
   //  llvm::outs() << "====end branchFork\n";
 
   //  llvm::outs() << "******************\n";
-  //  condition->dump();
+
+  llvm::BranchInst *binst =
+      llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isSpeculable(current)) {
       // create a new speculation execution node
-      uintptr_t pp = current.txTreeNode->getProgramPoint();
-      if (specRevisted.find(pp) == specRevisted.end() ||
-          specRevisted[pp] < specLimit) {
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
         specCount++;
         return addSpeculationNode(current, condition, isInternal, true);
       }
@@ -1169,13 +1193,11 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isSpeculable(current)) {
       // create a new speculation execution node
-      uintptr_t pp = current.txTreeNode->getProgramPoint();
-      if (specRevisted.find(pp) == specRevisted.end() ||
-          specRevisted[pp] < specLimit) {
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
         specCount++;
         return addSpeculationNode(current, condition, isInternal, false);
       }
-    } else {
     }
     return StatePair(0, &current);
   }
@@ -1202,14 +1224,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // be used to perform markings.
       // keep unsat core & increase spec counting
 
-      uintptr_t pp = current.txTreeNode->getProgramPoint();
-
-      if (specRevisted.find(pp) == specRevisted.end() ||
-          specRevisted[pp] < specLimit) {
-        llvm::BranchInst *binst =
-            llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-
         specCount++;
         return addSpeculationNode(current, condition, isInternal, true);
       }
@@ -1238,11 +1255,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
-      uintptr_t pp = current.txTreeNode->getProgramPoint();
-      if (specRevisted.find(pp) == specRevisted.end() ||
-          specRevisted[pp] < specLimit) {
-        llvm::BranchInst *binst =
-            llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         specCount++;
         return addSpeculationNode(current, condition, isInternal, false);
@@ -1525,13 +1540,15 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   //  }
   //  llvm::outs() << "====end SpeculationFork\n";
 
+  llvm::BranchInst *binst =
+      llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isSpeculable(current)) {
       // create a new speculation execution node
-      uintptr_t pp = current.txTreeNode->getProgramPoint();
-      if (specRevisted.find(pp) == specRevisted.end() ||
-          specRevisted[pp] < specLimit) {
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
         return addSpeculationNode(current, condition, isInternal, true);
       }
     }
@@ -1540,9 +1557,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isSpeculable(current)) {
       // create a new speculation execution node
-      uintptr_t pp = current.txTreeNode->getProgramPoint();
-      if (specRevisted.find(pp) == specRevisted.end() ||
-          specRevisted[pp] < specLimit) {
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
         return addSpeculationNode(current, condition, isInternal, false);
       }
     } else {
@@ -1569,12 +1585,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       // be used to perform markings.
       // keep unsat core & increase spec counting
 
-      uintptr_t pp = current.txTreeNode->getProgramPoint();
-
-      if (specRevisted.find(pp) == specRevisted.end() ||
-          specRevisted[pp] < specLimit) {
-        llvm::BranchInst *binst =
-            llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         return addSpeculationNode(current, condition, isInternal, true);
       }
@@ -1605,11 +1617,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
-      uintptr_t pp = current.txTreeNode->getProgramPoint();
-      if (specRevisted.find(pp) == specRevisted.end() ||
-          specRevisted[pp] < specLimit) {
-        llvm::BranchInst *binst =
-            llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         return addSpeculationNode(current, condition, isInternal, false);
       }
@@ -3884,6 +3893,17 @@ void Executor::doDumpStates() {
   updateStates(0);
 }
 
+std::set<std::string> Executor::readSpecAvoid(std::string fileName) {
+  std::set<std::string> res;
+  std::ifstream in(fileName.c_str());
+  std::string str;
+  while (std::getline(in, str)) {
+    res.insert(TxSpeculativeRun::trim(str));
+  }
+  in.close();
+  return res;
+}
+
 void Executor::run(ExecutionState &initialState) {
 
   specCount = 0;
@@ -3891,8 +3911,15 @@ void Executor::run(ExecutionState &initialState) {
   specAssertFail = 0;
   specLimit = 10;
   prevNodeSequence = 0;
-
+  specAvoid = readSpecAvoid("SpecAvoid.txt");
   bindModuleConstants();
+
+  //  llvm::errs() << "Vars: " << specAvoid.size() << "\n";
+  //  for (std::set<std::string>::iterator it = specAvoid.begin(),
+  //                                       ie = specAvoid.end();
+  //       it != ie; ++it) {
+  //    llvm::errs() << *it << "\n";
+  //  }
 
   // Delay init till now so that ticks don't accrue during
   // optimization and such.
