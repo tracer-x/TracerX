@@ -104,6 +104,9 @@ public:
   unsigned int specLimit;
   std::set<std::string> specAvoid;
   uintptr_t prevNodeSequence;
+  double totalSpecTime;
+  time_t specStartingTime;
+  time_t specStoppingTime;
 
   class Timer {
   public:

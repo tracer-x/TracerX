@@ -1031,7 +1031,10 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
   // The current node is in the speculation node
   if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode()) {
-    return speculationFork(current, condition, isInternal);
+	specStartingTime = time(0);
+    Executor::StatePair res = speculationFork(current, condition, isInternal);
+
+    return res;
   }
 
   Solver::Validity res;
@@ -1505,6 +1508,9 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       }
       specFail++;
       speculativeBackJump(current);
+
+      specStoppingTime = time(0);
+      totalSpecTime += (specStoppingTime - specStartingTime);
       return StatePair(0, 0);
     }
 
@@ -3912,6 +3918,8 @@ void Executor::run(ExecutionState &initialState) {
   specLimit = 10;
   prevNodeSequence = 0;
   specAvoid = readSpecAvoid("SpecAvoid.txt");
+  totalSpecTime = 0;
+
   bindModuleConstants();
 
   //  llvm::errs() << "Vars: " << specAvoid.size() << "\n";
@@ -4281,7 +4289,8 @@ void Executor::terminateStateOnError(ExecutionState &state,
     klee_message("ERROR: %s:%d: %s", ii.file.c_str(), ii.line, message.c_str());
     //    llvm::outs() << "=== end jumpback because of error \n";.
     // llvm::outs() << messaget << "\n";
-
+    specStoppingTime = time(0);
+    totalSpecTime += (specStoppingTime - specStartingTime);
     return;
   }
 
@@ -5035,6 +5044,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     std::string outSpecFile = interpreterHandler->getOutputFilename("spec.txt");
     std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
 
+    outSpec << "Total speculation time: " << totalSpecTime << "\n";
     outSpec << "Total speculation: " << specCount << "\n";
     outSpec << "Total speculation success: " << (specCount - specFail) << "\n";
     outSpec << "Total speculation failures: " << specFail << "\n";
