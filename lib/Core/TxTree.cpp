@@ -2278,6 +2278,7 @@ TxTreeNode::TxTreeNode(
   speculationFlag = 0;
   speculationFailed = 0;
   visitedProgramPoints = NULL;
+  specTime = NULL;
 }
 
 TxTreeNode::~TxTreeNode() {
@@ -2354,8 +2355,10 @@ void TxTreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
   if (this->speculationFlag) {
     leftData->txTreeNode->setSpeculationFlag();
     leftData->txTreeNode->visitedProgramPoints = this->visitedProgramPoints;
+    leftData->txTreeNode->specTime = this->specTime;
     rightData->txTreeNode->setSpeculationFlag();
     rightData->txTreeNode->visitedProgramPoints = this->visitedProgramPoints;
+    rightData->txTreeNode->specTime = this->specTime;
   }
 }
 

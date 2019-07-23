@@ -1028,12 +1028,12 @@ std::set<std::string> Executor::extractVarNames(ExecutionState &current,
 
 Executor::StatePair Executor::branchFork(ExecutionState &current,
                                          ref<Expr> condition, bool isInternal) {
-
+  start = clock();
   // The current node is in the speculation node
   if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode()) {
-	specStartingTime = time(0);
     Executor::StatePair res = speculationFork(current, condition, isInternal);
-
+    end = clock();
+    txTree->incSpecTime(double(end - start));
     return res;
   }
 
@@ -1411,6 +1411,7 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
     if (!isCurrentSpec) {
       speculationFalseState->txTreeNode->visitedProgramPoints =
           new std::set<uintptr_t>();
+      speculationFalseState->txTreeNode->specTime = new double(0.0);
     }
     trueState->txTreeNode = ires.second;
 
@@ -1460,6 +1461,7 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
     if (!isCurrentSpec) {
       speculationTrueState->txTreeNode->visitedProgramPoints =
           new std::set<uintptr_t>();
+      speculationTrueState->txTreeNode->specTime = new double(0.0);
     }
 
     falseState->txTreeNode = ires.second;
@@ -1507,10 +1509,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         //          INTERPOLATION!", current.txTreeNode->getProgramPoint());
       }
       specFail++;
-      speculativeBackJump(current);
+      speculativeBackJump(current, true);
 
-      specStoppingTime = time(0);
-      totalSpecTime += (specStoppingTime - specStartingTime);
       return StatePair(0, 0);
     }
 
@@ -1695,7 +1695,13 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   }
 }
 
-void Executor::speculativeBackJump(ExecutionState &current) {
+void Executor::speculativeBackJump(ExecutionState &current, bool isNL) {
+  if (isNL) {
+    totalSpecTimeNL += *(current.txTreeNode->specTime);
+  } else {
+    totalSpecTimeBH += *(current.txTreeNode->specTime);
+  }
+
   // identify the speculation root
   TxTreeNode *currentNode = current.txTreeNode;
   TxTreeNode *parent = currentNode->getParent();
@@ -3918,7 +3924,9 @@ void Executor::run(ExecutionState &initialState) {
   specLimit = 10;
   prevNodeSequence = 0;
   specAvoid = readSpecAvoid("SpecAvoid.txt");
-  totalSpecTime = 0;
+  totalSpecTimeNL = 0.0;
+  totalSpecTimeBH = 0.0;
+  totalSpecTimeSC = 0.0;
 
   bindModuleConstants();
 
@@ -4283,14 +4291,10 @@ void Executor::terminateStateOnError(ExecutionState &state,
   if (INTERPOLATION_ENABLED && Speculation &&
       state.txTreeNode->isSpeculationNode()) {
     //    llvm::outs() << "=== start jumpback because of error \n";
-    speculativeBackJump(state);
+    speculativeBackJump(state, false);
     specFail++;
     specAssertFail++;
     klee_message("ERROR: %s:%d: %s", ii.file.c_str(), ii.line, message.c_str());
-    //    llvm::outs() << "=== end jumpback because of error \n";.
-    // llvm::outs() << messaget << "\n";
-    specStoppingTime = time(0);
-    totalSpecTime += (specStoppingTime - specStartingTime);
     return;
   }
 
@@ -5044,7 +5048,6 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     std::string outSpecFile = interpreterHandler->getOutputFilename("spec.txt");
     std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
 
-    outSpec << "Total speculation time: " << totalSpecTime << "\n";
     outSpec << "Total speculation: " << specCount << "\n";
     outSpec << "Total speculation success: " << (specCount - specFail) << "\n";
     outSpec << "Total speculation failures: " << specFail << "\n";
@@ -5069,6 +5072,14 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
             << (revisted - revistedNoInter) << "\n";
     outSpec << "Total speculation non-linear failures with no interpolation: "
             << revistedNoInter << "\n";
+    outSpec << "Total speculation time: "
+            << (totalSpecTimeNL + totalSpecTimeBH) / double(CLOCKS_PER_SEC)
+            << "\n";
+    outSpec << "Total speculation time for assertion failures: "
+            << totalSpecTimeBH / double(CLOCKS_PER_SEC) << "\n";
+    outSpec << "Total speculation time for non-linear failures: "
+            << totalSpecTimeNL / double(CLOCKS_PER_SEC) << "\n";
+
     // print frequency of failure at each program point
     outSpec << "Frequency of non-linear failures:\n";
     //    TxSpeculativeRun::sort(specRevisted);

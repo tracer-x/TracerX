@@ -484,6 +484,7 @@ public:
   // \brief This object contains the visited program points in the speculation
   // node
   std::set<uintptr_t> *visitedProgramPoints;
+  double *specTime;
 
   /// \brief Check if the current node is a speculation node
   bool isSpeculationNode();
@@ -927,6 +928,12 @@ public:
 
   /// \brief Check if the current node is a speculation node
   bool isSpeculationNode();
+  void incSpecTime(double ts) {
+    //	llvm::errs() << "currentTxTreeNode->specTime=" <<
+    //currentTxTreeNode->specTime << "\n";
+    if (currentTxTreeNode->specTime != NULL)
+      *currentTxTreeNode->specTime += ts;
+  }
 
   void storeSpeculationUnsatCore(TimingSolver *solver,
                                  std::vector<ref<Expr> > unsatCore,

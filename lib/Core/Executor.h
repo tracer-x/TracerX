@@ -104,9 +104,11 @@ public:
   unsigned int specLimit;
   std::set<std::string> specAvoid;
   uintptr_t prevNodeSequence;
-  double totalSpecTime;
-  time_t specStartingTime;
-  time_t specStoppingTime;
+  double totalSpecTimeNL;
+  double totalSpecTimeBH;
+  double totalSpecTimeSC;
+  clock_t start, end;
+  bool isFail;
 
   class Timer {
   public:
@@ -341,7 +343,7 @@ private:
   StatePair addSpeculationNode(ExecutionState &current, ref<Expr> condition,
                                bool isInternal, bool falseBranchIsInfeasible);
 
-  void speculativeBackJump(ExecutionState &current);
+  void speculativeBackJump(ExecutionState &current, bool isNL);
   bool checkSpeculation(ExecutionState &current);
 
   std::vector<TxTreeNode *> collectSpeculationNodes(TxTreeNode *);
