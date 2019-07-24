@@ -103,27 +103,31 @@ std::set<std::string> TxPartitionHelper::getExprVars(ref<Expr> expr) {
   }
 
   case Expr::Select: {
-    ref<Expr> kids[3];
+    std::set<std::string> vars1;
+    ref<Expr> kids[2];
     kids[0] = expr->getKid(0);
+    if (kids[0]->getKind() != Expr::WPVar) {
+      vars1 = getExprVars(kids[0]);
+    }
     kids[1] = expr->getKid(1);
-    kids[2] = expr->getKid(2);
-    std::set<std::string> vars1 = getExprVars(kids[0]);
     std::set<std::string> vars2 = getExprVars(kids[1]);
-    std::set<std::string> vars3 = getExprVars(kids[2]);
     vars1.insert(vars2.begin(), vars2.end());
-    vars1.insert(vars3.begin(), vars3.end());
     return vars1;
   }
 
   case Expr::Upd: {
+    std::set<std::string> vars1;
     ref<Expr> kids[3];
     kids[0] = expr->getKid(0);
+    if (kids[0]->getKind() != Expr::WPVar) {
+      vars1 = getExprVars(kids[0]);
+    }
+
     kids[1] = expr->getKid(1);
-    kids[2] = expr->getKid(2);
-    std::set<std::string> vars1 = getExprVars(kids[0]);
     std::set<std::string> vars2 = getExprVars(kids[1]);
-    std::set<std::string> vars3 = getExprVars(kids[2]);
     vars1.insert(vars2.begin(), vars2.end());
+    kids[2] = expr->getKid(2);
+    std::set<std::string> vars3 = getExprVars(kids[2]);
     vars1.insert(vars3.begin(), vars3.end());
     return vars1;
   }
