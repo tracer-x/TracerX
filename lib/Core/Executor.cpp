@@ -4282,6 +4282,11 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 
   if (statsTracker)
     statsTracker->done();
+
+  if (atMemoryLimit)
+    klee_warning("Memory cap exceeded!!!\n");
+  else
+    klee_message("Memory cap NOT exceeded!\n");
 }
 
 unsigned Executor::getPathStreamID(const ExecutionState &state) {
