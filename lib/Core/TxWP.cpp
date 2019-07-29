@@ -1915,8 +1915,21 @@ TxWeakestPreCondition::getPointer(llvm::GetElementPtrInst *gep) {
     pair.first = offset->rebuild(kids);
     pair.second = parentPair.second;
   } else {
-    pair.first = this->generateExprFromOperand(gep->getOperand(2));
-    pair.second = this->generateExprFromOperand(gep->getOperand(0));
+    bool isFirstZero = false;
+    if (llvm::ConstantInt *c =
+            dyn_cast<llvm::ConstantInt>(gep->getOperand(1))) {
+      if (c->getZExtValue() == 0) {
+        isFirstZero = true;
+      }
+    }
+
+    if (isFirstZero) {
+      pair.first = this->generateExprFromOperand(gep->getOperand(2));
+      pair.second = this->generateExprFromOperand(gep->getOperand(0));
+    } else {
+      pair.first = this->generateExprFromOperand(gep->getOperand(1));
+      pair.second = this->generateExprFromOperand(gep->getOperand(0));
+    }
   }
   return pair;
 }
