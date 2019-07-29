@@ -123,8 +123,10 @@ namespace klee {
 /// - The <i>path condition</i> TxDependency#pathCondition. This field
 ///   maintains all the constraints accumulated through the execution.
 ///
-/// - The <i>store</i> TxDependency#store. This field points to an object of TxStore
-///   class. The store is essentially a continer of mappings from addresses to values.
+/// - The <i>store</i> TxDependency#store. This field points to an object of
+/// TxStore
+///   class. The store is essentially a continer of mappings from addresses to
+/// values.
 ///   The store has two such mappings, depending on whether the address is
 ///   concrete or is a symbolic expression.
 ///   Each entry in the mappings represents an element of the mapping.
@@ -330,6 +332,8 @@ public:
 
   ~TxDependency();
 
+  llvm::DataLayout *getTargetData() { return targetData; }
+
   TxDependency *cdr() const;
 
   /// \brief This retrieves the locations known at this state, and the
@@ -431,7 +435,7 @@ public:
         concretelyAddressedHistoricalStore,
         symbolicallyAddressedHistoricalStore);
   }
-  
+
   ref<TxStateValue>
   getLatestValue(llvm::Value *value,
                  const std::vector<llvm::Instruction *> &callHistory,
