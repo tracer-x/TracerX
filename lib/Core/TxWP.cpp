@@ -1922,13 +1922,18 @@ TxWeakestPreCondition::getPointer(llvm::GetElementPtrInst *gep) {
         isFirstZero = true;
       }
     }
-
-    if (isFirstZero) {
-      pair.first = this->generateExprFromOperand(gep->getOperand(2));
-      pair.second = this->generateExprFromOperand(gep->getOperand(0));
-    } else {
+    unsigned opsNo = gep->getNumOperands();
+    if (opsNo == 2) {
       pair.first = this->generateExprFromOperand(gep->getOperand(1));
       pair.second = this->generateExprFromOperand(gep->getOperand(0));
+    } else if (opsNo > 2) {
+      if (isFirstZero) {
+        pair.first = this->generateExprFromOperand(gep->getOperand(2));
+        pair.second = this->generateExprFromOperand(gep->getOperand(0));
+      } else {
+        pair.first = this->generateExprFromOperand(gep->getOperand(1));
+        pair.second = this->generateExprFromOperand(gep->getOperand(0));
+      }
     }
   }
   return pair;
@@ -2291,10 +2296,14 @@ unsigned int TxWeakestPreCondition::getAllocaInstSize(llvm::AllocaInst *alc) {
   } else if (alc->getAllocatedType()->isIntegerTy(64)) {
     size = Expr::Int64;
   } else {
-    alc->dump();
-    alc->getType()->dump();
-    klee_error("TxWeakestPreCondition::getAllocaInstSize getting size is not "
-               "defined for this type yet");
+    size = Expr::Int32;
+    //    llvm::errs() << "Size = " <<
+    // dependency->getTargetData()->getTypeStoreSize(alc->getType()->getElementType())
+    // << "\n";
+
+    //    klee_error("TxWeakestPreCondition::getAllocaInstSize getting size is
+    // not "
+    //               "defined for this type yet");
   }
   return size;
 }
