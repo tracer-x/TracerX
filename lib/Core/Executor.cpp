@@ -3259,7 +3259,9 @@ void Executor::run(ExecutionState &initialState) {
     }
 #endif
 
-    if (INTERPOLATION_ENABLED &&
+    std::string funcName = state.pc->inst->getParent()->getParent()->getName();
+    std::size_t kleeInitFound = funcName.find("klee_init");
+    if (INTERPOLATION_ENABLED && kleeInitFound != std::string::npos &&
         txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
       terminateStateOnSubsumption(state);
     } else {
