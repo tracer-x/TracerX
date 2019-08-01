@@ -388,6 +388,7 @@ class TxTreeNode {
   TxTreeNode *parent, *left, *right;
 
   uintptr_t programPoint;
+  llvm::BasicBlock *basicBlock;
 
   uint64_t nodeSequenceNumber;
 
@@ -411,8 +412,10 @@ class TxTreeNode {
   bool genericEarlyTermination;
 
   void setProgramPoint(llvm::Instruction *instr) {
-    if (!programPoint)
+    if (!programPoint) {
       programPoint = reinterpret_cast<uintptr_t>(instr);
+      basicBlock = instr->getParent();
+    }
 
     // Disabling the subsumption check within KLEE's own API
     // (call sites of klee_ and at any location within the klee_ function)
@@ -470,6 +473,7 @@ public:
   std::vector<llvm::Instruction *> callHistory;
 
   uintptr_t getProgramPoint() { return programPoint; }
+  llvm::BasicBlock *getBasicBlock() { return basicBlock; }
 
   uint64_t getNodeSequenceNumber() { return nodeSequenceNumber; }
 
@@ -930,7 +934,7 @@ public:
   bool isSpeculationNode();
   void incSpecTime(double ts) {
     //	llvm::errs() << "currentTxTreeNode->specTime=" <<
-    //currentTxTreeNode->specTime << "\n";
+    // currentTxTreeNode->specTime << "\n";
     if (currentTxTreeNode->specTime != NULL)
       *currentTxTreeNode->specTime += ts;
   }

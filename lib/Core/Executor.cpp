@@ -1518,6 +1518,14 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     current.txTreeNode->visitedProgramPoints->insert(pp);
   }
 
+  // stop when see the new BB
+  llvm::BasicBlock *currentBB = current.txTreeNode->getBasicBlock();
+  if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
+    specFail++;
+    speculativeBackJump(current, true);
+    return StatePair(0, 0);
+  }
+
   Solver::Validity res;
 
   double timeout = coreSolverTimeout;
@@ -2329,8 +2337,15 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
           if (visitedBlocks.find(dst) == visitedBlocks.end())
             newDstFlag = true;
 
-          visitedBlocks.insert(src);
-          visitedBlocks.insert(dst);
+          if (INTERPOLATION_ENABLED && Speculation &&
+              !txTree->isSpeculationNode()) {
+            visitedBlocks.insert(src);
+            visitedBlocks.insert(dst);
+          } else {
+            visitedBlocks.insert(src);
+            visitedBlocks.insert(dst);
+          }
+
           time_t now = time(0);
           double diff;
           diff = now - startingTime;
