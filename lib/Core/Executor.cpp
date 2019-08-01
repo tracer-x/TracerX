@@ -3921,7 +3921,7 @@ void Executor::run(ExecutionState &initialState) {
   specCount = 0;
   specFail = 0;
   specAssertFail = 0;
-  specLimit = 10;
+  specLimit = 200000;
   prevNodeSequence = 0;
   specAvoid = readSpecAvoid("SpecAvoid.txt");
   totalSpecTimeNL = 0.0;
@@ -4287,16 +4287,6 @@ void Executor::terminateStateOnError(ExecutionState &state,
   Instruction *lastInst;
   const InstructionInfo &ii =
       getLastNonKleeInternalInstruction(state, &lastInst);
-
-  if (INTERPOLATION_ENABLED && Speculation &&
-      state.txTreeNode->isSpeculationNode()) {
-    //    llvm::outs() << "=== start jumpback because of error \n";
-    speculativeBackJump(state, false);
-    specFail++;
-    specAssertFail++;
-    klee_message("ERROR: %s:%d: %s", ii.file.c_str(), ii.line, message.c_str());
-    return;
-  }
 
   interpreterHandler->incErrorTermination();
   if (INTERPOLATION_ENABLED) {
