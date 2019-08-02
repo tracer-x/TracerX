@@ -1189,6 +1189,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
         specCount++;
         return addSpeculationNode(current, condition, isInternal, true);
+      } else {
+        specCloseCount++;
       }
     }
     return StatePair(&current, 0);
@@ -1200,6 +1202,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
         specCount++;
         return addSpeculationNode(current, condition, isInternal, false);
+      } else {
+        specCloseCount++;
       }
     }
     return StatePair(0, &current);
@@ -1232,6 +1236,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         specCount++;
         return addSpeculationNode(current, condition, isInternal, true);
+      } else {
+        specCloseCount++;
       }
     }
 
@@ -1264,6 +1270,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         specCount++;
         return addSpeculationNode(current, condition, isInternal, false);
+      } else {
+        specCloseCount++;
       }
     }
 
@@ -1564,6 +1572,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       std::set<std::string> vars = extractVarNames(current, binst);
       if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
         return addSpeculationNode(current, condition, isInternal, true);
+      } else {
+        specCloseCount++;
       }
     }
     return StatePair(&current, 0);
@@ -1574,6 +1584,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       std::set<std::string> vars = extractVarNames(current, binst);
       if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
         return addSpeculationNode(current, condition, isInternal, false);
+      } else {
+        specCloseCount++;
       }
     } else {
     }
@@ -1603,6 +1615,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         return addSpeculationNode(current, condition, isInternal, true);
+      } else {
+        specCloseCount++;
       }
     }
 
@@ -1635,6 +1649,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         return addSpeculationNode(current, condition, isInternal, false);
+      } else {
+        specCloseCount++;
       }
     }
 
@@ -3930,6 +3946,7 @@ std::set<std::string> Executor::readSpecAvoid(std::string fileName) {
 void Executor::run(ExecutionState &initialState) {
 
   specCount = 0;
+  specCloseCount = 0;
   specFail = 0;
   specAssertFail = 0;
   specLimit = 200000;
@@ -5052,7 +5069,8 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     std::string outSpecFile = interpreterHandler->getOutputFilename("spec.txt");
     std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
 
-    outSpec << "Total speculation: " << specCount << "\n";
+    outSpec << "Total closed speculation: " << specCloseCount << "\n";
+    outSpec << "Total opened speculation: " << specCount << "\n";
     outSpec << "Total speculation success: " << (specCount - specFail) << "\n";
     outSpec << "Total speculation failures: " << specFail << "\n";
     outSpec << "Total speculation assertion failures: " << specAssertFail
