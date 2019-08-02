@@ -2337,12 +2337,8 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
           if (visitedBlocks.find(dst) == visitedBlocks.end())
             newDstFlag = true;
 
-          if (INTERPOLATION_ENABLED && Speculation &&
-              !txTree->isSpeculationNode()) {
-            visitedBlocks.insert(src);
-            visitedBlocks.insert(dst);
-          } else {
-            visitedBlocks.insert(src);
+          if (!(INTERPOLATION_ENABLED && Speculation &&
+                state.txTreeNode->isSpeculationNode())) {
             visitedBlocks.insert(dst);
           }
 
@@ -5031,6 +5027,9 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     state->txTreeNode = txTree->root;
     TxTreeGraph::initialize(txTree->root);
   }
+
+  // add initial BB to visited BBS
+  visitedBlocks.insert(&(f->front()));
 
   run(*state);
   delete processTree;
