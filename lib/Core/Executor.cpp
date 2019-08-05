@@ -2305,6 +2305,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
                 if ((klee_message_file = fopen(outfile4.c_str(), "a+")) == NULL)
                   klee_error("cannot open file \"%s\": %s", outfile4.c_str(),
                              strerror(errno));
+
                 std::string g4(outfile4.c_str());
                 std::ofstream out4(outfile4.c_str(), std::ofstream::app);
                 if (!out4.fail()) {
@@ -2363,6 +2364,8 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
           diff = now - startingTime;
           blockCoverage =
               ((float)visitedBlocks.size() / (float)allBlockCount) * 100;
+          klee_warning("Visited Blocks Up to now=========================: %d\n",
+                          int(visitedBlocks.size()));
           //************Live Coverage Start****************"
           if (BBCoverage >= 3) {
             std::string outfile3 =
@@ -2408,9 +2411,6 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
             if ((klee_message_file = fopen(outfile1.c_str(), "a+")) == NULL)
               klee_error("cannot open file \"%s\": %s", outfile1.c_str(),
                          strerror(errno));
-            klee_warning(
-                "Visited Blocks Up to now=========================: %d\n",
-                int(visitedBlocks.size()));
             std::string g1(outfile1.c_str());
             std::ofstream out1(outfile1.c_str(), std::ofstream::app);
             if (!out1.fail()) {
