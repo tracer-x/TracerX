@@ -2357,6 +2357,11 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
           if (!(INTERPOLATION_ENABLED && Speculation &&
                 state.txTreeNode->isSpeculationNode())) {
             visitedBlocks.insert(dst);
+            if ((fBBOrder.find(dst->getParent()) != fBBOrder.end()) &&
+                (fBBOrder.find(dst->getParent())->second.find(dst) !=
+                 fBBOrder.find(dst->getParent())->second.end())) {
+              visitedBlockOrders.insert(fBBOrder[dst->getParent()][dst]);
+            }
           }
 
           time_t now = time(0);
@@ -2364,8 +2369,9 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
           diff = now - startingTime;
           blockCoverage =
               ((float)visitedBlocks.size() / (float)allBlockCount) * 100;
-          klee_warning("Visited Blocks Up to now=========================: %d\n",
-                          int(visitedBlocks.size()));
+          klee_warning(
+              "Visited Blocks Up to now=========================: %d\n",
+              int(visitedBlocks.size()));
           //************Live Coverage Start****************"
           if (BBCoverage >= 3) {
             std::string outfile3 =
@@ -3956,6 +3962,39 @@ void Executor::run(ExecutionState &initialState) {
   totalSpecTimeBH = 0.0;
   totalSpecTimeSC = 0.0;
 
+  //  llvm::errs() << "=======MY Printing======\n";
+  int bbCounter = 0;
+  for (llvm::Module::iterator it = kmodule->module->begin(),
+                              ie = kmodule->module->end();
+       it != ie; ++it) {
+    if (!it->isIntrinsic() && (it->getName().str().substr(0, 5) != "klee_") &&
+        (it->getName() != "memcpy") && (it->getName() != "memmove") &&
+        (it->getName() != "mempcpy") && (it->getName() != "memset")) {
+      //      llvm::errs() << "Function: " << it->getName() << "\n";
+      for (llvm::Function::iterator it1 = it->begin(), ie1 = it->end();
+           it1 != ie1; ++it1) {
+        fBBOrder[it][it1] = bbCounter;
+        bbCounter++;
+        //        it1->dump();
+      }
+    }
+  }
+  //  llvm::errs() << "Map Data:\n";
+  //  for (std::map<llvm::Function *, std::map<llvm::BasicBlock *, int>
+  // >::iterator
+  //           it = fBBOrder.begin(),
+  //           ie = fBBOrder.end();
+  //       it != ie; ++it) {
+  //    for (std::map<llvm::BasicBlock *, int>::iterator it1 =
+  // it->second.begin(),
+  //                                                     ie1 = it->second.end();
+  //         it1 != ie1; ++it1) {
+  //      llvm::errs() << it->first << "-" << it1->first << "-" << it1->second
+  //                   << "\n";
+  //    }
+  //  }
+  //  llvm::errs() << "=======End MY Printing======\n";
+
   bindModuleConstants();
 
   //  llvm::errs() << "Vars: " << specAvoid.size() << "\n";
@@ -5047,6 +5086,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 
   // add initial BB to visited BBS
   visitedBlocks.insert(&(f->front()));
+  visitedBlockOrders.insert(fBBOrder[f][&(f->front())]);
 
   run(*state);
   delete processTree;
@@ -5140,18 +5180,20 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
         << "\n";
   }
   if (BBCoverage >= 2) {
+    // VisitedBB.txt
     std::string outfile5 =
         interpreterHandler->getOutputFilename("VisitedBB.txt");
     if ((klee_message_file = fopen(outfile5.c_str(), "a+")) == NULL)
       klee_error("cannot open file \"%s\": %s", outfile5.c_str(),
                  strerror(errno));
 
-    for (std::set<llvm::BasicBlock *>::iterator it = visitedBlocks.begin(),
-                                                ie = visitedBlocks.end();
-         it != ie; ++it) {
-      std::string g5(outfile5.c_str());
-      std::ofstream out5(outfile5.c_str(), std::ofstream::app);
-      if (!out5.fail()) {
+    std::string g5(outfile5.c_str());
+    std::ofstream out5(outfile5.c_str(), std::ofstream::app);
+    if (!out5.fail()) {
+      for (std::set<llvm::BasicBlock *>::iterator it = visitedBlocks.begin(),
+                                                  ie = visitedBlocks.end();
+           it != ie; ++it) {
+
         out5 << "BlockScopeStarts: \n";
         std::string tmp2 = ((*it)->getParent())->getName();
         std::string Str2;
@@ -5161,8 +5203,26 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
         out5 << "BlockScopeEnds: "
              << "\n";
       }
-      out5.close();
     }
+    out5.close();
+
+    // VisitedBBOrders.txt
+    std::string outfile6 =
+        interpreterHandler->getOutputFilename("VisitedBBOrders.txt");
+    if ((klee_message_file = fopen(outfile6.c_str(), "a+")) == NULL) {
+      klee_error("cannot open file \"%s\": %s", outfile6.c_str(),
+                 strerror(errno));
+    }
+    std::string g6(outfile6.c_str());
+    std::ofstream out6(outfile6.c_str(), std::ofstream::app);
+    if (!out6.fail()) {
+      for (std::set<int>::iterator it = visitedBlockOrders.begin(),
+                                   ie = visitedBlockOrders.end();
+           it != ie; ++it) {
+        out6 << (*it) << "\n";
+      }
+    }
+    out6.close();
   }
 
   // hack to clear memory objects
