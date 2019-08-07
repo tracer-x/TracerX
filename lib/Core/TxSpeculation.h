@@ -32,9 +32,12 @@ namespace klee {
 class TxSpeculativeRun {
 public:
   static std::string WHITESPACE;
-  static bool isSpeculable(ExecutionState &current);
+  static bool isStateSpeculable(ExecutionState &current);
 
-  static bool isOverlap(std::set<std::string> s1, std::set<std::string> s2);
+  static bool isSpec(std::set<std::string> &vars,
+                     std::map<int, std::set<std::string> > &avoidance);
+
+  static bool isOverlap(std::set<std::string> &s1, std::set<std::string> &s2);
 
   static std::string ltrim(const std::string &s) {
     size_t start = s.find_first_not_of(WHITESPACE);

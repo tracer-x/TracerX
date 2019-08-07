@@ -20,7 +20,7 @@ using namespace klee;
 
 std::string TxSpeculativeRun::WHITESPACE = " \n\r\t\f\v";
 
-bool TxSpeculativeRun::isSpeculable(ExecutionState &current) {
+bool TxSpeculativeRun::isStateSpeculable(ExecutionState &current) {
   if (current.stack.back().kf->function->getName().substr(0, 5) == "klee_" ||
       current.stack.back().kf->function->getName().substr(0, 3) == "tx_") {
     return false;
@@ -45,8 +45,8 @@ bool TxSpeculativeRun::isSpeculable(ExecutionState &current) {
   return true;
 }
 
-bool TxSpeculativeRun::isOverlap(std::set<std::string> s1,
-                                 std::set<std::string> s2) {
+bool TxSpeculativeRun::isOverlap(std::set<std::string> &s1,
+                                 std::set<std::string> &s2) {
   for (std::set<std::string>::iterator it1 = s1.begin(), ie1 = s1.end();
        it1 != ie1; ++it1) {
     for (std::set<std::string>::iterator it2 = s2.begin(), ie2 = s2.end();
@@ -57,4 +57,17 @@ bool TxSpeculativeRun::isOverlap(std::set<std::string> s1,
     }
   }
   return false;
+}
+
+bool
+TxSpeculativeRun::isSpec(std::set<std::string> &vars,
+                         std::map<int, std::set<std::string> > &avoidance) {
+  for (std::map<int, std::set<std::string> >::iterator it = avoidance.begin(),
+                                                       ie = avoidance.end();
+       it != ie; ++it) {
+    if (isOverlap(it->second, vars)) {
+      return false;
+    }
+  }
+  return true;
 }

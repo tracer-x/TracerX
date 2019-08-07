@@ -1183,10 +1183,10 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && Speculation &&
-        TxSpeculativeRun::isSpeculable(current)) {
+        TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
         specCount++;
         return addSpeculationNode(current, condition, isInternal, true);
       } else {
@@ -1196,10 +1196,10 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     return StatePair(&current, 0);
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && Speculation &&
-        TxSpeculativeRun::isSpeculable(current)) {
+        TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
         specCount++;
         return addSpeculationNode(current, condition, isInternal, false);
       } else {
@@ -1225,14 +1225,14 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       }
     }
     if (INTERPOLATION_ENABLED && Speculation &&
-        TxSpeculativeRun::isSpeculable(current)) {
+        TxSpeculativeRun::isStateSpeculable(current)) {
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
 
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         specCount++;
         return addSpeculationNode(current, condition, isInternal, true);
@@ -1259,14 +1259,14 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     }
 
     if (INTERPOLATION_ENABLED && Speculation &&
-        TxSpeculativeRun::isSpeculable(current)) {
+        TxSpeculativeRun::isStateSpeculable(current)) {
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
 
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         specCount++;
         return addSpeculationNode(current, condition, isInternal, false);
@@ -1567,10 +1567,10 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && Speculation &&
-        TxSpeculativeRun::isSpeculable(current)) {
+        TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
         return addSpeculationNode(current, condition, isInternal, true);
       } else {
         specCloseCount++;
@@ -1579,10 +1579,10 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     return StatePair(&current, 0);
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && Speculation &&
-        TxSpeculativeRun::isSpeculable(current)) {
+        TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
         return addSpeculationNode(current, condition, isInternal, false);
       } else {
         specCloseCount++;
@@ -1605,14 +1605,14 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       }
     }
     if (INTERPOLATION_ENABLED && Speculation &&
-        TxSpeculativeRun::isSpeculable(current)) {
+        TxSpeculativeRun::isStateSpeculable(current)) {
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
 
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         return addSpeculationNode(current, condition, isInternal, true);
       } else {
@@ -1640,13 +1640,13 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     }
 
     if (INTERPOLATION_ENABLED && Speculation &&
-        TxSpeculativeRun::isSpeculable(current)) {
+        TxSpeculativeRun::isStateSpeculable(current)) {
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (!TxSpeculativeRun::isOverlap(vars, specAvoid)) {
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         return addSpeculationNode(current, condition, isInternal, false);
       } else {
