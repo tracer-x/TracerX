@@ -22,6 +22,8 @@
 #include "klee/Internal/Module/KModule.h"
 #include "klee/util/ArrayCache.h"
 #include "llvm/Support/raw_ostream.h"
+#include <dirent.h>
+#include <stdlib.h>
 
 #include "llvm/ADT/Twine.h"
 
@@ -107,6 +109,7 @@ public:
   std::map<uintptr_t, unsigned int> specRevistedNoInter;
   unsigned int specLimit;
   std::set<std::string> specAvoid;
+  std::map<int, std::set<std::string> > bbOrderToSpecAvoid;
   uintptr_t prevNodeSequence;
   double totalSpecTimeNL;
   double totalSpecTimeBH;
@@ -247,6 +250,9 @@ private:
   void run(ExecutionState &initialState);
 
   std::set<std::string> readSpecAvoid(std::string fileName);
+  std::map<int, std::set<std::string> >
+  readBBOrderToSpecAvoid(std::string folderName);
+  std::pair<int, std::set<std::string> > readBBSpecAvoid(std::string fileName);
 
   // Given a concrete object in our [klee's] address space, add it to
   // objects checked code can reference.

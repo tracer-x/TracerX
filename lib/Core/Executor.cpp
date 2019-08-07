@@ -3946,10 +3946,47 @@ std::set<std::string> Executor::readSpecAvoid(std::string fileName) {
   std::ifstream in(fileName.c_str());
   std::string str;
   while (std::getline(in, str)) {
-    res.insert(TxSpeculativeRun::trim(str));
+    if (!TxSpeculativeRun::trim(str).empty())
+      res.insert(TxSpeculativeRun::trim(str));
   }
   in.close();
   return res;
+}
+
+std::map<int, std::set<std::string> >
+Executor::readBBOrderToSpecAvoid(std::string folderName) {
+  std::map<int, std::set<std::string> > res;
+  DIR *dirp = opendir(folderName.c_str());
+  dirent *dp;
+  while ((dp = readdir(dirp)) != NULL) {
+    std::string name(dp->d_name);
+    if (strcmp(name.substr(0, 10).c_str(), "SpecAvoid_") == 0) {
+      std::pair<int, std::set<std::string> > tmp = readBBSpecAvoid(name);
+      res[tmp.first] = tmp.second;
+    }
+  }
+  (void)closedir(dirp);
+  return res;
+}
+
+std::pair<int, std::set<std::string> >
+Executor::readBBSpecAvoid(std::string fileName) {
+  bool isFirst = true;
+  int bb;
+  std::set<std::string> avoid;
+  std::ifstream in(fileName.c_str());
+  std::string str;
+  while (std::getline(in, str)) {
+    if (isFirst) {
+      bb = atoi(str.c_str());
+      isFirst = false;
+    } else {
+      if (!TxSpeculativeRun::trim(str).empty())
+        avoid.insert(TxSpeculativeRun::trim(str));
+    }
+  }
+  in.close();
+  return std::make_pair(bb, avoid);
 }
 
 void Executor::run(ExecutionState &initialState) {
@@ -3961,11 +3998,27 @@ void Executor::run(ExecutionState &initialState) {
   specLimit = 200000;
   prevNodeSequence = 0;
   specAvoid = readSpecAvoid("SpecAvoid.txt");
+  bbOrderToSpecAvoid = readBBOrderToSpecAvoid(".");
   totalSpecTimeNL = 0.0;
   totalSpecTimeBH = 0.0;
   totalSpecTimeSC = 0.0;
 
-  //  llvm::errs() << "=======MY Printing======\n";
+  //  llvm::errs() << "== Print Spec Avoid ==\n";
+  for (std::map<int, std::set<std::string> >::iterator
+           it = bbOrderToSpecAvoid.begin(),
+           ie = bbOrderToSpecAvoid.end();
+       it != ie; ++it) {
+    llvm::errs() << it->first << "\n";
+    for (std::set<std::string>::iterator it1 = it->second.begin(),
+                                         ie1 = it->second.end();
+         it1 != ie1; ++it1) {
+      llvm::errs() << *it1 << "-";
+    }
+    llvm::errs() << "\n=====\n";
+  }
+  //  llvm::errs() << "== End Printing Spec Avoid ==\n";
+
+  //  llvm::errs() << "======= Load BB Order ======\n";
   int bbCounter = 0;
   for (llvm::Module::iterator it = kmodule->module->begin(),
                               ie = kmodule->module->end();
@@ -3996,7 +4049,7 @@ void Executor::run(ExecutionState &initialState) {
   //                   << "\n";
   //    }
   //  }
-  //  llvm::errs() << "=======End MY Printing======\n";
+  //  llvm::errs() << "======= End Load BB Order ======\n";
 
   bindModuleConstants();
 
