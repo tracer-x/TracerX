@@ -2357,7 +2357,10 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
           if (!(INTERPOLATION_ENABLED && Speculation &&
                 state.txTreeNode->isSpeculationNode())) {
             visitedBlocks.insert(dst);
-            if ((fBBOrder.find(dst->getParent()) != fBBOrder.end()) &&
+
+            // exclude speculation mode in this case
+            if (INTERPOLATION_ENABLED && Speculation &&
+                (fBBOrder.find(dst->getParent()) != fBBOrder.end()) &&
                 (fBBOrder.find(dst->getParent())->second.find(dst) !=
                  fBBOrder.find(dst->getParent())->second.end())) {
               visitedBlockOrders.insert(fBBOrder[dst->getParent()][dst]);
@@ -5086,7 +5089,9 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 
   // add initial BB to visited BBS
   visitedBlocks.insert(&(f->front()));
-  visitedBlockOrders.insert(fBBOrder[f][&(f->front())]);
+  if (INTERPOLATION_ENABLED && Speculation) {
+    visitedBlockOrders.insert(fBBOrder[f][&(f->front())]);
+  }
 
   run(*state);
   delete processTree;
@@ -5207,22 +5212,24 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     out5.close();
 
     // VisitedBBOrders.txt
-    std::string outfile6 =
-        interpreterHandler->getOutputFilename("VisitedBBOrders.txt");
-    if ((klee_message_file = fopen(outfile6.c_str(), "a+")) == NULL) {
-      klee_error("cannot open file \"%s\": %s", outfile6.c_str(),
-                 strerror(errno));
-    }
-    std::string g6(outfile6.c_str());
-    std::ofstream out6(outfile6.c_str(), std::ofstream::app);
-    if (!out6.fail()) {
-      for (std::set<int>::iterator it = visitedBlockOrders.begin(),
-                                   ie = visitedBlockOrders.end();
-           it != ie; ++it) {
-        out6 << (*it) << "\n";
+    if (INTERPOLATION_ENABLED && Speculation) {
+      std::string outfile6 =
+          interpreterHandler->getOutputFilename("VisitedBBOrders.txt");
+      if ((klee_message_file = fopen(outfile6.c_str(), "a+")) == NULL) {
+        klee_error("cannot open file \"%s\": %s", outfile6.c_str(),
+                   strerror(errno));
       }
+      std::string g6(outfile6.c_str());
+      std::ofstream out6(outfile6.c_str(), std::ofstream::app);
+      if (!out6.fail()) {
+        for (std::set<int>::iterator it = visitedBlockOrders.begin(),
+                                     ie = visitedBlockOrders.end();
+             it != ie; ++it) {
+          out6 << (*it) << "\n";
+        }
+      }
+      out6.close();
     }
-    out6.close();
   }
 
   // hack to clear memory objects
