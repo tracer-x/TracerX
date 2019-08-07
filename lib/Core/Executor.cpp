@@ -2358,6 +2358,17 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
                 state.txTreeNode->isSpeculationNode())) {
             visitedBlocks.insert(dst);
 
+            // delete from fBBOrder if new BB found
+            if ((fBBOrder.find(dst->getParent()) != fBBOrder.end()) &&
+                (fBBOrder.find(dst->getParent())->second.find(dst) !=
+                 fBBOrder.find(dst->getParent())->second.end())) {
+              // delete BB in function & delete function if no BB left
+              fBBOrder.find(dst->getParent())->second.erase(dst);
+              if (fBBOrder.find(dst->getParent())->second.size() == 0) {
+                fBBOrder.erase(dst->getParent());
+              }
+            }
+
             // exclude speculation mode in this case
             if (INTERPOLATION_ENABLED && Speculation &&
                 (fBBOrder.find(dst->getParent()) != fBBOrder.end()) &&
