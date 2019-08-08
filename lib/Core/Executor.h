@@ -104,16 +104,12 @@ public:
   int specCount;
   int specCloseCount;
   int specFail;
-  int specAssertFail;
-  std::map<uintptr_t, unsigned int> specRevisted;
-  std::map<uintptr_t, unsigned int> specRevistedNoInter;
+  std::map<uintptr_t, unsigned int> specFailNoInter;
   unsigned int specLimit;
   std::set<std::string> specAvoid;
   std::map<int, std::set<std::string> > bbOrderToSpecAvoid;
   uintptr_t prevNodeSequence;
-  double totalSpecTimeNL;
-  double totalSpecTimeBH;
-  double totalSpecTimeSC;
+  double totalSpecFailTime;
   clock_t start, end;
   bool isFail;
 
@@ -353,7 +349,7 @@ private:
   StatePair addSpeculationNode(ExecutionState &current, ref<Expr> condition,
                                bool isInternal, bool falseBranchIsInfeasible);
 
-  void speculativeBackJump(ExecutionState &current, bool isNL);
+  void speculativeBackJump(ExecutionState &current);
   bool checkSpeculation(ExecutionState &current);
 
   std::vector<TxTreeNode *> collectSpeculationNodes(TxTreeNode *);

@@ -1486,7 +1486,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
                                               ref<Expr> condition,
                                               bool isInternal) {
   //  klee_warning("Speculation node");
-  if (current.txTreeNode->getNodeSequenceNumber() != prevNodeSequence) {
+  /*
+        if (current.txTreeNode->getNodeSequenceNumber() != prevNodeSequence) {
     //    llvm::errs() << "Prev node sequence = " << prevNodeSequence << "\n";
     //    llvm::errs() << "Curr node sequence = "
     //                 << current.txTreeNode->getNodeSequenceNumber() << "\n";
@@ -1525,13 +1526,37 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     // Storing the visited program points.
     current.txTreeNode->visitedProgramPoints->insert(pp);
   }
+        */
 
-  // stop when see the new BB
-  llvm::BasicBlock *currentBB = current.txTreeNode->getBasicBlock();
-  if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
-    specFail++;
-    speculativeBackJump(current, true);
-    return StatePair(0, 0);
+  if (current.txTreeNode->getNodeSequenceNumber() != prevNodeSequence) {
+    // update last node sequence
+    prevNodeSequence = current.txTreeNode->getNodeSequenceNumber();
+    uintptr_t pp = current.txTreeNode->getProgramPoint();
+
+    // stop when see the new BB
+    llvm::BasicBlock *currentBB = current.txTreeNode->getBasicBlock();
+    // if new BB
+    if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
+      // check if there is any interpolation at this program point
+      bool hasInterpolation = TxSubsumptionTable::hasInterpolation(current);
+      if (!hasInterpolation) {
+        if (specFailNoInter.find(pp) != specFailNoInter.end()) {
+          specFailNoInter[pp] = specFailNoInter[pp] + 1;
+        } else {
+          specFailNoInter[pp] = 1;
+        }
+        //      klee_warning(
+        //          "SPECULATION_FAIL: Program point %lu is revisted - NO
+        //          INTERPOLATION!", current.txTreeNode->getProgramPoint());
+      }
+
+      // add to visited BB
+      visitedBlocks.insert(currentBB);
+
+      specFail++;
+      speculativeBackJump(current);
+      return StatePair(0, 0);
+    }
   }
 
   Solver::Validity res;
@@ -1719,12 +1744,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   }
 }
 
-void Executor::speculativeBackJump(ExecutionState &current, bool isNL) {
-  if (isNL) {
-    totalSpecTimeNL += *(current.txTreeNode->specTime);
-  } else {
-    totalSpecTimeBH += *(current.txTreeNode->specTime);
-  }
+void Executor::speculativeBackJump(ExecutionState &current) {
+  totalSpecFailTime += *(current.txTreeNode->specTime);
 
   // identify the speculation root
   TxTreeNode *currentNode = current.txTreeNode;
@@ -2356,25 +2377,23 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
 
           if (!(INTERPOLATION_ENABLED && Speculation &&
                 state.txTreeNode->isSpeculationNode())) {
-            visitedBlocks.insert(dst);
 
-            // delete from fBBOrder if new BB found
-            if ((fBBOrder.find(dst->getParent()) != fBBOrder.end()) &&
-                (fBBOrder.find(dst->getParent())->second.find(dst) !=
-                 fBBOrder.find(dst->getParent())->second.end())) {
-              // delete BB in function & delete function if no BB left
-              fBBOrder.find(dst->getParent())->second.erase(dst);
-              if (fBBOrder.find(dst->getParent())->second.size() == 0) {
-                fBBOrder.erase(dst->getParent());
-              }
+            // add new BB
+            if (visitedBlocks.find(dst) == visitedBlocks.end()) {
+              visitedBlocks.insert(dst);
             }
 
-            // exclude speculation mode in this case
-            if (INTERPOLATION_ENABLED && Speculation &&
-                (fBBOrder.find(dst->getParent()) != fBBOrder.end()) &&
-                (fBBOrder.find(dst->getParent())->second.find(dst) !=
-                 fBBOrder.find(dst->getParent())->second.end())) {
-              visitedBlockOrders.insert(fBBOrder[dst->getParent()][dst]);
+            if (INTERPOLATION_ENABLED && Speculation) {
+              // if in speculation mode then remove this BB from avoidance list
+              int dstOrder = fBBOrder[dst->getParent()][dst];
+              bbOrderToSpecAvoid.erase(dstOrder);
+            } else {
+              // add to visited BB orders in Klee mode
+              if ((fBBOrder.find(dst->getParent()) != fBBOrder.end()) &&
+                  (fBBOrder.find(dst->getParent())->second.find(dst) !=
+                   fBBOrder.find(dst->getParent())->second.end())) {
+                visitedBlockOrders.insert(fBBOrder[dst->getParent()][dst]);
+              }
             }
           }
 
@@ -4002,34 +4021,7 @@ Executor::readBBSpecAvoid(std::string fileName) {
 
 void Executor::run(ExecutionState &initialState) {
 
-  specCount = 0;
-  specCloseCount = 0;
-  specFail = 0;
-  specAssertFail = 0;
-  specLimit = 200000;
-  prevNodeSequence = 0;
-  specAvoid = readSpecAvoid("SpecAvoid.txt");
-  bbOrderToSpecAvoid = readBBOrderToSpecAvoid(".");
-  totalSpecTimeNL = 0.0;
-  totalSpecTimeBH = 0.0;
-  totalSpecTimeSC = 0.0;
-
-  //  llvm::errs() << "== Print Spec Avoid ==\n";
-  for (std::map<int, std::set<std::string> >::iterator
-           it = bbOrderToSpecAvoid.begin(),
-           ie = bbOrderToSpecAvoid.end();
-       it != ie; ++it) {
-    llvm::errs() << it->first << "\n";
-    for (std::set<std::string>::iterator it1 = it->second.begin(),
-                                         ie1 = it->second.end();
-         it1 != ie1; ++it1) {
-      llvm::errs() << *it1 << "-";
-    }
-    llvm::errs() << "\n=====\n";
-  }
-  //  llvm::errs() << "== End Printing Spec Avoid ==\n";
-
-  //  llvm::errs() << "======= Load BB Order ======\n";
+  //  llvm::errs() << "======= Create BB Order ======\n";
   int bbCounter = 0;
   for (llvm::Module::iterator it = kmodule->module->begin(),
                               ie = kmodule->module->end();
@@ -4060,7 +4052,49 @@ void Executor::run(ExecutionState &initialState) {
   //                   << "\n";
   //    }
   //  }
-  //  llvm::errs() << "======= End Load BB Order ======\n";
+  //  llvm::errs() << "======= End Create BB Order ======\n";
+
+  specCount = 0;
+  specCloseCount = 0;
+  specFail = 0;
+  specLimit = 200000;
+  prevNodeSequence = 0;
+  specAvoid = readSpecAvoid("SpecAvoid.txt");
+  totalSpecFailTime = 0.0;
+
+  // load avoid BB
+  bbOrderToSpecAvoid = readBBOrderToSpecAvoid(".");
+  //  llvm::errs() << "== Print Spec Avoid ==\n";
+  /*
+  for (std::map<int, std::set<std::string> >::iterator
+           it = bbOrderToSpecAvoid.begin(),
+           ie = bbOrderToSpecAvoid.end();
+       it != ie; ++it) {
+    //      llvm::errs() << it->first << "\n";
+    for (std::set<std::string>::iterator it1 = it->second.begin(),
+                                         ie1 = it->second.end();
+         it1 != ie1; ++it1) {
+      llvm::errs() << *it1 << "-";
+    }
+    llvm::errs() << "\n=====\n";
+  }
+  */
+  //  llvm::errs() << "== End Printing Spec Avoid ==\n";
+
+  // extract visited BB
+  for (std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> >::iterator
+           it = fBBOrder.begin(),
+           ie = fBBOrder.end();
+       it != ie; ++it) {
+    for (std::map<llvm::BasicBlock *, int>::iterator it1 = it->second.begin(),
+                                                     ie1 = it->second.end();
+         it1 != ie1; ++it1) {
+      // if not in avoidance set then add to visited BB
+      if (bbOrderToSpecAvoid.find(it1->second) == bbOrderToSpecAvoid.end()) {
+        visitedBlocks.insert(it1->first);
+      }
+    }
+  }
 
   bindModuleConstants();
 
@@ -5178,52 +5212,28 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     std::string outSpecFile = interpreterHandler->getOutputFilename("spec.txt");
     std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
 
-    outSpec << "Total closed speculation: " << specCloseCount << "\n";
-    outSpec << "Total opened speculation: " << specCount << "\n";
+    outSpec << "Total Unchecked speculation: " << specCloseCount << "\n";
+    outSpec << "Total Checked speculation: " << specCount << "\n";
     outSpec << "Total speculation success: " << (specCount - specFail) << "\n";
     outSpec << "Total speculation failures: " << specFail << "\n";
-    outSpec << "Total speculation assertion failures: " << specAssertFail
-            << "\n";
-    unsigned int revisted = 0;
-    for (std::map<uintptr_t, unsigned int>::iterator it = specRevisted.begin(),
-                                                     ie = specRevisted.end();
-         it != ie; ++it) {
-      revisted += it->second;
-    }
-
-    outSpec << "Total speculation non-linear failures: " << revisted << "\n";
-    unsigned int revistedNoInter = 0;
+    unsigned int failNoInter = 0;
     for (std::map<uintptr_t, unsigned int>::iterator
-             it = specRevistedNoInter.begin(),
-             ie = specRevistedNoInter.end();
+             it = specFailNoInter.begin(),
+             ie = specFailNoInter.end();
          it != ie; ++it) {
-      revistedNoInter += it->second;
+      failNoInter += it->second;
     }
-    outSpec << "Total speculation non-linear failures with interpolation: "
-            << (revisted - revistedNoInter) << "\n";
-    outSpec << "Total speculation non-linear failures with no interpolation: "
-            << revistedNoInter << "\n";
-    outSpec << "Total speculation time: "
-            << (totalSpecTimeNL + totalSpecTimeBH) / double(CLOCKS_PER_SEC)
-            << "\n";
-    outSpec << "Total speculation time for assertion failures: "
-            << totalSpecTimeBH / double(CLOCKS_PER_SEC) << "\n";
-    outSpec << "Total speculation time for non-linear failures: "
-            << totalSpecTimeNL / double(CLOCKS_PER_SEC) << "\n";
+    outSpec << "Total speculation failures with no interpolation: "
+            << failNoInter << "\n";
+    outSpec << "Total speculation fail time: "
+            << totalSpecFailTime / double(CLOCKS_PER_SEC) << "\n";
 
     // print frequency of failure at each program point
-    outSpec << "Frequency of non-linear failures:\n";
-    //    TxSpeculativeRun::sort(specRevisted);
-    for (std::map<uintptr_t, unsigned int>::iterator it = specRevisted.begin(),
-                                                     ie = specRevisted.end();
-         it != ie; ++it) {
-      outSpec << it->first << ": " << it->second << "\n";
-    }
-    outSpec << "Frequency of non-linear failures with no interpolation:\n";
+    outSpec << "Frequency of failures with no interpolation:\n";
     //    TxSpeculativeRun::sort(specRevistedNoInter);
     for (std::map<uintptr_t, unsigned int>::iterator
-             it = specRevistedNoInter.begin(),
-             ie = specRevistedNoInter.end();
+             it = specFailNoInter.begin(),
+             ie = specFailNoInter.end();
          it != ie; ++it) {
       outSpec << it->first << ": " << it->second << "\n";
     }
