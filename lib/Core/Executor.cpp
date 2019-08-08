@@ -1745,7 +1745,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 }
 
 void Executor::speculativeBackJump(ExecutionState &current) {
-  totalSpecFailTime += *(current.txTreeNode->specTime);
+
 
   // identify the speculation root
   TxTreeNode *currentNode = current.txTreeNode;
@@ -1797,6 +1797,10 @@ void Executor::speculativeBackJump(ExecutionState &current) {
     if (&current != *it)
       delete *it;
   }
+
+  end = clock();
+  txTree->incSpecTime(double(end - start));
+  totalSpecFailTime += *(current.txTreeNode->specTime);
 
   //  llvm::outs() << "Remaining states in worklist 1 = " << states.size() <<
   // "\n";
