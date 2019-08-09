@@ -1486,58 +1486,51 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
                                               ref<Expr> condition,
                                               bool isInternal) {
   //  klee_warning("Speculation node");
-  /*
-        if (current.txTreeNode->getNodeSequenceNumber() != prevNodeSequence) {
+
+  if (current.txTreeNode->getNodeSequenceNumber() != prevNodeSequence) {
     //    llvm::errs() << "Prev node sequence = " << prevNodeSequence << "\n";
     //    llvm::errs() << "Curr node sequence = "
     //                 << current.txTreeNode->getNodeSequenceNumber() << "\n";
     // update last node sequence
     prevNodeSequence = current.txTreeNode->getNodeSequenceNumber();
 
+    // CHECK NON_LINEAR
     // check program point of the current node is visited before or not
     uintptr_t pp = current.txTreeNode->getProgramPoint();
     bool isPPVisited = (current.txTreeNode->visitedProgramPoints->find(pp) !=
                         current.txTreeNode->visitedProgramPoints->end());
     if (isPPVisited) {
-      if (specRevisted.find(pp) != specRevisted.end()) {
-        specRevisted[pp] = specRevisted[pp] + 1;
+      // add to spec revisited statistic
+      if (specRevisited.find(pp) != specRevisited.end()) {
+        specRevisited[pp] = specRevisited[pp] + 1;
       } else {
-        specRevisted[pp] = 1;
+        specRevisited[pp] = 1;
       }
       // check interpolation at is program point
       bool hasInterpolation = TxSubsumptionTable::hasInterpolation(current);
-
       if (!hasInterpolation) {
-        if (specRevistedNoInter.find(pp) != specRevistedNoInter.end()) {
-          specRevistedNoInter[pp] = specRevistedNoInter[pp] + 1;
+        if (specRevisitedNoInter.find(pp) != specRevisitedNoInter.end()) {
+          specRevisitedNoInter[pp] = specRevisitedNoInter[pp] + 1;
         } else {
-          specRevistedNoInter[pp] = 1;
+          specRevisitedNoInter[pp] = 1;
         }
-        //      klee_warning(
-        //          "SPECULATION_FAIL: Program point %lu is revisted - NO
-        //          INTERPOLATION!", current.txTreeNode->getProgramPoint());
       }
       specFail++;
-      speculativeBackJump(current, true);
-
+      speculativeBackJump(current);
       return StatePair(0, 0);
     }
-
     // Storing the visited program points.
     current.txTreeNode->visitedProgramPoints->insert(pp);
-  }
-        */
 
-  if (current.txTreeNode->getNodeSequenceNumber() != prevNodeSequence) {
-    // update last node sequence
-    prevNodeSequence = current.txTreeNode->getNodeSequenceNumber();
-    uintptr_t pp = current.txTreeNode->getProgramPoint();
-
-    // stop when see the new BB
+    // CHECK NEW BB
     llvm::BasicBlock *currentBB = current.txTreeNode->getBasicBlock();
-    // if new BB
     if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
-      // check if there is any interpolation at this program point
+      if (specFailNew.find(pp) != specFailNew.end()) {
+        specFailNew[pp] = specFailNew[pp] + 1;
+      } else {
+        specFailNew[pp] = 1;
+      }
+      // check interpolation at is program point
       bool hasInterpolation = TxSubsumptionTable::hasInterpolation(current);
       if (!hasInterpolation) {
         if (specFailNoInter.find(pp) != specFailNoInter.end()) {
@@ -1545,14 +1538,9 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         } else {
           specFailNoInter[pp] = 1;
         }
-        //      klee_warning(
-        //          "SPECULATION_FAIL: Program point %lu is revisted - NO
-        //          INTERPOLATION!", current.txTreeNode->getProgramPoint());
       }
-
       // add to visited BB
       visitedBlocks.insert(currentBB);
-
       specFail++;
       speculativeBackJump(current);
       return StatePair(0, 0);
@@ -1746,7 +1734,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 
 void Executor::speculativeBackJump(ExecutionState &current) {
 
-
   // identify the speculation root
   TxTreeNode *currentNode = current.txTreeNode;
   TxTreeNode *parent = currentNode->getParent();
@@ -1798,8 +1785,11 @@ void Executor::speculativeBackJump(ExecutionState &current) {
       delete *it;
   }
 
+  // this count is for the fail node in spec tree
   end = clock();
   txTree->incSpecTime(double(end - start));
+
+  // add fail time for spec subtree
   totalSpecFailTime += *(current.txTreeNode->specTime);
 
   //  llvm::outs() << "Remaining states in worklist 1 = " << states.size() <<
@@ -5220,24 +5210,62 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     outSpec << "Total Checked speculation: " << specCount << "\n";
     outSpec << "Total speculation success: " << (specCount - specFail) << "\n";
     outSpec << "Total speculation failures: " << specFail << "\n";
-    unsigned int failNoInter = 0;
+
+    // total fail
+    // new
+    unsigned int failNew = 0;
+    for (std::map<uintptr_t, unsigned int>::iterator it = specFailNew.begin(),
+                                                     ie = specFailNew.end();
+         it != ie; ++it) {
+      failNew += it->second;
+    }
+    // revisted
+    unsigned int failRevisited = 0;
+    for (std::map<uintptr_t, unsigned int>::iterator it = specRevisited.begin(),
+                                                     ie = specRevisited.end();
+         it != ie; ++it) {
+      failRevisited += it->second;
+    }
+
+    // fail & no interpolant
+    // new
+    unsigned int failNewNoInter = 0;
     for (std::map<uintptr_t, unsigned int>::iterator
              it = specFailNoInter.begin(),
              ie = specFailNoInter.end();
          it != ie; ++it) {
-      failNoInter += it->second;
+      failNewNoInter += it->second;
     }
-    outSpec << "Total speculation failures with no interpolation: "
-            << failNoInter << "\n";
+    // revisted
+    unsigned int failRevisitedNoInter = 0;
+    for (std::map<uintptr_t, unsigned int>::iterator
+             it = specRevisitedNoInter.begin(),
+             ie = specRevisitedNoInter.end();
+         it != ie; ++it) {
+      failRevisitedNoInter += it->second;
+    }
+
+    outSpec << "Total speculation failures because of New BB with no "
+               "interpolation: " << failNewNoInter << "\n";
+    outSpec << "Total speculation failures because of Revisted with no "
+               "interpolation: " << failRevisitedNoInter << "\n";
+
     outSpec << "Total speculation fail time: "
             << totalSpecFailTime / double(CLOCKS_PER_SEC) << "\n";
 
     // print frequency of failure at each program point
-    outSpec << "Frequency of failures with no interpolation:\n";
-    //    TxSpeculativeRun::sort(specRevistedNoInter);
+    outSpec << "Frequency of failures because New BB with no interpolation:\n";
     for (std::map<uintptr_t, unsigned int>::iterator
              it = specFailNoInter.begin(),
              ie = specFailNoInter.end();
+         it != ie; ++it) {
+      outSpec << it->first << ": " << it->second << "\n";
+    }
+    outSpec
+        << "Frequency of failures because Revisted with no interpolation:\n";
+    for (std::map<uintptr_t, unsigned int>::iterator
+             it = specRevisitedNoInter.begin(),
+             ie = specRevisitedNoInter.end();
          it != ie; ++it) {
       outSpec << it->first << ": " << it->second << "\n";
     }
