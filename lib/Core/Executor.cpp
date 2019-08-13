@@ -1520,7 +1520,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         }
       }
       // add to visited BB
-      visitedBlocks.insert(currentBB);
       specFail++;
       speculativeBackJump(current);
       return StatePair(0, 0);
