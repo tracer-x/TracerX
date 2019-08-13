@@ -1185,26 +1185,16 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-        specCount++;
-        return addSpeculationNode(current, condition, isInternal, true);
-      } else {
-        specCloseCount++;
-      }
+      specCount++;
+      return addSpeculationNode(current, condition, isInternal, true);
     }
     return StatePair(&current, 0);
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-        specCount++;
-        return addSpeculationNode(current, condition, isInternal, false);
-      } else {
-        specCloseCount++;
-      }
+      specCount++;
+      return addSpeculationNode(current, condition, isInternal, false);
     }
     return StatePair(0, &current);
   }
@@ -1231,14 +1221,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // be used to perform markings.
       // keep unsat core & increase spec counting
 
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-        specCount++;
-        return addSpeculationNode(current, condition, isInternal, true);
-      } else {
-        specCloseCount++;
-      }
+      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+      specCount++;
+      return addSpeculationNode(current, condition, isInternal, true);
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -1265,14 +1250,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // be used to perform markings.
       // keep unsat core & increase spec counting
 
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-        specCount++;
-        return addSpeculationNode(current, condition, isInternal, false);
-      } else {
-        specCloseCount++;
-      }
+      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+      specCount++;
+      return addSpeculationNode(current, condition, isInternal, false);
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -1582,25 +1562,14 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-        return addSpeculationNode(current, condition, isInternal, true);
-      } else {
-        specCloseCount++;
-      }
+      return addSpeculationNode(current, condition, isInternal, true);
     }
     return StatePair(&current, 0);
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-        return addSpeculationNode(current, condition, isInternal, false);
-      } else {
-        specCloseCount++;
-      }
-    } else {
+      return addSpeculationNode(current, condition, isInternal, false);
     }
     return StatePair(0, &current);
   }
@@ -1624,13 +1593,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       // be used to perform markings.
       // keep unsat core & increase spec counting
 
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-        return addSpeculationNode(current, condition, isInternal, true);
-      } else {
-        specCloseCount++;
-      }
+      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+      return addSpeculationNode(current, condition, isInternal, true);
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -1658,13 +1622,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-        return addSpeculationNode(current, condition, isInternal, false);
-      } else {
-        specCloseCount++;
-      }
+      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+      return addSpeculationNode(current, condition, isInternal, false);
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -4452,6 +4411,15 @@ void Executor::terminateStateOnError(ExecutionState &state,
   const InstructionInfo &ii =
       getLastNonKleeInternalInstruction(state, &lastInst);
 
+  if (INTERPOLATION_ENABLED && Speculation &&
+      state.txTreeNode->isSpeculationNode()) {
+    //    llvm::outs() << "=== start jumpback because of error \n";
+    specFail++;
+    speculativeBackJump(state);
+    klee_message("ERROR: %s:%d: %s", ii.file.c_str(), ii.line, message.c_str());
+    return;
+  }
+
   interpreterHandler->incErrorTermination();
   if (INTERPOLATION_ENABLED) {
     interpreterHandler->incBranchingDepthOnErrorTermination(state.depth);
@@ -5247,10 +5215,18 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
       failRevisitedNoInter += it->second;
     }
 
+    outSpec << "Total speculation failures because of New BB: " << failNew
+            << "\n";
     outSpec << "Total speculation failures because of New BB with no "
                "interpolation: " << failNewNoInter << "\n";
+
+    outSpec << "Total speculation failures because of Revisted: "
+            << failRevisited << "\n";
     outSpec << "Total speculation failures because of Revisted with no "
                "interpolation: " << failRevisitedNoInter << "\n";
+
+    outSpec << "Total speculation failures because of Bug Hit: "
+            << (specFail - failNew - failRevisited) << "\n";
 
     outSpec << "Total speculation fail time: "
             << totalSpecFailTime / double(CLOCKS_PER_SEC) << "\n";
