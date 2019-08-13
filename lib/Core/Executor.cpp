@@ -1188,7 +1188,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       std::set<std::string> vars = extractVarNames(current, binst);
       if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
         specCount++;
-        return addSpeculationNode(current, condition, isInternal, true);
+        return StatePair(&current, 0);
+        //        return addSpeculationNode(current, condition, isInternal,
+        // true);
       } else {
         specCloseCount++;
       }
@@ -1201,7 +1203,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       std::set<std::string> vars = extractVarNames(current, binst);
       if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
         specCount++;
-        return addSpeculationNode(current, condition, isInternal, false);
+        return StatePair(0, &current);
+        //        return addSpeculationNode(current, condition, isInternal,
+        // false);
       } else {
         specCloseCount++;
       }
@@ -1233,9 +1237,11 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
       std::set<std::string> vars = extractVarNames(current, binst);
       if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        //        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         specCount++;
-        return addSpeculationNode(current, condition, isInternal, true);
+        return StatePair(&current, 0);
+        //        return addSpeculationNode(current, condition, isInternal,
+        // true);
       } else {
         specCloseCount++;
       }
@@ -1267,9 +1273,11 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
       std::set<std::string> vars = extractVarNames(current, binst);
       if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        //        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         specCount++;
-        return addSpeculationNode(current, condition, isInternal, false);
+        return StatePair(0, &current);
+        //        return addSpeculationNode(current, condition, isInternal,
+        // false);
       } else {
         specCloseCount++;
       }
