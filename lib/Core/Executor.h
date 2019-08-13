@@ -96,10 +96,7 @@ public:
   int allBlockCount;
   bool allBlockCollected;
   std::set<llvm::BasicBlock *> visitedBlocks;
-  std::set<int> visitedBlockOrders;
   float blockCoverage;
-
-  std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> > fBBOrder;
 
   int specCount;
   int specCloseCount;
@@ -112,8 +109,6 @@ public:
                                                           // revisited & no
                                                           // interpolant
   unsigned int specLimit;
-  std::set<std::string> specAvoid;
-  std::map<int, std::set<std::string> > bbOrderToSpecAvoid;
   uintptr_t prevNodeSequence;
   double totalSpecFailTime;
   clock_t start, end;

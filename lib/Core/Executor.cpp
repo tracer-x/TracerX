@@ -2337,19 +2337,6 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
             if (visitedBlocks.find(dst) == visitedBlocks.end()) {
               visitedBlocks.insert(dst);
             }
-
-            if (INTERPOLATION_ENABLED && Speculation) {
-              // if in speculation mode then remove this BB from avoidance list
-              int dstOrder = fBBOrder[dst->getParent()][dst];
-              bbOrderToSpecAvoid.erase(dstOrder);
-            } else {
-              // add to visited BB orders in Klee mode
-              if ((fBBOrder.find(dst->getParent()) != fBBOrder.end()) &&
-                  (fBBOrder.find(dst->getParent())->second.find(dst) !=
-                   fBBOrder.find(dst->getParent())->second.end())) {
-                visitedBlockOrders.insert(fBBOrder[dst->getParent()][dst]);
-              }
-            }
           }
 
           time_t now = time(0);
@@ -3976,80 +3963,12 @@ Executor::readBBSpecAvoid(std::string fileName) {
 
 void Executor::run(ExecutionState &initialState) {
 
-  //  llvm::errs() << "======= Create BB Order ======\n";
-  int bbCounter = 0;
-  for (llvm::Module::iterator it = kmodule->module->begin(),
-                              ie = kmodule->module->end();
-       it != ie; ++it) {
-    if (!it->isIntrinsic() && (it->getName().str().substr(0, 5) != "klee_") &&
-        (it->getName() != "memcpy") && (it->getName() != "memmove") &&
-        (it->getName() != "mempcpy") && (it->getName() != "memset")) {
-      //      llvm::errs() << "Function: " << it->getName() << "\n";
-      for (llvm::Function::iterator it1 = it->begin(), ie1 = it->end();
-           it1 != ie1; ++it1) {
-        fBBOrder[it][it1] = bbCounter;
-        bbCounter++;
-        //        it1->dump();
-      }
-    }
-  }
-  //  llvm::errs() << "Map Data:\n";
-  //  for (std::map<llvm::Function *, std::map<llvm::BasicBlock *, int>
-  // >::iterator
-  //           it = fBBOrder.begin(),
-  //           ie = fBBOrder.end();
-  //       it != ie; ++it) {
-  //    for (std::map<llvm::BasicBlock *, int>::iterator it1 =
-  // it->second.begin(),
-  //                                                     ie1 = it->second.end();
-  //         it1 != ie1; ++it1) {
-  //      llvm::errs() << it->first << "-" << it1->first << "-" << it1->second
-  //                   << "\n";
-  //    }
-  //  }
-  //  llvm::errs() << "======= End Create BB Order ======\n";
-
   specCount = 0;
   specCloseCount = 0;
   specFail = 0;
   specLimit = 200000;
   prevNodeSequence = 0;
-  specAvoid = readSpecAvoid("SpecAvoid.txt");
   totalSpecFailTime = 0.0;
-
-  // load avoid BB
-  bbOrderToSpecAvoid = readBBOrderToSpecAvoid(".");
-  //  llvm::errs() << "== Print Spec Avoid ==\n";
-  /*
-  for (std::map<int, std::set<std::string> >::iterator
-           it = bbOrderToSpecAvoid.begin(),
-           ie = bbOrderToSpecAvoid.end();
-       it != ie; ++it) {
-    //      llvm::errs() << it->first << "\n";
-    for (std::set<std::string>::iterator it1 = it->second.begin(),
-                                         ie1 = it->second.end();
-         it1 != ie1; ++it1) {
-      llvm::errs() << *it1 << "-";
-    }
-    llvm::errs() << "\n=====\n";
-  }
-  */
-  //  llvm::errs() << "== End Printing Spec Avoid ==\n";
-
-  // extract visited BB
-  for (std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> >::iterator
-           it = fBBOrder.begin(),
-           ie = fBBOrder.end();
-       it != ie; ++it) {
-    for (std::map<llvm::BasicBlock *, int>::iterator it1 = it->second.begin(),
-                                                     ie1 = it->second.end();
-         it1 != ie1; ++it1) {
-      // if not in avoidance set then add to visited BB
-      if (bbOrderToSpecAvoid.find(it1->second) == bbOrderToSpecAvoid.end()) {
-        visitedBlocks.insert(it1->first);
-      }
-    }
-  }
 
   bindModuleConstants();
 
@@ -5151,9 +5070,6 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 
   // add initial BB to visited BBS
   visitedBlocks.insert(&(f->front()));
-  if (INTERPOLATION_ENABLED && Speculation) {
-    visitedBlockOrders.insert(fBBOrder[f][&(f->front())]);
-  }
 
   run(*state);
   delete processTree;
@@ -5294,26 +5210,6 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
       }
     }
     out5.close();
-
-    // VisitedBBOrders.txt
-    if (INTERPOLATION_ENABLED && Speculation) {
-      std::string outfile6 =
-          interpreterHandler->getOutputFilename("VisitedBBOrders.txt");
-      if ((klee_message_file = fopen(outfile6.c_str(), "a+")) == NULL) {
-        klee_error("cannot open file \"%s\": %s", outfile6.c_str(),
-                   strerror(errno));
-      }
-      std::string g6(outfile6.c_str());
-      std::ofstream out6(outfile6.c_str(), std::ofstream::app);
-      if (!out6.fail()) {
-        for (std::set<int>::iterator it = visitedBlockOrders.begin(),
-                                     ie = visitedBlockOrders.end();
-             it != ie; ++it) {
-          out6 << (*it) << "\n";
-        }
-      }
-      out6.close();
-    }
   }
 
   // hack to clear memory objects
