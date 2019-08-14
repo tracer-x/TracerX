@@ -22,6 +22,7 @@
 #include "klee/Internal/Module/KModule.h"
 #include "klee/util/ArrayCache.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/Function.h"
 #include <dirent.h>
 #include <stdlib.h>
 
@@ -98,6 +99,7 @@ public:
   std::set<llvm::BasicBlock *> visitedBlocks;
   std::set<int> visitedBlockOrders;
   float blockCoverage;
+  std::string interestedSourceFileName;
 
   std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> > fBBOrder;
 
@@ -250,6 +252,11 @@ private:
                      llvm::raw_ostream &file);
 
   void run(ExecutionState &initialState);
+  bool isInterestedFunction(llvm::Function *f) {
+    return !f->isIntrinsic() && (f->getName().str().substr(0, 5) != "klee_") &&
+           (f->getName() != "memcpy") && (f->getName() != "memmove") &&
+           (f->getName() != "mempcpy") && (f->getName() != "memset");
+  }
 
   std::set<std::string> readSpecAvoid(std::string fileName);
   std::map<int, std::set<std::string> >
