@@ -2271,20 +2271,21 @@ void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
       // add to visited BBs if not in speculation mode
       visitedBlocks.insert(bb);
     }
-
+    //		klee_warning("Visited Blocks Up to now=========================:
+    //%d\n",
+    //				int(visitedBlocks.size()));
+    float percent = ((float)visitedBlocks.size() / (float)allBlockCount) * 100;
     // print percentage if this is a new BB
     if (BBCoverage >= 2 && isNew) {
       // print live %
-      float percent =
-          ((float)visitedBlocks.size() / (float)allBlockCount) * 100;
+
       std::string livePercentCovFile =
           interpreterHandler->getOutputFilename("LivePercentCov.txt");
       std::ofstream livePercentCovFileOut(livePercentCovFile.c_str(),
                                           std::ofstream::app);
       // [BB order - No. Visited - Total - %]
-      livePercentCovFileOut << "[" << order << " - " << visitedBlocks.size()
-                            << " - " << allBlockCount << " - " << percent
-                            << "]\n";
+      livePercentCovFileOut << "[" << visitedBlocks.size() << ","
+                            << allBlockCount << "," << percent << "]\n";
       livePercentCovFileOut.close();
     }
 
@@ -2311,7 +2312,7 @@ void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
       std::ofstream bbPlotingFileOut(bbPlottingFile.c_str(),
                                      std::ofstream::app);
       bbPlotingFileOut << diff << "     " << std::fixed << std::setprecision(2)
-                       << blockCoverage << "\n";
+                       << percent << "\n";
       bbPlotingFileOut.close();
     }
   }
@@ -5111,16 +5112,17 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
          it != ie; ++it) {
 
       int order = fBBOrder[(*it)->getParent()][*it];
-      visitedBBFileOut << "-- BlockScopeStarts --\n";
+      // visitedBBFileOut << "-- BlockScopeStarts --\n";
       std::string functionName = ((*it)->getParent())->getName();
-      visitedBBFileOut << "Function: " << functionName << "\n";
-      visitedBBFileOut << "Block Order: " << order;
+      // visitedBBFileOut << "Function: " << functionName << "\n";
+      // visitedBBFileOut << "Block Order: " << order;
+      visitedBBFileOut << order << "\n";
       // block content
       std::string tmp;
       raw_string_ostream tmpOS(tmp);
       (*it)->print(tmpOS);
-      visitedBBFileOut << tmp;
-      visitedBBFileOut << "-- BlockScopeEnds --\n\n";
+      // visitedBBFileOut << tmp;
+      // visitedBBFileOut << "-- BlockScopeEnds --\n\n";
     }
 
     visitedBBFileOut.close();
