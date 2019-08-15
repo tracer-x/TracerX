@@ -2096,6 +2096,14 @@ void Executor::stepInstruction(ExecutionState &state) {
 
 void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                            std::vector<ref<Expr> > &arguments) {
+  // BB Coverage
+  bool isInterested = (fBBOrder.find(f) != fBBOrder.end());
+  if (isInterested) {
+    bool isInSpecMode = (INTERPOLATION_ENABLED && Speculation &&
+                         state.txTreeNode->isSpeculationNode());
+    processBBCoverage(BBCoverage, &(f->front()), isInSpecMode);
+  }
+
   Instruction *i = ki->inst;
   if (f && f->isDeclaration()) {
     switch (f->getIntrinsicID()) {
@@ -2293,25 +2301,67 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
     TxTree::blockCount++;
   }
 
-  // BB Coverage
-  if (BBCoverage >= 1) {
-    // get source file name
-    Instruction *lastInst;
-    const InstructionInfo &ii =
-        getLastNonKleeInternalInstruction(state, &lastInst);
-    const std::string path = ii.file;
-    std::size_t botDirPos = path.find_last_of("/");
-    std::string sourceFileName = path.substr(botDirPos + 1, path.length());
-    if (sourceFileName == interestedSourceFileName &&
-        isInterestedFunction(kf->function)) {
+  // process BB Coverage
+  bool isInterested = (fBBOrder.find(dst->getParent()) != fBBOrder.end());
+  if (isInterested) {
+    bool isInSpecMode = (INTERPOLATION_ENABLED && Speculation &&
+                         state.txTreeNode->isSpeculationNode());
+    processBBCoverage(BBCoverage, dst, isInSpecMode);
+  }
+}
 
-      // save BB
-      if (!(INTERPOLATION_ENABLED && Speculation &&
-            state.txTreeNode->isSpeculationNode())) {
-        if (visitedBlocks.find(dst) == visitedBlocks.end()) {
-          visitedBlocks.insert(dst);
-        }
-      }
+void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
+                                 bool isInSpecMode) {
+  if (BBCoverage >= 1) {
+    bool isNew = (visitedBlocks.find(bb) == visitedBlocks.end());
+    int order = fBBOrder[bb->getParent()][bb];
+
+    if (!isInSpecMode && isNew) {
+      // add to visited BBs if not in speculation mode
+      visitedBlocks.insert(bb);
+    }
+
+    // print percentage if this is a new BB
+    if (BBCoverage >= 2 && isNew) {
+      // print live %
+      float percent =
+          ((float)visitedBlocks.size() / (float)allBlockCount) * 100;
+      std::string livePercentCovFile =
+          interpreterHandler->getOutputFilename("LivePercentCov.txt");
+      std::ofstream livePercentCovFileOut(livePercentCovFile.c_str(),
+                                          std::ofstream::app);
+      // [BB order - No. Visited - Total - %]
+      livePercentCovFileOut << "[" << order << " - " << visitedBlocks.size()
+                            << " - " << allBlockCount << " - " << percent
+                            << "]\n";
+      livePercentCovFileOut.close();
+    }
+
+    // print live BB
+    if (BBCoverage >= 3 && isNew) {
+      std::string liveBBFile =
+          interpreterHandler->getOutputFilename("LiveBB.txt");
+      std::ofstream liveBBFileOut(liveBBFile.c_str(), std::ofstream::app);
+      liveBBFileOut << "-- BlockScopeStarts --\n";
+      liveBBFileOut << "Function: " << bb->getParent()->getName().str() << "\n";
+      liveBBFileOut << "Block Order: " << order;
+      // block content
+      std::string tmp;
+      raw_string_ostream tmpOS(tmp);
+      bb->print(tmpOS);
+      liveBBFileOut << tmp;
+      liveBBFileOut << "-- BlockScopeEnds --\n\n";
+      liveBBFileOut.close();
+    }
+    if (BBCoverage >= 4) {
+      double diff = time(0) - startingBBPlottingTime;
+      std::string bbPlottingFile =
+          interpreterHandler->getOutputFilename("BBPlotting.txt");
+      std::ofstream bbPlotingFileOut(bbPlottingFile.c_str(),
+                                     std::ofstream::app);
+      bbPlotingFileOut << diff << "     " << std::fixed << std::setprecision(2)
+                       << blockCoverage << "\n";
+      bbPlotingFileOut.close();
     }
   }
 }
@@ -3853,39 +3903,6 @@ Executor::readBBSpecAvoid(std::string fileName) {
 
 void Executor::run(ExecutionState &initialState) {
 
-  //  llvm::errs() << "======= Create BB Order ======\n";
-  int bbCounter = 0;
-  for (llvm::Module::iterator it = kmodule->module->begin(),
-                              ie = kmodule->module->end();
-       it != ie; ++it) {
-    if (!it->isIntrinsic() && (it->getName().str().substr(0, 5) != "klee_") &&
-        (it->getName() != "memcpy") && (it->getName() != "memmove") &&
-        (it->getName() != "mempcpy") && (it->getName() != "memset")) {
-      //      llvm::errs() << "Function: " << it->getName() << "\n";
-      for (llvm::Function::iterator it1 = it->begin(), ie1 = it->end();
-           it1 != ie1; ++it1) {
-        fBBOrder[it][it1] = bbCounter;
-        bbCounter++;
-        //        it1->dump();
-      }
-    }
-  }
-  //  llvm::errs() << "Map Data:\n";
-  //  for (std::map<llvm::Function *, std::map<llvm::BasicBlock *, int>
-  // >::iterator
-  //           it = fBBOrder.begin(),
-  //           ie = fBBOrder.end();
-  //       it != ie; ++it) {
-  //    for (std::map<llvm::BasicBlock *, int>::iterator it1 =
-  // it->second.begin(),
-  //                                                     ie1 = it->second.end();
-  //         it1 != ie1; ++it1) {
-  //      llvm::errs() << it->first << "-" << it1->first << "-" << it1->second
-  //                   << "\n";
-  //    }
-  //  }
-  //  llvm::errs() << "======= End Create BB Order ======\n";
-
   specCount = 0;
   specCloseCount = 0;
   specFail = 0;
@@ -3893,9 +3910,8 @@ void Executor::run(ExecutionState &initialState) {
   prevNodeSequence = 0;
   specAvoid = readSpecAvoid("SpecAvoid.txt");
   totalSpecFailTime = 0.0;
+  startingBBPlottingTime = time(0);
 
-  // get all BBs
-  allBlockCount = 0;
   // get interested source code
   size_t lastindex = InputFile.find_last_of(".");
   std::string InputFile1 = InputFile.substr(0, lastindex);
@@ -3903,58 +3919,31 @@ void Executor::run(ExecutionState &initialState) {
   std::string InputFile2 = InputFile1.substr(lastindex + 1);
   interestedSourceFileName = InputFile2 + ".c";
 
-  if (BBCoverage >= 1) {
-
-    //************All Blocks Start****************
-    for (std::map<llvm::Function *, KFunction *>::iterator
-             it = kmodule->functionMap.begin(),
-             ie = kmodule->functionMap.end();
-         it != ie; ++it) {
-      // only get BBs on interested functions
-      Function *tmpF = it->first;
-      KFunction *tmpKF = it->second;
-      KInstruction *tmpIns = tmpKF->instructions[0];
-      const std::string path = tmpIns->info->file;
-      std::size_t botDirPos = path.find_last_of("/");
-      std::string sourceFileName = path.substr(botDirPos + 1, path.length());
-      if ((sourceFileName == interestedSourceFileName) &&
-          isInterestedFunction(tmpF)) {
-
-        // loop over BBs of function
-        std::vector<llvm::BasicBlock *> bbs;
-        for (llvm::Function::iterator b = tmpF->begin(); b != tmpF->end();
-             ++b) {
-          allBlockCount++;
-          bbs.push_back(b);
-        }
-
-        // write to file
-        if (BBCoverage >= 2) {
-          // write to file
-          std::string allBBFileName =
-              interpreterHandler->getOutputFilename("AllBB.txt");
-          std::ofstream allBBOutStream(allBBFileName.c_str(),
-                                       std::ofstream::app);
-          if (!allBBOutStream.fail()) {
-            allBBOutStream << "Total: " << allBlockCount << " Basic Blocks\n";
-            for (unsigned int i = 0; i < bbs.size(); i++) {
-              allBBOutStream << "BlockScopeStarts: \n";
-              std::string functionName = (bbs.at(i)->getParent())->getName();
-              allBBOutStream << "Block Number: " << (i + 1) << "\n";
-              allBBOutStream << "Function: " << functionName << "\n";
-              std::string tmp;
-              raw_string_ostream tmpOS(tmp);
-              bbs.at(i)->print(tmpOS);
-              allBBOutStream << tmp << "\n";
-              allBBOutStream << "BlockScopeEnds: \n";
-            }
-          }
-          allBBOutStream.close();
-        }
+  // BB to order
+  allBlockCount = 0;
+  for (std::map<llvm::Function *, KFunction *>::iterator
+           it = kmodule->functionMap.begin(),
+           ie = kmodule->functionMap.end();
+       it != ie; ++it) {
+    Function *f = it->first;
+    // get source file of the funtion
+    KFunction *kf = it->second;
+    KInstruction *ki = kf->instructions[0];
+    const std::string path = ki->info->file;
+    std::size_t botDirPos = path.find_last_of("/");
+    std::string sourceFileName = path.substr(botDirPos + 1, path.length());
+    // if the source file is interested then loop over its BBs
+    if ((sourceFileName == interestedSourceFileName) &&
+        isInterestedFunction(f)) {
+      // loop over BBs of function
+      std::vector<llvm::BasicBlock *> bbs;
+      for (llvm::Function::iterator b = f->begin(); b != f->end(); ++b) {
+        fBBOrder[f][b] = ++allBlockCount;
       }
     }
   }
-  //************All Blocks End****************"
+
+  llvm::errs() << "allBlockCount: " << allBlockCount << "\n";
 
   // load avoid BB
   bbOrderToSpecAvoid = readBBOrderToSpecAvoid(".");
@@ -3985,10 +3974,16 @@ void Executor::run(ExecutionState &initialState) {
          it1 != ie1; ++it1) {
       // if not in avoidance set then add to visited BB
       if (bbOrderToSpecAvoid.find(it1->second) == bbOrderToSpecAvoid.end()) {
+        // visited BBs
+        processBBCoverage(BBCoverage, it1->first, false);
         visitedBlocks.insert(it1->first);
       }
     }
   }
+
+  // first BB of main()
+  KInstruction *ki = initialState.pc;
+  processBBCoverage(BBCoverage, ki->inst->getParent(), false);
 
   bindModuleConstants();
 

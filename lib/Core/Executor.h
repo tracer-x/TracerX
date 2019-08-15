@@ -93,14 +93,13 @@ class Executor : public Interpreter {
   friend class StatsTracker;
 
 public:
-  time_t startingTime;
+  time_t startingBBPlottingTime;
   int allBlockCount;
   bool allBlockCollected;
   std::set<llvm::BasicBlock *> visitedBlocks;
   std::set<int> visitedBlockOrders;
   float blockCoverage;
   std::string interestedSourceFileName;
-
   std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> > fBBOrder;
 
   int specCount;
@@ -276,6 +275,8 @@ private:
   void updateStates(ExecutionState *current);
   void transferToBasicBlock(llvm::BasicBlock *dst, llvm::BasicBlock *src,
                             ExecutionState &state);
+  void processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
+                         bool isInSpecMode);
 
   void callExternalFunction(ExecutionState &state, KInstruction *target,
                             llvm::Function *function,
