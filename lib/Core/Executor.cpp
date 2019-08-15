@@ -5184,52 +5184,32 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
         << "************Basic Block Coverage Report Ends****************"
         << "\n";
   }
+
   if (BBCoverage >= 2) {
     // VisitedBB.txt
-    std::string outfile5 =
+    std::string visitedBBFile =
         interpreterHandler->getOutputFilename("VisitedBB.txt");
-    if ((klee_message_file = fopen(outfile5.c_str(), "a+")) == NULL)
-      klee_error("cannot open file \"%s\": %s", outfile5.c_str(),
-                 strerror(errno));
+    std::ofstream visitedBBFileOut(visitedBBFile.c_str(), std::ofstream::app);
 
-    std::string g5(outfile5.c_str());
-    std::ofstream out5(outfile5.c_str(), std::ofstream::app);
-    if (!out5.fail()) {
-      for (std::set<llvm::BasicBlock *>::iterator it = visitedBlocks.begin(),
-                                                  ie = visitedBlocks.end();
-           it != ie; ++it) {
+    for (std::set<llvm::BasicBlock *>::iterator it = visitedBlocks.begin(),
+                                                ie = visitedBlocks.end();
+         it != ie; ++it) {
 
-        out5 << "BlockScopeStarts: \n";
-        std::string tmp2 = ((*it)->getParent())->getName();
-        std::string Str2;
-        raw_string_ostream OS(Str2);
-        (*it)->print(OS);
-        out5 << "Function:" << tmp2 << Str2 << "\n";
-        out5 << "BlockScopeEnds: "
-             << "\n";
-      }
+      int order = fBBOrder[(*it)->getParent()][*it];
+      // visitedBBFileOut << "-- BlockScopeStarts --\n";
+      std::string functionName = ((*it)->getParent())->getName();
+      // visitedBBFileOut << "Function: " << functionName << "\n";
+      // visitedBBFileOut << "Block Order: " << order;
+      visitedBBFileOut << order << "\n";
+      // block content
+      std::string tmp;
+      raw_string_ostream tmpOS(tmp);
+      (*it)->print(tmpOS);
+      // visitedBBFileOut << tmp;
+      // visitedBBFileOut << "-- BlockScopeEnds --\n\n";
     }
-    out5.close();
 
-    // VisitedBBOrders.txt
-    if (INTERPOLATION_ENABLED && Speculation) {
-      std::string outfile6 =
-          interpreterHandler->getOutputFilename("VisitedBBOrders.txt");
-      if ((klee_message_file = fopen(outfile6.c_str(), "a+")) == NULL) {
-        klee_error("cannot open file \"%s\": %s", outfile6.c_str(),
-                   strerror(errno));
-      }
-      std::string g6(outfile6.c_str());
-      std::ofstream out6(outfile6.c_str(), std::ofstream::app);
-      if (!out6.fail()) {
-        for (std::set<int>::iterator it = visitedBlockOrders.begin(),
-                                     ie = visitedBlockOrders.end();
-             it != ie; ++it) {
-          out6 << (*it) << "\n";
-        }
-      }
-      out6.close();
-    }
+    visitedBBFileOut.close();
   }
 
   // hack to clear memory objects
