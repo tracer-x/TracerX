@@ -2047,6 +2047,14 @@ void Executor::stepInstruction(ExecutionState &state) {
 
 void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                            std::vector<ref<Expr> > &arguments) {
+  // BB Coverage
+  bool isInterested = (fBBOrder.find(f) != fBBOrder.end());
+  if (isInterested) {
+    bool isInSpecMode = (INTERPOLATION_ENABLED && Speculation &&
+                         state.txTreeNode->isSpeculationNode());
+    processBBCoverage(BBCoverage, &(f->front()), isInSpecMode);
+  }
+
   Instruction *i = ki->inst;
   if (f && f->isDeclaration()) {
     switch (f->getIntrinsicID()) {
@@ -2064,8 +2072,9 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
       if (!sf.varargs)
         return;
 
-      // FIXME: This is really specific to the architecture, not the pointer
-      // size. This happens to work fir x86-32 and x86-64, however.
+      // FIXME: This is really specific to the architecture, not the
+      // pointer size. This happens to work fir x86-32 and x86-64,
+      // however.
       Expr::Width WordSize = Context::get().getPointerWidth();
       if (WordSize == Expr::Int32) {
         executeMemoryOperation(state, true, arguments[0],
@@ -2244,78 +2253,72 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
     TxTree::blockCount++;
   }
 
-  // BB Coverage
+  // process BB Coverage
+  bool isInterested = (fBBOrder.find(dst->getParent()) != fBBOrder.end());
+  if (isInterested) {
+    bool isInSpecMode = (INTERPOLATION_ENABLED && Speculation &&
+                         state.txTreeNode->isSpeculationNode());
+    processBBCoverage(BBCoverage, dst, isInSpecMode);
+  }
+}
+
+void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
+                                 bool isInSpecMode) {
   if (BBCoverage >= 1) {
-    // get source file name from last instruction
-    Instruction *lastInst;
-    const InstructionInfo &ii =
-        getLastNonKleeInternalInstruction(state, &lastInst);
-    const std::string path = ii.file;
-    std::size_t botDirPos = path.find_last_of("/");
-    std::string sourceFileName = path.substr(botDirPos + 1, path.length());
+    bool isNew = (visitedBlocks.find(bb) == visitedBlocks.end());
+    int order = fBBOrder[bb->getParent()][bb];
+    if (order == 2) {
+      llvm::errs() << "isNew=" << isNew << "\n";
+      llvm::errs() << "isInSpecMode=" << isInSpecMode << "\n";
+      bb->dump();
+    }
 
-    // if the source file name is interested then save the new BB
-    if (sourceFileName == interestedSourceFileName &&
-        isInterestedFunction(kf->function)) {
-      // save BB in all mode except speculation
-      if (!(INTERPOLATION_ENABLED && Speculation &&
-            state.txTreeNode->isSpeculationNode())) {
-        bool isNew = (visitedBlocks.find(dst) == visitedBlocks.end());
-        if (isNew) {
-          visitedBlocks.insert(dst);
-        }
+    if (!isInSpecMode && isNew) {
+      // add to visited BBs if not in speculation mode
+      visitedBlocks.insert(bb);
+    }
 
-        // report % coverage
-        if (BBCoverage >= 2) {
-          int order = fBBOrder[kf->function][dst];
-          if (isNew) {
-            float percent =
-                ((float)visitedBlocks.size() / (float)allBlockCount) * 100;
-            std::string livePercentCovFile =
-                interpreterHandler->getOutputFilename("LivePercentCov.txt");
-            std::ofstream livePercentCovFileOut(livePercentCovFile.c_str(),
-                                                std::ofstream::app);
-            // [BB order - No. Visited - Total - %]
-            livePercentCovFileOut << "[" << order << " - "
-                                  << visitedBlocks.size() << " - "
-                                  << allBlockCount << " - " << percent << "]\n";
-            livePercentCovFileOut.close();
-          }
-          // print the BB
-          if (BBCoverage >= 3) {
-            if (isNew) {
-              std::string liveBBFile =
-                  interpreterHandler->getOutputFilename("LiveBB.txt");
-              std::ofstream liveBBFileOut(liveBBFile.c_str(),
+    // print percentage if this is a new BB
+    if (BBCoverage >= 2 && isNew) {
+      // print live %
+      float percent =
+          ((float)visitedBlocks.size() / (float)allBlockCount) * 100;
+      std::string livePercentCovFile =
+          interpreterHandler->getOutputFilename("LivePercentCov.txt");
+      std::ofstream livePercentCovFileOut(livePercentCovFile.c_str(),
                                           std::ofstream::app);
-              liveBBFileOut << "-- BlockScopeStarts --\n";
-              std::string functionName = (dst->getParent())->getName();
-              liveBBFileOut << "Function: " << functionName << "\n";
-              liveBBFileOut << "Block Order: " << order;
-              // block content
-              std::string tmp;
-              raw_string_ostream tmpOS(tmp);
-              dst->print(tmpOS);
-              liveBBFileOut << tmp;
-              liveBBFileOut << "-- BlockScopeEnds --\n\n";
-              liveBBFileOut.close();
-            }
-            if (BBCoverage >= 4) {
-              if (isNew) {
-                double diff = time(0) - startingBBPlottingTime;
-                std::string bbPlottingFile =
-                    interpreterHandler->getOutputFilename("BBPlotting.txt");
-                std::ofstream bbPlotingFileOut(bbPlottingFile.c_str(),
-                                               std::ofstream::app);
-                bbPlotingFileOut << diff << "     " << std::fixed
-                                 << std::setprecision(2) << blockCoverage
-                                 << "\n";
-                bbPlotingFileOut.close();
-              }
-            }
-          }
-        }
-      }
+      // [BB order - No. Visited - Total - %]
+      livePercentCovFileOut << "[" << order << " - " << visitedBlocks.size()
+                            << " - " << allBlockCount << " - " << percent
+                            << "]\n";
+      livePercentCovFileOut.close();
+    }
+
+    // print live BB
+    if (BBCoverage >= 3 && isNew) {
+      std::string liveBBFile =
+          interpreterHandler->getOutputFilename("LiveBB.txt");
+      std::ofstream liveBBFileOut(liveBBFile.c_str(), std::ofstream::app);
+      liveBBFileOut << "-- BlockScopeStarts --\n";
+      liveBBFileOut << "Function: " << bb->getParent()->getName().str() << "\n";
+      liveBBFileOut << "Block Order: " << order;
+      // block content
+      std::string tmp;
+      raw_string_ostream tmpOS(tmp);
+      bb->print(tmpOS);
+      liveBBFileOut << tmp;
+      liveBBFileOut << "-- BlockScopeEnds --\n\n";
+      liveBBFileOut.close();
+    }
+    if (BBCoverage >= 4) {
+      double diff = time(0) - startingBBPlottingTime;
+      std::string bbPlottingFile =
+          interpreterHandler->getOutputFilename("BBPlotting.txt");
+      std::ofstream bbPlotingFileOut(bbPlottingFile.c_str(),
+                                     std::ofstream::app);
+      bbPlotingFileOut << diff << "     " << std::fixed << std::setprecision(2)
+                       << blockCoverage << "\n";
+      bbPlotingFileOut.close();
     }
   }
 }
@@ -2329,8 +2332,8 @@ void Executor::printFileLine(ExecutionState &state, KInstruction *ki,
     debugFile << "     [no debug info]:";
 }
 
-/// Compute the true target of a function call, resolving LLVM and KLEE aliases
-/// and bitcasts.
+/// Compute the true target of a function call, resolving LLVM and KLEE
+/// aliases and bitcasts.
 Function *Executor::getTargetFunction(Value *calledVal, ExecutionState &state) {
   SmallPtrSet<const GlobalValue *, 3> Visited;
 
@@ -3896,6 +3899,10 @@ void Executor::run(ExecutionState &initialState) {
     }
   }
 
+  // first BB of main()
+  KInstruction *ki = initialState.pc;
+  processBBCoverage(BBCoverage, ki->inst->getParent(), false);
+
   bindModuleConstants();
 
   // Delay init till now so that ticks don't accrue during
@@ -3906,7 +3913,6 @@ void Executor::run(ExecutionState &initialState) {
 
   if (usingSeeds) {
     std::vector<SeedInfo> &v = seedMap[&initialState];
-
     for (std::vector<KTest *>::const_iterator it = usingSeeds->begin(),
                                               ie = usingSeeds->end();
          it != ie; ++it)
@@ -4986,9 +4992,6 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     state->txTreeNode = txTree->root;
     TxTreeGraph::initialize(txTree->root);
   }
-
-  // add initial BB to visited BBS
-  visitedBlocks.insert(&(f->front()));
 
   run(*state);
   delete processTree;

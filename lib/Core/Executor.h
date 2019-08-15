@@ -272,6 +272,8 @@ private:
   void updateStates(ExecutionState *current);
   void transferToBasicBlock(llvm::BasicBlock *dst, llvm::BasicBlock *src,
                             ExecutionState &state);
+  void processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
+                         bool isInSpecMode);
 
   void callExternalFunction(ExecutionState &state, KInstruction *target,
                             llvm::Function *function,
