@@ -2320,7 +2320,7 @@ void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
       // add to visited BBs if not in speculation mode
       visitedBlocks.insert(bb);
     }
-
+    float percent = ((float)visitedBlocks.size() / (float)allBlockCount) * 100;
     // print percentage if this is a new BB
     if (BBCoverage >= 2 && isNew) {
       // print live %
@@ -2331,9 +2331,8 @@ void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
       std::ofstream livePercentCovFileOut(livePercentCovFile.c_str(),
                                           std::ofstream::app);
       // [BB order - No. Visited - Total - %]
-      livePercentCovFileOut << "[" << order << " - " << visitedBlocks.size()
-                            << " - " << allBlockCount << " - " << percent
-                            << "]\n";
+      livePercentCovFileOut << "[" << visitedBlocks.size() << ","
+                            << allBlockCount << "," << percent << "]\n";
       livePercentCovFileOut.close();
     }
 
@@ -2360,7 +2359,7 @@ void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
       std::ofstream bbPlotingFileOut(bbPlottingFile.c_str(),
                                      std::ofstream::app);
       bbPlotingFileOut << diff << "     " << std::fixed << std::setprecision(2)
-                       << blockCoverage << "\n";
+                       << percent << "\n";
       bbPlotingFileOut.close();
     }
   }
