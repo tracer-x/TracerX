@@ -1276,6 +1276,13 @@ void Executor::stepInstruction(ExecutionState &state) {
 
 void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                            std::vector<ref<Expr> > &arguments) {
+
+  // BB Coverage
+  bool isInterested = (fBBOrder.find(f) != fBBOrder.end());
+  if (isInterested) {
+    processBBCoverage(BBCoverage, &(f->front()));
+  }
+
   Instruction *i = ki->inst;
   if (f && f->isDeclaration()) {
     switch (f->getIntrinsicID()) {
@@ -1472,176 +1479,64 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
     // blockCount increased to count all visited Basic Blocks
     TxTree::blockCount++;
   }
+
+  // process BB Coverage
+  bool isInterested = (fBBOrder.find(dst->getParent()) != fBBOrder.end());
+  if (isInterested) {
+    processBBCoverage(BBCoverage, dst);
+  }
+}
+
+void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb) {
   if (BBCoverage >= 1) {
-    char buf[80];
-    size_t lastindex = InputFile.find_last_of(".");
-    std::string InputFile1 = InputFile.substr(0, lastindex);
-    lastindex = InputFile1.find_last_of("/");
-    std::string InputFile2 = InputFile1.substr(lastindex + 1);
-    InputFile2 = InputFile2 + ".c";
-    if (!allBlockCollected) {
-      allBlockCollected = true;
-      //************All Blocks Start****************
-      for (std::map<llvm::Function *, KFunction *>::iterator
-               it = kmodule->functionMap.begin(),
-               ie = kmodule->functionMap.end();
-           it != ie; ++it) {
-        Function *tmpF = it->first;
-        KFunction *tmpKF = it->second;
-        KInstruction *tmpIns = tmpKF->instructions[0];
-        const std::string path = tmpIns->info->file;
-        std::size_t botDirPos = path.find_last_of("/");
-        std::string file = path.substr(botDirPos + 1, path.length());
-
-        if (file == InputFile2) {
-          if ((tmpF->getName() != "klee_div_zero_check") &&
-              (tmpF->getName() != "klee_range") &&
-              (tmpF->getName() != "klee_int") &&
-              (tmpF->getName() != "klee_overshift_check") &&
-              (tmpF->getName() != "memcpy") && (tmpF->getName() != "memmove") &&
-              (tmpF->getName() != "mempcpy") && (tmpF->getName() != "memset")) {
-            for (llvm::Function::iterator b = tmpF->begin(); b != tmpF->end();
-                 ++b) {
-              allBlockCount++;
-              if (BBCoverage >= 2) {
-                std::string outfile4 =
-                    interpreterHandler->getOutputFilename("AllBB.txt");
-                if ((klee_message_file = fopen(outfile4.c_str(), "a+")) == NULL)
-                  klee_error("cannot open file \"%s\": %s", outfile4.c_str(),
-                             strerror(errno));
-                std::string g4(outfile4.c_str());
-                std::ofstream out4(outfile4.c_str(), std::ofstream::app);
-                if (!out4.fail()) {
-                  out4 << "BlockScopeStarts: \n";
-                  out4 << "Block Number: " << allBlockCount << "\n";
-                  std::string tmp1 = (*b->getParent()).getName();
-                  std::string Str1;
-                  raw_string_ostream OS(Str1);
-                  b->print(OS);
-                  out4 << "Function:" << tmp1 << Str1 << "\n";
-                  out4 << "BlockScopeEnds: "
-                       << "\n";
-                }
-                out4.close();
-              }
-            }
-          }
-        }
-        startingTime = time(0);
-      }
+    bool isNew = (visitedBlocks.find(bb) == visitedBlocks.end());
+    int order = fBBOrder[bb->getParent()][bb];
+    if (isNew) {
+      // add to visited BBs if not in speculation mode
+      visitedBlocks.insert(bb);
     }
-    //************All Blocks End****************"
 
-    Instruction *lastInst;
-    const InstructionInfo &ii =
-        getLastNonKleeInternalInstruction(state, &lastInst);
-    const std::string path = ii.file;
-    std::size_t botDirPos = path.find_last_of("/");
-    std::string file = path.substr(botDirPos + 1, path.length());
-    if (file == InputFile2) {
-      if ((kf->function->getName() != "klee_div_zero_check") &&
-          (kf->function->getName() != "klee_range") &&
-          (kf->function->getName() != "klee_int") &&
-          (kf->function->getName() != "klee_overshift_check") &&
-          (kf->function->getName() != "memcpy") &&
-          (kf->function->getName() != "memmove") &&
-          (kf->function->getName() != "mempcpy") &&
-          (kf->function->getName() != "memset")) {
-        if (visitedBlocks.find(src) == visitedBlocks.end() ||
-            visitedBlocks.find(dst) == visitedBlocks.end()) {
+    // print percentage if this is a new BB
+    if (BBCoverage >= 2 && isNew) {
+      // print live %
+      float percent =
+          ((float)visitedBlocks.size() / (float)allBlockCount) * 100;
+      std::string livePercentCovFile =
+          interpreterHandler->getOutputFilename("LivePercentCov.txt");
+      std::ofstream livePercentCovFileOut(livePercentCovFile.c_str(),
+                                          std::ofstream::app);
+      // [BB order - No. Visited - Total - %]
+      livePercentCovFileOut << "[" << order << " - " << visitedBlocks.size()
+                            << " - " << allBlockCount << " - " << percent
+                            << "]\n";
+      livePercentCovFileOut.close();
+    }
 
-          bool newSrcFlag = false;
-          bool newDstFlag = false;
-          if (visitedBlocks.find(src) == visitedBlocks.end())
-            newSrcFlag = true;
-          if (visitedBlocks.find(dst) == visitedBlocks.end())
-            newDstFlag = true;
-
-          visitedBlocks.insert(src);
-          visitedBlocks.insert(dst);
-          time_t now = time(0);
-          double diff;
-          diff = now - startingTime;
-          blockCoverage =
-              ((float)visitedBlocks.size() / (float)allBlockCount) * 100;
-          //************Live Coverage Start****************"
-          if (BBCoverage >= 3) {
-            std::string outfile3 =
-                interpreterHandler->getOutputFilename("LiveBB.txt");
-            if ((klee_message_file = fopen(outfile3.c_str(), "a+")) == NULL)
-              klee_error("cannot open file \"%s\": %s", outfile3.c_str(),
-                         strerror(errno));
-            std::string g3(outfile3.c_str());
-            std::ofstream out3(outfile3.c_str(), std::ofstream::app);
-            if (newSrcFlag == true) {
-              std::string tmp = src->getParent()->getName();
-              std::string Str;
-              raw_string_ostream OS(Str);
-              src->print(OS);
-              if (!out3.fail()) {
-                out3 << "BlockScopeStarts: \n";
-                out3 << "Function:" << tmp << Str << "\n";
-                out3 << "BlockScopeEnds: "
-                     << "\n";
-              }
-            }
-            if (newDstFlag == true) {
-              std::string tmp = dst->getParent()->getName();
-              std::string Str;
-              raw_string_ostream OS(Str);
-              dst->print(OS);
-              if (!out3.fail()) {
-                out3 << "BlockScopeStarts: \n";
-                out3 << "Function:" << tmp << Str << "\n";
-                out3 << "BlockScopeEnds: "
-                     << "\n";
-              }
-            }
-            out3.close();
-
-            // --------------------------------------------------------------------------
-
-            struct tm tstruct;
-            tstruct = *localtime(&now);
-            strftime(buf, sizeof(buf), "%T", &tstruct);
-            std::string outfile1 =
-                interpreterHandler->getOutputFilename("LiveLogBB.txt");
-            if ((klee_message_file = fopen(outfile1.c_str(), "a+")) == NULL)
-              klee_error("cannot open file \"%s\": %s", outfile1.c_str(),
-                         strerror(errno));
-            klee_warning(
-                "Visited Blocks Up to now=========================: %d\n",
-                int(visitedBlocks.size()));
-            std::string g1(outfile1.c_str());
-            std::ofstream out1(outfile1.c_str(), std::ofstream::app);
-            if (!out1.fail()) {
-              out1 << "[" << buf << ","
-                   << "(" << visitedBlocks.size() << "," << allBlockCount << ","
-                   << std::fixed << std::setprecision(2) << blockCoverage
-                   << "%)]"
-                   << "\n";
-            }
-            out1.close();
-          }
-          //************Live Coverage Finish****************"
-          //************Coverage Plot Start****************"
-          if (BBCoverage >= 4) {
-            std::string outfile2 =
-                interpreterHandler->getOutputFilename("PlotBB.dat");
-            if ((klee_message_file = fopen(outfile2.c_str(), "a+")) == NULL)
-              klee_error("cannot open file \"%s\": %s", outfile2.c_str(),
-                         strerror(errno));
-            std::string g2(outfile2.c_str());
-            std::ofstream out2(outfile2.c_str(), std::ofstream::app);
-            if (!out2.fail()) {
-              out2 << diff << "     " << std::fixed << std::setprecision(2)
-                   << blockCoverage << "\n";
-            }
-            out2.close();
-          }
-          //************Coverage Plot Finish****************"
-        }
-      }
+    // print live BB
+    if (BBCoverage >= 3 && isNew) {
+      std::string liveBBFile =
+          interpreterHandler->getOutputFilename("LiveBB.txt");
+      std::ofstream liveBBFileOut(liveBBFile.c_str(), std::ofstream::app);
+      liveBBFileOut << "-- BlockScopeStarts --\n";
+      liveBBFileOut << "Function: " << bb->getParent()->getName().str() << "\n";
+      liveBBFileOut << "Block Order: " << order;
+      // block content
+      std::string tmp;
+      raw_string_ostream tmpOS(tmp);
+      bb->print(tmpOS);
+      liveBBFileOut << tmp;
+      liveBBFileOut << "-- BlockScopeEnds --\n\n";
+      liveBBFileOut.close();
+    }
+    if (BBCoverage >= 4) {
+      double diff = time(0) - startingBBPlottingTime;
+      std::string bbPlottingFile =
+          interpreterHandler->getOutputFilename("BBPlotting.txt");
+      std::ofstream bbPlotingFileOut(bbPlottingFile.c_str(),
+                                     std::ofstream::app);
+      bbPlotingFileOut << diff << "     " << std::fixed << std::setprecision(2)
+                       << blockCoverage << "\n";
+      bbPlotingFileOut.close();
     }
   }
 }
@@ -3130,6 +3025,42 @@ void Executor::doDumpStates() {
 
 void Executor::run(ExecutionState &initialState) {
 
+  startingBBPlottingTime = time(0);
+  // get interested source code
+  size_t lastindex = InputFile.find_last_of(".");
+  std::string InputFile1 = InputFile.substr(0, lastindex);
+  lastindex = InputFile1.find_last_of("/");
+  std::string InputFile2 = InputFile1.substr(lastindex + 1);
+  interestedSourceFileName = InputFile2 + ".c";
+
+  // BB to order
+  allBlockCount = 0;
+  for (std::map<llvm::Function *, KFunction *>::iterator
+           it = kmodule->functionMap.begin(),
+           ie = kmodule->functionMap.end();
+       it != ie; ++it) {
+    Function *f = it->first;
+    // get source file of the funtion
+    KFunction *kf = it->second;
+    KInstruction *ki = kf->instructions[0];
+    const std::string path = ki->info->file;
+    std::size_t botDirPos = path.find_last_of("/");
+    std::string sourceFileName = path.substr(botDirPos + 1, path.length());
+    // if the source file is interested then loop over its BBs
+    if ((sourceFileName == interestedSourceFileName) &&
+        isInterestedFunction(f)) {
+      // loop over BBs of function
+      std::vector<llvm::BasicBlock *> bbs;
+      for (llvm::Function::iterator b = f->begin(); b != f->end(); ++b) {
+        fBBOrder[f][b] = ++allBlockCount;
+      }
+    }
+  }
+
+  // first BB of main()
+  KInstruction *ki = initialState.pc;
+  processBBCoverage(BBCoverage, ki->inst->getParent());
+
   bindModuleConstants();
 
   // Delay init till now so that ticks don't accrue during
@@ -4228,6 +4159,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     interpreterHandler->assignSubsumptionStats(TxTree::getInterpolationStat());
 #endif
   }
+
   if (BBCoverage >= 1) {
     llvm::errs()
         << "************Basic Block Coverage Report Starts****************"
@@ -4248,29 +4180,29 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
         << "\n";
   }
   if (BBCoverage >= 2) {
-    std::string outfile5 =
+    // VisitedBB.txt
+    std::string visitedBBFile =
         interpreterHandler->getOutputFilename("VisitedBB.txt");
-    if ((klee_message_file = fopen(outfile5.c_str(), "a+")) == NULL)
-      klee_error("cannot open file \"%s\": %s", outfile5.c_str(),
-                 strerror(errno));
+    std::ofstream visitedBBFileOut(visitedBBFile.c_str(), std::ofstream::app);
 
     for (std::set<llvm::BasicBlock *>::iterator it = visitedBlocks.begin(),
                                                 ie = visitedBlocks.end();
          it != ie; ++it) {
-      std::string g5(outfile5.c_str());
-      std::ofstream out5(outfile5.c_str(), std::ofstream::app);
-      if (!out5.fail()) {
-        out5 << "BlockScopeStarts: \n";
-        std::string tmp2 = ((*it)->getParent())->getName();
-        std::string Str2;
-        raw_string_ostream OS(Str2);
-        (*it)->print(OS);
-        out5 << "Function:" << tmp2 << Str2 << "\n";
-        out5 << "BlockScopeEnds: "
-             << "\n";
-      }
-      out5.close();
+
+      int order = fBBOrder[(*it)->getParent()][*it];
+      visitedBBFileOut << "-- BlockScopeStarts --\n";
+      std::string functionName = ((*it)->getParent())->getName();
+      visitedBBFileOut << "Function: " << functionName << "\n";
+      visitedBBFileOut << "Block Order: " << order;
+      // block content
+      std::string tmp;
+      raw_string_ostream tmpOS(tmp);
+      (*it)->print(tmpOS);
+      visitedBBFileOut << tmp;
+      visitedBBFileOut << "-- BlockScopeEnds --\n\n";
     }
+
+    visitedBBFileOut.close();
   }
 
   // hack to clear memory objects
