@@ -93,12 +93,13 @@ class Executor : public Interpreter {
   friend class StatsTracker;
 
 public:
-  time_t startingTime;
+  time_t startingBBPlottingTime;
   int allBlockCount;
   bool allBlockCollected;
   std::set<llvm::BasicBlock *> visitedBlocks;
   float blockCoverage;
   std::string interestedSourceFileName;
+  std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> > fBBOrder;
 
   int specCount;
   int specCloseCount;
@@ -247,7 +248,7 @@ private:
                      llvm::raw_ostream &file);
 
   void run(ExecutionState &initialState);
-  bool isInterestedFunction(llvm::Function* f) {
+  bool isInterestedFunction(llvm::Function *f) {
     return !f->isIntrinsic() && (f->getName().str().substr(0, 5) != "klee_") &&
            (f->getName() != "memcpy") && (f->getName() != "memmove") &&
            (f->getName() != "mempcpy") && (f->getName() != "memset");
