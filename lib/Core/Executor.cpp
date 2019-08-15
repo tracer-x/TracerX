@@ -2267,12 +2267,6 @@ void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
   if (BBCoverage >= 1) {
     bool isNew = (visitedBlocks.find(bb) == visitedBlocks.end());
     int order = fBBOrder[bb->getParent()][bb];
-    if (order == 2) {
-      llvm::errs() << "isNew=" << isNew << "\n";
-      llvm::errs() << "isInSpecMode=" << isInSpecMode << "\n";
-      bb->dump();
-    }
-
     if (!isInSpecMode && isNew) {
       // add to visited BBs if not in speculation mode
       visitedBlocks.insert(bb);
