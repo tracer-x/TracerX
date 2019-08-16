@@ -3852,18 +3852,6 @@ void Executor::doDumpStates() {
   updateStates(0);
 }
 
-std::set<std::string> Executor::readSpecAvoid(std::string fileName) {
-  std::set<std::string> res;
-  std::ifstream in(fileName.c_str());
-  std::string str;
-  while (std::getline(in, str)) {
-    if (!TxSpeculativeRun::trim(str).empty())
-      res.insert(TxSpeculativeRun::trim(str));
-  }
-  in.close();
-  return res;
-}
-
 std::map<int, std::set<std::string> >
 Executor::readBBOrderToSpecAvoid(std::string folderName) {
   std::map<int, std::set<std::string> > res;
@@ -3907,7 +3895,6 @@ void Executor::run(ExecutionState &initialState) {
   specFail = 0;
   specLimit = 200000;
   prevNodeSequence = 0;
-  specAvoid = readSpecAvoid("SpecAvoid.txt");
   totalSpecFailTime = 0.0;
   startingBBPlottingTime = time(0);
 
@@ -3963,6 +3950,7 @@ void Executor::run(ExecutionState &initialState) {
   */
   //  llvm::errs() << "== End Printing Spec Avoid ==\n";
 
+  /*
   // extract visited BB
   for (std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> >::iterator
            it = fBBOrder.begin(),
@@ -3979,6 +3967,7 @@ void Executor::run(ExecutionState &initialState) {
       }
     }
   }
+  */
 
   // first BB of main()
   KInstruction *ki = initialState.pc;

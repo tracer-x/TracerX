@@ -257,7 +257,6 @@ private:
            (f->getName() != "mempcpy") && (f->getName() != "memset");
   }
 
-  std::set<std::string> readSpecAvoid(std::string fileName);
   std::map<int, std::set<std::string> >
   readBBOrderToSpecAvoid(std::string folderName);
   std::pair<int, std::set<std::string> > readBBSpecAvoid(std::string fileName);
