@@ -1278,8 +1278,8 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                            std::vector<ref<Expr> > &arguments) {
 
   // BB Coverage
-  bool isInterested = (fBBOrder.find(f) != fBBOrder.end());
-  if (isInterested) {
+  bool isCoverableFunction = (fBBOrder.find(f) != fBBOrder.end());
+  if (isCoverableFunction) {
     processBBCoverage(BBCoverage, &(f->front()));
   }
 
@@ -3029,7 +3029,7 @@ void Executor::run(ExecutionState &initialState) {
   std::string InputFile1 = InputFile.substr(0, lastindex);
   lastindex = InputFile1.find_last_of("/");
   std::string InputFile2 = InputFile1.substr(lastindex + 1);
-  interestedSourceFileName = InputFile2 + ".c";
+  covInterestSourceFileName = InputFile2 + ".c";
 
   // BB to order
   allBlockCount = 0;
@@ -3045,8 +3045,8 @@ void Executor::run(ExecutionState &initialState) {
     std::size_t botDirPos = path.find_last_of("/");
     std::string sourceFileName = path.substr(botDirPos + 1, path.length());
     // if the source file is interested then loop over its BBs
-    if ((sourceFileName == interestedSourceFileName) &&
-        isInterestedFunction(f)) {
+    if ((sourceFileName == covInterestSourceFileName) &&
+        isCoverableFunction(f)) {
       // loop over BBs of function
       std::vector<llvm::BasicBlock *> bbs;
       for (llvm::Function::iterator b = f->begin(); b != f->end(); ++b) {
@@ -4188,17 +4188,8 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
          it != ie; ++it) {
 
       int order = fBBOrder[(*it)->getParent()][*it];
-      // visitedBBFileOut << "-- BlockScopeStarts --\n";
       std::string functionName = ((*it)->getParent())->getName();
-      // visitedBBFileOut << "Function: " << functionName << "\n";
-      // visitedBBFileOut << "Block Order: " << order;
       visitedBBFileOut << order << "\n";
-      // block content
-      std::string tmp;
-      raw_string_ostream tmpOS(tmp);
-      (*it)->print(tmpOS);
-      // visitedBBFileOut << tmp;
-      // visitedBBFileOut << "-- BlockScopeEnds --\n\n";
     }
 
     visitedBBFileOut.close();
