@@ -3960,7 +3960,7 @@ void Executor::run(ExecutionState &initialState) {
 
   // load avoid BB
   bbOrderToSpecAvoid = readBBOrderToSpecAvoid(".");
-  visitedBlocks = readVisitedBB("VisitedBB.txt");
+  visitedBlocks = readVisitedBB("InitialVisitedBB.txt");
 
   // first BB of main()
   KInstruction *ki = initialState.pc;
