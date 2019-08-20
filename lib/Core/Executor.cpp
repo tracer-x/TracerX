@@ -3888,6 +3888,33 @@ Executor::readBBSpecAvoid(std::string fileName) {
   return std::make_pair(bb, avoid);
 }
 
+std::set<llvm::BasicBlock *> Executor::readVisitedBB(std::string fileName) {
+  std::set<int> bbs;
+  std::ifstream in(fileName.c_str());
+  std::string str;
+  while (std::getline(in, str)) {
+    if (!TxSpeculativeRun::trim(str).empty()) {
+      int bb = atoi(str.c_str());
+      bbs.insert(bb);
+    }
+  }
+  in.close();
+  std::set<llvm::BasicBlock *> res;
+  for (std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> >::iterator
+           it = fBBOrder.begin(),
+           ie = fBBOrder.end();
+       it != ie; ++it) {
+    for (std::map<llvm::BasicBlock *, int>::iterator it1 = it->second.begin(),
+                                                     ie1 = it->second.end();
+         it1 != ie1; ++it1) {
+      if (bbs.find(it1->second) != bbs.end()) {
+        res.insert(it1->first);
+      }
+    }
+  }
+  return res;
+}
+
 void Executor::run(ExecutionState &initialState) {
 
   specCount = 0;
@@ -3933,41 +3960,7 @@ void Executor::run(ExecutionState &initialState) {
 
   // load avoid BB
   bbOrderToSpecAvoid = readBBOrderToSpecAvoid(".");
-  //  llvm::errs() << "== Print Spec Avoid ==\n";
-  /*
-  for (std::map<int, std::set<std::string> >::iterator
-           it = bbOrderToSpecAvoid.begin(),
-           ie = bbOrderToSpecAvoid.end();
-       it != ie; ++it) {
-    //      llvm::errs() << it->first << "\n";
-    for (std::set<std::string>::iterator it1 = it->second.begin(),
-                                         ie1 = it->second.end();
-         it1 != ie1; ++it1) {
-      llvm::errs() << *it1 << "-";
-    }
-    llvm::errs() << "\n=====\n";
-  }
-  */
-  //  llvm::errs() << "== End Printing Spec Avoid ==\n";
-
-  /*
-  // extract visited BB
-  for (std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> >::iterator
-           it = fBBOrder.begin(),
-           ie = fBBOrder.end();
-       it != ie; ++it) {
-    for (std::map<llvm::BasicBlock *, int>::iterator it1 = it->second.begin(),
-                                                     ie1 = it->second.end();
-         it1 != ie1; ++it1) {
-      // if not in avoidance set then add to visited BB
-      if (bbOrderToSpecAvoid.find(it1->second) == bbOrderToSpecAvoid.end()) {
-        // visited BBs
-        processBBCoverage(BBCoverage, it1->first, false);
-        visitedBlocks.insert(it1->first);
-      }
-    }
-  }
-  */
+  visitedBlocks = readVisitedBB("VisitedBB.txt");
 
   // first BB of main()
   KInstruction *ki = initialState.pc;
@@ -5183,21 +5176,9 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     for (std::set<llvm::BasicBlock *>::iterator it = visitedBlocks.begin(),
                                                 ie = visitedBlocks.end();
          it != ie; ++it) {
-
       int order = fBBOrder[(*it)->getParent()][*it];
-      // visitedBBFileOut << "-- BlockScopeStarts --\n";
-      std::string functionName = ((*it)->getParent())->getName();
-      // visitedBBFileOut << "Function: " << functionName << "\n";
-      // visitedBBFileOut << "Block Order: " << order;
       visitedBBFileOut << order << "\n";
-      // block content
-      std::string tmp;
-      raw_string_ostream tmpOS(tmp);
-      (*it)->print(tmpOS);
-      // visitedBBFileOut << tmp;
-      // visitedBBFileOut << "-- BlockScopeEnds --\n\n";
     }
-
     visitedBBFileOut.close();
   }
 

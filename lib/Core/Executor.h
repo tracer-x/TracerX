@@ -260,6 +260,7 @@ private:
   std::map<int, std::set<std::string> >
   readBBOrderToSpecAvoid(std::string folderName);
   std::pair<int, std::set<std::string> > readBBSpecAvoid(std::string fileName);
+  std::set<llvm::BasicBlock *> readVisitedBB(std::string fileName);
 
   // Given a concrete object in our [klee's] address space, add it to
   // objects checked code can reference.
