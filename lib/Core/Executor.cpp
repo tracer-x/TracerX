@@ -1548,6 +1548,13 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         }
       }
       // add to visited BB
+      visitedBlocks.insert(currentBB);
+      if (fBBOrder.find(currentBB->getParent()) != fBBOrder.end() &&
+          fBBOrder.find(currentBB->getParent())->second.find(currentBB) !=
+              fBBOrder.find(currentBB->getParent())->second.end()) {
+        int curOrder = fBBOrder[currentBB->getParent()][currentBB];
+        bbOrderToSpecAvoid.erase(curOrder);
+      }
       specFail++;
       speculativeBackJump(current);
       return StatePair(0, 0);
