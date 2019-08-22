@@ -1026,6 +1026,37 @@ std::set<std::string> Executor::extractVarNames(ExecutionState &current,
   return res;
 }
 
+/**
+ * Return speculation type
+ * 0: variables are not in the map -> allow speculation & assume success
+ * 1: variables are in the map & the number of visited BBs
+ * do not change -> don't allow speculation
+ * 2: variables are in the map & the number of visited BBs changes -> allow
+ * speculation as usual
+ */
+int Executor::getSpecType(std::set<std::string> &vars,
+                          std::map<int, std::set<std::string> > &avoidance) {
+  bool isInMap = false;
+  for (std::map<int, std::set<std::string> >::iterator it = avoidance.begin(),
+                                                       ie = avoidance.end();
+       it != ie; ++it) {
+    if (TxSpeculativeRun::isOverlap(it->second, vars)) {
+      isInMap = true;
+      break;
+    }
+  }
+  if (!isInMap) {
+    return 0;
+  } else {
+    if (lastVisitedBBSize == visitedBlocks.size()) {
+      return 1;
+    } else {
+      lastVisitedBBSize = visitedBlocks.size();
+      return 2;
+    }
+  }
+}
+
 Executor::StatePair Executor::branchFork(ExecutionState &current,
                                          ref<Expr> condition, bool isInternal) {
   start = clock();
@@ -1186,13 +1217,16 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+
+      int specType = getSpecType(vars, bbOrderToSpecAvoid);
+      if (specType == 0) { // open & assume success
         specCount++;
         return StatePair(&current, 0);
-        //        return addSpeculationNode(current, condition, isInternal,
-        // true);
-      } else {
+      } else if (specType == 1) { // close
         specCloseCount++;
+      } else { // open as usual
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, true);
       }
     }
     return StatePair(&current, 0);
@@ -1201,13 +1235,16 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+
+      int specType = getSpecType(vars, bbOrderToSpecAvoid);
+      if (specType == 0) { // open & assume success
         specCount++;
         return StatePair(0, &current);
-        //        return addSpeculationNode(current, condition, isInternal,
-        // false);
-      } else {
+      } else if (specType == 1) { // close
         specCloseCount++;
+      } else { // open as usual
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, false);
       }
     }
     return StatePair(0, &current);
@@ -1236,14 +1273,16 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // keep unsat core & increase spec counting
 
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-        //        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+      int specType = getSpecType(vars, bbOrderToSpecAvoid);
+      if (specType == 0) { // open & assume success
         specCount++;
         return StatePair(&current, 0);
-        //        return addSpeculationNode(current, condition, isInternal,
-        // true);
-      } else {
+      } else if (specType == 1) { // close
         specCloseCount++;
+      } else { // open as usual
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, true);
       }
     }
 
@@ -1272,14 +1311,16 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // keep unsat core & increase spec counting
 
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-        //        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+      int specType = getSpecType(vars, bbOrderToSpecAvoid);
+      if (specType == 0) { // open & assume success
         specCount++;
         return StatePair(0, &current);
-        //        return addSpeculationNode(current, condition, isInternal,
-        // false);
-      } else {
+      } else if (specType == 1) { // close
         specCloseCount++;
+      } else { // open as usual
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, false);
       }
     }
 
@@ -1548,6 +1589,14 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         }
       }
       // add to visited BB
+      visitedBlocks.insert(currentBB);
+      if (fBBOrder.find(currentBB->getParent()) != fBBOrder.end() &&
+          fBBOrder.find(currentBB->getParent())->second.find(currentBB) !=
+              fBBOrder.find(currentBB->getParent())->second.end()) {
+        int curOrder = fBBOrder[currentBB->getParent()][currentBB];
+        bbOrderToSpecAvoid.erase(curOrder);
+      }
+
       specFail++;
       speculativeBackJump(current);
       return StatePair(0, 0);
@@ -1607,7 +1656,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       } else {
         specCloseCount++;
       }
-    } else {
     }
     return StatePair(0, &current);
   }
@@ -3924,6 +3972,7 @@ void Executor::run(ExecutionState &initialState) {
   prevNodeSequence = 0;
   totalSpecFailTime = 0.0;
   startingBBPlottingTime = time(0);
+  lastVisitedBBSize = 0;
 
   // get interested source code
   size_t lastindex = InputFile.find_last_of(".");
@@ -3961,6 +4010,7 @@ void Executor::run(ExecutionState &initialState) {
   // load avoid BB
   bbOrderToSpecAvoid = readBBOrderToSpecAvoid(".");
   visitedBlocks = readVisitedBB("InitialVisitedBB.txt");
+  lastVisitedBBSize = visitedBlocks.size();
 
   // first BB of main()
   KInstruction *ki = initialState.pc;

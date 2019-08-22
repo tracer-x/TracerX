@@ -101,6 +101,7 @@ public:
   float blockCoverage;
   std::string interestedSourceFileName;
   std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> > fBBOrder;
+  size_t lastVisitedBBSize;
 
   int specCount;
   int specCloseCount;
@@ -355,6 +356,8 @@ private:
 
   std::set<std::string> extractVarNames(ExecutionState &current,
                                         llvm::Value *v);
+  int getSpecType(std::set<std::string> &vars,
+                  std::map<int, std::set<std::string> > &avoidance);
 
   // Generally the nodes are in normal mode. In case an infeasible path
   // is found, an speculation node is generated for the infeasible path
