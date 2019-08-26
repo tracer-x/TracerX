@@ -1520,7 +1520,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         }
       }
       // add to visited BB
-      visitedBlocks.insert(currentBB);
+      //This is disabled to not to count blocks in speculation subtree
+      //visitedBlocks.insert(currentBB);
       specFail++;
       speculativeBackJump(current);
       return StatePair(0, 0);
