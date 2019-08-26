@@ -1589,7 +1589,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         }
       }
       // add to visited BB
-      visitedBlocks.insert(currentBB);
+      //This is disabled to not to count blocks in speculation subtree
+      //visitedBlocks.insert(currentBB);
       if (fBBOrder.find(currentBB->getParent()) != fBBOrder.end() &&
           fBBOrder.find(currentBB->getParent())->second.find(currentBB) !=
               fBBOrder.find(currentBB->getParent())->second.end()) {
