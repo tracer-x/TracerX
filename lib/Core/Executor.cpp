@@ -1513,7 +1513,6 @@ void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb) {
                             << allBlockCount << "," << percent << "]\n";
       livePercentCovFileOut.close();
     }
-
     // print live BB
     if (BBCoverage >= 3 && isNew) {
       std::string liveBBFile =
@@ -2911,7 +2910,7 @@ void Executor::updateStates(ExecutionState *current) {
       seedMap.erase(it3);
     processTree->remove(es->ptreeNode);
     if (INTERPOLATION_ENABLED)
-      txTree->remove(es,solver, (current == 0));
+      txTree->remove(es, solver, (current == 0));
     delete es;
   }
   removedStates.clear();
@@ -3029,7 +3028,6 @@ void Executor::doDumpStates() {
 }
 
 void Executor::run(ExecutionState &initialState) {
-
   startingBBPlottingTime = time(0);
   // get interested source code
   size_t lastindex = InputFile.find_last_of(".");
@@ -3065,6 +3063,30 @@ void Executor::run(ExecutionState &initialState) {
   // first BB of main()
   KInstruction *ki = initialState.pc;
   processBBCoverage(BBCoverage, ki->inst->getParent());
+
+  // BB to order
+  allBlockCount = 0;
+  for (std::map<llvm::Function *, KFunction *>::iterator
+           it = kmodule->functionMap.begin(),
+           ie = kmodule->functionMap.end();
+       it != ie; ++it) {
+    Function *f = it->first;
+    // get source file of the funtion
+    KFunction *kf = it->second;
+    KInstruction *ki = kf->instructions[0];
+    const std::string path = ki->info->file;
+    std::size_t botDirPos = path.find_last_of("/");
+    std::string sourceFileName = path.substr(botDirPos + 1, path.length());
+    // if the source file is interested then loop over its BBs
+    if ((sourceFileName == covInterestSourceFileName) &&
+        isCoverableFunction(f)) {
+      // loop over BBs of function
+      std::vector<llvm::BasicBlock *> bbs;
+      for (llvm::Function::iterator b = f->begin(); b != f->end(); ++b) {
+        fBBOrder[f][b] = ++allBlockCount;
+      }
+    }
+  }
 
   bindModuleConstants();
 
@@ -3291,7 +3313,7 @@ void Executor::terminateState(ExecutionState &state) {
     processTree->remove(state.ptreeNode);
 
     if (INTERPOLATION_ENABLED)
-      txTree->remove(&state,solver, false);
+      txTree->remove(&state, solver, false);
     delete &state;
   }
 }
