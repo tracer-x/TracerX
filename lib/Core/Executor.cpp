@@ -2332,7 +2332,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         }
       }
       specFail++;
-      speculativeBackJump1(state);
+      speculativeBackJump(state);
       return;
     } else {
       // Storing the visited program points.
@@ -2360,7 +2360,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // This is disabled to not to count blocks in speculation subtree
       // visitedBlocks.insert(currentBB);
       specFail++;
-      speculativeBackJump1(state);
+      speculativeBackJump(state);
       return;
     }
   }
