@@ -1495,73 +1495,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
                                               bool isInternal) {
   //  klee_warning("Speculation node");
 
-  if (current.txTreeNode->getNodeSequenceNumber() != prevNodeSequence) {
-    //    llvm::errs() << "Prev node sequence = " << prevNodeSequence << "\n";
-    //    llvm::errs() << "Curr node sequence = "
-    //                 << current.txTreeNode->getNodeSequenceNumber() << "\n";
-    // update last node sequence
-    prevNodeSequence = current.txTreeNode->getNodeSequenceNumber();
-
-    // CHECK NON_LINEAR
-    // check program point of the current node is visited before or not
-    uintptr_t pp = current.txTreeNode->getProgramPoint();
-    bool isPPVisited = (current.txTreeNode->visitedProgramPoints->find(pp) !=
-                        current.txTreeNode->visitedProgramPoints->end());
-    if (isPPVisited) {
-      // add to spec revisited statistic
-      if (specRevisited.find(pp) != specRevisited.end()) {
-        specRevisited[pp] = specRevisited[pp] + 1;
-      } else {
-        specRevisited[pp] = 1;
-      }
-      // check interpolation at is program point
-      bool hasInterpolation = TxSubsumptionTable::hasInterpolation(current);
-      if (!hasInterpolation) {
-        if (specRevisitedNoInter.find(pp) != specRevisitedNoInter.end()) {
-          specRevisitedNoInter[pp] = specRevisitedNoInter[pp] + 1;
-        } else {
-          specRevisitedNoInter[pp] = 1;
-        }
-      }
-      specFail++;
-      speculativeBackJump(current);
-      return StatePair(0, 0);
-    }
-    // Storing the visited program points.
-    current.txTreeNode->visitedProgramPoints->insert(pp);
-
-    // CHECK NEW BB
-    llvm::BasicBlock *currentBB = current.txTreeNode->getBasicBlock();
-    if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
-      if (specFailNew.find(pp) != specFailNew.end()) {
-        specFailNew[pp] = specFailNew[pp] + 1;
-      } else {
-        specFailNew[pp] = 1;
-      }
-      // check interpolation at is program point
-      bool hasInterpolation = TxSubsumptionTable::hasInterpolation(current);
-      if (!hasInterpolation) {
-        if (specFailNoInter.find(pp) != specFailNoInter.end()) {
-          specFailNoInter[pp] = specFailNoInter[pp] + 1;
-        } else {
-          specFailNoInter[pp] = 1;
-        }
-      }
-      // add to visited BB
-      //This is disabled to not to count blocks in speculation tree
-      //visitedBlocks.insert(currentBB);
-      if (fBBOrder.find(currentBB->getParent()) != fBBOrder.end() &&
-          fBBOrder.find(currentBB->getParent())->second.find(currentBB) !=
-              fBBOrder.find(currentBB->getParent())->second.end()) {
-        int curOrder = fBBOrder[currentBB->getParent()][currentBB];
-        bbOrderToSpecAvoid.erase(curOrder);
-      }
-      specFail++;
-      speculativeBackJump(current);
-      return StatePair(0, 0);
-    }
-  }
-
   Solver::Validity res;
 
   double timeout = coreSolverTimeout;
@@ -1750,7 +1683,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 void Executor::speculativeBackJump(ExecutionState &current) {
 
   double thisSpecTreeTime = *(current.txTreeNode->specTime);
-
   // identify the speculation root
   TxTreeNode *currentNode = current.txTreeNode;
   TxTreeNode *parent = currentNode->getParent();
@@ -1759,14 +1691,15 @@ void Executor::speculativeBackJump(ExecutionState &current) {
     parent = parent->getParent();
   }
 
-  // interpolant marking
-  if (!currentNode->speculationUnsatCore.empty()) {
-    currentNode->mark();
+  // interpolant marking on parent node
+  if (parent && !parent->speculationUnsatCore.empty()) {
+    parent->mark();
   }
 
+  // collect & mark speculation fail all nodes in the sub tree
   std::vector<TxTreeNode *> deletedNodes = collectSpeculationNodes(currentNode);
 
-  // collect removed states
+  // collect removed states which pointing to speculation fail node
   std::vector<ExecutionState *> removedSpeculationStates;
   for (std::set<ExecutionState *>::const_iterator it = states.begin(),
                                                   ie = states.end();
@@ -1776,23 +1709,17 @@ void Executor::speculativeBackJump(ExecutionState &current) {
       removedSpeculationStates.push_back(tmp);
     }
   }
-  //  llvm::outs() << "States in worklist 1 = " << states.size() << "\n";
-  //  llvm::outs() << "States in worklist 2 = " << searcher->getStates().size()
-  //               << "\n";
-  //  llvm::outs() << "Nodes to be deleted = " << deletedNodes.size() << "\n";
-  //  llvm::outs() << "States to be deleted = " <<
-  // removedSpeculationStates.size()
-  //               << "\n";
 
+  // update states in search
   searcher->update(0, std::vector<ExecutionState *>(),
                    removedSpeculationStates);
-
+  // remove fail nodes in subtree
   for (std::vector<TxTreeNode *>::iterator it = deletedNodes.begin(),
                                            ie = deletedNodes.end();
        it != ie; ++it) {
     txTree->removeSpeculationFailedNodes(*it);
   }
-
+  // remove state in states
   for (std::vector<ExecutionState *>::iterator
            it = removedSpeculationStates.begin(),
            ie = removedSpeculationStates.end();
@@ -1801,19 +1728,12 @@ void Executor::speculativeBackJump(ExecutionState &current) {
     if (&current != *it)
       delete *it;
   }
-
   // this count is for the fail node in spec tree
   end = clock();
   thisSpecTreeTime += (double(end - start));
 
   // add fail time for spec subtree
   totalSpecFailTime += thisSpecTreeTime;
-
-  //  llvm::outs() << "Remaining states in worklist 1 = " << states.size() <<
-  // "\n";
-  //  llvm::outs() << "Remaining states in worklist 2 = "
-  //               << searcher->getStates().size() << "\n";
-  //  llvm::outs() << "Remaining addedStates = " << addedStates.size() << "\n";
 }
 
 std::vector<TxTreeNode *> Executor::collectSpeculationNodes(TxTreeNode *root) {
@@ -2441,6 +2361,64 @@ static inline const llvm::fltSemantics *fpWidthToSemantics(unsigned width) {
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
+
+  // if this is starting a new BB then
+  // check for non-linear & new BB in speculation mode
+  if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode() &&
+      (i == &state.txTreeNode->getBasicBlock()->front())) {
+    // check non-linear
+    uintptr_t pp = state.txTreeNode->getProgramPoint();
+    bool isPPVisited = (state.txTreeNode->visitedProgramPoints->find(pp) !=
+                        state.txTreeNode->visitedProgramPoints->end());
+    if (isPPVisited) {
+      // add to spec revisited statistic
+      if (specRevisited.find(pp) != specRevisited.end()) {
+        specRevisited[pp] = specRevisited[pp] + 1;
+      } else {
+        specRevisited[pp] = 1;
+      }
+      // check interpolation at is program point
+      bool hasInterpolation = TxSubsumptionTable::hasInterpolation(state);
+      if (!hasInterpolation) {
+        if (specRevisitedNoInter.find(pp) != specRevisitedNoInter.end()) {
+          specRevisitedNoInter[pp] = specRevisitedNoInter[pp] + 1;
+        } else {
+          specRevisitedNoInter[pp] = 1;
+        }
+      }
+      specFail++;
+      speculativeBackJump(state);
+      return;
+    } else {
+      // Storing the visited program points.
+      state.txTreeNode->visitedProgramPoints->insert(pp);
+    }
+
+    // check new BB
+    llvm::BasicBlock *currentBB = state.txTreeNode->getBasicBlock();
+    if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
+      if (specFailNew.find(pp) != specFailNew.end()) {
+        specFailNew[pp] = specFailNew[pp] + 1;
+      } else {
+        specFailNew[pp] = 1;
+      }
+      // check interpolation at is program point
+      bool hasInterpolation = TxSubsumptionTable::hasInterpolation(state);
+      if (!hasInterpolation) {
+        if (specFailNoInter.find(pp) != specFailNoInter.end()) {
+          specFailNoInter[pp] = specFailNoInter[pp] + 1;
+        } else {
+          specFailNoInter[pp] = 1;
+        }
+      }
+      // add to visited BB
+      // This is disabled to not to count blocks in speculation subtree
+      // visitedBlocks.insert(currentBB);
+      specFail++;
+      speculativeBackJump(state);
+      return;
+    }
+  }
 
   switch (i->getOpcode()) {
   // Control flow
