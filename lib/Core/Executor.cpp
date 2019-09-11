@@ -1185,29 +1185,26 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
-   	std::set<std::string> vars = extractVarNames(current, binst);
+      std::set<std::string> vars = extractVarNames(current, binst);
       if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-      	  specCount++;
-      	return addSpeculationNode(current, condition, isInternal, true);
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, true);
+      } else {
+        specCloseCount++;
       }
-      else {
-    	  specCloseCount++;
-      }
-
     }
     return StatePair(&current, 0);
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
-    	std::set<std::string> vars = extractVarNames(current, binst);
-    	if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-    		specCount++;
-      return addSpeculationNode(current, condition, isInternal, false);
-    	} else {
-            specCloseCount++;
-          }
-
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, false);
+      } else {
+        specCloseCount++;
+      }
     }
     return StatePair(0, &current);
   }
@@ -1234,15 +1231,14 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // be used to perform markings.
       // keep unsat core & increase spec counting
 
-    	std::set<std::string> vars = extractVarNames(current, binst);
-    	if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-    		txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-    		specCount++;
-    		return addSpeculationNode(current, condition, isInternal, true);
-    	}
-    	else {
-    	        specCloseCount++;
-    	      }
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, true);
+      } else {
+        specCloseCount++;
+      }
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -1268,15 +1264,14 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
-    	 std::set<std::string> vars = extractVarNames(current, binst);
-    	      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-      specCount++;
-      return addSpeculationNode(current, condition, isInternal, false);
-    	      }
-    	      else {
-    	              specCloseCount++;
-    	            }
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        specCount++;
+        return addSpeculationNode(current, condition, isInternal, false);
+      } else {
+        specCloseCount++;
+      }
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -1526,26 +1521,24 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
-    	std::set<std::string> vars = extractVarNames(current, binst);
-    	if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-    		return addSpeculationNode(current, condition, isInternal, true);
-    	}
-    	else {
-    		specCloseCount++;
-    	}
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+        return addSpeculationNode(current, condition, isInternal, true);
+      } else {
+        specCloseCount++;
+      }
     }
     return StatePair(&current, 0);
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
-    	std::set<std::string> vars = extractVarNames(current, binst);
-    	if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-    		return addSpeculationNode(current, condition, isInternal, false);
-    	}
-    	else {
-    		specCloseCount++;
-    	}
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+        return addSpeculationNode(current, condition, isInternal, false);
+      } else {
+        specCloseCount++;
+      }
     }
     return StatePair(0, &current);
   }
@@ -1568,14 +1561,13 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
-    	std::set<std::string> vars = extractVarNames(current, binst);
-    		if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-    			txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-    			return addSpeculationNode(current, condition, isInternal, true);
-    		}
-    		else {
-    			specCloseCount++;
-    	      	  }
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        return addSpeculationNode(current, condition, isInternal, true);
+      } else {
+        specCloseCount++;
+      }
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -1603,14 +1595,13 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
-    	std::set<std::string> vars = extractVarNames(current, binst);
-    	if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
-    		txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-    		return addSpeculationNode(current, condition, isInternal, false);
-    	}
-    	else {
-    		specCloseCount++;
-    	}
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        return addSpeculationNode(current, condition, isInternal, false);
+      } else {
+        specCloseCount++;
+      }
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -2416,10 +2407,10 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // visitedBlocks.insert(currentBB);
 
       if (fBBOrder.find(currentBB->getParent()) != fBBOrder.end() &&
-    		  fBBOrder.find(currentBB->getParent())->second.find(currentBB) !=
-    				  fBBOrder.find(currentBB->getParent())->second.end()) {
-    	  int curOrder = fBBOrder[currentBB->getParent()][currentBB];
-    	  bbOrderToSpecAvoid.erase(curOrder);
+          fBBOrder.find(currentBB->getParent())->second.find(currentBB) !=
+              fBBOrder.find(currentBB->getParent())->second.end()) {
+        int curOrder = fBBOrder[currentBB->getParent()][currentBB];
+        bbOrderToSpecAvoid.erase(curOrder);
       }
 
       specFail++;
@@ -3964,9 +3955,9 @@ void Executor::run(ExecutionState &initialState) {
 
   llvm::errs() << "allBlockCount: " << allBlockCount << "\n";
 
-    // load avoid BB
-    bbOrderToSpecAvoid = readBBOrderToSpecAvoid(".");
-    visitedBlocks = readVisitedBB("InitialVisitedBB.txt");
+  // load avoid BB
+  bbOrderToSpecAvoid = readBBOrderToSpecAvoid(".");
+  visitedBlocks = readVisitedBB("InitialVisitedBB.txt");
 
   // first BB of main()
   KInstruction *ki = initialState.pc;

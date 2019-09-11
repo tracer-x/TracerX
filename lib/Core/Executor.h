@@ -112,7 +112,6 @@ public:
                                                           // revisited & no
                                                           // interpolant
   unsigned int specLimit;
-  std::set<std::string> specAvoid;
   std::map<int, std::set<std::string> > bbOrderToSpecAvoid;
 
   uintptr_t prevNodeSequence;
