@@ -1185,16 +1185,29 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
-      specCount++;
-      return addSpeculationNode(current, condition, isInternal, true);
+   	std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+      	  specCount++;
+      	return addSpeculationNode(current, condition, isInternal, true);
+      }
+      else {
+    	  specCloseCount++;
+      }
+
     }
     return StatePair(&current, 0);
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
-      specCount++;
+    	std::set<std::string> vars = extractVarNames(current, binst);
+    	if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+    		specCount++;
       return addSpeculationNode(current, condition, isInternal, false);
+    	} else {
+            specCloseCount++;
+          }
+
     }
     return StatePair(0, &current);
   }
@@ -1221,9 +1234,15 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // be used to perform markings.
       // keep unsat core & increase spec counting
 
-      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-      specCount++;
-      return addSpeculationNode(current, condition, isInternal, true);
+    	std::set<std::string> vars = extractVarNames(current, binst);
+    	if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+    		txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+    		specCount++;
+    		return addSpeculationNode(current, condition, isInternal, true);
+    	}
+    	else {
+    	        specCloseCount++;
+    	      }
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -1249,10 +1268,15 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
-
+    	 std::set<std::string> vars = extractVarNames(current, binst);
+    	      if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
       txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
       specCount++;
       return addSpeculationNode(current, condition, isInternal, false);
+    	      }
+    	      else {
+    	              specCloseCount++;
+    	            }
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -1502,14 +1526,26 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
-      return addSpeculationNode(current, condition, isInternal, true);
+    	std::set<std::string> vars = extractVarNames(current, binst);
+    	if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+    		return addSpeculationNode(current, condition, isInternal, true);
+    	}
+    	else {
+    		specCloseCount++;
+    	}
     }
     return StatePair(&current, 0);
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
-      return addSpeculationNode(current, condition, isInternal, false);
+    	std::set<std::string> vars = extractVarNames(current, binst);
+    	if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+    		return addSpeculationNode(current, condition, isInternal, false);
+    	}
+    	else {
+    		specCloseCount++;
+    	}
     }
     return StatePair(0, &current);
   }
@@ -1532,9 +1568,14 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
-
-      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-      return addSpeculationNode(current, condition, isInternal, true);
+    	std::set<std::string> vars = extractVarNames(current, binst);
+    		if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+    			txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+    			return addSpeculationNode(current, condition, isInternal, true);
+    		}
+    		else {
+    			specCloseCount++;
+    	      	  }
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -1562,8 +1603,14 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
       // keep unsat core & increase spec counting
-      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-      return addSpeculationNode(current, condition, isInternal, false);
+    	std::set<std::string> vars = extractVarNames(current, binst);
+    	if (TxSpeculativeRun::isSpec(vars, bbOrderToSpecAvoid)) {
+    		txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+    		return addSpeculationNode(current, condition, isInternal, false);
+    	}
+    	else {
+    		specCloseCount++;
+    	}
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -2367,6 +2414,14 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // add to visited BB
       // This is disabled to not to count blocks in speculation subtree
       // visitedBlocks.insert(currentBB);
+
+      if (fBBOrder.find(currentBB->getParent()) != fBBOrder.end() &&
+    		  fBBOrder.find(currentBB->getParent())->second.find(currentBB) !=
+    				  fBBOrder.find(currentBB->getParent())->second.end()) {
+    	  int curOrder = fBBOrder[currentBB->getParent()][currentBB];
+    	  bbOrderToSpecAvoid.erase(curOrder);
+      }
+
       specFail++;
       speculativeBackJump(state);
       return;
@@ -3839,6 +3894,33 @@ Executor::readBBSpecAvoid(std::string fileName) {
   return std::make_pair(bb, avoid);
 }
 
+std::set<llvm::BasicBlock *> Executor::readVisitedBB(std::string fileName) {
+  std::set<int> bbs;
+  std::ifstream in(fileName.c_str());
+  std::string str;
+  while (std::getline(in, str)) {
+    if (!TxSpeculativeRun::trim(str).empty()) {
+      int bb = atoi(str.c_str());
+      bbs.insert(bb);
+    }
+  }
+  in.close();
+  std::set<llvm::BasicBlock *> res;
+  for (std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> >::iterator
+           it = fBBOrder.begin(),
+           ie = fBBOrder.end();
+       it != ie; ++it) {
+    for (std::map<llvm::BasicBlock *, int>::iterator it1 = it->second.begin(),
+                                                     ie1 = it->second.end();
+         it1 != ie1; ++it1) {
+      if (bbs.find(it1->second) != bbs.end()) {
+        res.insert(it1->first);
+      }
+    }
+  }
+  return res;
+}
+
 void Executor::run(ExecutionState &initialState) {
 
   specCount = 0;
@@ -3879,6 +3961,12 @@ void Executor::run(ExecutionState &initialState) {
       }
     }
   }
+
+  llvm::errs() << "allBlockCount: " << allBlockCount << "\n";
+
+    // load avoid BB
+    bbOrderToSpecAvoid = readBBOrderToSpecAvoid(".");
+    visitedBlocks = readVisitedBB("InitialVisitedBB.txt");
 
   // first BB of main()
   KInstruction *ki = initialState.pc;

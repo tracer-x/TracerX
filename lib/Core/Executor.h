@@ -112,6 +112,9 @@ public:
                                                           // revisited & no
                                                           // interpolant
   unsigned int specLimit;
+  std::set<std::string> specAvoid;
+  std::map<int, std::set<std::string> > bbOrderToSpecAvoid;
+
   uintptr_t prevNodeSequence;
   double totalSpecFailTime;
   clock_t start, end;
@@ -258,6 +261,7 @@ private:
   std::map<int, std::set<std::string> >
   readBBOrderToSpecAvoid(std::string folderName);
   std::pair<int, std::set<std::string> > readBBSpecAvoid(std::string fileName);
+  std::set<llvm::BasicBlock *> readVisitedBB(std::string fileName);
 
   // Given a concrete object in our [klee's] address space, add it to
   // objects checked code can reference.
