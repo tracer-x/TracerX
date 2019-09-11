@@ -1632,6 +1632,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 }
 
 void Executor::speculativeBackJump(ExecutionState &current) {
+
+  double thisSpecTreeTime = *(current.txTreeNode->specTime);
   // identify the speculation root
   TxTreeNode *currentNode = current.txTreeNode;
   TxTreeNode *parent = currentNode->getParent();
@@ -1677,6 +1679,12 @@ void Executor::speculativeBackJump(ExecutionState &current) {
     if (&current != *it)
       delete *it;
   }
+  // this count is for the fail node in spec tree
+  end = clock();
+  thisSpecTreeTime += (double(end - start));
+
+  // add fail time for spec subtree
+  totalSpecFailTime += thisSpecTreeTime;
 }
 
 std::vector<TxTreeNode *> Executor::collectSpeculationNodes(TxTreeNode *root) {
