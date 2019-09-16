@@ -102,23 +102,11 @@ public:
   std::string interestedSourceFileName;
   std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> > fBBOrder;
 
-  int specCount;
-  int specCloseCount;
-  int specFail;
-  std::map<uintptr_t, unsigned int> specFailNew;     // fail because of new BB
-  std::map<uintptr_t, unsigned int> specFailNoInter; // fail because of new BB &
-                                                     // no interpolant
-  std::map<uintptr_t, unsigned int> specRevisited; // fail because of revisited
-  std::map<uintptr_t, unsigned int> specRevisitedNoInter; // // fail because of
-                                                          // revisited & no
-                                                          // interpolant
-  unsigned int specLimit;
-  std::set<std::string> specAvoid;
+  int independenceYes;
+  int independenceNo;
+
   std::map<int, std::set<std::string> > bbOrderToSpecAvoid;
   uintptr_t prevNodeSequence;
-  double totalSpecFailTime;
-  clock_t start, end;
-  bool isFail;
 
   class Timer {
   public:
@@ -355,22 +343,6 @@ private:
 
   std::set<std::string> extractVarNames(ExecutionState &current,
                                         llvm::Value *v);
-
-  // Generally the nodes are in normal mode. In case an infeasible path
-  // is found, an speculation node is generated for the infeasible path
-  // excluding the last constraint and the execution of the speculation
-  // node will be continued in speculationFork.
-  StatePair addSpeculationNode(ExecutionState &current, ref<Expr> condition,
-                               bool isInternal, bool falseBranchIsInfeasible);
-
-  void speculativeBackJump(ExecutionState &current);
-  bool checkSpeculation(ExecutionState &current);
-
-  std::vector<TxTreeNode *> collectSpeculationNodes(TxTreeNode *);
-
-  // Speculation fork performs fork in the speculation mode.
-  StatePair speculationFork(ExecutionState &current, ref<Expr> condition,
-                            bool isInternal);
 
   /// Add the given (boolean) condition as a constraint on state. This
   /// function is a wrapper around the state's addConstraint function

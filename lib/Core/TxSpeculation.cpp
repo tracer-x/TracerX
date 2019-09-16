@@ -59,9 +59,9 @@ bool TxSpeculativeRun::isOverlap(std::set<std::string> &s1,
   return false;
 }
 
-bool
-TxSpeculativeRun::isSpec(std::set<std::string> &vars,
-                         std::map<int, std::set<std::string> > &avoidance) {
+bool TxSpeculativeRun::isIndependent(
+    std::set<std::string> &vars,
+    std::map<int, std::set<std::string> > &avoidance) {
   for (std::map<int, std::set<std::string> >::iterator it = avoidance.begin(),
                                                        ie = avoidance.end();
        it != ie; ++it) {
