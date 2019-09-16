@@ -2372,7 +2372,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     uintptr_t pp = state.txTreeNode->getProgramPoint();
     bool isPPVisited = (state.txTreeNode->visitedProgramPoints->find(pp) !=
                         state.txTreeNode->visitedProgramPoints->end());
-    if (isPPVisited) {
+    if (isPPVisited && specSnap != (int)visitedBlocks.size()) {
       // add to spec revisited statistic
       if (specRevisited.find(pp) != specRevisited.end()) {
         specRevisited[pp] = specRevisited[pp] + 1;
@@ -2388,6 +2388,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           specRevisitedNoInter[pp] = 1;
         }
       }
+      specSnap = visitedBlocks.size();
       specFail++;
       speculativeBackJump(state);
       return;
@@ -2398,7 +2399,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
     // check new BB
     llvm::BasicBlock *currentBB = state.txTreeNode->getBasicBlock();
-    if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
+    if (visitedBlocks.find(currentBB) == visitedBlocks.end() &&
+        specSnap != (int)visitedBlocks.size()) {
       if (specFailNew.find(pp) != specFailNew.end()) {
         specFailNew[pp] = specFailNew[pp] + 1;
       } else {
@@ -2416,6 +2418,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // add to visited BB
       // This is disabled to not to count blocks in speculation subtree
       // visitedBlocks.insert(currentBB);
+      specSnap = visitedBlocks.size();
       specFail++;
       speculativeBackJump(state);
       return;
@@ -3906,6 +3909,7 @@ void Executor::run(ExecutionState &initialState) {
 
   independenceYes = 0;
   independenceNo = 0;
+  specSnap = 0;
   specFail = 0;
   totalSpecFailTime = 0.0;
   startingBBPlottingTime = time(0);
@@ -4302,8 +4306,10 @@ void Executor::terminateStateOnError(ExecutionState &state,
       getLastNonKleeInternalInstruction(state, &lastInst);
 
   if (INTERPOLATION_ENABLED && Speculation &&
-      state.txTreeNode->isSpeculationNode()) {
+      state.txTreeNode->isSpeculationNode() &&
+      specSnap != (int)visitedBlocks.size()) {
     //    llvm::outs() << "=== start jumpback because of error \n";
+    specSnap = visitedBlocks.size();
     specFail++;
     speculativeBackJump(state);
     klee_message("ERROR: %s:%d: %s", ii.file.c_str(), ii.line, message.c_str());
