@@ -2356,7 +2356,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   // if this is starting a new BB then
   // check for non-linear & new BB in speculation mode
   if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode() &&
-      (i == &state.txTreeNode->getBasicBlock()->front())) {
+      (i == &state.txTreeNode->getBasicBlock()->front()) &&
+      specSnap != (int)visitedBlocks.size()) {
     // check non-linear
     uintptr_t pp = state.txTreeNode->getProgramPoint();
     bool isPPVisited = (state.txTreeNode->visitedProgramPoints->find(pp) !=
@@ -2377,6 +2378,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           specRevisitedNoInter[pp] = 1;
         }
       }
+      specSnap = visitedBlocks.size();
       specFail++;
       speculativeBackJump(state);
       return;
@@ -2413,6 +2415,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         bbOrderToSpecAvoid.erase(curOrder);
       }
 
+      specSnap = visitedBlocks.size();
       specFail++;
       speculativeBackJump(state);
       return;
@@ -3917,6 +3920,7 @@ void Executor::run(ExecutionState &initialState) {
   specCount = 0;
   specCloseCount = 0;
   specFail = 0;
+  specSnap = 0;
   specLimit = 200000;
   prevNodeSequence = 0;
   totalSpecFailTime = 0.0;
@@ -4316,8 +4320,10 @@ void Executor::terminateStateOnError(ExecutionState &state,
       getLastNonKleeInternalInstruction(state, &lastInst);
 
   if (INTERPOLATION_ENABLED && Speculation &&
-      state.txTreeNode->isSpeculationNode()) {
+      state.txTreeNode->isSpeculationNode() &&
+      specSnap != (int)visitedBlocks.size()) {
     //    llvm::outs() << "=== start jumpback because of error \n";
+    specSnap = visitedBlocks.size();
     specFail++;
     speculativeBackJump(state);
     klee_message("ERROR: %s:%d: %s", ii.file.c_str(), ii.line, message.c_str());
