@@ -34,8 +34,8 @@ public:
   static std::string WHITESPACE;
   static bool isStateSpeculable(ExecutionState &current);
 
-  static bool isSpec(std::set<std::string> &vars,
-                     std::map<int, std::set<std::string> > &avoidance);
+  static bool isIndependent(std::set<std::string> &vars,
+                            std::map<int, std::set<std::string> > &avoidance);
 
   static bool isOverlap(std::set<std::string> &s1, std::set<std::string> &s2);
 

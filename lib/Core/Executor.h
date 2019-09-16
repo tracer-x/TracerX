@@ -101,8 +101,9 @@ public:
   std::string interestedSourceFileName;
   std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> > fBBOrder;
 
-  int specCount;
-  int specCloseCount;
+  std::map<int, std::set<std::string> > bbOrderToSpecAvoid;
+  int independenceYes;
+  int independenceNo;
   int specFail;
   std::map<uintptr_t, unsigned int> specFailNew;     // fail because of new BB
   std::map<uintptr_t, unsigned int> specFailNoInter; // fail because of new BB &
@@ -111,8 +112,6 @@ public:
   std::map<uintptr_t, unsigned int> specRevisitedNoInter; // // fail because of
                                                           // revisited & no
                                                           // interpolant
-  unsigned int specLimit;
-  uintptr_t prevNodeSequence;
   double totalSpecFailTime;
   clock_t start, end;
   bool isFail;
@@ -254,10 +253,10 @@ private:
            (f->getName() != "mempcpy") && (f->getName() != "memset");
   }
 
-  std::set<std::string> readSpecAvoid(std::string fileName);
   std::map<int, std::set<std::string> >
   readBBOrderToSpecAvoid(std::string folderName);
   std::pair<int, std::set<std::string> > readBBSpecAvoid(std::string fileName);
+  std::set<llvm::BasicBlock *> readVisitedBB(std::string fileName);
 
   // Given a concrete object in our [klee's] address space, add it to
   // objects checked code can reference.
