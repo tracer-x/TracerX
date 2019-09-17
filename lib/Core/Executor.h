@@ -104,7 +104,8 @@ public:
   std::map<int, std::set<std::string> > bbOrderToSpecAvoid;
   int independenceYes;
   int independenceNo;
-  int specSnap;
+  //int specSnap;
+  std::map<std::string, unsigned int> specSnap;
   int specFail;
   std::map<uintptr_t, unsigned int> specFailNew;     // fail because of new BB
   std::map<uintptr_t, unsigned int> specFailNoInter; // fail because of new BB &
