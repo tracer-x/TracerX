@@ -1200,6 +1200,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
           return addSpeculationNode(current, condition, isInternal, true);
         } else {
           // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
           return StatePair(&current, 0);
         }
       }
@@ -1221,6 +1222,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
           return addSpeculationNode(current, condition, isInternal, false);
         } else {
           // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
           return StatePair(0, &current);
         }
       }
@@ -1252,9 +1254,17 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       } else {
         // save unsat core
         // open speculation & result may be success or fail
-        independenceNo++;
-        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-        return addSpeculationNode(current, condition, isInternal, true);
+        if (specSnap[current.txTreeNode->getBasicBlock()] !=
+            visitedBlocks.size()) {
+          independenceNo++;
+          specSnap[current.txTreeNode->getBasicBlock()] = visitedBlocks.size();
+          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+          return addSpeculationNode(current, condition, isInternal, true);
+        } else {
+          // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(&current, 0);
+        }
       }
     }
 
@@ -1285,9 +1295,17 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       } else {
         // save unsat core
         // open speculation & result may be success or fail
-        independenceNo++;
-        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-        return addSpeculationNode(current, condition, isInternal, false);
+        if (specSnap[current.txTreeNode->getBasicBlock()] !=
+            visitedBlocks.size()) {
+          independenceNo++;
+          specSnap[current.txTreeNode->getBasicBlock()] = visitedBlocks.size();
+          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+          return addSpeculationNode(current, condition, isInternal, false);
+        } else {
+          // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(0, &current);
+        }
       }
     }
 
@@ -1544,8 +1562,16 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         return StatePair(&current, 0);
       } else {
         // open speculation & result may be success or fail
-        independenceNo++;
-        return addSpeculationNode(current, condition, isInternal, true);
+        if (specSnap[current.txTreeNode->getBasicBlock()] !=
+            visitedBlocks.size()) {
+          independenceNo++;
+          specSnap[current.txTreeNode->getBasicBlock()] = visitedBlocks.size();
+          return addSpeculationNode(current, condition, isInternal, true);
+        } else {
+          // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(&current, 0);
+        }
       }
     }
     return StatePair(&current, 0);
@@ -1560,8 +1586,16 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         return StatePair(0, &current);
       } else {
         // open speculation & result may be success or fail
-        independenceNo++;
-        return addSpeculationNode(current, condition, isInternal, false);
+        if (specSnap[current.txTreeNode->getBasicBlock()] !=
+            visitedBlocks.size()) {
+          independenceNo++;
+          specSnap[current.txTreeNode->getBasicBlock()] = visitedBlocks.size();
+          return addSpeculationNode(current, condition, isInternal, false);
+        } else {
+          // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(0, &current);
+        }
       }
     }
     return StatePair(0, &current);
@@ -1589,9 +1623,17 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       } else {
         // save unsat core
         // open speculation & result may be success or fail
-        independenceNo++;
-        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-        return addSpeculationNode(current, condition, isInternal, true);
+        if (specSnap[current.txTreeNode->getBasicBlock()] !=
+            visitedBlocks.size()) {
+          independenceNo++;
+          specSnap[current.txTreeNode->getBasicBlock()] = visitedBlocks.size();
+          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+          return addSpeculationNode(current, condition, isInternal, true);
+        } else {
+          // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(&current, 0);
+        }
       }
     }
 
@@ -1624,9 +1666,17 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       } else {
         // save unsat core
         // open speculation & result may be success or fail
-        independenceNo++;
-        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-        return addSpeculationNode(current, condition, isInternal, false);
+        if (specSnap[current.txTreeNode->getBasicBlock()] !=
+            visitedBlocks.size()) {
+          independenceNo++;
+          specSnap[current.txTreeNode->getBasicBlock()] = visitedBlocks.size();
+          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+          return addSpeculationNode(current, condition, isInternal, false);
+        } else {
+          // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(0, &current);
+        }
       }
     }
 
