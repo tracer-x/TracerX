@@ -1196,7 +1196,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
           independenceNo++;
-          specSnap[current.txTreeNode->getBasicBlock()] = visitedBlocks.size();
+
           return addSpeculationNode(current, condition, isInternal, true);
         } else {
           // then close speculation & do marking as deletion
@@ -1218,7 +1218,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
           independenceNo++;
-          specSnap[current.txTreeNode->getBasicBlock()] = visitedBlocks.size();
+
           return addSpeculationNode(current, condition, isInternal, false);
         } else {
           // then close speculation & do marking as deletion
@@ -1257,7 +1257,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
           independenceNo++;
-          specSnap[current.txTreeNode->getBasicBlock()] = visitedBlocks.size();
+
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, isInternal, true);
         } else {
@@ -1298,7 +1298,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
           independenceNo++;
-          specSnap[current.txTreeNode->getBasicBlock()] = visitedBlocks.size();
+
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, isInternal, false);
         } else {
@@ -1565,7 +1565,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
           independenceNo++;
-          specSnap[current.txTreeNode->getBasicBlock()] = visitedBlocks.size();
+
           return addSpeculationNode(current, condition, isInternal, true);
         } else {
           // then close speculation & do marking as deletion
@@ -1589,7 +1589,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
           independenceNo++;
-          specSnap[current.txTreeNode->getBasicBlock()] = visitedBlocks.size();
+
           return addSpeculationNode(current, condition, isInternal, false);
         } else {
           // then close speculation & do marking as deletion
@@ -1626,7 +1626,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
           independenceNo++;
-          specSnap[current.txTreeNode->getBasicBlock()] = visitedBlocks.size();
+
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, isInternal, true);
         } else {
@@ -1669,7 +1669,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
           independenceNo++;
-          specSnap[current.txTreeNode->getBasicBlock()] = visitedBlocks.size();
+
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, isInternal, false);
         } else {
@@ -2454,7 +2454,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           specRevisitedNoInter[pp] = 1;
         }
       }
-
+      specSnap[state.txTreeNode->getBasicBlock()] = visitedBlocks.size();
       specFail++;
       speculativeBackJump(state);
       return;
@@ -2483,7 +2483,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // add to visited BB
       // This is disabled to not to count blocks in speculation subtree
       // visitedBlocks.insert(currentBB);
-
+      specSnap[state.txTreeNode->getBasicBlock()] = visitedBlocks.size();
       specFail++;
       speculativeBackJump(state);
       return;
@@ -4376,6 +4376,7 @@ void Executor::terminateStateOnError(ExecutionState &state,
   if (INTERPOLATION_ENABLED && Speculation &&
       state.txTreeNode->isSpeculationNode()) {
     //    llvm::outs() << "=== start jumpback because of error \n";
+    specSnap[state.txTreeNode->getBasicBlock()] = visitedBlocks.size();
     specFail++;
     speculativeBackJump(state);
     klee_message("ERROR: %s:%d: %s", ii.file.c_str(), ii.line, message.c_str());
