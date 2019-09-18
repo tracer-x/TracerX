@@ -108,7 +108,7 @@ public:
   int dynamicNo;
 
   // int specSnap;
-  std::map<llvm::BasicBlock *, unsigned int> specSnap;
+  std::map<llvm::Instruction *, unsigned int> specSnap;
   int specFail;
   std::map<uintptr_t, unsigned int> specFailNew;     // fail because of new BB
   std::map<uintptr_t, unsigned int> specFailNoInter; // fail because of new BB &

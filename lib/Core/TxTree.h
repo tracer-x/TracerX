@@ -377,7 +377,7 @@ class TxTreeNode {
   // path
   TimingSolver *speculationSolver;
 
-  llvm::BranchInst *speculationBInst;
+
 
   // \brief Used to identify if the node is in the speculation mode
   bool speculationFlag;
@@ -464,6 +464,7 @@ public:
   // and in case speculation is failed it's used to do marking related to
   // the infeasible path
   std::vector<ref<Expr> > speculationUnsatCore;
+  llvm::BranchInst *speculationBInst;
   void mark();
 
   /// \brief The entry call history

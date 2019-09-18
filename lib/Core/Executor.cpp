@@ -1180,8 +1180,6 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
   llvm::BranchInst *binst =
       llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
-  llvm::errs() << "SNAP TAKEN..."
-               << specSnap[current.txTreeNode->getBasicBlock()] << "\n";
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
@@ -1194,8 +1192,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       } else {
         // open speculation & result may be success or fail and Now second check
         independenceNo++;
-        if (specSnap[current.txTreeNode->getBasicBlock()] !=
-            visitedBlocks.size()) {
+        if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
           return addSpeculationNode(current, condition, isInternal, true);
         } else {
@@ -1217,9 +1214,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       } else {
         independenceNo++;
         // open speculation & result may be success or fail and Now second check
-        if (specSnap[current.txTreeNode->getBasicBlock()] !=
-            visitedBlocks.size()) {
-
+        if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
           return addSpeculationNode(current, condition, isInternal, false);
         } else {
@@ -1258,9 +1253,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         independenceNo++;
         // save unsat core
         // open speculation & result may be success or fail
-        if (specSnap[current.txTreeNode->getBasicBlock()] !=
-            visitedBlocks.size()) {
-
+        if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, isInternal, true);
@@ -1301,9 +1294,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         independenceNo++;
         // save unsat core
         // open speculation & result may be success or fail
-        if (specSnap[current.txTreeNode->getBasicBlock()] !=
-            visitedBlocks.size()) {
-
+        if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, isInternal, false);
@@ -1570,9 +1561,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       } else {
         independenceNo++;
         // open speculation & result may be success or fail
-        if (specSnap[current.txTreeNode->getBasicBlock()] !=
-            visitedBlocks.size()) {
-
+        if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
           return addSpeculationNode(current, condition, isInternal, true);
         } else {
@@ -1587,7 +1576,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-
       std::set<std::string> vars = extractVarNames(current, binst);
       if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
         // open speculation & assume success
@@ -1596,9 +1584,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       } else {
         independenceNo++;
         // open speculation & result may be success or fail
-        if (specSnap[current.txTreeNode->getBasicBlock()] !=
-            visitedBlocks.size()) {
-
+        if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
           return addSpeculationNode(current, condition, isInternal, false);
         } else {
@@ -1635,9 +1621,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         independenceNo++;
         // save unsat core
         // open speculation & result may be success or fail
-        if (specSnap[current.txTreeNode->getBasicBlock()] !=
-            visitedBlocks.size()) {
-
+        if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, isInternal, true);
@@ -1680,9 +1664,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         independenceNo++;
         // save unsat core
         // open speculation & result may be success or fail
-        if (specSnap[current.txTreeNode->getBasicBlock()] !=
-            visitedBlocks.size()) {
-
+        if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, isInternal, false);
@@ -1773,6 +1755,7 @@ void Executor::speculativeBackJump(ExecutionState &current) {
 
   // interpolant marking on parent node
   if (parent && !parent->speculationUnsatCore.empty()) {
+    specSnap[parent->speculationBInst] = visitedBlocks.size();
     parent->mark();
   }
 
@@ -2443,8 +2426,6 @@ static inline const llvm::fltSemantics *fpWidthToSemantics(unsigned width) {
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
-  // llvm::errs() << "SNAP TAKEN..." <<
-  // specSnap[state.txTreeNode->getBasicBlock()] << "\n";
   // if this is starting a new BB then
   // check for non-linear & new BB in speculation mode
   if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode() &&
@@ -2469,7 +2450,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           specRevisitedNoInter[pp] = 1;
         }
       }
-      specSnap[state.txTreeNode->getBasicBlock()] = visitedBlocks.size();
       specFail++;
       speculativeBackJump(state);
       return;
@@ -2498,7 +2478,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // add to visited BB
       // This is disabled to not to count blocks in speculation subtree
       // visitedBlocks.insert(currentBB);
-      specSnap[state.txTreeNode->getBasicBlock()] = visitedBlocks.size();
       specFail++;
       speculativeBackJump(state);
       return;
@@ -3994,7 +3973,7 @@ void Executor::run(ExecutionState &initialState) {
   specFail = 0;
   totalSpecFailTime = 0.0;
   startingBBPlottingTime = time(0);
-  for (std::map<llvm::BasicBlock *, unsigned int>::iterator
+  for (std::map<llvm::Instruction *, unsigned int>::iterator
            it = specSnap.begin(),
            ie = specSnap.end();
        it != ie; ++it) {
@@ -4393,7 +4372,6 @@ void Executor::terminateStateOnError(ExecutionState &state,
   if (INTERPOLATION_ENABLED && Speculation &&
       state.txTreeNode->isSpeculationNode()) {
     //    llvm::outs() << "=== start jumpback because of error \n";
-    specSnap[state.txTreeNode->getBasicBlock()] = visitedBlocks.size();
     specFail++;
     speculativeBackJump(state);
     klee_message("ERROR: %s:%d: %s", ii.file.c_str(), ii.line, message.c_str());
