@@ -1193,12 +1193,13 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         return StatePair(&current, 0);
       } else {
         // open speculation & result may be success or fail and Now second check
+        independenceNo++;
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
-          independenceNo++;
-
+          dynamicYes++;
           return addSpeculationNode(current, condition, isInternal, true);
         } else {
+          dynamicNo++;
           // then close speculation & do marking as deletion
           txTree->markPathCondition(current, unsatCore);
           return StatePair(&current, 0);
@@ -1214,13 +1215,15 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         independenceYes++;
         return StatePair(0, &current);
       } else {
+        independenceNo++;
         // open speculation & result may be success or fail and Now second check
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
-          independenceNo++;
 
+          dynamicYes++;
           return addSpeculationNode(current, condition, isInternal, false);
         } else {
+          dynamicNo++;
           // then close speculation & do marking as deletion
           txTree->markPathCondition(current, unsatCore);
           return StatePair(0, &current);
@@ -1252,15 +1255,17 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         independenceYes++;
         return StatePair(&current, 0);
       } else {
+        independenceNo++;
         // save unsat core
         // open speculation & result may be success or fail
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
-          independenceNo++;
 
+          dynamicYes++;
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, isInternal, true);
         } else {
+          dynamicNo++;
           // then close speculation & do marking as deletion
           txTree->markPathCondition(current, unsatCore);
           return StatePair(&current, 0);
@@ -1293,15 +1298,17 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         independenceYes++;
         return StatePair(0, &current);
       } else {
+        independenceNo++;
         // save unsat core
         // open speculation & result may be success or fail
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
-          independenceNo++;
 
+          dynamicYes++;
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, isInternal, false);
         } else {
+          dynamicNo++;
           // then close speculation & do marking as deletion
           txTree->markPathCondition(current, unsatCore);
           return StatePair(0, &current);
@@ -1561,13 +1568,15 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         independenceYes++;
         return StatePair(&current, 0);
       } else {
+        independenceNo++;
         // open speculation & result may be success or fail
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
-          independenceNo++;
 
+          dynamicYes++;
           return addSpeculationNode(current, condition, isInternal, true);
         } else {
+          dynamicNo++;
           // then close speculation & do marking as deletion
           txTree->markPathCondition(current, unsatCore);
           return StatePair(&current, 0);
@@ -1585,13 +1594,15 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         independenceYes++;
         return StatePair(0, &current);
       } else {
+        independenceNo++;
         // open speculation & result may be success or fail
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
-          independenceNo++;
 
+          dynamicYes++;
           return addSpeculationNode(current, condition, isInternal, false);
         } else {
+          dynamicNo++;
           // then close speculation & do marking as deletion
           txTree->markPathCondition(current, unsatCore);
           return StatePair(0, &current);
@@ -1621,15 +1632,17 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         independenceYes++;
         return StatePair(&current, 0);
       } else {
+        independenceNo++;
         // save unsat core
         // open speculation & result may be success or fail
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
-          independenceNo++;
 
+          dynamicYes++;
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, isInternal, true);
         } else {
+          dynamicNo++;
           // then close speculation & do marking as deletion
           txTree->markPathCondition(current, unsatCore);
           return StatePair(&current, 0);
@@ -1664,15 +1677,17 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         independenceYes++;
         return StatePair(0, &current);
       } else {
+        independenceNo++;
         // save unsat core
         // open speculation & result may be success or fail
         if (specSnap[current.txTreeNode->getBasicBlock()] !=
             visitedBlocks.size()) {
-          independenceNo++;
 
+          dynamicYes++;
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, isInternal, false);
         } else {
+          dynamicNo++;
           // then close speculation & do marking as deletion
           txTree->markPathCondition(current, unsatCore);
           return StatePair(0, &current);
@@ -3974,6 +3989,8 @@ void Executor::run(ExecutionState &initialState) {
 
   independenceYes = 0;
   independenceNo = 0;
+  dynamicYes = 0;
+  dynamicNo = 0;
   specFail = 0;
   totalSpecFailTime = 0.0;
   startingBBPlottingTime = time(0);
@@ -5135,9 +5152,12 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 
     outSpec << "Total Independence Yes: " << independenceYes << "\n";
     outSpec << "Total Independence No: " << independenceNo << "\n";
-    outSpec << "Total Independence No & Success: "
-            << (independenceNo - specFail) << "\n";
-    outSpec << "Total Independence No & Fail: " << specFail << "\n";
+    outSpec << "Total Dynamic Yes: " << dynamicYes << "\n";
+    outSpec << "Total Dynamic No: " << dynamicNo << "\n";
+    outSpec << "Total Independence No, Dynamic Yes & Success: "
+            << (dynamicYes - specFail) << "\n";
+    outSpec << "Total Independence No, Dynamic Yes & Fail: " << specFail
+            << "\n";
 
     // total fail
     // new

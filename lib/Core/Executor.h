@@ -104,6 +104,9 @@ public:
   std::map<int, std::set<std::string> > bbOrderToSpecAvoid;
   int independenceYes;
   int independenceNo;
+  int dynamicYes;
+  int dynamicNo;
+
   // int specSnap;
   std::map<llvm::BasicBlock *, unsigned int> specSnap;
   int specFail;
