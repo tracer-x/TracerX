@@ -1686,8 +1686,19 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         llvm::GetElementPtrInst *parentGEP =
             dyn_cast<llvm::GetElementPtrInst>(i->getOperand(1));
         std::pair<ref<Expr>, ref<Expr> > pair = getPointer(parentGEP);
+        if (pair.first.isNull()) {
+          WPExpr = pair.first;
+          return WPExpr;
+        }
+        if (pair.second.isNull()) {
+          WPExpr = pair.second;
+          return WPExpr;
+        }
+
         // If WPExpr has connection with array, replace by the UpdateExpr
         ref<Expr> val = this->generateExprFromOperand(i->getOperand(0));
+        if (val.isNull())
+          return val;
         ref<Expr> update = UpdExpr::create(pair.second, pair.first, val);
         //        llvm::outs() << "****** Flag = 0 for Update Array *******\n";
         //        i->dump();
@@ -1739,7 +1750,11 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
       llvm::GetElementPtrInst *parentGEP =
           dyn_cast<llvm::GetElementPtrInst>(inst->getOperand(0));
       std::pair<ref<Expr>, ref<Expr> > pair = getPointer(parentGEP);
-      ret = SelExpr::create(pair.second, pair.first);
+
+      if (!pair.first.isNull())
+        ret = SelExpr::create(pair.second, pair.first);
+      else
+        ret = pair.first;
     } else {
       ret = getLoad(inst);
     }
@@ -1843,11 +1858,15 @@ ref<Expr> TxWeakestPreCondition::getConstantInt(llvm::ConstantInt *CI) {
 
 ref<Expr> TxWeakestPreCondition::getConstantExpr(llvm::ConstantExpr *ce) {
   ref<Expr> result;
-  //  klee_warning("PUSHUP2");
+  klee_warning("PUSHUP1");
+  return result;
+
   switch (ce->getOpcode()) {
   case llvm::Instruction::GetElementPtr: {
     // generate index expression
     ref<Expr> idx = generateExprFromOperand(ce->getOperand(2));
+    if (idx.isNull())
+      return idx;
     unsigned width = idx->getWidth();
     unsigned dimension = ce->getNumOperands() - 2;
     llvm::ArrayType *at = dyn_cast<llvm::ArrayType>(dyn_cast<llvm::PointerType>(
@@ -1856,14 +1875,17 @@ ref<Expr> TxWeakestPreCondition::getConstantExpr(llvm::ConstantExpr *ce) {
       at = dyn_cast<llvm::ArrayType>(at->getElementType());
       ref<Expr> tmp1 = ConstantExpr::create(at->getNumElements(), width);
       ref<Expr> tmp2 = generateExprFromOperand(ce->getOperand(3 + i));
+      if (tmp2.isNull())
+        return tmp2;
       idx = AddExpr::create(MulExpr::create(tmp1, idx), tmp2);
     }
 
     // generate array expression
     ref<Expr> arr = generateExprFromOperand(ce->getOperand(0));
+    if (arr.isNull())
+      return arr;
     result = SelExpr::create(arr, idx);
     //    result->dump();
-    //    klee_warning("PUSHUP2");
     break;
   }
   default: {
@@ -1889,6 +1911,8 @@ ref<Expr> TxWeakestPreCondition::getGlobalValue(llvm::GlobalValue *gv) {
 ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
   unsigned width;
   ref<Expr> index, result;
+  klee_warning("PUSHUP2");
+  return result;
   width = getFunctionArgumentSize(arg);
   index = ConstantExpr::create(0, width);
   result = WPVarExpr::create(arg, arg->getName(), index);
@@ -1898,11 +1922,15 @@ ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
 std::pair<ref<Expr>, ref<Expr> >
 TxWeakestPreCondition::getPointer(llvm::GetElementPtrInst *gep) {
   std::pair<ref<Expr>, ref<Expr> > pair;
+  klee_warning("PUSHUP3");
+  return pair;
   if (isa<llvm::GetElementPtrInst>(gep->getOperand(0))) {
     llvm::GetElementPtrInst *parentGEP =
         dyn_cast<llvm::GetElementPtrInst>(gep->getOperand(0));
     std::pair<ref<Expr>, ref<Expr> > parentPair = getPointer(parentGEP);
     ref<Expr> offset = this->generateExprFromOperand(gep->getOperand(2));
+    if (offset.isNull())
+      return pair;
     unsigned width = getGepSize(gep->getType());
     llvm::PointerType *pt =
         dyn_cast<llvm::PointerType>(gep->getOperand(0)->getType());
@@ -1941,7 +1969,7 @@ TxWeakestPreCondition::getPointer(llvm::GetElementPtrInst *gep) {
 
 ref<Expr> TxWeakestPreCondition::getLoadGep(llvm::LoadInst *p) {
   ref<Expr> result;
-  klee_warning("PUSHUP6");
+  klee_warning("PUSHUP4");
   return result;
 }
 
@@ -2111,9 +2139,9 @@ ref<Expr> TxWeakestPreCondition::getCmpCondition(llvm::CmpInst *cmp) {
   ref<Expr> result;
   ref<Expr> left = this->generateExprFromOperand(cmp->getOperand(0));
   ref<Expr> right = this->generateExprFromOperand(cmp->getOperand(1));
-
   if (left.isNull() || right.isNull())
     return result;
+
   if (left->getWidth() > right->getWidth())
     right = ZExtExpr::create(right, left->getWidth());
   else if (left->getWidth() < right->getWidth())
@@ -2222,19 +2250,19 @@ ref<Expr> TxWeakestPreCondition::getGepInst(llvm::GetElementPtrInst *gep) {
 
 
   }*/
-  klee_warning("PUSHUP10");
+  klee_warning("PUSHUP5");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getSwitchInst(llvm::SwitchInst *si) {
   ref<Expr> result;
-  klee_warning("PUSHUP11");
+  klee_warning("PUSHUP6");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getPhiInst(llvm::PHINode *phi) {
   ref<Expr> result;
-  klee_warning("PUSHUP12");
+  klee_warning("PUSHUP7");
   return result;
 }
 
@@ -2278,7 +2306,7 @@ bool TxWeakestPreCondition::inFunction(llvm::Instruction *ins,
 
 ref<Expr> TxWeakestPreCondition::getCallAssume(llvm::CallInst *ci) {
   ref<Expr> result;
-  klee_warning("PUSHUP14");
+  klee_warning("PUSHUP8");
   return result;
 }
 
