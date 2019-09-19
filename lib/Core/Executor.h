@@ -362,7 +362,8 @@ private:
   // excluding the last constraint and the execution of the speculation
   // node will be continued in speculationFork.
   StatePair addSpeculationNode(ExecutionState &current, ref<Expr> condition,
-                               bool isInternal, bool falseBranchIsInfeasible);
+                               llvm::Instruction *binst, bool isInternal,
+                               bool falseBranchIsInfeasible);
 
   void speculativeBackJump(ExecutionState &current);
   bool checkSpeculation(ExecutionState &current);

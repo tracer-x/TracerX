@@ -1194,7 +1194,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         independenceNo++;
         if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
-          return addSpeculationNode(current, condition, isInternal, true);
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    true);
         } else {
           dynamicNo++;
           // then close speculation & do marking as deletion
@@ -1216,7 +1217,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         // open speculation & result may be success or fail and Now second check
         if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
-          return addSpeculationNode(current, condition, isInternal, false);
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    false);
         } else {
           dynamicNo++;
           // then close speculation & do marking as deletion
@@ -1256,7 +1258,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-          return addSpeculationNode(current, condition, isInternal, true);
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    true);
         } else {
           dynamicNo++;
           // then close speculation & do marking as deletion
@@ -1297,7 +1300,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-          return addSpeculationNode(current, condition, isInternal, false);
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    false);
         } else {
           dynamicNo++;
           // then close speculation & do marking as deletion
@@ -1408,8 +1412,10 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
 Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
                                                  ref<Expr> condition,
+                                                 llvm::Instruction *binst,
                                                  bool isInternal,
                                                  bool falseBranchIsInfeasible) {
+  current.txTreeNode->secondCheckInst = binst;
   if (falseBranchIsInfeasible == true) {
     // At this point the speculation node should be created and
     // added to the working list in a way that its speculated
@@ -1563,7 +1569,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         // open speculation & result may be success or fail
         if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
-          return addSpeculationNode(current, condition, isInternal, true);
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    true);
         } else {
           dynamicNo++;
           // then close speculation & do marking as deletion
@@ -1586,7 +1593,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         // open speculation & result may be success or fail
         if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
-          return addSpeculationNode(current, condition, isInternal, false);
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    false);
         } else {
           dynamicNo++;
           // then close speculation & do marking as deletion
@@ -1624,7 +1632,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-          return addSpeculationNode(current, condition, isInternal, true);
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    true);
         } else {
           dynamicNo++;
           // then close speculation & do marking as deletion
@@ -1667,7 +1676,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         if (specSnap[binst] != visitedBlocks.size()) {
           dynamicYes++;
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-          return addSpeculationNode(current, condition, isInternal, false);
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    false);
         } else {
           dynamicNo++;
           // then close speculation & do marking as deletion
@@ -1755,9 +1765,9 @@ void Executor::speculativeBackJump(ExecutionState &current) {
 
   // interpolant marking on parent node
   if (parent && !parent->speculationUnsatCore.empty()) {
-    specSnap[parent->speculationBInst] = visitedBlocks.size();
     parent->mark();
   }
+  specSnap[parent->secondCheckInst] = visitedBlocks.size();
 
   // collect & mark speculation fail all nodes in the sub tree
   std::vector<TxTreeNode *> deletedNodes = collectSpeculationNodes(currentNode);
