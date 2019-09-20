@@ -1527,32 +1527,18 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(&current, 0);
-      } else {
-        // open speculation & result may be success or fail
-        independenceNo++;
-        return addSpeculationNode(current, condition, isInternal, true);
-      }
+
+      // open speculation & result may be success or fail
+
+      return addSpeculationNode(current, condition, isInternal, true);
     }
     return StatePair(&current, 0);
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
 
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(0, &current);
-      } else {
-        // open speculation & result may be success or fail
-        independenceNo++;
-        return addSpeculationNode(current, condition, isInternal, false);
-      }
+      // open speculation & result may be success or fail
+      return addSpeculationNode(current, condition, isInternal, false);
     }
     return StatePair(0, &current);
   }
@@ -1571,18 +1557,12 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     }
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(&current, 0);
-      } else {
-        // save unsat core
-        // open speculation & result may be success or fail
-        independenceNo++;
-        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-        return addSpeculationNode(current, condition, isInternal, true);
-      }
+
+      // save unsat core
+      // open speculation & result may be success or fail
+
+      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+      return addSpeculationNode(current, condition, isInternal, true);
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -1606,18 +1586,12 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(0, &current);
-      } else {
-        // save unsat core
-        // open speculation & result may be success or fail
-        independenceNo++;
-        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-        return addSpeculationNode(current, condition, isInternal, false);
-      }
+
+      // save unsat core
+      // open speculation & result may be success or fail
+
+      txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+      return addSpeculationNode(current, condition, isInternal, false);
     }
 
     if (INTERPOLATION_ENABLED) {
