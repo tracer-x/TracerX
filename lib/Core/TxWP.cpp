@@ -1173,6 +1173,7 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
     entry->setInterpolant(TxPartitionHelper::createAnd(newpiComps));
 
   // update miu by (miu, v1star)
+  std::set<ref<TxAllocationContext> > dels;
   for (TxStore::TopInterpolantStore::iterator
            it1 = concretelyAddressedStore.begin(),
            ie1 = concretelyAddressedStore.end();
@@ -1183,11 +1184,15 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
       std::set<std::string> right = TxPartitionHelper::getExprVars(
           it1->second.begin()->second->getExpression());
       tmp.insert(right.begin(), right.end());
-
       if (!TxPartitionHelper::isShared(tmp, v1star)) {
-        concretelyAddressedStore.erase(it1);
+        dels.insert(it1->first);
       }
     }
+  }
+  for (std::set<ref<TxAllocationContext> >::iterator it = dels.begin(),
+                                                     ie = dels.end();
+       it != ie; ++it) {
+    concretelyAddressedStore.erase((*it));
   }
 
   entry->setConcretelyAddressedStore(concretelyAddressedStore);
@@ -1733,6 +1738,9 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
   if (isa<llvm::ConstantInt>(val)) {
     llvm::ConstantInt *constInt = dyn_cast<llvm::ConstantInt>(val);
     ret = getConstantInt(constInt);
+  } else if (isa<llvm::ConstantFP>(val)) {
+    llvm::ConstantFP *constFP = dyn_cast<llvm::ConstantFP>(val);
+    ret = getConstantFP(constFP);
   } else if (isa<llvm::GlobalValue>(val)) {
     llvm::GlobalValue *gv = dyn_cast<llvm::GlobalValue>(val);
     ret = getGlobalValue(gv);
@@ -1853,6 +1861,13 @@ ref<Expr> TxWeakestPreCondition::getConstantInt(llvm::ConstantInt *CI) {
     result = ConstantExpr::create(CI->getZExtValue(), Expr::Int32);
   else
     result = ConstantExpr::create(CI->getZExtValue(), Expr::Int64);
+  return result;
+}
+
+ref<Expr> TxWeakestPreCondition::getConstantFP(llvm::ConstantFP *CI) {
+  ref<Expr> result;
+  klee_warning("Silently skipping WP (reason: Constant Floating Point): "
+               "TxWeakestPreCondition::getConstantFP");
   return result;
 }
 
@@ -2096,6 +2111,8 @@ ref<Expr> TxWeakestPreCondition::getCastInst(llvm::CastInst *ci) {
     width = Expr::Int32;
   else if (ci->getDestTy()->isIntegerTy(64))
     width = Expr::Int64;
+  else if (ci->getDestTy()->isDoubleTy())
+    width = Expr::Fl80;
   else {
     ci->getDestTy()->dump();
     klee_warning("TxWeakestPreCondition::getCastInst size not supported yet!");
@@ -2115,6 +2132,14 @@ ref<Expr> TxWeakestPreCondition::getCastInst(llvm::CastInst *ci) {
     result = ExtractExpr::create(arg1, 0, width);
     break;
   }
+  case llvm::Instruction::SIToFP:
+  case llvm::Instruction::UIToFP: {
+    // ci->dump();
+    klee_warning("Silently skipping WP (reason: SIToFP or UIToFP "
+                 "instructions): "
+                 "TxWeakestPreCondition::generateExprFromOperand\n");
+    return result;
+  }
   case llvm::Instruction::AddrSpaceCast:
   case llvm::Instruction::BitCast:
   case llvm::Instruction::FPExt:
@@ -2123,8 +2148,6 @@ ref<Expr> TxWeakestPreCondition::getCastInst(llvm::CastInst *ci) {
   case llvm::Instruction::FPTrunc:
   case llvm::Instruction::IntToPtr:
   case llvm::Instruction::PtrToInt:
-  case llvm::Instruction::SIToFP:
-  case llvm::Instruction::UIToFP:
   default: {
     ci->dump();
     klee_warning("TxWeakestPreCondition::generateExprFromOperand Unary Operand "

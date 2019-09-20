@@ -157,7 +157,10 @@ private:
   ref<Expr> getCondition(llvm::Value *value);
 
   // \brief Handling ConstantInt LLVM Value
-  ref<Expr> getConstantInt(llvm::ConstantInt *cmp);
+  ref<Expr> getConstantInt(llvm::ConstantInt *constantInt);
+
+  // \brief Handling ConstantFP LLVM Value
+  ref<Expr> getConstantFP(llvm::ConstantFP *constantFP);
 
   // \brief Handling ConstantExpr LLVM Value
   ref<Expr> getConstantExpr(llvm::ConstantExpr *ce);

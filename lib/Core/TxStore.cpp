@@ -311,17 +311,18 @@ TxStore::getAddressofLatestCopyLLVMValue(llvm::Value *val) {
       }
     }
   }
-  if (foundValue)
-    return address;
+
+  // Maybe NULL
+  return address;
 
   // Sanity Check
-  llvm::errs() << "LLVM Value:\n";
+  /*llvm::errs() << "LLVM Value:\n";
   val->dump();
   llvm::errs() << "Store:\n";
   this->dump();
   llvm::errs() << "TxStore::getAddressofLatestCopyLLVMValue LLVM::Value not "
-                  "found in store!";
-  exit(0);
+                  "found in store!\n";
+  exit(0);*/
 }
 
 inline void TxStore::concreteToInterpolant(

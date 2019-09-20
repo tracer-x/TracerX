@@ -805,6 +805,9 @@ bool TxSubsumptionTableEntry::subsumed(
         state.txTreeNode->instantiateWPatSubsumption(
             wpInterpolant, state.txTreeNode->getDependency());
 
+    if (wpInstantiatedInterpolant.isNull())
+      return false;
+
     ref<Expr> wpBoolean =
         ZExtExpr::create(wpInstantiatedInterpolant, Expr::Bool);
 
@@ -931,10 +934,11 @@ bool TxSubsumptionTableEntry::subsumed(
                    nodeSequenceNumber);
     }
 
-    if (WPInterpolant && !wpInterpolant.isNull())
+    if (WPInterpolant) {
       // In case a node is subsumed, the WP Expr is stored at the parent node.
       // This is crucial for generating WP Expr at the parent node.
       state.txTreeNode->setWPatSubsumption(wpInterpolant);
+    }
     return true;
   }
 
@@ -1439,10 +1443,11 @@ bool TxSubsumptionTableEntry::subsumed(
 
       interpolateValues(state, coreValues, corePointerValues,
                         debugSubsumptionLevel);
-      if (WPInterpolant && !wpInterpolant.isNull())
+      if (WPInterpolant) {
         // In case a node is subsumed, the WP Expr is stored at the parent node.
         // This is crucial for generating WP Expr at the parent node.
         state.txTreeNode->setWPatSubsumption(wpInterpolant);
+      }
       return true;
     }
 
@@ -1512,10 +1517,11 @@ bool TxSubsumptionTableEntry::subsumed(
                          state.txTreeNode->getNodeSequenceNumber(),
                          nodeSequenceNumber, msg.c_str());
           }
-          if (WPInterpolant && !wpInterpolant.isNull())
+          if (WPInterpolant) {
             // In case a node is subsumed, the WP Expr is stored at the parent
             // node. This is crucial for generating WP Expr at the parent node.
             state.txTreeNode->setWPatSubsumption(wpInterpolant);
+          }
           return true;
         } else {
           // Here we try to get bound-variables-free conjunction, if there is
@@ -1603,10 +1609,11 @@ bool TxSubsumptionTableEntry::subsumed(
 
         interpolateValues(state, coreValues, corePointerValues,
                           debugSubsumptionLevel);
-        if (WPInterpolant && !wpInterpolant.isNull())
+        if (WPInterpolant) {
           // In case a node is subsumed, the WP Expr is stored at the parent
           // node. This is crucial for generating WP Expr at the parent node.
           state.txTreeNode->setWPatSubsumption(wpInterpolant);
+        }
         return true;
       }
       if (debugSubsumptionLevel >= 1) {
@@ -1633,10 +1640,11 @@ bool TxSubsumptionTableEntry::subsumed(
     state.txTreeNode->unsatCoreInterpolation(unsatCore);
     interpolateValues(state, coreValues, corePointerValues,
                       debugSubsumptionLevel);
-    if (WPInterpolant && !wpInterpolant.isNull())
+    if (WPInterpolant) {
       // In case a node is subsumed, the WP Expr is stored at the parent node.
       // This is crucial for generating WP Expr at the parent node.
       state.txTreeNode->setWPatSubsumption(wpInterpolant);
+    }
     return true;
   }
 #endif /* ENABLE_Z3 */
@@ -2322,7 +2330,13 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         //        Solver::Validity result;
         //        std::vector<ref<Expr> > unsatCore;
         ref<Expr> WPExpr = entry->getWPInterpolant();
-
+        //        llvm::errs() << "Node " << node->getNodeSequenceNumber() <<
+        // "\n";
+        //        if (!WPExpr.isNull()) {
+        //          WPExpr->dump();
+        //        } else {
+        //          llvm::errs() << "WPExpr is null\n";
+        //        }
         if (!WPExpr.isNull()) {
           //          bool success = solver->evaluate(*state, WPExpr, result,
           //          unsatCore);
@@ -2656,24 +2670,38 @@ void TxTreeNode::mark() {
 ref<Expr> TxTreeNode::generateWPInterpolant() {
   TimerStatIncrementer t(getWPInterpolantTime);
 
+  //  for (std::vector<std::pair<KInstruction *, int> >::iterator
+  //           it = reverseInstructionList.begin(),
+  //           ie = reverseInstructionList.end();
+  //       it != ie; ++it) {
+  //    it->first->inst->dump();
+  //    llvm::errs() << (it->second) << "\n";
+  //  }
+
   ref<Expr> expr;
   if (assertionFail && emitAllErrors) {
+    //    llvm::errs() << "1--\n";
     expr = wp->False();
   } else if (assertionFail) {
+    //    llvm::errs() << "2--\n";
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->True();
   } else if (childWPInterpolant[0].isNull() || childWPInterpolant[1].isNull()) {
+    //    llvm::errs() << "3--\n";
     expr = childWPInterpolant[0];
   } else if (childWPInterpolant[0] == wp->False() ||
              childWPInterpolant[1] == wp->False()) {
+    //    llvm::errs() << "4--\n";
     expr = wp->False();
   } else if (childWPInterpolant[0] == wp->True() &&
-             childWPInterpolant[0] == wp->True()) {
+             childWPInterpolant[1] == wp->True()) {
+    //    llvm::errs() << "5--\n";
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->PushUp(reverseInstructionList);
   } else {
+    //    llvm::errs() << "6--\n";
     // Get branch condition
     llvm::Instruction *i = reverseInstructionList.back().first->inst;
     if (i->getOpcode() == llvm::Instruction::Br) {
@@ -2681,25 +2709,22 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
       if (br->isConditional()) {
         branchCondition = wp->getBrCondition(i);
       }
-      if (branchCondition.isNull()) {
-        return branchCondition;
+    }
+    if (!branchCondition.isNull()) {
+      expr = wp->intersectWPExpr(branchCondition, childWPInterpolant[0],
+                                 childWPInterpolant[1]);
+      if (!expr.isNull()) {
+        wp->setWPExpr(expr);
+        // Generate weakest precondition from pathCondition and/or BB
+        // instructions
+        expr = wp->PushUp(reverseInstructionList);
       }
+    } else {
+      expr = branchCondition; // expr is null
     }
-    //    llvm::errs() << "START branchCondition\n";
-    //    branchCondition->dump();
-    //    childWPInterpolant[0]->dump();
-    //    childWPInterpolant[1]->dump();
-    //    llvm::errs() << "END branchCondition\n";
-
-    expr = wp->intersectWPExpr(branchCondition, childWPInterpolant[0],
-                               childWPInterpolant[1]);
-    if (expr.isNull()) {
-      return expr;
-    }
-    wp->setWPExpr(expr);
-    // Generate weakest precondition from pathCondition and/or BB instructions
-    expr = wp->PushUp(reverseInstructionList);
   }
+
+  // set to parent node
   if (parent) {
     this->parent->setChildWPInterpolant(expr);
   }
@@ -2755,23 +2780,28 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     ref<TxAllocationContext> alc =
         dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
 
-    ref<TxStoreEntry> entry;
-    entry = dependency->getStore()->find(alc);
+    if (!alc.isNull()) {
+      ref<TxStoreEntry> entry;
+      entry = dependency->getStore()->find(alc);
 
-    if (!entry.isNull()) {
-      if (wpInterpolant->getWidth() ==
-          entry->getContent()->getExpression()->getWidth()) {
-        return entry->getContent()->getExpression();
-      } else {
-        ref<Expr> result = ZExtExpr::create(
-            entry->getContent()->getExpression(), wpInterpolant->getWidth());
-        return result;
+      if (!entry.isNull()) {
+        if (wpInterpolant->getWidth() ==
+            entry->getContent()->getExpression()->getWidth()) {
+          return entry->getContent()->getExpression();
+        } else {
+          ref<Expr> result = ZExtExpr::create(
+              entry->getContent()->getExpression(), wpInterpolant->getWidth());
+          return result;
+        }
       }
     }
+    // wpInterpolant->dump();
+    // dependency->getStore()->dump();
+    klee_warning(
+        "TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
+    ref<Expr> dummy;
+    return dummy;
 
-    wpInterpolant->dump();
-    dependency->getStore()->dump();
-    klee_error("TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
     break;
   }
 
@@ -2816,6 +2846,11 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     ref<Expr> kids[2];
     kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
     kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
+    if (kids[0].isNull())
+      return kids[0];
+    if (kids[1].isNull())
+      return kids[1];
+
     return wpInterpolant->rebuild(kids);
   }
 
@@ -2824,6 +2859,12 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
     kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
     kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), dependency);
+    if (kids[0].isNull())
+      return kids[0];
+    if (kids[1].isNull())
+      return kids[1];
+    if (kids[2].isNull())
+      return kids[2];
     return wpInterpolant->rebuild(kids);
   }
   case Expr::Upd: {
@@ -2831,6 +2872,12 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
     kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
     kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), dependency);
+    if (kids[0].isNull())
+      return kids[0];
+    if (kids[1].isNull())
+      return kids[1];
+    if (kids[2].isNull())
+      return kids[2];
     return wpInterpolant->rebuild(kids);
   }
   case Expr::Sel: {
@@ -2838,33 +2885,41 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     ref<Expr> kids[2];
     kids[0] = wpInterpolant->getKid(0);
     kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
+    if (kids[0].isNull())
+      return kids[0];
+    if (kids[1].isNull())
+      return kids[1];
 
     ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
 
     ref<TxAllocationContext> alc =
         dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
 
-    ref<TxStoreEntry> entry;
-    ref<Expr> offset = MulExpr::create(
-        kids[1],
-        UDivExpr::create(
-            ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
-            ConstantExpr::create(8, kids[1]->getWidth())));
+    if (!alc.isNull()) {
+      ref<TxStoreEntry> entry;
+      ref<Expr> offset = MulExpr::create(
+          kids[1],
+          UDivExpr::create(
+              ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
+              ConstantExpr::create(8, kids[1]->getWidth())));
 
-    assert(isa<ConstantExpr>(offset) && "TxTreeNode::"
-                                        "instantiateWPatSubsumption, offset is "
-                                        "not a constant value");
-    entry = dependency->getStore()->find(alc, offset);
+      assert(isa<ConstantExpr>(offset) &&
+             "TxTreeNode::"
+             "instantiateWPatSubsumption, offset is "
+             "not a constant value");
+      entry = dependency->getStore()->find(alc, offset);
 
-    if (!entry.isNull()) {
-      if (wpInterpolant->getWidth() ==
-          entry->getContent()->getExpression()->getWidth()) {
-        return entry->getContent()->getExpression();
-      } else {
-        ref<Expr> result = ZExtExpr::create(
-            entry->getContent()->getExpression(), wpInterpolant->getWidth());
-        return result;
+      if (!entry.isNull()) {
+        if (wpInterpolant->getWidth() ==
+            entry->getContent()->getExpression()->getWidth()) {
+          return entry->getContent()->getExpression();
+        } else {
+          ref<Expr> result = ZExtExpr::create(
+              entry->getContent()->getExpression(), wpInterpolant->getWidth());
+          return result;
+        }
       }
+    } else {
     }
 
     wpInterpolant->dump();
