@@ -1007,8 +1007,13 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
 std::set<std::string> Executor::extractVarNames(ExecutionState &current,
                                                 llvm::Value *v) {
   std::set<std::string> res;
-  if (!isa<Instruction>(v))
+  if (!isa<Instruction>(v)) {
+    if (isa<GlobalVariable>(v)) {
+      GlobalVariable *gv = cast<GlobalVariable>(v);
+      res.insert(gv->getName().data());
+    }
     return res;
+  }
   Instruction *ins = dyn_cast<Instruction>(v);
   switch (ins->getOpcode()) {
   case Instruction::Alloca: {
