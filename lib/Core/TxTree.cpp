@@ -803,6 +803,9 @@ bool TxSubsumptionTableEntry::subsumed(
         state.txTreeNode->instantiateWPatSubsumption(
             wpInterpolant, state.txTreeNode->getDependency());
 
+    if (wpInstantiatedInterpolant.isNull())
+      return false;
+
     ref<Expr> wpBoolean =
         ZExtExpr::create(wpInstantiatedInterpolant, Expr::Bool);
 
@@ -2536,23 +2539,31 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     ref<TxAllocationContext> alc =
         dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
 
-    ref<TxStoreEntry> entry;
-    entry = dependency->getStore()->find(alc);
+    if (!alc.isNull()) {
+      ref<TxStoreEntry> entry;
+      entry = dependency->getStore()->find(alc);
 
-    if (!entry.isNull()) {
-      if (wpInterpolant->getWidth() ==
-          entry->getContent()->getExpression()->getWidth()) {
-        return entry->getContent()->getExpression();
-      } else {
-        ref<Expr> result = ZExtExpr::create(
-            entry->getContent()->getExpression(), wpInterpolant->getWidth());
-        return result;
+      if (!entry.isNull()) {
+        if (wpInterpolant->getWidth() ==
+            entry->getContent()->getExpression()->getWidth()) {
+          return entry->getContent()->getExpression();
+        } else {
+          ref<Expr> result = ZExtExpr::create(
+              entry->getContent()->getExpression(), wpInterpolant->getWidth());
+          return result;
+        }
       }
     }
 
-    wpInterpolant->dump();
-    dependency->getStore()->dump();
-    klee_error("TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
+    this->dependency->dump();
+
+    // wpInterpolant->dump();
+    // dependency->getStore()->dump();
+    klee_warning(
+        "TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
+    ref<Expr> dummy;
+    return dummy;
+
     break;
   }
 
@@ -2597,6 +2608,11 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     ref<Expr> kids[2];
     kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
     kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
+    if (kids[0].isNull())
+      return kids[0];
+    if (kids[1].isNull())
+      return kids[1];
+
     return wpInterpolant->rebuild(kids);
   }
 
@@ -2605,6 +2621,12 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
     kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
     kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), dependency);
+    if (kids[0].isNull())
+      return kids[0];
+    if (kids[1].isNull())
+      return kids[1];
+    if (kids[2].isNull())
+      return kids[2];
     return wpInterpolant->rebuild(kids);
   }
   case Expr::Upd: {
@@ -2612,6 +2634,12 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
     kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
     kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), dependency);
+    if (kids[0].isNull())
+      return kids[0];
+    if (kids[1].isNull())
+      return kids[1];
+    if (kids[2].isNull())
+      return kids[2];
     return wpInterpolant->rebuild(kids);
   }
   case Expr::Sel: {
@@ -2619,33 +2647,41 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     ref<Expr> kids[2];
     kids[0] = wpInterpolant->getKid(0);
     kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
+    if (kids[0].isNull())
+      return kids[0];
+    if (kids[1].isNull())
+      return kids[1];
 
     ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
 
     ref<TxAllocationContext> alc =
         dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
 
-    ref<TxStoreEntry> entry;
-    ref<Expr> offset = MulExpr::create(
-        kids[1],
-        UDivExpr::create(
-            ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
-            ConstantExpr::create(8, kids[1]->getWidth())));
+    if (!alc.isNull()) {
+      ref<TxStoreEntry> entry;
+      ref<Expr> offset = MulExpr::create(
+          kids[1],
+          UDivExpr::create(
+              ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
+              ConstantExpr::create(8, kids[1]->getWidth())));
 
-    assert(isa<ConstantExpr>(offset) && "TxTreeNode::"
-                                        "instantiateWPatSubsumption, offset is "
-                                        "not a constant value");
-    entry = dependency->getStore()->find(alc, offset);
+      assert(isa<ConstantExpr>(offset) &&
+             "TxTreeNode::"
+             "instantiateWPatSubsumption, offset is "
+             "not a constant value");
+      entry = dependency->getStore()->find(alc, offset);
 
-    if (!entry.isNull()) {
-      if (wpInterpolant->getWidth() ==
-          entry->getContent()->getExpression()->getWidth()) {
-        return entry->getContent()->getExpression();
-      } else {
-        ref<Expr> result = ZExtExpr::create(
-            entry->getContent()->getExpression(), wpInterpolant->getWidth());
-        return result;
+      if (!entry.isNull()) {
+        if (wpInterpolant->getWidth() ==
+            entry->getContent()->getExpression()->getWidth()) {
+          return entry->getContent()->getExpression();
+        } else {
+          ref<Expr> result = ZExtExpr::create(
+              entry->getContent()->getExpression(), wpInterpolant->getWidth());
+          return result;
+        }
       }
+    } else {
     }
 
     wpInterpolant->dump();
