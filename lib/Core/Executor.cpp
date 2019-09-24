@@ -1007,38 +1007,42 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
 std::set<std::string> Executor::extractVarNames(ExecutionState &current,
                                                 llvm::Value *v) {
   std::set<std::string> res;
-  if (!isa<Instruction>(v)) {
-    if (isa<GlobalVariable>(v)) {
-      GlobalVariable *gv = cast<GlobalVariable>(v);
-      res.insert(gv->getName().data());
+  if (isa<GlobalVariable>(v)) {
+    GlobalVariable *gv = cast<GlobalVariable>(v);
+    /*klee_warning("GV:");
+    gv->dump();
+    klee_warning(" ");*/
+    res.insert(gv->getName().data());
+    return res;
+  } else if (isa<Instruction>(v)) {
+    Instruction *ins = dyn_cast<Instruction>(v);
+    switch (ins->getOpcode()) {
+    case Instruction::Alloca: {
+      AllocaInst *ai = cast<AllocaInst>(ins);
+      /*klee_warning("Alloca:");
+      ai->dump();
+      klee_warning(" ");*/
+      res.insert(ai->getName().data());
+      break;
+    }
+    case Instruction::Load: {
+      LoadInst *li = cast<LoadInst>(ins);
+      res.insert(li->getName().data());
+      break;
+    }
+    default: {
+      /*klee_warning("Ins:");
+      v->dump();
+      klee_warning(" ");*/
+      for (unsigned i = 0u; i < ins->getNumOperands(); i++) {
+        std::set<std::string> tmp =
+            extractVarNames(current, ins->getOperand(i));
+        res.insert(tmp.begin(), tmp.end());
+      }
+    }
     }
     return res;
   }
-  Instruction *ins = dyn_cast<Instruction>(v);
-  switch (ins->getOpcode()) {
-  case Instruction::Alloca: {
-    AllocaInst *ai = cast<AllocaInst>(ins);
-    res.insert(ai->getName().data());
-    break;
-  }
-  case Instruction::Load: {
-    LoadInst *li = cast<LoadInst>(ins);
-    res.insert(li->getName().data());
-    break;
-  }
-  case Instruction::ICmp: {
-    ICmpInst *icmp = cast<ICmpInst>(ins);
-    res.insert(icmp->getName().data());
-    break;
-  }
-  default: {
-    for (unsigned i = 0u; i < ins->getNumOperands(); i++) {
-      std::set<std::string> tmp = extractVarNames(current, ins->getOperand(i));
-      res.insert(tmp.begin(), tmp.end());
-    }
-  }
-  }
-  return res;
 }
 
 Executor::StatePair Executor::branchFork(ExecutionState &current,
