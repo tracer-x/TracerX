@@ -2554,9 +2554,6 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
         }
       }
     }
-
-    this->dependency->dump();
-
     // wpInterpolant->dump();
     // dependency->getStore()->dump();
     klee_warning(
