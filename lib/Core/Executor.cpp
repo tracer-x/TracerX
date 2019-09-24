@@ -1021,6 +1021,16 @@ std::set<std::string> Executor::extractVarNames(ExecutionState &current,
     res.insert(ai->getName().data());
     break;
   }
+  case Instruction::Load: {
+    LoadInst *li = cast<LoadInst>(ins);
+    res.insert(li->getName().data());
+    break;
+  }
+  case Instruction::ICmp: {
+    ICmpInst *icmp = cast<ICmpInst>(ins);
+    res.insert(icmp->getName().data());
+    break;
+  }
   default: {
     for (unsigned i = 0u; i < ins->getNumOperands(); i++) {
       std::set<std::string> tmp = extractVarNames(current, ins->getOperand(i));
