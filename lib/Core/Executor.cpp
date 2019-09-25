@@ -1022,7 +1022,12 @@ std::set<std::string> Executor::extractVarNames(ExecutionState &current,
       /*klee_warning("Alloca:");
       ai->dump();
       klee_warning(" ");*/
-      res.insert(ai->getName().data());
+      std::string tmp = ai->getName().data();
+      std::string s = ".addr";
+      std::string::size_type i = tmp.find(s);
+      if (i != std::string::npos)
+        tmp.erase(i, s.length());
+      res.insert(tmp);
 
       break;
     }
