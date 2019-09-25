@@ -1009,41 +1009,26 @@ std::set<std::string> Executor::extractVarNames(ExecutionState &current,
   std::set<std::string> res;
   if (isa<GlobalVariable>(v)) {
     GlobalVariable *gv = cast<GlobalVariable>(v);
-    /*klee_warning("GV:");
-    gv->dump();
-    klee_warning(" ");*/
     res.insert(gv->getName().data());
-    return res;
   } else if (isa<Instruction>(v)) {
     Instruction *ins = dyn_cast<Instruction>(v);
     switch (ins->getOpcode()) {
     case Instruction::Alloca: {
       AllocaInst *ai = cast<AllocaInst>(ins);
-      /*klee_warning("Alloca:");
-      ai->dump();
-      klee_warning(" ");*/
-      std::string tmp = ai->getName().data();
-      std::string s = ".addr";
-      std::string::size_type i = tmp.find(s);
-      if (i != std::string::npos)
-        tmp.erase(i, s.length());
-      res.insert(tmp);
+      if (ai->getName() == "") {
+        llvm::Function *f = ai->getParent()->getParent();
+        if (ai == &f->getEntryBlock().front()) {
+          res.insert(f->arg_begin()->getName().data());
+        } else if (ai == f->getEntryBlock().front().getNextNode()) {
+          res.insert(f->arg_begin()->getNextNode()->getName().data());
+        }
+      } else {
+        res.insert(ai->getName().data());
+      }
 
       break;
     }
-    case Instruction::Load: {
-      /*klee_warning("Load:");
-      v->dump();
-      klee_warning(" ");*/
-      LoadInst *li = cast<LoadInst>(ins);
-      std::set<std::string> tmp = extractVarNames(current, li->getOperand(0));
-      res.insert(tmp.begin(), tmp.end());
-      break;
-    }
     default: {
-      /*klee_warning("Ins:");
-      v->dump();
-      klee_warning(" ");*/
       for (unsigned i = 0u; i < ins->getNumOperands(); i++) {
         std::set<std::string> tmp =
             extractVarNames(current, ins->getOperand(i));
@@ -1051,7 +1036,6 @@ std::set<std::string> Executor::extractVarNames(ExecutionState &current,
       }
     }
     }
-    return res;
   }
   return res;
 }
