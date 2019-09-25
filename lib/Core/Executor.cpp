@@ -1023,11 +1023,16 @@ std::set<std::string> Executor::extractVarNames(ExecutionState &current,
       ai->dump();
       klee_warning(" ");*/
       res.insert(ai->getName().data());
+
       break;
     }
     case Instruction::Load: {
+      /*klee_warning("Load:");
+      v->dump();
+      klee_warning(" ");*/
       LoadInst *li = cast<LoadInst>(ins);
-      res.insert(li->getName().data());
+      std::set<std::string> tmp = extractVarNames(current, li->getOperand(0));
+      res.insert(tmp.begin(), tmp.end());
       break;
     }
     default: {
@@ -1043,6 +1048,7 @@ std::set<std::string> Executor::extractVarNames(ExecutionState &current,
     }
     return res;
   }
+  return res;
 }
 
 Executor::StatePair Executor::branchFork(ExecutionState &current,
