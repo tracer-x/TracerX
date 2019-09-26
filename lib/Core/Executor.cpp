@@ -3498,10 +3498,13 @@ void Executor::run(ExecutionState &initialState) {
 
   // first BB of main()
   KInstruction *ki = initialState.pc;
-  BasicBlock *bbF = ki->inst->getParent();
-  if (bbF->getParent()->getName() != "main") {
+  BasicBlock *firstBB = ki->inst->getParent();
+  if (fBBOrder.find(firstBB->getParent()) != fBBOrder.end() &&
+      fBBOrder[firstBB->getParent()].find(firstBB) !=
+          fBBOrder[firstBB->getParent()].end()) {
     processBBCoverage(BBCoverage, ki->inst->getParent(), false);
   }
+
   bindModuleConstants();
 
   //  llvm::errs() << "Vars: " << specAvoid.size() << "\n";
