@@ -2455,7 +2455,7 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
              childWPInterpolant[1] == wp->False()) {
     expr = wp->False();
   } else if (childWPInterpolant[0] == wp->True() &&
-             childWPInterpolant[0] == wp->True()) {
+             childWPInterpolant[1] == wp->True()) {
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->PushUp(reverseInstructionList);
@@ -2468,6 +2468,10 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
         branchCondition = wp->getBrCondition(i);
       }
       if (branchCondition.isNull()) {
+        // set to parent node
+        if (parent) {
+          this->parent->setChildWPInterpolant(branchCondition);
+        }
         return branchCondition;
       }
     }
@@ -2480,12 +2484,18 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
     expr = wp->intersectWPExpr(branchCondition, childWPInterpolant[0],
                                childWPInterpolant[1]);
     if (expr.isNull()) {
+      // set to parent node
+      if (parent) {
+        this->parent->setChildWPInterpolant(branchCondition);
+      }
       return expr;
     }
     wp->setWPExpr(expr);
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->PushUp(reverseInstructionList);
   }
+
+  // set to parent node
   if (parent) {
     this->parent->setChildWPInterpolant(expr);
   }
