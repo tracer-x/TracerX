@@ -1198,47 +1198,32 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // check independency
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(&current, 0);
+
+      // open speculation & result may be success or fail and Now second check
+
+      if (specSnap[binst] != visitedBlocks.size()) {
+        dynamicYes++;
+        return addSpeculationNode(current, condition, binst, isInternal, true);
       } else {
-        // open speculation & result may be success or fail and Now second check
-        independenceNo++;
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
-          return addSpeculationNode(current, condition, binst, isInternal,
-                                    true);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
-          return StatePair(&current, 0);
-        }
+        dynamicNo++;
+        // then close speculation & do marking as deletion
+        txTree->markPathCondition(current, unsatCore);
+        return StatePair(&current, 0);
       }
     }
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(0, &current);
+
+      // open speculation & result may be success or fail and Now second check
+      if (specSnap[binst] != visitedBlocks.size()) {
+        dynamicYes++;
+        return addSpeculationNode(current, condition, binst, isInternal, false);
       } else {
-        independenceNo++;
-        // open speculation & result may be success or fail and Now second check
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
-          return addSpeculationNode(current, condition, binst, isInternal,
-                                    false);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
-          return StatePair(0, &current);
-        }
+        dynamicNo++;
+        // then close speculation & do marking as deletion
+        txTree->markPathCondition(current, unsatCore);
+        return StatePair(0, &current);
       }
     }
   }
@@ -1260,26 +1245,18 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     }
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(&current, 0);
+
+      // save unsat core
+      // open speculation & result may be success or fail
+      if (specSnap[binst] != visitedBlocks.size()) {
+        dynamicYes++;
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        return addSpeculationNode(current, condition, binst, isInternal, true);
       } else {
-        independenceNo++;
-        // save unsat core
-        // open speculation & result may be success or fail
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
-          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-          return addSpeculationNode(current, condition, binst, isInternal,
-                                    true);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
-          return StatePair(&current, 0);
-        }
+        dynamicNo++;
+        // then close speculation & do marking as deletion
+        txTree->markPathCondition(current, unsatCore);
+        return StatePair(&current, 0);
       }
     }
 
@@ -1302,26 +1279,18 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(0, &current);
+
+      // save unsat core
+      // open speculation & result may be success or fail
+      if (specSnap[binst] != visitedBlocks.size()) {
+        dynamicYes++;
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        return addSpeculationNode(current, condition, binst, isInternal, false);
       } else {
-        independenceNo++;
-        // save unsat core
-        // open speculation & result may be success or fail
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
-          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-          return addSpeculationNode(current, condition, binst, isInternal,
-                                    false);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
-          return StatePair(0, &current);
-        }
+        dynamicNo++;
+        // then close speculation & do marking as deletion
+        txTree->markPathCondition(current, unsatCore);
+        return StatePair(0, &current);
       }
     }
 
@@ -1573,48 +1542,32 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(&current, 0);
+
+      // open speculation & result may be success or fail
+      if (specSnap[binst] != visitedBlocks.size()) {
+        dynamicYes++;
+        return addSpeculationNode(current, condition, binst, isInternal, true);
       } else {
-        independenceNo++;
-        // open speculation & result may be success or fail
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
-          return addSpeculationNode(current, condition, binst, isInternal,
-                                    true);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
-          return StatePair(&current, 0);
-        }
+        dynamicNo++;
+        // then close speculation & do marking as deletion
+        txTree->markPathCondition(current, unsatCore);
+        return StatePair(&current, 0);
       }
     }
     return StatePair(&current, 0);
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(0, &current);
+
+      // open speculation & result may be success or fail
+      if (specSnap[binst] != visitedBlocks.size()) {
+        dynamicYes++;
+        return addSpeculationNode(current, condition, binst, isInternal, false);
       } else {
-        independenceNo++;
-        // open speculation & result may be success or fail
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
-          return addSpeculationNode(current, condition, binst, isInternal,
-                                    false);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
-          return StatePair(0, &current);
-        }
+        dynamicNo++;
+        // then close speculation & do marking as deletion
+        txTree->markPathCondition(current, unsatCore);
+        return StatePair(0, &current);
       }
     }
     return StatePair(0, &current);
@@ -1634,26 +1587,18 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     }
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(&current, 0);
+
+      // save unsat core
+      // open speculation & result may be success or fail
+      if (specSnap[binst] != visitedBlocks.size()) {
+        dynamicYes++;
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        return addSpeculationNode(current, condition, binst, isInternal, true);
       } else {
-        independenceNo++;
-        // save unsat core
-        // open speculation & result may be success or fail
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
-          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-          return addSpeculationNode(current, condition, binst, isInternal,
-                                    true);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
-          return StatePair(&current, 0);
-        }
+        dynamicNo++;
+        // then close speculation & do marking as deletion
+        txTree->markPathCondition(current, unsatCore);
+        return StatePair(&current, 0);
       }
     }
 
@@ -1678,26 +1623,18 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(0, &current);
+
+      // save unsat core
+      // open speculation & result may be success or fail
+      if (specSnap[binst] != visitedBlocks.size()) {
+        dynamicYes++;
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        return addSpeculationNode(current, condition, binst, isInternal, false);
       } else {
-        independenceNo++;
-        // save unsat core
-        // open speculation & result may be success or fail
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
-          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-          return addSpeculationNode(current, condition, binst, isInternal,
-                                    false);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
-          return StatePair(0, &current);
-        }
+        dynamicNo++;
+        // then close speculation & do marking as deletion
+        txTree->markPathCondition(current, unsatCore);
+        return StatePair(0, &current);
       }
     }
 
@@ -3990,8 +3927,6 @@ std::set<llvm::BasicBlock *> Executor::readVisitedBB(std::string fileName) {
 
 void Executor::run(ExecutionState &initialState) {
 
-  independenceYes = 0;
-  independenceNo = 0;
   dynamicYes = 0;
   dynamicNo = 0;
   specFail = 0;
@@ -5156,8 +5091,6 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     std::string outSpecFile = interpreterHandler->getOutputFilename("spec.txt");
     std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
 
-    outSpec << "Total Independence Yes: " << independenceYes << "\n";
-    outSpec << "Total Independence No: " << independenceNo << "\n";
     outSpec << "Total Dynamic Yes: " << dynamicYes << "\n";
     outSpec << "Total Dynamic No: " << dynamicNo << "\n";
     outSpec << "Total Independence No, Dynamic Yes & Success: "
