@@ -1173,6 +1173,7 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
     entry->setInterpolant(TxPartitionHelper::createAnd(newpiComps));
 
   // update miu by (miu, v1star)
+  std::set<ref<TxAllocationContext> > dels;
   for (TxStore::TopInterpolantStore::iterator
            it1 = concretelyAddressedStore.begin(),
            ie1 = concretelyAddressedStore.end();
@@ -1183,11 +1184,15 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
       std::set<std::string> right = TxPartitionHelper::getExprVars(
           it1->second.begin()->second->getExpression());
       tmp.insert(right.begin(), right.end());
-
       if (!TxPartitionHelper::isShared(tmp, v1star)) {
-        concretelyAddressedStore.erase(it1);
+        dels.insert(it1->first);
       }
     }
+  }
+  for (std::set<ref<TxAllocationContext> >::iterator it = dels.begin(),
+                                                     ie = dels.end();
+       it != ie; ++it) {
+    concretelyAddressedStore.erase((*it));
   }
 
   entry->setConcretelyAddressedStore(concretelyAddressedStore);
