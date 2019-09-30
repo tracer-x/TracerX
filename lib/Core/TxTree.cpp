@@ -2467,32 +2467,19 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
       if (br->isConditional()) {
         branchCondition = wp->getBrCondition(i);
       }
-      if (branchCondition.isNull()) {
-        // set to parent node
-        if (parent) {
-          this->parent->setChildWPInterpolant(branchCondition);
-        }
-        return branchCondition;
-      }
     }
-    //    llvm::errs() << "START branchCondition\n";
-    //    branchCondition->dump();
-    //    childWPInterpolant[0]->dump();
-    //    childWPInterpolant[1]->dump();
-    //    llvm::errs() << "END branchCondition\n";
-
-    expr = wp->intersectWPExpr(branchCondition, childWPInterpolant[0],
-                               childWPInterpolant[1]);
-    if (expr.isNull()) {
-      // set to parent node
-      if (parent) {
-        this->parent->setChildWPInterpolant(branchCondition);
+    if (!branchCondition.isNull()) {
+      expr = wp->intersectWPExpr(branchCondition, childWPInterpolant[0],
+                                 childWPInterpolant[1]);
+      if (!expr.isNull()) {
+        wp->setWPExpr(expr);
+        // Generate weakest precondition from pathCondition and/or BB
+        // instructions
+        expr = wp->PushUp(reverseInstructionList);
       }
-      return expr;
+    } else {
+      expr = branchCondition; // expr is null
     }
-    wp->setWPExpr(expr);
-    // Generate weakest precondition from pathCondition and/or BB instructions
-    expr = wp->PushUp(reverseInstructionList);
   }
 
   // set to parent node
