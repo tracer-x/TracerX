@@ -55,6 +55,7 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   std::map<ref<Expr>, ref<Expr> > substitution;
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
+  prevProgramPoint = node->getPrevProgramPoint();
 
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
@@ -793,6 +794,12 @@ bool TxSubsumptionTableEntry::subsumed(
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
+
+  // PhiNode Check
+  if (prevProgramPoint != reinterpret_cast<uintptr_t>(state.prevPC->inst)) {
+    return false;
+  }
+
   // Tell the solver implementation that we are checking for subsumption for
   // collecting statistics of solver calls.
   SubsumptionCheckMarker subsumptionCheckMarker;
@@ -1977,8 +1984,9 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
   // first instruction executed of the sequence executed for a state
   // node, typically this the first instruction of a basic block.
   // Subsumption check only matches against this first instruction.
-  if (!state.txTreeNode || reinterpret_cast<uintptr_t>(state.pc->inst) !=
-                               state.txTreeNode->getProgramPoint())
+  if (!state.txTreeNode ||
+      reinterpret_cast<uintptr_t>(state.pc->inst) !=
+          state.txTreeNode->getProgramPoint())
     return false;
 
   int debugSubsumptionLevel =
@@ -2006,7 +2014,7 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
 void TxTree::setCurrentINode(ExecutionState &state) {
   TimerStatIncrementer t(setCurrentINodeTime);
   currentTxTreeNode = state.txTreeNode;
-  currentTxTreeNode->setProgramPoint(state.pc->inst);
+  currentTxTreeNode->setProgramPoint(state.pc->inst, state.prevPC->inst);
   if (!currentTxTreeNode->nodeSequenceNumber)
     currentTxTreeNode->nodeSequenceNumber =
         TxTreeNode::nextNodeSequenceNumber++;
@@ -2211,7 +2219,7 @@ void TxTreeNode::printTimeStat(std::stringstream &stream) {
 TxTreeNode::TxTreeNode(
     TxTreeNode *_parent, llvm::DataLayout *_targetData,
     std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses)
-    : parent(_parent), left(0), right(0), programPoint(0),
+    : parent(_parent), left(0), right(0), programPoint(0), prevProgramPoint(0),
       nodeSequenceNumber(0), storable(true),
       graph(_parent ? _parent->graph : 0),
       instructionsDepth(_parent ? _parent->instructionsDepth : 0),

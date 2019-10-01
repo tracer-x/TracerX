@@ -177,6 +177,8 @@ class TxSubsumptionTableEntry {
 
   std::set<const Array *> existentials;
 
+  uintptr_t prevProgramPoint;
+
   /// \brief A procedure for building subsumption check constraints using
   /// symbolically-addressed store elements
   ///
@@ -373,6 +375,8 @@ class TxTreeNode {
 
   uintptr_t programPoint;
 
+  uintptr_t prevProgramPoint;
+
   uint64_t nodeSequenceNumber;
 
   bool storable;
@@ -394,9 +398,11 @@ class TxTreeNode {
   /// \brief Indicates that a generic error was encountered in this node
   bool genericEarlyTermination;
 
-  void setProgramPoint(llvm::Instruction *instr) {
-    if (!programPoint)
+  void setProgramPoint(llvm::Instruction *instr, llvm::Instruction *prevInstr) {
+    if (!programPoint) {
       programPoint = reinterpret_cast<uintptr_t>(instr);
+      prevProgramPoint = reinterpret_cast<uintptr_t>(prevInstr);
+    }
 
     // Disabling the subsumption check within KLEE's own API
     // (call sites of klee_ and at any location within the klee_ function)
@@ -446,6 +452,8 @@ public:
   std::vector<llvm::Instruction *> callHistory;
 
   uintptr_t getProgramPoint() { return programPoint; }
+
+  uintptr_t getPrevProgramPoint() { return prevProgramPoint; }
 
   uint64_t getNodeSequenceNumber() { return nodeSequenceNumber; }
 
