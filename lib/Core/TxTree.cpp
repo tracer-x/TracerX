@@ -840,10 +840,11 @@ bool TxSubsumptionTableEntry::subsumed(
                    nodeSequenceNumber);
     }
 
-    if (WPInterpolant && !wpInterpolant.isNull())
+    if (WPInterpolant) {
       // In case a node is subsumed, the WP Expr is stored at the parent node.
       // This is crucial for generating WP Expr at the parent node.
       state.txTreeNode->setWPatSubsumption(wpInterpolant);
+    }
     return true;
   }
 
@@ -2181,7 +2182,13 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         //        Solver::Validity result;
         //        std::vector<ref<Expr> > unsatCore;
         ref<Expr> WPExpr = entry->getWPInterpolant();
-
+        //        llvm::errs() << "Node " << node->getNodeSequenceNumber() <<
+        // "\n";
+        //        if (!WPExpr.isNull()) {
+        //          WPExpr->dump();
+        //        } else {
+        //          llvm::errs() << "WPExpr is null\n";
+        //        }
         if (!WPExpr.isNull()) {
           //          bool success = solver->evaluate(*state, WPExpr, result,
           //          unsatCore);
@@ -2442,24 +2449,38 @@ ref<Expr> TxTreeNode::getInterpolant(
 ref<Expr> TxTreeNode::generateWPInterpolant() {
   TimerStatIncrementer t(getWPInterpolantTime);
 
+  //  for (std::vector<std::pair<KInstruction *, int> >::iterator
+  //           it = reverseInstructionList.begin(),
+  //           ie = reverseInstructionList.end();
+  //       it != ie; ++it) {
+  //    it->first->inst->dump();
+  //    llvm::errs() << (it->second) << "\n";
+  //  }
+
   ref<Expr> expr;
   if (assertionFail && emitAllErrors) {
+    //    llvm::errs() << "1--\n";
     expr = wp->False();
   } else if (assertionFail) {
+    //    llvm::errs() << "2--\n";
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->True();
   } else if (childWPInterpolant[0].isNull() || childWPInterpolant[1].isNull()) {
+    //    llvm::errs() << "3--\n";
     expr = childWPInterpolant[0];
   } else if (childWPInterpolant[0] == wp->False() ||
              childWPInterpolant[1] == wp->False()) {
+    //    llvm::errs() << "4--\n";
     expr = wp->False();
   } else if (childWPInterpolant[0] == wp->True() &&
              childWPInterpolant[1] == wp->True()) {
+    //    llvm::errs() << "5--\n";
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->PushUp(reverseInstructionList);
   } else {
+    //    llvm::errs() << "6--\n";
     // Get branch condition
     llvm::Instruction *i = reverseInstructionList.back().first->inst;
     if (i->getOpcode() == llvm::Instruction::Br) {
