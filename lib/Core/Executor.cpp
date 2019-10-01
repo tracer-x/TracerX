@@ -3057,8 +3057,12 @@ void Executor::run(ExecutionState &initialState) {
 
   // first BB of main()
   KInstruction *ki = initialState.pc;
-  processBBCoverage(BBCoverage, ki->inst->getParent());
-
+  BasicBlock *firstBB = ki->inst->getParent();
+  if (fBBOrder.find(firstBB->getParent()) != fBBOrder.end() &&
+      fBBOrder[firstBB->getParent()].find(firstBB) !=
+          fBBOrder[firstBB->getParent()].end()) {
+    processBBCoverage(BBCoverage, ki->inst->getParent());
+  }
   bindModuleConstants();
 
   // Delay init till now so that ticks don't accrue during
