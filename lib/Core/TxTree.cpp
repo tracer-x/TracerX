@@ -1349,10 +1349,11 @@ bool TxSubsumptionTableEntry::subsumed(
 
       interpolateValues(state, coreValues, corePointerValues,
                         debugSubsumptionLevel);
-      if (WPInterpolant && !wpInterpolant.isNull())
+      if (WPInterpolant) {
         // In case a node is subsumed, the WP Expr is stored at the parent node.
         // This is crucial for generating WP Expr at the parent node.
         state.txTreeNode->setWPatSubsumption(wpInterpolant);
+      }
       return true;
     }
 
@@ -1421,10 +1422,11 @@ bool TxSubsumptionTableEntry::subsumed(
                          state.txTreeNode->getNodeSequenceNumber(),
                          nodeSequenceNumber, msg.c_str());
           }
-          if (WPInterpolant && !wpInterpolant.isNull())
+          if (WPInterpolant) {
             // In case a node is subsumed, the WP Expr is stored at the parent
             // node. This is crucial for generating WP Expr at the parent node.
             state.txTreeNode->setWPatSubsumption(wpInterpolant);
+          }
           return true;
         } else {
           // Here we try to get bound-variables-free conjunction, if there is
@@ -1510,10 +1512,11 @@ bool TxSubsumptionTableEntry::subsumed(
 
         interpolateValues(state, coreValues, corePointerValues,
                           debugSubsumptionLevel);
-        if (WPInterpolant && !wpInterpolant.isNull())
+        if (WPInterpolant) {
           // In case a node is subsumed, the WP Expr is stored at the parent
           // node. This is crucial for generating WP Expr at the parent node.
           state.txTreeNode->setWPatSubsumption(wpInterpolant);
+        }
         return true;
       }
       if (debugSubsumptionLevel >= 1) {
@@ -1540,10 +1543,11 @@ bool TxSubsumptionTableEntry::subsumed(
     state.txTreeNode->unsatCoreInterpolation(unsatCore);
     interpolateValues(state, coreValues, corePointerValues,
                       debugSubsumptionLevel);
-    if (WPInterpolant && !wpInterpolant.isNull())
+    if (WPInterpolant) {
       // In case a node is subsumed, the WP Expr is stored at the parent node.
       // This is crucial for generating WP Expr at the parent node.
       state.txTreeNode->setWPatSubsumption(wpInterpolant);
+    }
     return true;
   }
 #endif /* ENABLE_Z3 */
