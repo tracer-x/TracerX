@@ -23,6 +23,9 @@ void Z3Simplification::test() {
 }
 
 ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
+  if (txe.isNull()) {
+    return txe;
+  }
   z3::context c;
   std::map<std::string, ref<Expr> > emap;
   z3::expr z3e = c.bool_val(false);
@@ -360,7 +363,7 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
       ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
       ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
       return SDivExpr::create(l, r);
-    } else if (symbol == "rem") {
+    } else if (symbol == "rem" || symbol == "mod") {
       ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
       ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
       return SRemExpr::create(l, r);

@@ -2287,13 +2287,16 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         //        Solver::Validity result;
         //        std::vector<ref<Expr> > unsatCore;
         ref<Expr> WPExpr = entry->getWPInterpolant();
-        //        llvm::errs() << "Node " << node->getNodeSequenceNumber() <<
-        // "\n";
+
+        //        llvm::errs() << "TxTree::remove Node " <<
+        // node->getNodeSequenceNumber()
+        //                     << "\n";
         //        if (!WPExpr.isNull()) {
         //          WPExpr->dump();
         //        } else {
         //          llvm::errs() << "WPExpr is null\n";
         //        }
+
         if (!WPExpr.isNull()) {
           //          bool success = solver->evaluate(*state, WPExpr, result,
           //          unsatCore);
@@ -2400,9 +2403,13 @@ void TxTree::executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
   symbolicExecutionError = false;
 }
 
-void TxTree::storeInstruction(KInstruction *instr) {
+void TxTree::storeInstruction(KInstruction *instr, unsigned incomingBB) {
   currentTxTreeNode->reverseInstructionList.push_back(
       std::pair<KInstruction *, bool>(instr, 0));
+  if (llvm::isa<llvm::PHINode>(instr->inst)) {
+    currentTxTreeNode->phiNodeArg.insert(
+        std::pair<llvm::Instruction *, unsigned>(instr->inst, incomingBB));
+  }
 }
 
 void TxTree::markInstruction(KInstruction *instr, bool branchFlag) {
@@ -2580,7 +2587,8 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
     expr = wp->True();
   } else if (childWPInterpolant[0].isNull() || childWPInterpolant[1].isNull()) {
     //    llvm::errs() << "3--\n";
-    expr = childWPInterpolant[0];
+    expr = childWPInterpolant[0].isNull() ? childWPInterpolant[0]
+                                          : childWPInterpolant[1];
   } else if (childWPInterpolant[0] == wp->False() ||
              childWPInterpolant[1] == wp->False()) {
     //    llvm::errs() << "4--\n";
@@ -2613,20 +2621,33 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
     } else {
       expr = branchCondition; // expr is null
     }
+    //    llvm::outs() << "****** Simplify 6 -- *******\n";
+    //    expr->dump();
+    //    llvm::outs() << "------\n";
+    expr = Z3Simplification::simplify(expr);
+    //    expr->dump();
+    //    llvm::outs() << "******* End Flag = 0 *******\n";
   }
+
+  //    llvm::errs() << "TxTreeNode::generateWPInterpolant Node "
+  //                 << getNodeSequenceNumber() << "\n";
+  //    if (expr.isNull()) {
+  //      llvm::errs() << "expr is null\n";
+  //    } else {
+  //      expr->dump();
+  //    }
 
   // set to parent node
   if (parent) {
-    this->parent->setChildWPInterpolant(expr);
+    //	  llvm::errs() << "Parent Node is " << parent->getNodeSequenceNumber()
+    //<< "\n";
+    if (parent->left == this) {
+      parent->childWPInterpolant[0] = expr;
+    } else {
+      parent->childWPInterpolant[1] = expr;
+    }
   }
   return expr;
-}
-
-void TxTreeNode::setChildWPInterpolant(ref<Expr> interpolant) {
-  if (!childWPInterpolant[0].isNull() && wp->True() == childWPInterpolant[0])
-    childWPInterpolant[0] = interpolant;
-  else
-    childWPInterpolant[1] = interpolant;
 }
 
 ref<Expr> TxTreeNode::getChildWPInterpolant(int flag) {
@@ -2829,7 +2850,11 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
 
 void TxTreeNode::setWPatSubsumption(ref<Expr> _wpInterpolant) {
   if (parent) {
-    parent->setChildWPInterpolant(_wpInterpolant);
+    if (parent->left == this) {
+      parent->childWPInterpolant[0] = _wpInterpolant;
+    } else {
+      parent->childWPInterpolant[1] = _wpInterpolant;
+    }
   }
 }
 

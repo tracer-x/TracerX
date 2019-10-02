@@ -1091,17 +1091,15 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
     }
   }
 
-  // revmoving __shadow__ from var names
+  // removing __shadow__ from var names
   std::set<std::string> pimiuVars2;
   for (std::set<std::string>::iterator it1 = pimiuVars.begin(),
                                        ie1 = pimiuVars.end();
        it1 != ie1; ++it1) {
     std::string toErase = "__shadow__";
     size_t pos = (*it1).find(toErase);
-    if (pos != std::string::npos) {
-      std::string str = (*it1);
-      str.erase(pos, toErase.length());
-      pimiuVars2.insert(str);
+    if (pos == std::string::npos) {
+      pimiuVars2.insert(*it1);
     }
   }
 
@@ -1792,6 +1790,18 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
   } else if (isa<llvm::GetElementPtrInst>(val)) {
     llvm::GetElementPtrInst *gep = dyn_cast<llvm::GetElementPtrInst>(val);
     ret = getGepInst(gep);
+  } else if (isa<llvm::Constant>(val)) {
+    if (isa<llvm::ConstantPointerNull>(val)) {
+      return Expr::createPointer(0);
+    } else {
+      llvm::errs() << "Value:";
+      val->dump();
+      llvm::errs() << "\nType:";
+      val->getType()->dump();
+      klee_error(
+          "\nTxWeakestPreCondition::generateExprFromOperand, This constant"
+          " case not implemented yet\n");
+    }
   } else {
     llvm::errs() << "Value:";
     val->dump();
@@ -1843,6 +1853,11 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
                  "implemented yet!");
     }
     }
+  } else if (llvm::isa<llvm::PHINode>(value)) {
+    llvm::PHINode *phi = dyn_cast<llvm::PHINode>(value);
+    result = getPhiInst(phi);
+    if (result.isNull())
+      return result;
   } else {
     value->dump();
     klee_error("TxWeakestPreCondition::getCondition: value is not "
@@ -2285,8 +2300,12 @@ ref<Expr> TxWeakestPreCondition::getSwitchInst(llvm::SwitchInst *si) {
 }
 
 ref<Expr> TxWeakestPreCondition::getPhiInst(llvm::PHINode *phi) {
-  ref<Expr> result;
-  klee_warning("PUSHUP7");
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
+  llvm::Value *inputArg = phi->getOperand(node->phiNodeArg[phi]);
+#else
+  llvm::Value *inputArg = phi->getOperand(node->phiNodeArg[phi] * 2);
+#endif
+  ref<Expr> result = this->generateExprFromOperand(inputArg);
   return result;
 }
 
