@@ -535,9 +535,6 @@ public:
   /// \return Return the weakest precondition object
   TxWeakestPreCondition *getWP() { return wp; }
 
-  /// \brief Store the child WP interpolants in the parent node
-  void setChildWPInterpolant(ref<Expr> interpolant);
-
   /// \brief Get the stored child WP interpolants in the parent node
   ref<Expr> getChildWPInterpolant(int flag);
 
