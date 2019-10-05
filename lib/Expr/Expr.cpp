@@ -221,10 +221,11 @@ unsigned ReadExpr::computeHash() {
 }
 
 unsigned WPVarExpr::computeHash() {
-  int i, sum = 0;
-  for (i = 0; name[i] != '\0'; i++)
-    sum = sum + name[i] * i;
-  unsigned res = index->hash() * Expr::MAGIC_HASH_CONSTANT * sum;
+  unsigned hash = 0;
+  for(unsigned i = 0; i < name.size(); i++) {
+    hash = (hash * Expr::MAGIC_HASH_CONSTANT) + name[i];
+  }
+  unsigned res = index->hash() * Expr::MAGIC_HASH_CONSTANT * hash;
   hashValue = res;
   return hashValue;
 }
