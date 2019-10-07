@@ -56,6 +56,7 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
   prevProgramPoint = node->getPrevProgramPoint();
+  phiValues = node->getPhiValue();
 
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
@@ -795,9 +796,28 @@ bool TxSubsumptionTableEntry::subsumed(
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
 
-  // PhiNode Check
+  // PhiNode Check 1 (checking previous BB is the same at subsumption point)
   if (prevProgramPoint != reinterpret_cast<uintptr_t>(state.prevPC->inst)) {
     return false;
+  }
+
+  // PhiNode Check 2 (checking the value of phi instructions at subsumption
+  // point)
+  for (std::map<llvm::Value *, std::set<ref<Expr> > >::const_iterator it =
+           phiValues.begin();
+       it != phiValues.end(); ++it) {
+    std::set<ref<Expr> > tmp = (*it).second;
+    if (!isa<llvm::Instruction>((*it).first))
+      return false;
+    llvm::Instruction *inst = dyn_cast<llvm::Instruction>((*it).first);
+    ref<Expr> phiVal = state.txTreeNode->getPhiValue(inst);
+    if (phiVal.isNull())
+      return false;
+    for (std::set<ref<Expr> >::const_iterator it1 = tmp.begin();
+         it1 != tmp.end(); ++it1) {
+      if (phiVal.compare((*it1)) == 0)
+        return false;
+    }
   }
 
   // Tell the solver implementation that we are checking for subsumption for
@@ -2197,6 +2217,22 @@ TxTreeNode::getStoredCoreExpressionsTime("GetStoredCoreExpressionsTime",
 // The interpolation tree node sequence number
 uint64_t TxTreeNode::nextNodeSequenceNumber = 1;
 
+void TxTreeNode::setPhiValue(llvm::Value *val, ref<Expr> value) {
+  if (isa<llvm::Instruction>(val)) {
+    llvm::Instruction *instr = dyn_cast<llvm::Instruction>(val);
+    phiValues[instr].insert(value);
+  }
+}
+
+ref<Expr> TxTreeNode::getPhiValue(llvm::Instruction *instr) {
+  ref<Expr> dummy;
+  // For now we don't have any means to check phi values in a loop, so we should
+  // not subsume here.
+  if (phiValues[instr].size() > 1)
+    klee_error("TxTreeNode::getPhiValue, phiValues set size > 1!");
+  return dummy;
+}
+
 void TxTreeNode::printTimeStat(std::stringstream &stream) {
   stream << "KLEE: done:     getInterpolant = "
          << ((double)getInterpolantTime.getValue()) / 1000 << "\n";
@@ -2220,7 +2256,7 @@ TxTreeNode::TxTreeNode(
     TxTreeNode *_parent, llvm::DataLayout *_targetData,
     std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses)
     : parent(_parent), left(0), right(0), programPoint(0), prevProgramPoint(0),
-      nodeSequenceNumber(0), storable(true),
+      phiValuesFlag(1), nodeSequenceNumber(0), storable(true),
       graph(_parent ? _parent->graph : 0),
       instructionsDepth(_parent ? _parent->instructionsDepth : 0),
       targetData(_targetData), globalAddresses(_globalAddresses),

@@ -1715,6 +1715,10 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       ref<Expr> cond = eval(ki, 0, state).value;
       Executor::StatePair branches = fork(state, cond, false);
 
+      // stop collecting phi values for the current node
+      if (INTERPOLATION_ENABLED)
+        txTree->setPhiValuesFlag(0);
+
       // NOTE: There is a hidden dependency here, markBranchVisited
       // requires that we still be in the context of the branch
       // instruction (it reuses its statistic id). Should be cleaned
@@ -2012,8 +2016,14 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     if (INTERPOLATION_ENABLED) {
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
       txTree->executePHI(i, state.incomingBBIndex, result);
+      if (txTree->getPhiValuesFlag()) {
+        txTree->setPhiValue(i->getOperand(state.incomingBBIndex), result);
+      }
 #else
       txTree->executePHI(i, state.incomingBBIndex * 2, result);
+      if (txTree->getPhiValuesFlag()) {
+        txTree->setPhiValue(i->getOperand(state.incomingBBIndex * 2), result);
+      }
 #endif
     }
 

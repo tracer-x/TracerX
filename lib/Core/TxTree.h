@@ -177,7 +177,10 @@ class TxSubsumptionTableEntry {
 
   std::set<const Array *> existentials;
 
+  // Used to ensure at subsumption the value of the phiNodes in the subsumed
+  // tree remain the same
   uintptr_t prevProgramPoint;
+  std::map<llvm::Value *, std::set<ref<Expr> > > phiValues;
 
   /// \brief A procedure for building subsumption check constraints using
   /// symbolically-addressed store elements
@@ -375,7 +378,11 @@ class TxTreeNode {
 
   uintptr_t programPoint;
 
+  // Used to ensure at subsumption the value of the phiNodes in the subsumed
+  // tree remain the same
   uintptr_t prevProgramPoint;
+  std::map<llvm::Value *, std::set<ref<Expr> > > phiValues;
+  bool phiValuesFlag;
 
   uint64_t nodeSequenceNumber;
 
@@ -455,7 +462,21 @@ public:
 
   uintptr_t getPrevProgramPoint() { return prevProgramPoint; }
 
+  bool getPhiValuesFlag() { return phiValuesFlag; }
+
+  void setPhiValuesFlag(bool _phiValuesFlag) { phiValuesFlag = _phiValuesFlag; }
+
   uint64_t getNodeSequenceNumber() { return nodeSequenceNumber; }
+
+  TxDependency *getDependency() { return dependency; }
+
+  std::map<llvm::Value *, std::set<ref<Expr> > > getPhiValue() {
+    return phiValues;
+  };
+
+  void setPhiValue(llvm::Value *instr, ref<Expr> value);
+
+  ref<Expr> getPhiValue(llvm::Instruction *instr);
 
   /// \brief Retrieve the interpolant for this node as KLEE expression object
   ///
@@ -733,6 +754,19 @@ public:
   ///
   /// \param state The KLEE execution state to associate the current node with.
   void setCurrentINode(ExecutionState &state);
+
+  // \brief stop collecting phi values for the current node
+  void setPhiValuesFlag(bool phiValuesFlag) {
+    currentTxTreeNode->setPhiValuesFlag(phiValuesFlag);
+  }
+
+  // \brief get the flag to store phi values for the current node
+  bool getPhiValuesFlag() { return currentTxTreeNode->getPhiValuesFlag(); }
+
+  // \brief stop collecting phi values for the current node
+  void setPhiValue(llvm::Value *instr, ref<Expr> value) {
+    currentTxTreeNode->setPhiValue(instr, value);
+  }
 
   /// \brief Deletes the Tracer-X tree node
   ///
