@@ -796,28 +796,60 @@ bool TxSubsumptionTableEntry::subsumed(
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
 
-  // PhiNode Check 1 (checking previous BB is the same at subsumption point)
-  if (prevProgramPoint != reinterpret_cast<uintptr_t>(state.prevPC->inst)) {
-    return false;
-  }
-
-  // PhiNode Check 2 (checking the value of phi instructions at subsumption
+  // PhiNode Check 1 (checking the value of phi instructions at subsumption
   // point)
   for (std::map<llvm::Value *, std::set<ref<Expr> > >::const_iterator it =
            phiValues.begin();
        it != phiValues.end(); ++it) {
-    std::set<ref<Expr> > tmp = (*it).second;
-    if (!isa<llvm::Instruction>((*it).first))
-      return false;
-    llvm::Instruction *inst = dyn_cast<llvm::Instruction>((*it).first);
-    ref<Expr> phiVal = state.txTreeNode->getPhiValue(inst);
-    if (phiVal.isNull())
-      return false;
-    for (std::set<ref<Expr> >::const_iterator it1 = tmp.begin();
-         it1 != tmp.end(); ++it1) {
-      if (phiVal.compare((*it1)) == 0)
+    if (isa<llvm::PHINode>((*it).first)) {
+      llvm::Instruction *phi = dyn_cast<llvm::Instruction>((*it).first);
+      std::set<ref<Expr> > values = (*it).second;
+/*klee_warning("Start printing phiValues:");
+klee_warning("instruction");
+phi->dump();
+klee_warning("values");
+for (std::set<ref<Expr> >::const_iterator it1 = values.begin();
+         it1 != values.end(); ++it1) {
+        (*it1)->dump();
+}
+klee_warning("End printing phiValues");*/
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
+      llvm::Value *inputArg = phi->getOperand(state.incomingBBIndex);
+#else
+      llvm::Value *inputArg = phi->getOperand(state.incomingBBIndex * 2);
+#endif
+      /*klee_warning("Printing incoming instruction");
+      inputArg->dump();
+      klee_warning("Printing incoming value");*/
+      if (state.txTreeNode->getParent() &&
+          state.txTreeNode->getParent()->getDependency()) {
+        std::map<llvm::Value *, std::vector<ref<TxStateValue> > > valuesMap =
+            state.txTreeNode->getParent()->getDependency()->getvaluesMap();
+        std::vector<ref<TxStateValue> > txStateVal =
+            valuesMap[dyn_cast<llvm::Value>(inputArg)];
+        if (txStateVal.size() == 0) {
+          klee_warning("TxSubsumptionTableEntry::subsumed txStateVal is empty");
+          return false;
+        }
+        ref<Expr> inputVal = txStateVal.back()->getExpression();
+        for (std::set<ref<Expr> >::const_iterator it1 = values.begin();
+             it1 != values.end(); ++it1) {
+          if (inputVal.compare(*it1) != 0)
+            return false;
+        }
+      } else {
+        klee_warning("TxSubsumptionTableEntry::subsumed:parent doen't exist");
         return false;
+      }
+    } else {
+      klee_warning("TxSubsumptionTableEntry::subsumed: not implemented yet");
+      return false;
     }
+  }
+
+  // PhiNode Check 2 (checking previous BB is the same at subsumption point)
+  if (prevProgramPoint != reinterpret_cast<uintptr_t>(state.prevPC->inst)) {
+    return false;
   }
 
   // Tell the solver implementation that we are checking for subsumption for

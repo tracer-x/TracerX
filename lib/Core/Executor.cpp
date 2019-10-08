@@ -1705,6 +1705,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #endif
   case Instruction::Br: {
     BranchInst *bi = cast<BranchInst>(i);
+    // stop collecting phi values for the current node
+    if (INTERPOLATION_ENABLED)
+      txTree->setPhiValuesFlag(0);
     if (bi->isUnconditional()) {
       transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), state);
       if (INTERPOLATION_ENABLED)
@@ -1714,10 +1717,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       assert(bi->getCondition() == bi->getOperand(0) && "Wrong operand index!");
       ref<Expr> cond = eval(ki, 0, state).value;
       Executor::StatePair branches = fork(state, cond, false);
-
-      // stop collecting phi values for the current node
-      if (INTERPOLATION_ENABLED)
-        txTree->setPhiValuesFlag(0);
 
       // NOTE: There is a hidden dependency here, markBranchVisited
       // requires that we still be in the context of the branch
@@ -2016,15 +2015,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     if (INTERPOLATION_ENABLED) {
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
       txTree->executePHI(i, state.incomingBBIndex, result);
-      if (txTree->getPhiValuesFlag()) {
-        txTree->setPhiValue(i->getOperand(state.incomingBBIndex), result);
-      }
 #else
       txTree->executePHI(i, state.incomingBBIndex * 2, result);
-      if (txTree->getPhiValuesFlag()) {
-        txTree->setPhiValue(i->getOperand(state.incomingBBIndex * 2), result);
-      }
 #endif
+      if (txTree->getPhiValuesFlag())
+        txTree->setPhiValue(i, result);
     }
 
     break;

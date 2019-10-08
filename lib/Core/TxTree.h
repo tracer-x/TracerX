@@ -462,6 +462,8 @@ public:
 
   uintptr_t getPrevProgramPoint() { return prevProgramPoint; }
 
+  TxTreeNode *getParent() { return parent; }
+
   bool getPhiValuesFlag() { return phiValuesFlag; }
 
   void setPhiValuesFlag(bool _phiValuesFlag) { phiValuesFlag = _phiValuesFlag; }
