@@ -404,7 +404,7 @@ ref<Expr> TxSubsumptionTableEntry::replaceExpr(ref<Expr> originalExpr,
 
   if (originalExpr->getKid(0) == replacedExpr)
     return TxShadowArray::createBinaryOfSameKind(originalExpr, replacementExpr,
-                                               originalExpr->getKid(1));
+                                                 originalExpr->getKid(1));
 
   if (originalExpr->getKid(1) == replacedExpr)
     return TxShadowArray::createBinaryOfSameKind(
@@ -798,44 +798,35 @@ bool TxSubsumptionTableEntry::subsumed(
 
   // PhiNode Check 1 (checking the value of phi instructions at subsumption
   // point)
-  for (std::map<llvm::Value *, std::set<ref<Expr> > >::const_iterator it =
+  for (std::map<llvm::Value *, std::vector<ref<Expr> > >::const_iterator it =
            phiValues.begin();
        it != phiValues.end(); ++it) {
     if (isa<llvm::PHINode>((*it).first)) {
       llvm::Instruction *phi = dyn_cast<llvm::Instruction>((*it).first);
-      std::set<ref<Expr> > values = (*it).second;
-/*klee_warning("Start printing phiValues:");
-klee_warning("instruction");
-phi->dump();
-klee_warning("values");
-for (std::set<ref<Expr> >::const_iterator it1 = values.begin();
-         it1 != values.end(); ++it1) {
-        (*it1)->dump();
-}
-klee_warning("End printing phiValues");*/
+      std::vector<ref<Expr> > values = (*it).second;
+      if (values.empty()) {
+        continue;
+      }
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
       llvm::Value *inputArg = phi->getOperand(state.incomingBBIndex);
 #else
       llvm::Value *inputArg = phi->getOperand(state.incomingBBIndex * 2);
 #endif
-      /*klee_warning("Printing incoming instruction");
-      inputArg->dump();
-      klee_warning("Printing incoming value");*/
+
       if (state.txTreeNode->getParent() &&
           state.txTreeNode->getParent()->getDependency()) {
         std::map<llvm::Value *, std::vector<ref<TxStateValue> > > valuesMap =
             state.txTreeNode->getParent()->getDependency()->getvaluesMap();
         std::vector<ref<TxStateValue> > txStateVal =
             valuesMap[dyn_cast<llvm::Value>(inputArg)];
-        if (txStateVal.size() == 0) {
+        if (txStateVal.empty()) {
           klee_warning("TxSubsumptionTableEntry::subsumed txStateVal is empty");
           return false;
         }
-        ref<Expr> inputVal = txStateVal.back()->getExpression();
-        for (std::set<ref<Expr> >::const_iterator it1 = values.begin();
-             it1 != values.end(); ++it1) {
-          if (inputVal.compare(*it1) != 0)
-            return false;
+        txStateVal.back()->getExpression()->dump();
+        values.back()->dump();
+        if (txStateVal.back()->getExpression().compare(values.back()) != 0) {
+          return false;
         }
       } else {
         klee_warning("TxSubsumptionTableEntry::subsumed:parent doen't exist");
@@ -1137,13 +1128,13 @@ klee_warning("End printing phiValues");*/
               e->getAddress()->getOffset(), coreValues, corePointerValues,
               unifiedBases, debugSubsumptionLevel);
           if (constraint.isNull())
-              return false;
-            if (stateEqualityConstraints.isNull()) {
-              stateEqualityConstraints = constraint;
-            } else {
-              stateEqualityConstraints =
-                  AndExpr::create(constraint, stateEqualityConstraints);
-            }
+            return false;
+          if (stateEqualityConstraints.isNull()) {
+            stateEqualityConstraints = constraint;
+          } else {
+            stateEqualityConstraints =
+                AndExpr::create(constraint, stateEqualityConstraints);
+          }
         } else {
           // Match not found
           return false;
@@ -1307,10 +1298,10 @@ klee_warning("End printing phiValues");*/
             stateEqualityConstraints =
                 AndExpr::create(constraint, stateEqualityConstraints);
           }
-          } else {
-            // Match not found
-            return false;
-          }
+        } else {
+          // Match not found
+          return false;
+        }
       } else {
         ref<TxStoreEntry> e = mIt->second;
         bool leftUse =
@@ -2001,9 +1992,9 @@ std::string TxTree::inTwoDecimalPoints(const double n) {
 std::string TxTree::getInterpolationStat() {
   std::stringstream stream;
   stream << "KLEE: done: Total reduced symbolic execution tree nodes = "
-		 << TxTreeGraph::nodeCount  << "\n";
-  stream << "KLEE: done: Total number of visited basic blocks = "
-		 << blockCount  << "\n";
+         << TxTreeGraph::nodeCount << "\n";
+  stream << "KLEE: done: Total number of visited basic blocks = " << blockCount
+         << "\n";
   stream << "\nKLEE: done: Subsumption statistics\n";
   printTableStat(stream);
   stream << "\nKLEE: done: TxTree method execution times (ms):\n";
@@ -2036,9 +2027,8 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
   // first instruction executed of the sequence executed for a state
   // node, typically this the first instruction of a basic block.
   // Subsumption check only matches against this first instruction.
-  if (!state.txTreeNode ||
-      reinterpret_cast<uintptr_t>(state.pc->inst) !=
-          state.txTreeNode->getProgramPoint())
+  if (!state.txTreeNode || reinterpret_cast<uintptr_t>(state.pc->inst) !=
+                               state.txTreeNode->getProgramPoint())
     return false;
 
   int debugSubsumptionLevel =
@@ -2252,17 +2242,8 @@ uint64_t TxTreeNode::nextNodeSequenceNumber = 1;
 void TxTreeNode::setPhiValue(llvm::Value *val, ref<Expr> value) {
   if (isa<llvm::Instruction>(val)) {
     llvm::Instruction *instr = dyn_cast<llvm::Instruction>(val);
-    phiValues[instr].insert(value);
+    phiValues[instr].push_back(value);
   }
-}
-
-ref<Expr> TxTreeNode::getPhiValue(llvm::Instruction *instr) {
-  ref<Expr> dummy;
-  // For now we don't have any means to check phi values in a loop, so we should
-  // not subsume here.
-  if (phiValues[instr].size() > 1)
-    klee_error("TxTreeNode::getPhiValue, phiValues set size > 1!");
-  return dummy;
 }
 
 void TxTreeNode::printTimeStat(std::stringstream &stream) {
@@ -2352,8 +2333,8 @@ void TxTreeNode::bindReturnValue(llvm::CallInst *site, llvm::Instruction *inst,
 }
 
 void TxTreeNode::getStoredExpressions(
-    const std::vector<llvm::Instruction *> &_callHistory,
-    bool &leftRetrieval, TxStore::TopStateStore &__internalStore,
+    const std::vector<llvm::Instruction *> &_callHistory, bool &leftRetrieval,
+    TxStore::TopStateStore &__internalStore,
     TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) const {
   TimerStatIncrementer t(getStoredExpressionsTime);
