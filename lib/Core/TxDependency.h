@@ -432,7 +432,7 @@ public:
         symbolicallyAddressedHistoricalStore);
   }
 
-  std::map<llvm::Value *, std::vector<ref<TxStateValue> > > getvaluesMap() {
+  std::map<llvm::Value *, std::vector<ref<TxStateValue> > >& getValuesMap() {
     return valuesMap;
   }
 

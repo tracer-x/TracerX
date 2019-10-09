@@ -2018,8 +2018,20 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #else
       txTree->executePHI(i, state.incomingBBIndex * 2, result);
 #endif
-      if (txTree->getPhiValuesFlag())
+
+      // for fixing phi bug
+      if (txTree->getPhiValuesFlag()) {
         txTree->setPhiValue(i, result);
+        // save operand for upward marking
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
+        llvm::Value *inputArg = i->getOperand(state.incomingBBIndex);
+#else
+        llvm::Value *inputArg = i->getOperand(state.incomingBBIndex * 2);
+#endif
+        if (isa<llvm::Instruction>(inputArg)) {
+          txTree->getCurrentTxTreeNode()->phiOperands.push_back(inputArg);
+        }
+      }
     }
 
     break;

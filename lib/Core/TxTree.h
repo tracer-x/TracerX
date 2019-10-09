@@ -181,6 +181,7 @@ class TxSubsumptionTableEntry {
   // tree remain the same
   uintptr_t prevProgramPoint;
   std::map<llvm::Value *, std::vector<ref<Expr> > > phiValues;
+  std::map<llvm::Value *, ref<Expr> > nonPhiValues;
 
   /// \brief A procedure for building subsumption check constraints using
   /// symbolically-addressed store elements
@@ -294,6 +295,15 @@ class TxSubsumptionTableEntry {
   static void printStat(std::stringstream &stream);
 
 public:
+  void markValueMap(TxTreeNode *node);
+  void markUp(TxTreeNode *node, std::vector<llvm::Value *> &insts,
+              std::set<llvm::Value *> &markedInsts);
+  std::vector<llvm::Value *>
+  getDependants(llvm::Value *ins,
+                std::map<llvm::Value *, std::vector<ref<TxStateValue> > >
+                    &currentValuesMap,
+                std::set<llvm::Value *> &markedInstruction);
+
   const uintptr_t programPoint;
 
   const uint64_t nodeSequenceNumber;
@@ -382,6 +392,7 @@ class TxTreeNode {
   // tree remain the same
   uintptr_t prevProgramPoint;
   std::map<llvm::Value *, std::vector<ref<Expr> > > phiValues;
+
   bool phiValuesFlag;
 
   uint64_t nodeSequenceNumber;
@@ -452,6 +463,9 @@ class TxTreeNode {
   }
 
 public:
+  std::map<llvm::Value *, ref<Expr> > nonPhiValues;
+  std::vector<llvm::Value *> phiOperands;
+
   bool isSubsumed;
 
   /// \brief The entry call history
@@ -772,6 +786,8 @@ public:
   void setPhiValue(llvm::Value *instr, ref<Expr> value) {
     currentTxTreeNode->setPhiValue(instr, value);
   }
+
+  TxTreeNode *getCurrentTxTreeNode() { return currentTxTreeNode; }
 
   /// \brief Deletes the Tracer-X tree node
   ///
