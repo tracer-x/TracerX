@@ -1812,6 +1812,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #endif
   case Instruction::Br: {
     BranchInst *bi = cast<BranchInst>(i);
+    txTree->getCurrentTxTreeNode()->isCollectingPhi = false;
     if (bi->isUnconditional()) {
       transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), state);
       if (INTERPOLATION_ENABLED)
@@ -2117,7 +2118,10 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
     // Update dependency
     if (INTERPOLATION_ENABLED) {
-      txTree->getCurrentTxTreeNode()->phiNodes.push_back(i);
+      if (txTree->getCurrentTxTreeNode()->isCollectingPhi) {
+        txTree->getCurrentTxTreeNode()->phiNodes.push_back(i);
+      }
+
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
       txTree->executePHI(i, state.incomingBBIndex, result);
 #else

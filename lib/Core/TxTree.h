@@ -468,6 +468,7 @@ public:
   /// \brief The current call history
   std::vector<llvm::Instruction *> callHistory;
 
+  bool isCollectingPhi;
   std::vector<llvm::Value *> phiNodes;
   std::vector<llvm::Value *> markedValues;
 
