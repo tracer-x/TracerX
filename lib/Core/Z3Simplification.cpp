@@ -360,7 +360,7 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
       ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
       ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
       return SDivExpr::create(l, r);
-    } else if (symbol == "rem") {
+    } else if (symbol == "rem" || symbol == "mod") {
       ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
       ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
       return SRemExpr::create(l, r);
