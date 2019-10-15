@@ -2509,6 +2509,12 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
     } else {
       expr = branchCondition; // expr is null
     }
+    //    llvm::outs() << "****** Simplify 6 -- *******\n";
+    //    expr->dump();
+    //    llvm::outs() << "------\n";
+    expr = Z3Simplification::simplify(expr);
+    //    expr->dump();
+    //    llvm::outs() << "******* End Flag = 0 *******\n";
   }
 
   //    llvm::errs() << "TxTreeNode::generateWPInterpolant Node "
