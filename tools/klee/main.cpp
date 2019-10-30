@@ -573,6 +573,16 @@ void KleeHandler::processTestCase(const ExecutionState &state,
     unsigned id = ++m_testIndex;
 
     if (success) {
+      // xml test
+      std::stringstream ss;
+      ss << "testcase-" << id << ".xml";
+      std::string tc = getOutputFilename(ss.str());
+      std::ofstream tcofs(tc.c_str(), std::ofstream::app);
+      tcofs << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n";
+	  tcofs << "<!DOCTYPE testcase PUBLIC \"+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN\" \"https://sosy-lab.org/test-format/testcase-1.1.dtd\">\n";
+	  tcofs << "<testcase>\n";
+	  // --- xml
+
       KTest b;
       b.numArgs = m_argc;
       b.args = m_argv;
@@ -588,11 +598,24 @@ void KleeHandler::processTestCase(const ExecutionState &state,
         o->bytes = new unsigned char[o->numBytes];
         assert(o->bytes);
         std::copy(out[i].second.begin(), out[i].second.end(), o->bytes);
+
+        // xml input: <input variable="x" type="int">1023</input>
+        tcofs << "  <input variable=\"" << out[i].first << "\">";
+        int val ;
+        std::memcpy(&val, o->bytes, o->numBytes);
+        tcofs << val;
+        tcofs << "</input>\n";
+        // --- xml
+
       }
 
       if (!kTest_toFile(&b, getOutputFilename(getTestFilename("ktest", id)).c_str())) {
         klee_warning("unable to write output test case, losing it");
       }
+
+      // write to xml file
+      tcofs << "</testcase>\n";
+      tcofs.close();
 
       for (unsigned i=0; i<b.numObjects; i++)
         delete[] b.objects[i].bytes;
