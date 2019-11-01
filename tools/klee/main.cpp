@@ -396,6 +396,26 @@ public:
                                  std::vector<std::string> &results);
 
   static std::string getRunTimeLibraryPath(const char *argv0);
+
+
+  std::string tohex(unsigned char *bytes, int len)
+  {
+    static const char characters[] = "0123456789ABCDEF";
+
+    // Zeroes out the buffer unnecessarily, can't be avoided for std::string.
+    std::string ret(len * 2, 0);
+
+    // Hack... Against the rules but avoids copying the whole buffer.
+    char *buf = const_cast<char *>(ret.data());
+
+    for (int i=0;i<len;++i)
+    {
+      *buf++ = characters[bytes[i] >> 4];
+      *buf++ = characters[bytes[i] & 0x0F];
+    }
+    return ret;
+  }
+
 };
 
 KleeHandler::KleeHandler(int argc, char **argv)
@@ -601,9 +621,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
 
         // xml input: <input variable="x" type="int">1023</input>
         tcofs << "  <input variable=\"" << out[i].first << "\">";
-        int val ;
-        std::memcpy(&val, o->bytes, o->numBytes);
-        tcofs << val;
+        tcofs << tohex(o->bytes, o->numBytes);;
         tcofs << "</input>\n";
         // --- xml
 
@@ -616,6 +634,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
       // write to xml file
       tcofs << "</testcase>\n";
       tcofs.close();
+      // --- xml
 
       for (unsigned i=0; i<b.numObjects; i++)
         delete[] b.objects[i].bytes;
