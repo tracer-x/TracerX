@@ -828,7 +828,9 @@ ref<Expr> TxWeakestPreCondition::intersectWPExpr(ref<Expr> branchCondition,
                                                  ref<Expr> expr1,
                                                  ref<Expr> expr2) {
   // v
-  std::set<std::string> bvars = TxPartitionHelper::getExprVars(branchCondition);
+  std::set<std::string> bvars;
+  if (!branchCondition.isNull())
+    bvars = TxPartitionHelper::getExprVars(branchCondition);
 
   // Closure(W1,v)
   std::set<std::string> closure1 = bvars;
@@ -1674,9 +1676,20 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         ref<Expr> left = this->generateExprFromOperand(i->getOperand(0));
         ref<Expr> right = this->generateExprFromOperand(i->getOperand(1));
 
-        if (left.isNull() || right.isNull()) {
+        /*if (left.isNull() || right.isNull()) {
           ref<Expr> result;
           return result;
+        }*/
+
+        if (right->getKind() == Expr::WPVar) {
+          ref<WPVarExpr> var = dyn_cast<WPVarExpr>(right);
+          if (var->getName() == "wcet" && left->getKind() == Expr::Constant) {
+            ref<ConstantExpr> val = dyn_cast<ConstantExpr>(left);
+            if (val->getZExtValue() == 0) {
+              llvm::errs() << "WCET Pushup: ";
+              WPExpr->getKid(1)->dump();
+            }
+          }
         }
 
         WPExpr = TxWPHelper::substituteExpr(WPExpr, right, left);
@@ -1686,7 +1699,7 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         WPExpr = Z3Simplification::simplify(WPExpr);
         //        WPExpr->dump();
         //        llvm::outs() << "******* End Flag = 0 *******\n";
-      } else if (isa<llvm::GetElementPtrInst>(
+      } /*else if (isa<llvm::GetElementPtrInst>(
                      i->getOperand(1))) { // Update Array
         llvm::GetElementPtrInst *parentGEP =
             dyn_cast<llvm::GetElementPtrInst>(i->getOperand(1));
@@ -1712,7 +1725,7 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         //        WPExpr->dump();
         //        llvm::outs() << "****** End Flag = 0 for Update Array
         // *******\n";
-      }
+      }*/
     }
   }
   return WPExpr;
@@ -1873,7 +1886,7 @@ ref<Expr> TxWeakestPreCondition::getConstantFP(llvm::ConstantFP *CI) {
 
 ref<Expr> TxWeakestPreCondition::getConstantExpr(llvm::ConstantExpr *ce) {
   ref<Expr> result;
-  klee_warning("PUSHUP1");
+  // klee_warning("PUSHUP1");
   return result;
 
   switch (ce->getOpcode()) {
@@ -1926,7 +1939,7 @@ ref<Expr> TxWeakestPreCondition::getGlobalValue(llvm::GlobalValue *gv) {
 ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
   unsigned width;
   ref<Expr> index, result;
-  klee_warning("PUSHUP2");
+  // klee_warning("PUSHUP2");
   return result;
   width = getFunctionArgumentSize(arg);
   index = ConstantExpr::create(0, width);
@@ -1937,7 +1950,7 @@ ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
 std::pair<ref<Expr>, ref<Expr> >
 TxWeakestPreCondition::getPointer(llvm::GetElementPtrInst *gep) {
   std::pair<ref<Expr>, ref<Expr> > pair;
-  klee_warning("PUSHUP3");
+  // klee_warning("PUSHUP3");
   return pair;
   if (isa<llvm::GetElementPtrInst>(gep->getOperand(0))) {
     llvm::GetElementPtrInst *parentGEP =
@@ -1984,7 +1997,7 @@ TxWeakestPreCondition::getPointer(llvm::GetElementPtrInst *gep) {
 
 ref<Expr> TxWeakestPreCondition::getLoadGep(llvm::LoadInst *p) {
   ref<Expr> result;
-  klee_warning("PUSHUP4");
+  // klee_warning("PUSHUP4");
   return result;
 }
 
@@ -2273,19 +2286,19 @@ ref<Expr> TxWeakestPreCondition::getGepInst(llvm::GetElementPtrInst *gep) {
 
 
   }*/
-  klee_warning("PUSHUP5");
+  // klee_warning("PUSHUP5");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getSwitchInst(llvm::SwitchInst *si) {
   ref<Expr> result;
-  klee_warning("PUSHUP6");
+  // klee_warning("PUSHUP6");
   return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getPhiInst(llvm::PHINode *phi) {
   ref<Expr> result;
-  klee_warning("PUSHUP7");
+  // klee_warning("PUSHUP7");
   return result;
 }
 
@@ -2329,7 +2342,7 @@ bool TxWeakestPreCondition::inFunction(llvm::Instruction *ins,
 
 ref<Expr> TxWeakestPreCondition::getCallAssume(llvm::CallInst *ci) {
   ref<Expr> result;
-  klee_warning("PUSHUP8");
+  // klee_warning("PUSHUP8");
   return result;
 }
 

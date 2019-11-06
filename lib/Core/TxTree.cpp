@@ -2320,6 +2320,8 @@ void TxTree::markInstruction(KInstruction *instr, bool branchFlag) {
   if (isa<llvm::BranchInst>(iter->first->inst) &&
       fname.find("klee_") == std::string::npos &&
       fname.find("tx_") == std::string::npos) {
+  }
+  if (fname.find("tracerx_check") != std::string::npos) {
     if (branchFlag == true)
       iter->second = 1;
     else
@@ -2497,24 +2499,25 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
         branchCondition = wp->getBrCondition(i);
       }
     }
-    if (!branchCondition.isNull()) {
-      expr = wp->intersectWPExpr(branchCondition, childWPInterpolant[0],
-                                 childWPInterpolant[1]);
-      if (!expr.isNull()) {
-        wp->setWPExpr(expr);
-        // Generate weakest precondition from pathCondition and/or BB
-        // instructions
-        expr = wp->PushUp(reverseInstructionList);
+    // if (!branchCondition.isNull()) {
+    expr = wp->intersectWPExpr(branchCondition, childWPInterpolant[0],
+                               childWPInterpolant[1]);
+    if (!expr.isNull()) {
+      wp->setWPExpr(expr);
+      // Generate weakest precondition from pathCondition and/or BB
+      // instructions
+      expr = wp->PushUp(reverseInstructionList);
       }
-    } else {
-      expr = branchCondition; // expr is null
-    }
-    //    llvm::outs() << "****** Simplify 6 -- *******\n";
-    //    expr->dump();
-    //    llvm::outs() << "------\n";
-    expr = Z3Simplification::simplify(expr);
-    //    expr->dump();
-    //    llvm::outs() << "******* End Flag = 0 *******\n";
+      //} else {
+      //      expr = branchCondition; // expr is null
+      //}
+      //    llvm::outs() << "****** Simplify 6 -- *******\n";
+      //    expr->dump();
+      //    llvm::outs() << "------\n";
+      if (!expr.isNull())
+        expr = Z3Simplification::simplify(expr);
+      //    expr->dump();
+      //    llvm::outs() << "******* End Flag = 0 *******\n";
   }
 
   //    llvm::errs() << "TxTreeNode::generateWPInterpolant Node "

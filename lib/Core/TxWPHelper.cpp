@@ -285,7 +285,7 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
                                      const ref<Expr> rhs) {
 
   if (rhs.isNull()) {
-    return rhs;
+    return base;
   } else if (base.compare(lhs) == 0) { // base case
     return rhs;
   } else {
