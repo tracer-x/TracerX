@@ -72,7 +72,7 @@
 #include <iomanip>
 #include <iterator>
 #include <sstream>
-
+#include <time.h>
 
 using namespace llvm;
 using namespace klee;
@@ -223,6 +223,30 @@ namespace {
   Watchdog("watchdog",
            cl::desc("Use a watchdog process to enforce --max-time."),
            cl::init(0));
+
+  cl::OptionCategory TestCompCat("Options specific to Test-Comp",
+                                 "Options specific to test-comp.");
+
+  llvm::cl::opt<bool> WriteXMLTests("write-xml-tests",
+                                    llvm::cl::desc("Write XML-formated tests"),
+                                    llvm::cl::init(false),
+                                    cl::cat(TestCompCat));
+  llvm::cl::opt<std::string> TCOrig("tc-orig",
+                                    llvm::cl::desc("Test-Comp original file"),
+                                    llvm::cl::cat(TestCompCat));
+
+  llvm::cl::opt<std::string>
+      TCHash("tc-hash", llvm::cl::desc("Test-Comp hash sum of original file"),
+             llvm::cl::cat(TestCompCat));
+
+  llvm::cl::opt<std::string>
+      SVProperty("sv-property", llvm::cl::desc("Test-Comp original file"),
+                 llvm::cl::init("assert-error"), llvm::cl::cat(TestCompCat));
+
+  llvm::cl::opt<std::string>
+      SVArchitecture("sv-architecture",
+                     llvm::cl::desc("Test-Comp original file"),
+                     llvm::cl::init("32"), llvm::cl::cat(TestCompCat));
 }
 
 extern cl::opt<double> MaxTime;
@@ -274,6 +298,17 @@ private:
   // used for writing .ktest files
   int m_argc;
   char **m_argv;
+
+  void writeTestCaseKTest(
+      const std::vector<std::pair<std::string, std::vector<unsigned char> > >
+          &out,
+      unsigned id);
+
+  void writeTestCaseXML(
+      bool isError,
+      const std::vector<std::pair<std::string, std::vector<unsigned char> > >
+          &out,
+      unsigned id);
 
 public:
   KleeHandler(int argc, char **argv);
@@ -386,7 +421,9 @@ public:
   std::string getOutputFilename(const std::string &filename);
   llvm::raw_fd_ostream *openOutputFile(const std::string &filename);
   std::string getTestFilename(const std::string &suffix, unsigned id);
+  std::string getXmlTestFilename(const std::string &suffix, unsigned id);
   llvm::raw_fd_ostream *openTestFile(const std::string &suffix, unsigned id);
+  llvm::raw_fd_ostream *openXmlTestFile(const std::string &suffix, unsigned id);
 
   // load a .path file
   static void loadPathFile(std::string name,
@@ -546,6 +583,117 @@ llvm::raw_fd_ostream *KleeHandler::openTestFile(const std::string &suffix,
   return openOutputFile(getTestFilename(suffix, id));
 }
 
+std::string KleeHandler::getXmlTestFilename(const std::string &suffix,
+                                            unsigned id) {
+  std::stringstream filename;
+  filename << "testcase-" << id << '.' << suffix;
+  return filename.str();
+}
+
+llvm::raw_fd_ostream *KleeHandler::openXmlTestFile(const std::string &suffix,
+                                                   unsigned id) {
+  return openOutputFile(getXmlTestFilename(suffix, id));
+}
+
+void KleeHandler::writeTestCaseKTest(
+    const std::vector<std::pair<std::string, std::vector<unsigned char> > >
+        &out,
+    unsigned id) {
+  KTest b;
+  b.numArgs = m_argc;
+  b.args = m_argv;
+  b.symArgvs = 0;
+  b.symArgvLen = 0;
+  b.numObjects = out.size();
+  b.objects = new KTestObject[b.numObjects];
+  assert(b.objects);
+  for (unsigned i = 0; i < b.numObjects; i++) {
+    KTestObject *o = &b.objects[i];
+    o->name = const_cast<char *>(out[i].first.c_str());
+    o->numBytes = out[i].second.size();
+    o->bytes = new unsigned char[o->numBytes];
+    assert(o->bytes);
+    std::copy(out[i].second.begin(), out[i].second.end(), o->bytes);
+  }
+  if (!kTest_toFile(&b,
+                    getOutputFilename(getTestFilename("ktest", id)).c_str())) {
+    klee_warning("unable to write output test case, losing it");
+  }
+
+  for (unsigned i = 0; i < b.numObjects; i++)
+    delete[] b.objects[i].bytes;
+  delete[] b.objects;
+}
+
+void KleeHandler::writeTestCaseXML(
+    bool isError,
+    const std::vector<std::pair<std::string, std::vector<unsigned char> > >
+        &assignments,
+    unsigned id) {
+
+  // TODO: This is super specific to test-comp and assumes that the name is the
+  // type information
+  llvm::raw_fd_ostream *file = openXmlTestFile("xml", id);
+  if (!file)
+    return;
+
+  *file << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n";
+  *file << "<!DOCTYPE testcase PUBLIC \"+//IDN sosy-lab.org//DTD test-format "
+           "testcase 1.0//EN\" "
+           "\"https://sosy-lab.org/test-format/testcase-1.0.dtd\">\n";
+  *file << "<testcase";
+  if (isError)
+    *file << " coversError=\"true\"";
+  *file << ">\n";
+  for (std::vector<
+           std::pair<std::string, std::vector<unsigned char> > >::const_iterator
+           it = assignments.begin(),
+           ie = assignments.end();
+       it != ie; ++it) {
+    *file << "\t<input variable=\"" << it->first << "\" ";
+    *file << "type =\"";
+    // print type of the input
+    *file << it->first;
+    *file << "\">";
+    errs() << "type=" << it->first << "\n";
+    // Ignore the type
+    size_t type_size_bytes = it->second.size() * 8;
+    llvm::APInt v(type_size_bytes, 0, false);
+    for (std::vector<unsigned char>::const_reverse_iterator
+             i = it->second.rbegin(),
+             e = it->second.rend();
+         i != e; ++i) {
+      v <<= 8;
+      v |= *i;
+    }
+    // print value
+
+    // Check if this is an unsigned type
+    if (it->first.find("u") == 0) {
+      v.print(*file, false);
+    } else if (it->first.rfind("*") != std::string::npos) {
+      // Pointer types
+      v.print(*file, false);
+    } else if (it->first.find("float") == 0) {
+      *file << llvm::APFloat(APFloat::IEEEhalf, v).convertToFloat();
+    } else if (it->first.find("double") == 0) {
+      *file << llvm::APFloat(APFloat::IEEEdouble, v).convertToDouble();
+    } else if (it->first.rfind("_t") != std::string::npos) {
+      // arbitrary type, e.g. sector_t
+      v.print(*file, false);
+    } else if (it->first.find("_") == 0) {
+      // _Bool
+      v.print(*file, false);
+    } else {
+      // the rest must be signed
+      v.print(*file, true);
+    }
+    *file << "</input>\n";
+  }
+  *file << "</testcase>\n";
+
+  file->flush();
+}
 
 /* Outputs all files (.ktest, .pc, .cov etc.) describing a test case */
 void KleeHandler::processTestCase(const ExecutionState &state,
@@ -573,30 +721,11 @@ void KleeHandler::processTestCase(const ExecutionState &state,
     unsigned id = ++m_testIndex;
 
     if (success) {
-      KTest b;
-      b.numArgs = m_argc;
-      b.args = m_argv;
-      b.symArgvs = 0;
-      b.symArgvLen = 0;
-      b.numObjects = out.size();
-      b.objects = new KTestObject[b.numObjects];
-      assert(b.objects);
-      for (unsigned i=0; i<b.numObjects; i++) {
-        KTestObject *o = &b.objects[i];
-        o->name = const_cast<char*>(out[i].first.c_str());
-        o->numBytes = out[i].second.size();
-        o->bytes = new unsigned char[o->numBytes];
-        assert(o->bytes);
-        std::copy(out[i].second.begin(), out[i].second.end(), o->bytes);
+      if (!WriteXMLTests) {
+        writeTestCaseKTest(out, id);
+      } else {
+        writeTestCaseXML(errorMessage != NULL, out, id);
       }
-
-      if (!kTest_toFile(&b, getOutputFilename(getTestFilename("ktest", id)).c_str())) {
-        klee_warning("unable to write output test case, losing it");
-      }
-
-      for (unsigned i=0; i<b.numObjects; i++)
-        delete[] b.objects[i].bytes;
-      delete[] b.objects;
     }
 
     if (errorMessage) {
@@ -1541,6 +1670,48 @@ int main(int argc, char **argv, char **envp) {
 
   if (ReplayPathFile != "") {
     interpreter->setReplayPath(&replayPath);
+  }
+
+  if (WriteXMLTests) {
+    // Write metadata.xml
+    llvm::raw_fd_ostream *meta_file = handler->openOutputFile("metadata.xml");
+    if (!meta_file)
+      klee_error("Could not write metadata.xml");
+
+    *meta_file
+        << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n";
+    *meta_file
+        << "<!DOCTYPE test-metadata PUBLIC \"+//IDN sosy-lab.org//DTD "
+           "test-format test-metadata 1.0//EN\" "
+           "\"https://sosy-lab.org/test-format/test-metadata-1.0.dtd\">\n";
+    *meta_file << "<test-metadata>\n";
+    *meta_file << "\t<sourcecodelang>C</sourcecodelang>\n";
+    *meta_file << "\t<producer>"
+               << "Tracer-X"
+               << "</producer>\n";
+
+    // Assume with early exit a bug finding mode and otherwise coverage
+    if (SVProperty == "assert-error") {
+      *meta_file << "\t<specification>COVER( init(main()), FQL(COVER "
+                    "EDGES(@CALL(__VERIFIER_error))) )</specification>\n";
+    } else {
+      *meta_file << "\t<specification>COVER( init(main()), FQL(COVER "
+                    "EDGES(@DECISIONEDGE)) )</specification>\n";
+    }
+
+    // Assume the input file resembles the original source file; just exchange
+    // extension
+    *meta_file << "\t<programfile>" << TCOrig << ".c</programfile>\n";
+    *meta_file << "\t<programhash>" << TCHash << "</programhash>\n";
+    *meta_file << "\t<entryfunction>" << EntryPoint << "</entryfunction>\n";
+    *meta_file << "\t<architecture>" << SVArchitecture
+               << "bit</architecture>\n";
+    time_t now = time(NULL);
+    char tmp[256];
+    strftime(tmp, sizeof(tmp), "%Y-%m-%dT%H:%M:%SZ", localtime(&now));
+    *meta_file << "\t<creationtime>" << tmp << "</creationtime>\n";
+    *meta_file << "</test-metadata>\n";
+    meta_file->flush();
   }
 
   char buf[256];
