@@ -2348,29 +2348,29 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     }
 
     // check new BB
-    llvm::BasicBlock *currentBB = state.txTreeNode->getBasicBlock();
-    if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
-      if (specFailNew.find(pp) != specFailNew.end()) {
-        specFailNew[pp] = specFailNew[pp] + 1;
-      } else {
-        specFailNew[pp] = 1;
-      }
-      // check interpolation at is program point
-      bool hasInterpolation = TxSubsumptionTable::hasInterpolation(state);
-      if (!hasInterpolation) {
-        if (specFailNoInter.find(pp) != specFailNoInter.end()) {
-          specFailNoInter[pp] = specFailNoInter[pp] + 1;
-        } else {
-          specFailNoInter[pp] = 1;
-        }
-      }
-      // add to visited BB
-      // This is disabled to not to count blocks in speculation subtree
-      // visitedBlocks.insert(currentBB);
-      specFail++;
-      speculativeBackJump(state);
-      return;
-    }
+//    llvm::BasicBlock *currentBB = state.txTreeNode->getBasicBlock();
+//    if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
+//      if (specFailNew.find(pp) != specFailNew.end()) {
+//        specFailNew[pp] = specFailNew[pp] + 1;
+//      } else {
+//        specFailNew[pp] = 1;
+//      }
+//      // check interpolation at is program point
+//      bool hasInterpolation = TxSubsumptionTable::hasInterpolation(state);
+//      if (!hasInterpolation) {
+//        if (specFailNoInter.find(pp) != specFailNoInter.end()) {
+//          specFailNoInter[pp] = specFailNoInter[pp] + 1;
+//        } else {
+//          specFailNoInter[pp] = 1;
+//        }
+//      }
+//      // add to visited BB
+//      // This is disabled to not to count blocks in speculation subtree
+//      // visitedBlocks.insert(currentBB);
+//      specFail++;
+//      speculativeBackJump(state);
+//      return;
+//    }
   }
 
   switch (i->getOpcode()) {
