@@ -655,7 +655,7 @@ void KleeHandler::writeTestCaseXML(
     // print type of the input
     *file << it->first;
     *file << "\">";
-    errs() << "type=" << it->first << "\n";
+//    errs() << "type=" << it->first << "\n";
     // Ignore the type
     size_t type_size_bytes = it->second.size() * 8;
     llvm::APInt v(type_size_bytes, 0, false);
