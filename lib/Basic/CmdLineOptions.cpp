@@ -174,6 +174,20 @@ llvm::cl::opt<bool> TracerXPointerError(
     llvm::cl::desc("Enables detection of more memory errors by interpolation "
                    "shadow memory (may be false positives)."),
     llvm::cl::init(false));
+
+llvm::cl::opt<std::string> SpecType(
+    "spec-type",
+    llvm::cl::desc(
+        "Two types of speculation: one is based on coverage and another "
+        "is based on bug-hit"),
+    llvm::cl::init("default"));
+
+llvm::cl::opt<std::string> SpecStrategy(
+    "spec-strategy",
+    llvm::cl::desc(
+        "Specify a strategy to do speculation, eg. timid, aggressive, ..."),
+    llvm::cl::init("default"));
+
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT
