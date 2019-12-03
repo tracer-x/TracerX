@@ -175,18 +175,22 @@ llvm::cl::opt<bool> TracerXPointerError(
                    "shadow memory (may be false positives)."),
     llvm::cl::init(false));
 
-llvm::cl::opt<std::string> SpecType(
-    "spec-type",
-    llvm::cl::desc(
-        "Two types of speculation: one is based on coverage and another "
-        "is based on bug-hit"),
-    llvm::cl::init("default"));
+llvm::cl::opt<SpecType>
+    SpecTypeToUse("spec-type",
+                  llvm::cl::desc("Speculation type: coverage or safety"),
+                  llvm::cl::values(clEnumValN(SAFETY, "safety", "safety"),
+                                   clEnumValN(COVERAGE, "coverage", "coverage"),
+                                   clEnumValEnd),
+                  llvm::cl::init(SAFETY));
 
-llvm::cl::opt<std::string> SpecStrategy(
+llvm::cl::opt<SpecStrategy> SpecStrategyToUse(
     "spec-strategy",
     llvm::cl::desc(
-        "Specify a strategy to do speculation, eg. timid, aggressive, ..."),
-    llvm::cl::init("default"));
+        "Strategy used by speculation, timid, aggressive or custom."),
+    llvm::cl::values(clEnumValN(TIMID, "timid", "timid"),
+                     clEnumValN(AGGRESSIVE, "aggressive", "aggressive"),
+                     clEnumValN(CUSTOM, "custom", "custom"), clEnumValEnd),
+    llvm::cl::init(CUSTOM));
 
 #endif // ENABLE_Z3
 
