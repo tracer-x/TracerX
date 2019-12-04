@@ -174,6 +174,13 @@ llvm::cl::opt<bool> TracerXPointerError(
     llvm::cl::desc("Enables detection of more memory errors by interpolation "
                    "shadow memory (may be false positives)."),
     llvm::cl::init(false));
+
+llvm::cl::opt<bool> Speculation(
+    "speculation",
+    llvm::cl::desc(
+        "Perform speculation to remove infeasible paths from interpolants."
+        "Speculation should be used with Depth First Search."),
+    llvm::cl::init(false));
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT

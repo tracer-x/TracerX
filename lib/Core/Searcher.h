@@ -46,6 +46,10 @@ namespace klee {
       os << "<unnamed searcher>\n";
     }
 
+    virtual std::vector<ExecutionState *> getStates() {
+      return std::vector<ExecutionState *>();
+    }
+
     // pgbovine - to be called when a searcher gets activated and
     // deactivated, say, by a higher-level searcher; most searchers
     // don't need this functionality, so don't have to override.
@@ -92,6 +96,8 @@ namespace klee {
     void printName(llvm::raw_ostream &os) {
       os << "DFSSearcher\n";
     }
+
+    virtual std::vector<ExecutionState *> getStates() { return states; }
   };
 
   class BFSSearcher : public Searcher {
@@ -120,6 +126,8 @@ namespace klee {
     void printName(llvm::raw_ostream &os) {
       os << "RandomSearcher\n";
     }
+
+    virtual std::vector<ExecutionState *> getStates() { return states; }
   };
 
   class WeightedRandomSearcher : public Searcher {

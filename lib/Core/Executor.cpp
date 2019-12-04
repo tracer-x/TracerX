@@ -10,6 +10,7 @@
 #include "Executor.h"
 #include "Context.h"
 #include "CoreStats.h"
+#include "ExecutorTimerInfo.h"
 #include "ExternalDispatcher.h"
 #include "ImpliedValue.h"
 #include "Memory.h"
@@ -21,21 +22,15 @@
 #include "StatsTracker.h"
 #include "TimingSolver.h"
 #include "UserSearcher.h"
-#include "ExecutorTimerInfo.h"
 
-#include "klee/ExecutionState.h"
-#include "klee/Expr.h"
-#include "klee/Interpreter.h"
-#include "klee/TimerStatIncrementer.h"
+#include "TxShadowArray.h"
+#include "TxSpeculation.h"
+#include "TxTree.h"
 #include "klee/CommandLine.h"
 #include "klee/Common.h"
-#include "klee/util/Assignment.h"
-#include "klee/util/ExprPPrinter.h"
-#include "klee/util/ExprSMTLIBPrinter.h"
-#include "klee/util/ExprUtil.h"
-#include "klee/util/GetElementPtrTypeIterator.h"
-#include "klee/util/TxPrintUtil.h"
 #include "klee/Config/Version.h"
+#include "klee/ExecutionState.h"
+#include "klee/Expr.h"
 #include "klee/Internal/ADT/KTest.h"
 #include "klee/Internal/ADT/RNG.h"
 #include "klee/Internal/Module/Cell.h"
@@ -44,23 +39,28 @@
 #include "klee/Internal/Module/KModule.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "klee/Internal/Support/FloatEvaluation.h"
-#include "klee/Internal/System/Time.h"
 #include "klee/Internal/System/MemoryUsage.h"
+#include "klee/Internal/System/Time.h"
+#include "klee/Interpreter.h"
 #include "klee/SolverStats.h"
-#include "TxShadowArray.h"
-#include "TxTree.h"
+#include "klee/TimerStatIncrementer.h"
+#include "klee/util/Assignment.h"
+#include "klee/util/ExprPPrinter.h"
+#include "klee/util/ExprSMTLIBPrinter.h"
+#include "klee/util/ExprUtil.h"
+#include "klee/util/GetElementPtrTypeIterator.h"
+#include "klee/util/TxPrintUtil.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
-#include "llvm/IR/Function.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/TypeBuilder.h"
 #else
 #include "llvm/Attributes.h"
@@ -81,11 +81,11 @@
 #endif
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Analysis/MemoryDependenceAnalysis.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Analysis/MemoryDependenceAnalysis.h"
 
 #if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
 #include "llvm/Support/CallSite.h"
@@ -97,19 +97,19 @@
 #include "klee/Internal/Support/CompressionStream.h"
 #endif
 
-#include <cassert>
 #include <algorithm>
+#include <cassert>
+#include <fstream>
 #include <iomanip>
 #include <iosfwd>
-#include <fstream>
 #include <sstream>
-#include <vector>
 #include <string>
+#include <vector>
 
 #include <sys/mman.h>
 
-#include <errno.h>
 #include <cxxabi.h>
+#include <errno.h>
 
 using namespace llvm;
 using namespace klee;
@@ -301,7 +301,7 @@ cl::opt<bool> MaxMemoryInhibit(
     cl::desc(
         "Inhibit forking at memory cap (vs. random terminate) (default=on)"),
     cl::init(true));
-}
+} // namespace
 
 namespace klee {
 RNG theRNG;
@@ -1004,6 +1004,841 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
   }
 }
 
+std::set<std::string> Executor::extractVarNames(ExecutionState &current,
+                                                llvm::Value *v) {
+  std::set<std::string> res;
+  if (isa<GlobalVariable>(v)) {
+    GlobalVariable *gv = cast<GlobalVariable>(v);
+    res.insert(gv->getName().data());
+  } else if (isa<Instruction>(v)) {
+    Instruction *ins = dyn_cast<Instruction>(v);
+    switch (ins->getOpcode()) {
+    case Instruction::Alloca: {
+      AllocaInst *ai = cast<AllocaInst>(ins);
+      if (ai->getName() == "") {
+        llvm::Function *f = ai->getParent()->getParent();
+        if (ai == &f->getEntryBlock().front()) {
+          res.insert(f->arg_begin()->getName().data());
+        } else if (ai == f->getEntryBlock().front().getNextNode()) {
+          res.insert(f->arg_begin()->getNextNode()->getName().data());
+        }
+      } else {
+        res.insert(ai->getName().data());
+      }
+
+      break;
+    }
+    default: {
+      for (unsigned i = 0u; i < ins->getNumOperands(); i++) {
+        std::set<std::string> tmp =
+            extractVarNames(current, ins->getOperand(i));
+        res.insert(tmp.begin(), tmp.end());
+      }
+    }
+    }
+  }
+  return res;
+}
+
+Executor::StatePair Executor::branchFork(ExecutionState &current,
+                                         ref<Expr> condition, bool isInternal) {
+  start = clock();
+  // The current node is in the speculation node
+  if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode()) {
+    Executor::StatePair res = speculationFork(current, condition, isInternal);
+    end = clock();
+    txTree->incSpecTime(double(end - start));
+    return res;
+  }
+
+  Solver::Validity res;
+  std::map<ExecutionState *, std::vector<SeedInfo> >::iterator it =
+      seedMap.find(&current);
+  bool isSeeding = it != seedMap.end();
+
+  if (!isSeeding && !isa<ConstantExpr>(condition) &&
+      (MaxStaticForkPct != 1. || MaxStaticSolvePct != 1. ||
+       MaxStaticCPForkPct != 1. || MaxStaticCPSolvePct != 1.) &&
+      statsTracker->elapsed() > 60.) {
+    StatisticManager &sm = *theStatisticManager;
+    CallPathNode *cpn = current.stack.back().callPathNode;
+    if ((MaxStaticForkPct < 1. &&
+         sm.getIndexedValue(stats::forks, sm.getIndex()) >
+             stats::forks * MaxStaticForkPct) ||
+        (MaxStaticCPForkPct < 1. && cpn &&
+         (cpn->statistics.getValue(stats::forks) >
+          stats::forks * MaxStaticCPForkPct)) ||
+        (MaxStaticSolvePct < 1 &&
+         sm.getIndexedValue(stats::solverTime, sm.getIndex()) >
+             stats::solverTime * MaxStaticSolvePct) ||
+        (MaxStaticCPForkPct < 1. && cpn &&
+         (cpn->statistics.getValue(stats::solverTime) >
+          stats::solverTime * MaxStaticCPSolvePct))) {
+      ref<ConstantExpr> value;
+      bool success = solver->getValue(current, condition, value);
+      assert(success && "FIXME: Unhandled solver failure");
+      (void)success;
+      addConstraint(current, EqExpr::create(value, condition));
+      condition = value;
+    }
+  }
+
+  double timeout = coreSolverTimeout;
+  if (isSeeding)
+    timeout *= it->second.size();
+
+  // llvm::errs() << "Calling solver->evaluate on query:\n";
+  // ExprPPrinter::printQuery(llvm::errs(), current.constraints, condition);
+
+  solver->setTimeout(timeout);
+  std::vector<ref<Expr> > unsatCore;
+  bool success = solver->evaluate(current, condition, res, unsatCore);
+  solver->setTimeout(0);
+
+  if (!success) {
+    current.pc = current.prevPC;
+    terminateStateEarly(current, "Query timed out (fork).");
+    return StatePair(0, 0);
+  }
+
+  if (!isSeeding) {
+    if (replayPath && !isInternal) {
+      assert(replayPosition < replayPath->size() &&
+             "ran out of branches in replay path mode");
+      bool branch = (*replayPath)[replayPosition++];
+
+      if (res == Solver::True) {
+        assert(branch && "hit invalid branch in replay path mode");
+      } else if (res == Solver::False) {
+        assert(!branch && "hit invalid branch in replay path mode");
+      } else {
+        // add constraints
+        if (branch) {
+          res = Solver::True;
+          addConstraint(current, condition);
+        } else {
+          res = Solver::False;
+          addConstraint(current, Expr::createIsZero(condition));
+        }
+      }
+    } else if (res == Solver::Unknown) {
+      assert(!replayKTest && "in replay mode, only one branch can be true.");
+
+      if ((MaxMemoryInhibit && atMemoryLimit) || current.forkDisabled ||
+          inhibitForking || (MaxForks != ~0u && stats::forks >= MaxForks)) {
+
+        if (MaxMemoryInhibit && atMemoryLimit)
+          klee_warning_once(0, "skipping fork (memory cap exceeded)");
+        else if (current.forkDisabled)
+          klee_warning_once(0, "skipping fork (fork disabled on current path)");
+        else if (inhibitForking)
+          klee_warning_once(0, "skipping fork (fork disabled globally)");
+        else
+          klee_warning_once(0, "skipping fork (max-forks reached)");
+
+        TimerStatIncrementer timer(stats::forkTime);
+        if (theRNG.getBool()) {
+          addConstraint(current, condition);
+          res = Solver::True;
+        } else {
+          addConstraint(current, Expr::createIsZero(condition));
+          res = Solver::False;
+        }
+      }
+    }
+  }
+
+  // Fix branch in only-replay-seed mode, if we don't have both true
+  // and false seeds.
+  if (isSeeding && (current.forkDisabled || OnlyReplaySeeds) &&
+      res == Solver::Unknown) {
+    bool trueSeed = false, falseSeed = false;
+    // Is seed extension still ok here?
+    for (std::vector<SeedInfo>::iterator siit = it->second.begin(),
+                                         siie = it->second.end();
+         siit != siie; ++siit) {
+      ref<ConstantExpr> res;
+      bool success =
+          solver->getValue(current, siit->assignment.evaluate(condition), res);
+      assert(success && "FIXME: Unhandled solver failure");
+      (void)success;
+      if (res->isTrue()) {
+        trueSeed = true;
+      } else {
+        falseSeed = true;
+      }
+      if (trueSeed && falseSeed)
+        break;
+    }
+    if (!(trueSeed && falseSeed)) {
+      assert(trueSeed || falseSeed);
+
+      res = trueSeed ? Solver::True : Solver::False;
+      addConstraint(current,
+                    trueSeed ? condition : Expr::createIsZero(condition));
+    }
+  }
+
+  //  llvm::outs() << "====begin branchFork\n";
+  //  condition->dump();
+  //  llvm::outs() << "res=" << res << "\n";
+  //  for (ConstraintManager::const_iterator it = current.constraints.begin(),
+  //                                         ie = current.constraints.end();
+  //       it != ie; ++it) {
+  //    (*it)->dump();
+  //  }
+  //
+  //  llvm::outs() << "====end branchFork\n";
+
+  //  llvm::outs() << "******************\n";
+
+  llvm::BranchInst *binst =
+      llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+  if (condition->isTrue()) {
+    if (INTERPOLATION_ENABLED && Speculation &&
+        TxSpeculativeRun::isStateSpeculable(current)) {
+      // check independency
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        // open speculation & assume success
+        independenceYes++;
+        return StatePair(&current, 0);
+      } else {
+        // open speculation & result may be success or fail and Now second check
+        independenceNo++;
+        if (specSnap[binst] != visitedBlocks.size()) {
+          dynamicYes++;
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    true);
+        } else {
+          dynamicNo++;
+          // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(&current, 0);
+        }
+      }
+    }
+  } else if (condition->isFalse()) {
+    if (INTERPOLATION_ENABLED && Speculation &&
+        TxSpeculativeRun::isStateSpeculable(current)) {
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        // open speculation & assume success
+        independenceYes++;
+        return StatePair(0, &current);
+      } else {
+        independenceNo++;
+        // open speculation & result may be success or fail and Now second check
+        if (specSnap[binst] != visitedBlocks.size()) {
+          dynamicYes++;
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    false);
+        } else {
+          dynamicNo++;
+          // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(0, &current);
+        }
+      }
+    }
+  }
+  //  llvm::outs() << "******************\n";
+
+  // XXX - even if the constraint is provable one way or the other we
+  // can probably benefit by adding this constraint and allowing it to
+  // reduce the other constraints. For example, if we do a binary
+  // search on a particular value, and then see a comparison against
+  // the value it has been fixed at, we should take this as a nice
+  // hint to just use the single constraint instead of all the binary
+  // search ones. If that makes sense.
+  if (res == Solver::True) {
+
+    if (!isInternal) {
+      if (pathWriter) {
+        current.pathOS << "1";
+      }
+    }
+    if (INTERPOLATION_ENABLED && Speculation &&
+        TxSpeculativeRun::isStateSpeculable(current)) {
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        // open speculation & assume success
+        independenceYes++;
+        return StatePair(&current, 0);
+      } else {
+        independenceNo++;
+        // save unsat core
+        // open speculation & result may be success or fail
+        if (specSnap[binst] != visitedBlocks.size()) {
+          dynamicYes++;
+          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    true);
+        } else {
+          dynamicNo++;
+          // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(&current, 0);
+        }
+      }
+    }
+
+    if (INTERPOLATION_ENABLED) {
+      // Validity proof succeeded of a query: antecedent -> consequent.
+      // We then extract the unsatisfiability core of antecedent and not
+      // consequent as the Craig interpolant.
+      txTree->markPathCondition(current, unsatCore);
+      return StatePair(&current, 0);
+    }
+
+    return StatePair(&current, 0);
+
+  } else if (res == Solver::False) {
+    if (!isInternal) {
+      if (pathWriter) {
+        current.pathOS << "0";
+      }
+    }
+
+    if (INTERPOLATION_ENABLED && Speculation &&
+        TxSpeculativeRun::isStateSpeculable(current)) {
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        // open speculation & assume success
+        independenceYes++;
+        return StatePair(0, &current);
+      } else {
+        independenceNo++;
+        // save unsat core
+        // open speculation & result may be success or fail
+        if (specSnap[binst] != visitedBlocks.size()) {
+          dynamicYes++;
+          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    false);
+        } else {
+          dynamicNo++;
+          // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(0, &current);
+        }
+      }
+    }
+
+    if (INTERPOLATION_ENABLED) {
+      // Falsity proof succeeded of a query: antecedent -> consequent,
+      // which means that antecedent -> not(consequent) is valid. In this
+      // case also we extract the unsat core of the proof
+      txTree->markPathCondition(current, unsatCore);
+      return StatePair(0, &current);
+    }
+
+    return StatePair(0, &current);
+  } else {
+
+    TimerStatIncrementer timer(stats::forkTime);
+    ExecutionState *falseState, *trueState = &current;
+
+    ++stats::forks;
+
+    falseState = trueState->branch();
+    addedStates.push_back(falseState);
+
+    if (RandomizeFork && theRNG.getBool())
+      std::swap(trueState, falseState);
+
+    if (it != seedMap.end()) {
+      std::vector<SeedInfo> seeds = it->second;
+      it->second.clear();
+      std::vector<SeedInfo> &trueSeeds = seedMap[trueState];
+      std::vector<SeedInfo> &falseSeeds = seedMap[falseState];
+      for (std::vector<SeedInfo>::iterator siit = seeds.begin(),
+                                           siie = seeds.end();
+           siit != siie; ++siit) {
+        ref<ConstantExpr> res;
+        bool success = solver->getValue(
+            current, siit->assignment.evaluate(condition), res);
+        assert(success && "FIXME: Unhandled solver failure");
+        (void)success;
+        if (res->isTrue()) {
+          trueSeeds.push_back(*siit);
+        } else {
+          falseSeeds.push_back(*siit);
+        }
+      }
+
+      bool swapInfo = false;
+      if (trueSeeds.empty()) {
+        if (&current == trueState)
+          swapInfo = true;
+        seedMap.erase(trueState);
+      }
+      if (falseSeeds.empty()) {
+        if (&current == falseState)
+          swapInfo = true;
+        seedMap.erase(falseState);
+      }
+      if (swapInfo) {
+        std::swap(trueState->coveredNew, falseState->coveredNew);
+        std::swap(trueState->coveredLines, falseState->coveredLines);
+      }
+    }
+
+    current.ptreeNode->data = 0;
+    std::pair<PTree::Node *, PTree::Node *> res =
+        processTree->split(current.ptreeNode, falseState, trueState);
+    falseState->ptreeNode = res.first;
+    trueState->ptreeNode = res.second;
+
+    if (!isInternal) {
+      if (pathWriter) {
+        falseState->pathOS = pathWriter->open(current.pathOS);
+        trueState->pathOS << "1";
+        falseState->pathOS << "0";
+      }
+      if (symPathWriter) {
+        falseState->symPathOS = symPathWriter->open(current.symPathOS);
+        trueState->symPathOS << "1";
+        falseState->symPathOS << "0";
+      }
+    }
+
+    if (INTERPOLATION_ENABLED) {
+      std::pair<TxTreeNode *, TxTreeNode *> ires =
+          txTree->split(current.txTreeNode, falseState, trueState);
+      falseState->txTreeNode = ires.first;
+      trueState->txTreeNode = ires.second;
+    }
+
+    addConstraint(*trueState, condition);
+    addConstraint(*falseState, Expr::createIsZero(condition));
+
+    // Kinda gross, do we even really still want this option?
+    if (MaxDepth && MaxDepth <= trueState->depth) {
+      terminateStateEarly(*trueState, "max-depth exceeded.");
+      terminateStateEarly(*falseState, "max-depth exceeded.");
+      return StatePair(0, 0);
+    }
+
+    return StatePair(trueState, falseState);
+  }
+}
+
+Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
+                                                 ref<Expr> condition,
+                                                 llvm::Instruction *binst,
+                                                 bool isInternal,
+                                                 bool falseBranchIsInfeasible) {
+  current.txTreeNode->secondCheckInst = binst;
+  if (falseBranchIsInfeasible == true) {
+    // At this point the speculation node should be created and
+    // added to the working list in a way that its speculated
+    // after the other node is traversed.
+
+    TimerStatIncrementer timer(stats::forkTime);
+    ExecutionState *trueState, *speculationFalseState = &current;
+
+    ++stats::forks;
+
+    trueState = speculationFalseState->branch();
+    addedStates.push_back(trueState);
+
+    current.ptreeNode->data = 0;
+    std::pair<PTree::Node *, PTree::Node *> res =
+        processTree->split(current.ptreeNode, speculationFalseState, trueState);
+    speculationFalseState->ptreeNode = res.first;
+    trueState->ptreeNode = res.second;
+
+    if (!isInternal) {
+      if (pathWriter) {
+        speculationFalseState->pathOS = pathWriter->open(current.pathOS);
+        trueState->pathOS << "1";
+        speculationFalseState->pathOS << "0";
+      }
+      if (symPathWriter) {
+        speculationFalseState->symPathOS =
+            symPathWriter->open(current.symPathOS);
+        trueState->symPathOS << "1";
+        speculationFalseState->symPathOS << "0";
+      }
+    }
+
+    bool isCurrentSpec = current.txTreeNode->isSpeculationNode();
+    std::pair<TxTreeNode *, TxTreeNode *> ires =
+        txTree->split(current.txTreeNode, speculationFalseState, trueState);
+    speculationFalseState->txTreeNode = ires.first;
+    speculationFalseState->txTreeNode->setSpeculationFlag();
+    if (!isCurrentSpec) {
+      speculationFalseState->txTreeNode->visitedProgramPoints =
+          new std::set<uintptr_t>();
+      speculationFalseState->txTreeNode->specTime = new double(0.0);
+    }
+    trueState->txTreeNode = ires.second;
+
+    if (!condition->isTrue() && !condition->isFalse()) {
+      addConstraint(*trueState, condition);
+    }
+
+    return StatePair(trueState, speculationFalseState);
+  } else {
+    // At this point the speculation node should be created and
+    // added to the working list in a way that its speculated
+    // after the other node is traversed.
+
+    TimerStatIncrementer timer(stats::forkTime);
+    ExecutionState *speculationTrueState = &current, *falseState;
+
+    ++stats::forks;
+
+    falseState = speculationTrueState->branch();
+    addedStates.push_back(falseState);
+
+    current.ptreeNode->data = 0;
+    std::pair<PTree::Node *, PTree::Node *> res =
+        processTree->split(current.ptreeNode, speculationTrueState, falseState);
+    speculationTrueState->ptreeNode = res.first;
+    falseState->ptreeNode = res.second;
+
+    if (!isInternal) {
+      if (pathWriter) {
+        speculationTrueState->pathOS = pathWriter->open(current.pathOS);
+        speculationTrueState->pathOS << "1";
+        falseState->pathOS << "0";
+      }
+      if (symPathWriter) {
+        speculationTrueState->symPathOS =
+            symPathWriter->open(current.symPathOS);
+        speculationTrueState->symPathOS << "1";
+        falseState->symPathOS << "0";
+      }
+    }
+    bool isCurrentSpec = current.txTreeNode->isSpeculationNode();
+    std::pair<TxTreeNode *, TxTreeNode *> ires =
+        txTree->split(current.txTreeNode, speculationTrueState, falseState);
+    speculationTrueState->txTreeNode = ires.first;
+    speculationTrueState->txTreeNode->setSpeculationFlag();
+
+    if (!isCurrentSpec) {
+      speculationTrueState->txTreeNode->visitedProgramPoints =
+          new std::set<uintptr_t>();
+      speculationTrueState->txTreeNode->specTime = new double(0.0);
+    }
+
+    falseState->txTreeNode = ires.second;
+
+    if (!condition->isTrue() && !condition->isFalse()) {
+      addConstraint(*falseState, Expr::createIsZero(condition));
+    }
+
+    return StatePair(speculationTrueState, falseState);
+  }
+}
+
+Executor::StatePair Executor::speculationFork(ExecutionState &current,
+                                              ref<Expr> condition,
+                                              bool isInternal) {
+  //  klee_warning("Speculation node");
+
+  Solver::Validity res;
+
+  double timeout = coreSolverTimeout;
+
+  // llvm::errs() << "Calling solver->evaluate on query:\n";
+  // ExprPPrinter::printQuery(llvm::errs(), current.constraints, condition);
+
+  solver->setTimeout(timeout);
+  std::vector<ref<Expr> > unsatCore;
+  bool success = solver->evaluate(current, condition, res, unsatCore);
+  solver->setTimeout(0);
+
+  if (!success) {
+    current.pc = current.prevPC;
+    terminateStateEarly(current, "Query timed out (fork).");
+    return StatePair(0, 0);
+  }
+
+  //  llvm::outs() << "====begin SpeculationFork\n";
+  //  condition->dump();
+  //  llvm::outs() << "res=" << res << "\n";
+  //  for (ConstraintManager::const_iterator it = current.constraints.begin(),
+  //                                         ie = current.constraints.end();
+  //       it != ie; ++it) {
+  //    (*it)->dump();
+  //  }
+  //  llvm::outs() << "====end SpeculationFork\n";
+
+  llvm::BranchInst *binst =
+      llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+
+  if (condition->isTrue()) {
+    if (INTERPOLATION_ENABLED && Speculation &&
+        TxSpeculativeRun::isStateSpeculable(current)) {
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        // open speculation & assume success
+        independenceYes++;
+        return StatePair(&current, 0);
+      } else {
+        independenceNo++;
+        // open speculation & result may be success or fail
+        if (specSnap[binst] != visitedBlocks.size()) {
+          dynamicYes++;
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    true);
+        } else {
+          dynamicNo++;
+          // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(&current, 0);
+        }
+      }
+    }
+    return StatePair(&current, 0);
+  } else if (condition->isFalse()) {
+    if (INTERPOLATION_ENABLED && Speculation &&
+        TxSpeculativeRun::isStateSpeculable(current)) {
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        // open speculation & assume success
+        independenceYes++;
+        return StatePair(0, &current);
+      } else {
+        independenceNo++;
+        // open speculation & result may be success or fail
+        if (specSnap[binst] != visitedBlocks.size()) {
+          dynamicYes++;
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    false);
+        } else {
+          dynamicNo++;
+          // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(0, &current);
+        }
+      }
+    }
+    return StatePair(0, &current);
+  }
+  // XXX - even if the constraint is provable one way or the other we
+  // can probably benefit by adding this constraint and allowing it to
+  // reduce the other constraints. For example, if we do a binary
+  // search on a particular value, and then see a comparison against
+  // the value it has been fixed at, we should take this as a nice
+  // hint to just use the single constraint instead of all the binary
+  // search ones. If that makes sense.
+  if (res == Solver::True) {
+    if (!isInternal) {
+      if (pathWriter) {
+        current.pathOS << "1";
+      }
+    }
+    if (INTERPOLATION_ENABLED && Speculation &&
+        TxSpeculativeRun::isStateSpeculable(current)) {
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        // open speculation & assume success
+        independenceYes++;
+        return StatePair(&current, 0);
+      } else {
+        independenceNo++;
+        // save unsat core
+        // open speculation & result may be success or fail
+        if (specSnap[binst] != visitedBlocks.size()) {
+          dynamicYes++;
+          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    true);
+        } else {
+          dynamicNo++;
+          // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(&current, 0);
+        }
+      }
+    }
+
+    if (INTERPOLATION_ENABLED) {
+      // Validity proof succeeded of a query: antecedent -> consequent.
+      // We then extract the unsatisfiability core of antecedent and not
+      // consequent as the Craig interpolant.
+      txTree->markPathCondition(current, unsatCore);
+      return StatePair(&current, 0);
+    }
+
+    return StatePair(&current, 0);
+
+    //    txTree->markPathCondition(current, unsatCore);
+    //    return StatePair(&current, 0);
+  } else if (res == Solver::False) {
+    if (!isInternal) {
+      if (pathWriter) {
+        current.pathOS << "0";
+      }
+    }
+
+    if (INTERPOLATION_ENABLED && Speculation &&
+        TxSpeculativeRun::isStateSpeculable(current)) {
+      std::set<std::string> vars = extractVarNames(current, binst);
+      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        // open speculation & assume success
+        independenceYes++;
+        return StatePair(0, &current);
+      } else {
+        independenceNo++;
+        // save unsat core
+        // open speculation & result may be success or fail
+        if (specSnap[binst] != visitedBlocks.size()) {
+          dynamicYes++;
+          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+          return addSpeculationNode(current, condition, binst, isInternal,
+                                    false);
+        } else {
+          dynamicNo++;
+          // then close speculation & do marking as deletion
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(0, &current);
+        }
+      }
+    }
+
+    if (INTERPOLATION_ENABLED) {
+      // Falsity proof succeeded of a query: antecedent -> consequent,
+      // which means that antecedent -> not(consequent) is valid. In this
+      // case also we extract the unsat core of the proof
+      txTree->markPathCondition(current, unsatCore);
+      return StatePair(0, &current);
+    }
+
+    return StatePair(0, &current);
+
+    //    txTree->markPathCondition(current, unsatCore);
+    //    return StatePair(0, &current);
+  } else {
+    TimerStatIncrementer timer(stats::forkTime);
+    ExecutionState *falseState, *trueState = &current;
+
+    ++stats::forks;
+
+    falseState = trueState->branch();
+    addedStates.push_back(falseState);
+
+    if (RandomizeFork && theRNG.getBool())
+      std::swap(trueState, falseState);
+
+    current.ptreeNode->data = 0;
+    std::pair<PTree::Node *, PTree::Node *> resNode =
+        processTree->split(current.ptreeNode, falseState, trueState);
+    falseState->ptreeNode = resNode.first;
+    trueState->ptreeNode = resNode.second;
+
+    if (!isInternal) {
+      if (pathWriter) {
+        falseState->pathOS = pathWriter->open(current.pathOS);
+        trueState->pathOS << "1";
+        falseState->pathOS << "0";
+      }
+      if (symPathWriter) {
+        falseState->symPathOS = symPathWriter->open(current.symPathOS);
+        trueState->symPathOS << "1";
+        falseState->symPathOS << "0";
+      }
+    }
+
+    std::pair<TxTreeNode *, TxTreeNode *> ires =
+        txTree->split(current.txTreeNode, falseState, trueState);
+
+    falseState->txTreeNode = ires.first;
+    trueState->txTreeNode = ires.second;
+
+    if (res != Solver::False)
+      addConstraint(*trueState, condition);
+    if (res != Solver::True)
+      addConstraint(*falseState, Expr::createIsZero(condition));
+
+    // Kinda gross, do we even really still want this option?
+    if (MaxDepth && MaxDepth <= trueState->depth) {
+      terminateStateEarly(*trueState, "max-depth exceeded.");
+      terminateStateEarly(*falseState, "max-depth exceeded.");
+      return StatePair(0, 0);
+    }
+
+    return StatePair(trueState, falseState);
+  }
+}
+
+void Executor::speculativeBackJump(ExecutionState &current) {
+
+  double thisSpecTreeTime = *(current.txTreeNode->specTime);
+  // identify the speculation root
+  TxTreeNode *currentNode = current.txTreeNode;
+  TxTreeNode *parent = currentNode->getParent();
+  while (parent && parent->isSpeculationNode()) {
+    currentNode = parent;
+    parent = parent->getParent();
+  }
+
+  // interpolant marking on parent node
+  if (parent && !parent->speculationUnsatCore.empty()) {
+    parent->mark();
+  }
+  specSnap[parent->secondCheckInst] = visitedBlocks.size();
+
+  // collect & mark speculation fail all nodes in the sub tree
+  std::vector<TxTreeNode *> deletedNodes = collectSpeculationNodes(currentNode);
+
+  // collect removed states which pointing to speculation fail node
+  std::vector<ExecutionState *> removedSpeculationStates;
+  for (std::set<ExecutionState *>::const_iterator it = states.begin(),
+                                                  ie = states.end();
+       it != ie; ++it) {
+    ExecutionState *tmp = (*it);
+    if (tmp->txTreeNode->isSpeculationFailedNode()) {
+      removedSpeculationStates.push_back(tmp);
+    }
+  }
+
+  // update states in search
+  searcher->update(0, std::vector<ExecutionState *>(),
+                   removedSpeculationStates);
+  // remove fail nodes in subtree
+  for (std::vector<TxTreeNode *>::iterator it = deletedNodes.begin(),
+                                           ie = deletedNodes.end();
+       it != ie; ++it) {
+    txTree->removeSpeculationFailedNodes(*it);
+  }
+  // remove state in states
+  for (std::vector<ExecutionState *>::iterator
+           it = removedSpeculationStates.begin(),
+           ie = removedSpeculationStates.end();
+       it != ie; ++it) {
+    states.erase(*it);
+    if (&current != *it)
+      delete *it;
+  }
+  // this count is for the fail node in spec tree
+  end = clock();
+  thisSpecTreeTime += (double(end - start));
+
+  // add fail time for spec subtree
+  totalSpecFailTime += thisSpecTreeTime;
+}
+
+std::vector<TxTreeNode *> Executor::collectSpeculationNodes(TxTreeNode *root) {
+  if (!root)
+    return std::vector<TxTreeNode *>();
+  std::vector<TxTreeNode *> leftNodes =
+      collectSpeculationNodes(root->getLeft());
+  std::vector<TxTreeNode *> rightNodes =
+      collectSpeculationNodes(root->getRight());
+  std::vector<TxTreeNode *> result;
+  result.insert(result.end(), leftNodes.begin(), leftNodes.end());
+  result.insert(result.end(), rightNodes.begin(), rightNodes.end());
+  // mark root fail & add to result
+  root->setSpeculationFailed();
+  result.insert(result.end(), root);
+  return result;
+}
+
 void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(condition)) {
     if (!CE->isTrue())
@@ -1276,11 +2111,12 @@ void Executor::stepInstruction(ExecutionState &state) {
 
 void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                            std::vector<ref<Expr> > &arguments) {
-
   // BB Coverage
-  bool isCoverableFunction = (fBBOrder.find(f) != fBBOrder.end());
-  if (isCoverableFunction) {
-    processBBCoverage(BBCoverage, &(f->front()));
+  bool isInterested = (fBBOrder.find(f) != fBBOrder.end());
+  if (isInterested) {
+    bool isInSpecMode = (INTERPOLATION_ENABLED && Speculation &&
+                         state.txTreeNode->isSpeculationNode());
+    processBBCoverage(BBCoverage, &(f->front()), isInSpecMode);
   }
 
   Instruction *i = ki->inst;
@@ -1300,8 +2136,9 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
       if (!sf.varargs)
         return;
 
-      // FIXME: This is really specific to the architecture, not the pointer
-      // size. This happens to work fir x86-32 and x86-64, however.
+      // FIXME: This is really specific to the architecture, not the
+      // pointer size. This happens to work fir x86-32 and x86-64,
+      // however.
       Expr::Width WordSize = Context::get().getPointerWidth();
       if (WordSize == Expr::Int32) {
         executeMemoryOperation(state, true, arguments[0],
@@ -1483,18 +2320,25 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   // process BB Coverage
   bool isInterested = (fBBOrder.find(dst->getParent()) != fBBOrder.end());
   if (isInterested) {
-    processBBCoverage(BBCoverage, dst);
+
+    bool isInSpecMode = (INTERPOLATION_ENABLED && Speculation &&
+                         state.txTreeNode->isSpeculationNode());
+    processBBCoverage(BBCoverage, dst, isInSpecMode);
   }
 }
 
-void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb) {
+void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
+                                 bool isInSpecMode) {
   if (BBCoverage >= 1) {
     bool isNew = (visitedBlocks.find(bb) == visitedBlocks.end());
     int order = fBBOrder[bb->getParent()][bb];
-    if (isNew) {
+    if (!isInSpecMode && isNew) {
       // add to visited BBs if not in speculation mode
       visitedBlocks.insert(bb);
     }
+    //		klee_warning("Visited Blocks Up to now=========================:
+    //%d\n",
+    //				int(visitedBlocks.size()));
     float percent = ((float)visitedBlocks.size() / (float)allBlockCount) * 100;
     // print percentage if this is a new BB
     if (BBCoverage >= 2 && isNew) {
@@ -1548,8 +2392,8 @@ void Executor::printFileLine(ExecutionState &state, KInstruction *ki,
     debugFile << "     [no debug info]:";
 }
 
-/// Compute the true target of a function call, resolving LLVM and KLEE aliases
-/// and bitcasts.
+/// Compute the true target of a function call, resolving LLVM and KLEE
+/// aliases and bitcasts.
 Function *Executor::getTargetFunction(Value *calledVal, ExecutionState &state) {
   SmallPtrSet<const GlobalValue *, 3> Visited;
 
@@ -1607,6 +2451,63 @@ static inline const llvm::fltSemantics *fpWidthToSemantics(unsigned width) {
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
+  // if this is starting a new BB then
+  // check for non-linear & new BB in speculation mode
+  if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode() &&
+      (i == &state.txTreeNode->getBasicBlock()->front())) {
+    // check non-linear
+    uintptr_t pp = state.txTreeNode->getProgramPoint();
+    bool isPPVisited = (state.txTreeNode->visitedProgramPoints->find(pp) !=
+                        state.txTreeNode->visitedProgramPoints->end());
+    if (isPPVisited) {
+      // add to spec revisited statistic
+      if (specRevisited.find(pp) != specRevisited.end()) {
+        specRevisited[pp] = specRevisited[pp] + 1;
+      } else {
+        specRevisited[pp] = 1;
+      }
+      // check interpolation at is program point
+      bool hasInterpolation = TxSubsumptionTable::hasInterpolation(state);
+      if (!hasInterpolation) {
+        if (specRevisitedNoInter.find(pp) != specRevisitedNoInter.end()) {
+          specRevisitedNoInter[pp] = specRevisitedNoInter[pp] + 1;
+        } else {
+          specRevisitedNoInter[pp] = 1;
+        }
+      }
+      specFail++;
+      speculativeBackJump(state);
+      return;
+    } else {
+      // Storing the visited program points.
+      state.txTreeNode->visitedProgramPoints->insert(pp);
+    }
+
+    // check new BB
+    llvm::BasicBlock *currentBB = state.txTreeNode->getBasicBlock();
+    if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
+      if (specFailNew.find(pp) != specFailNew.end()) {
+        specFailNew[pp] = specFailNew[pp] + 1;
+      } else {
+        specFailNew[pp] = 1;
+      }
+      // check interpolation at is program point
+      bool hasInterpolation = TxSubsumptionTable::hasInterpolation(state);
+      if (!hasInterpolation) {
+        if (specFailNoInter.find(pp) != specFailNoInter.end()) {
+          specFailNoInter[pp] = specFailNoInter[pp] + 1;
+        } else {
+          specFailNoInter[pp] = 1;
+        }
+      }
+      // add to visited BB
+      // This is disabled to not to count blocks in speculation subtree
+      // visitedBlocks.insert(currentBB);
+      specFail++;
+      speculativeBackJump(state);
+      return;
+    }
+  }
 
   switch (i->getOpcode()) {
   // Control flow
@@ -1716,7 +2617,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // FIXME: Find a way that we don't have this hidden dependency.
       assert(bi->getCondition() == bi->getOperand(0) && "Wrong operand index!");
       ref<Expr> cond = eval(ki, 0, state).value;
-      Executor::StatePair branches = fork(state, cond, false);
+
+      Executor::StatePair branches = branchFork(state, cond, false);
 
       // NOTE: There is a hidden dependency here, markBranchVisited
       // requires that we still be in the context of the branch
@@ -1724,6 +2626,10 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // up with convenient instruction specific data.
       if (statsTracker && state.stack.back().kf->trackCoverage)
         statsTracker->markBranchVisited(branches.first, branches.second);
+
+      //      int brcount = branches.first? 1: 0;
+      //      brcount = branches.second? brcount+1: brcount;
+      //      llvm::outs() << "branches size=" << brcount << "\n";
 
       if (branches.first)
         transferToBasicBlock(bi->getSuccessor(0), bi->getParent(),
@@ -3026,15 +3932,89 @@ void Executor::doDumpStates() {
   updateStates(0);
 }
 
+std::map<int, std::set<std::string> >
+Executor::readBBOrderToSpecAvoid(std::string folderName) {
+  std::map<int, std::set<std::string> > res;
+  DIR *dirp = opendir(folderName.c_str());
+  dirent *dp;
+  while ((dp = readdir(dirp)) != NULL) {
+    std::string name(dp->d_name);
+    if (strcmp(name.substr(0, 10).c_str(), "SpecAvoid_") == 0) {
+      std::pair<int, std::set<std::string> > tmp = readBBSpecAvoid(name);
+      res[tmp.first] = tmp.second;
+    }
+  }
+  (void)closedir(dirp);
+  return res;
+}
+
+std::pair<int, std::set<std::string> >
+Executor::readBBSpecAvoid(std::string fileName) {
+  bool isFirst = true;
+  int bb;
+  std::set<std::string> avoid;
+  std::ifstream in(fileName.c_str());
+  std::string str;
+  while (std::getline(in, str)) {
+    if (isFirst) {
+      bb = atoi(str.c_str());
+      isFirst = false;
+    } else {
+      if (!TxSpeculativeRun::trim(str).empty())
+        avoid.insert(TxSpeculativeRun::trim(str));
+    }
+  }
+  in.close();
+  return std::make_pair(bb, avoid);
+}
+std::set<llvm::BasicBlock *> Executor::readVisitedBB(std::string fileName) {
+  std::set<int> bbs;
+  std::ifstream in(fileName.c_str());
+  std::string str;
+  while (std::getline(in, str)) {
+    if (!TxSpeculativeRun::trim(str).empty()) {
+      int bb = atoi(str.c_str());
+      bbs.insert(bb);
+    }
+  }
+  in.close();
+  std::set<llvm::BasicBlock *> res;
+  for (std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> >::iterator
+           it = fBBOrder.begin(),
+           ie = fBBOrder.end();
+       it != ie; ++it) {
+    for (std::map<llvm::BasicBlock *, int>::iterator it1 = it->second.begin(),
+                                                     ie1 = it->second.end();
+         it1 != ie1; ++it1) {
+      if (bbs.find(it1->second) != bbs.end()) {
+        res.insert(it1->first);
+      }
+    }
+  }
+  return res;
+}
+
 void Executor::run(ExecutionState &initialState) {
 
+  independenceYes = 0;
+  independenceNo = 0;
+  dynamicYes = 0;
+  dynamicNo = 0;
+  specFail = 0;
+  totalSpecFailTime = 0.0;
   startingBBPlottingTime = time(0);
+  for (std::map<llvm::Instruction *, unsigned int>::iterator
+           it = specSnap.begin(),
+           ie = specSnap.end();
+       it != ie; ++it) {
+    it->second = 0;
+  }
   // get interested source code
   size_t lastindex = InputFile.find_last_of(".");
   std::string InputFile1 = InputFile.substr(0, lastindex);
   lastindex = InputFile1.find_last_of("/");
   std::string InputFile2 = InputFile1.substr(lastindex + 1);
-  covInterestSourceFileName = InputFile2 + ".c";
+  interestedSourceFileName = InputFile2 + ".c";
 
   // BB to order
   allBlockCount = 0;
@@ -3050,7 +4030,7 @@ void Executor::run(ExecutionState &initialState) {
     std::size_t botDirPos = path.find_last_of("/");
     std::string sourceFileName = path.substr(botDirPos + 1, path.length());
     // if the source file is interested then loop over its BBs
-    if ((sourceFileName == covInterestSourceFileName) &&
+    if ((sourceFileName == interestedSourceFileName) &&
         isCoverableFunction(f)) {
       // loop over BBs of function
       std::vector<llvm::BasicBlock *> bbs;
@@ -3060,13 +4040,16 @@ void Executor::run(ExecutionState &initialState) {
     }
   }
 
+  // load avoid BB
+  bbOrderToSpecAvoid = readBBOrderToSpecAvoid(".");
+  visitedBlocks = readVisitedBB("InitialVisitedBB.txt");
   // first BB of main()
   KInstruction *ki = initialState.pc;
   BasicBlock *firstBB = ki->inst->getParent();
   if (fBBOrder.find(firstBB->getParent()) != fBBOrder.end() &&
       fBBOrder[firstBB->getParent()].find(firstBB) !=
           fBBOrder[firstBB->getParent()].end()) {
-    processBBCoverage(BBCoverage, ki->inst->getParent());
+    processBBCoverage(BBCoverage, ki->inst->getParent(), false);
   }
   bindModuleConstants();
 
@@ -3078,7 +4061,6 @@ void Executor::run(ExecutionState &initialState) {
 
   if (usingSeeds) {
     std::vector<SeedInfo> &v = seedMap[&initialState];
-
     for (std::vector<KTest *>::const_iterator it = usingSeeds->begin(),
                                               ie = usingSeeds->end();
          it != ie; ++it)
@@ -3197,7 +4179,7 @@ void Executor::run(ExecutionState &initialState) {
     }
 #endif
 
-    if (INTERPOLATION_ENABLED &&
+    if (INTERPOLATION_ENABLED && !isa<llvm::PHINode>(state.pc->inst) &&
         txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
       terminateStateOnSubsumption(state);
     } else {
@@ -3415,6 +4397,21 @@ void Executor::terminateStateOnError(ExecutionState &state,
                                      enum TerminateReason termReason,
                                      const char *suffix,
                                      const llvm::Twine &info) {
+  std::string message = messaget.str();
+  static std::set<std::pair<Instruction *, std::string> > emittedErrors;
+  Instruction *lastInst;
+  const InstructionInfo &ii =
+      getLastNonKleeInternalInstruction(state, &lastInst);
+
+  if (INTERPOLATION_ENABLED && Speculation &&
+      state.txTreeNode->isSpeculationNode()) {
+    //    llvm::outs() << "=== start jumpback because of error \n";
+    specFail++;
+    speculativeBackJump(state);
+    klee_message("ERROR: %s:%d: %s", ii.file.c_str(), ii.line, message.c_str());
+    return;
+  }
+
   interpreterHandler->incErrorTermination();
   if (INTERPOLATION_ENABLED) {
     interpreterHandler->incBranchingDepthOnErrorTermination(state.depth);
@@ -3431,12 +4428,6 @@ void Executor::terminateStateOnError(ExecutionState &state,
       TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
     }
   }
-
-  std::string message = messaget.str();
-  static std::set<std::pair<Instruction *, std::string> > emittedErrors;
-  Instruction *lastInst;
-  const InstructionInfo &ii =
-      getLastNonKleeInternalInstruction(state, &lastInst);
 
   if (EmitAllErrors ||
       emittedErrors.insert(std::make_pair(lastInst, message)).second) {
@@ -4167,6 +5158,89 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 #endif
   }
 
+  if (Speculation) {
+    std::string outSpecFile = interpreterHandler->getOutputFilename("spec.txt");
+    std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
+
+    outSpec << "Total Independence Yes: " << independenceYes << "\n";
+    outSpec << "Total Independence No: " << independenceNo << "\n";
+    outSpec << "Total Dynamic Yes: " << dynamicYes << "\n";
+    outSpec << "Total Dynamic No: " << dynamicNo << "\n";
+    outSpec << "Total Independence No, Dynamic Yes & Success: "
+            << (dynamicYes - specFail) << "\n";
+    outSpec << "Total Independence No, Dynamic Yes & Fail: " << specFail
+            << "\n";
+
+    // total fail
+    // new
+    unsigned int failNew = 0;
+    for (std::map<uintptr_t, unsigned int>::iterator it = specFailNew.begin(),
+                                                     ie = specFailNew.end();
+         it != ie; ++it) {
+      failNew += it->second;
+    }
+    // revisted
+    unsigned int failRevisited = 0;
+    for (std::map<uintptr_t, unsigned int>::iterator it = specRevisited.begin(),
+                                                     ie = specRevisited.end();
+         it != ie; ++it) {
+      failRevisited += it->second;
+    }
+
+    // fail & no interpolant
+    // new
+    unsigned int failNewNoInter = 0;
+    for (std::map<uintptr_t, unsigned int>::iterator
+             it = specFailNoInter.begin(),
+             ie = specFailNoInter.end();
+         it != ie; ++it) {
+      failNewNoInter += it->second;
+    }
+    // revisted
+    unsigned int failRevisitedNoInter = 0;
+    for (std::map<uintptr_t, unsigned int>::iterator
+             it = specRevisitedNoInter.begin(),
+             ie = specRevisitedNoInter.end();
+         it != ie; ++it) {
+      failRevisitedNoInter += it->second;
+    }
+
+    outSpec << "Total speculation failures because of New BB: " << failNew
+            << "\n";
+    outSpec << "Total speculation failures because of New BB with no "
+               "interpolation: "
+            << failNewNoInter << "\n";
+
+    outSpec << "Total speculation failures because of Revisted: "
+            << failRevisited << "\n";
+    outSpec << "Total speculation failures because of Revisted with no "
+               "interpolation: "
+            << failRevisitedNoInter << "\n";
+
+    outSpec << "Total speculation failures because of Bug Hit: "
+            << (specFail - failNew - failRevisited) << "\n";
+
+    outSpec << "Total speculation fail time: "
+            << totalSpecFailTime / double(CLOCKS_PER_SEC) << "\n";
+
+    // print frequency of failure at each program point
+    outSpec << "Frequency of failures because New BB with no interpolation:\n";
+    for (std::map<uintptr_t, unsigned int>::iterator
+             it = specFailNoInter.begin(),
+             ie = specFailNoInter.end();
+         it != ie; ++it) {
+      outSpec << it->first << ": " << it->second << "\n";
+    }
+    outSpec
+        << "Frequency of failures because Revisted with no interpolation:\n";
+    for (std::map<uintptr_t, unsigned int>::iterator
+             it = specRevisitedNoInter.begin(),
+             ie = specRevisitedNoInter.end();
+         it != ie; ++it) {
+      outSpec << it->first << ": " << it->second << "\n";
+    }
+  }
+
   if (BBCoverage >= 1) {
     llvm::errs()
         << "************Basic Block Coverage Report Starts****************"
@@ -4197,8 +5271,17 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
          it != ie; ++it) {
 
       int order = fBBOrder[(*it)->getParent()][*it];
+      // visitedBBFileOut << "-- BlockScopeStarts --\n";
       std::string functionName = ((*it)->getParent())->getName();
+      // visitedBBFileOut << "Function: " << functionName << "\n";
+      // visitedBBFileOut << "Block Order: " << order;
       visitedBBFileOut << order << "\n";
+      // block content
+      std::string tmp;
+      raw_string_ostream tmpOS(tmp);
+      (*it)->print(tmpOS);
+      // visitedBBFileOut << tmp;
+      // visitedBBFileOut << "-- BlockScopeEnds --\n\n";
     }
 
     visitedBBFileOut.close();

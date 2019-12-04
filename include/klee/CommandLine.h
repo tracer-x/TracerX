@@ -98,6 +98,8 @@ extern llvm::cl::opt<bool> TracerXPointerError;
 
 extern llvm::cl::opt<bool> EmitAllErrorsInSamePath;
 
+extern llvm::cl::opt<bool> Speculation;
+
 #endif
 
 #ifdef ENABLE_METASMT
