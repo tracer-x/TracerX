@@ -23,6 +23,8 @@
 #include "klee/util/ArrayCache.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/Function.h"
+#include <dirent.h>
+#include <stdlib.h>
 #include "llvm/ADT/Twine.h"
 
 #include <vector>
@@ -95,8 +97,28 @@ public:
   bool allBlockCollected;
   std::set<llvm::BasicBlock *> visitedBlocks;
   float blockCoverage;
-  std::string covInterestSourceFileName;
+  std::string interestedSourceFileName;
   std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> > fBBOrder;
+
+  std::map<int, std::set<std::string> > bbOrderToSpecAvoid;
+  int independenceYes;
+  int independenceNo;
+  int dynamicYes;
+  int dynamicNo;
+
+  // int specSnap;
+  std::map<llvm::Instruction *, unsigned int> specSnap;
+  int specFail;
+  std::map<uintptr_t, unsigned int> specFailNew;     // fail because of new BB
+  std::map<uintptr_t, unsigned int> specFailNoInter; // fail because of new BB &
+                                                     // no interpolant
+  std::map<uintptr_t, unsigned int> specRevisited; // fail because of revisited
+  std::map<uintptr_t, unsigned int> specRevisitedNoInter; // // fail because of
+                                                          // revisited & no
+                                                          // interpolant
+  double totalSpecFailTime;
+  clock_t start, end;
+  bool isFail;
 
   class Timer {
   public:
@@ -236,6 +258,11 @@ private:
            (f->getName() != "mempcpy") && (f->getName() != "memset");
   }
 
+  std::map<int, std::set<std::string> >
+  readBBOrderToSpecAvoid(std::string folderName);
+  std::pair<int, std::set<std::string> > readBBSpecAvoid(std::string fileName);
+  std::set<llvm::BasicBlock *> readVisitedBB(std::string fileName);
+
   // Given a concrete object in our [klee's] address space, add it to
   // objects checked code can reference.
   MemoryObject *addExternalObject(ExecutionState &state, void *addr,
@@ -249,7 +276,8 @@ private:
   void updateStates(ExecutionState *current);
   void transferToBasicBlock(llvm::BasicBlock *dst, llvm::BasicBlock *src,
                             ExecutionState &state);
-  void processBBCoverage(int BBCoverage, llvm::BasicBlock *bb);
+  void processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
+                         bool isInSpecMode);
 
   void callExternalFunction(ExecutionState &state, KInstruction *target,
                             llvm::Function *function,
@@ -323,6 +351,28 @@ private:
   // not hold, respectively. One of the states is necessarily the
   // current state, and one of the states may be null.
   StatePair fork(ExecutionState &current, ref<Expr> condition, bool isInternal);
+  StatePair branchFork(ExecutionState &current, ref<Expr> condition,
+                       bool isInternal);
+
+  std::set<std::string> extractVarNames(ExecutionState &current,
+                                        llvm::Value *v);
+
+  // Generally the nodes are in normal mode. In case an infeasible path
+  // is found, an speculation node is generated for the infeasible path
+  // excluding the last constraint and the execution of the speculation
+  // node will be continued in speculationFork.
+  StatePair addSpeculationNode(ExecutionState &current, ref<Expr> condition,
+                               llvm::Instruction *binst, bool isInternal,
+                               bool falseBranchIsInfeasible);
+
+  void speculativeBackJump(ExecutionState &current);
+  bool checkSpeculation(ExecutionState &current);
+
+  std::vector<TxTreeNode *> collectSpeculationNodes(TxTreeNode *);
+
+  // Speculation fork performs fork in the speculation mode.
+  StatePair speculationFork(ExecutionState &current, ref<Expr> condition,
+                            bool isInternal);
 
   /// Add the given (boolean) condition as a constraint on state. This
   /// function is a wrapper around the state's addConstraint function
@@ -383,6 +433,7 @@ private:
 
   // remove state from queue and delete
   void terminateState(ExecutionState &state);
+
   // call subsumption handler and terminate state
   void terminateStateOnSubsumption(ExecutionState &state);
   // call exit handler and terminate state

@@ -17,18 +17,18 @@
 
 #include "TimingSolver.h"
 
+#include "TxDependency.h"
+#include "TxShadowArray.h"
+#include <fstream>
 #include <klee/CommandLine.h>
 #include <klee/Expr.h>
+#include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/Solver.h>
 #include <klee/SolverStats.h>
-#include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ExprPPrinter.h>
 #include <klee/util/TxExprUtil.h>
 #include <klee/util/TxPrintUtil.h>
-#include <fstream>
 #include <vector>
-#include "TxDependency.h"
-#include "TxShadowArray.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
@@ -402,7 +402,7 @@ ref<Expr> TxSubsumptionTableEntry::replaceExpr(ref<Expr> originalExpr,
 
   if (originalExpr->getKid(0) == replacedExpr)
     return TxShadowArray::createBinaryOfSameKind(originalExpr, replacementExpr,
-                                               originalExpr->getKid(1));
+                                                 originalExpr->getKid(1));
 
   if (originalExpr->getKid(1) == replacedExpr)
     return TxShadowArray::createBinaryOfSameKind(
@@ -1078,13 +1078,13 @@ bool TxSubsumptionTableEntry::subsumed(
               e->getAddress()->getOffset(), coreValues, corePointerValues,
               unifiedBases, debugSubsumptionLevel);
           if (constraint.isNull())
-              return false;
-            if (stateEqualityConstraints.isNull()) {
-              stateEqualityConstraints = constraint;
-            } else {
-              stateEqualityConstraints =
-                  AndExpr::create(constraint, stateEqualityConstraints);
-            }
+            return false;
+          if (stateEqualityConstraints.isNull()) {
+            stateEqualityConstraints = constraint;
+          } else {
+            stateEqualityConstraints =
+                AndExpr::create(constraint, stateEqualityConstraints);
+          }
         } else {
           // Match not found
           return false;
@@ -1248,10 +1248,10 @@ bool TxSubsumptionTableEntry::subsumed(
             stateEqualityConstraints =
                 AndExpr::create(constraint, stateEqualityConstraints);
           }
-          } else {
-            // Match not found
-            return false;
-          }
+        } else {
+          // Match not found
+          return false;
+        }
       } else {
         ref<TxStoreEntry> e = mIt->second;
         bool leftUse =
@@ -1858,6 +1858,27 @@ bool TxSubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
   return false;
 }
 
+bool TxSubsumptionTable::hasInterpolation(ExecutionState &state) {
+
+  CallHistoryIndexedTable *subTable = 0;
+  TxTreeNode *txTreeNode = state.txTreeNode;
+
+  std::map<uintptr_t, CallHistoryIndexedTable *>::iterator it =
+      instance.find(state.txTreeNode->getProgramPoint());
+  if (it == instance.end()) {
+    return false;
+  }
+  subTable = it->second;
+
+  bool found;
+  subTable->find(txTreeNode->entryCallHistory, found);
+  if (!found) {
+    return false;
+  }
+
+  return true;
+}
+
 void TxSubsumptionTable::clear() {
   for (std::map<uintptr_t, CallHistoryIndexedTable *>::iterator
            it = instance.begin(),
@@ -1942,9 +1963,9 @@ std::string TxTree::inTwoDecimalPoints(const double n) {
 std::string TxTree::getInterpolationStat() {
   std::stringstream stream;
   stream << "KLEE: done: Total reduced symbolic execution tree nodes = "
-		 << TxTreeGraph::nodeCount  << "\n";
-  stream << "KLEE: done: Total number of visited basic blocks = "
-		 << blockCount  << "\n";
+         << TxTreeGraph::nodeCount << "\n";
+  stream << "KLEE: done: Total number of visited basic blocks = " << blockCount
+         << "\n";
   stream << "\nKLEE: done: Subsumption statistics\n";
   printTableStat(stream);
   stream << "\nKLEE: done: TxTree method execution times (ms):\n";
@@ -2004,6 +2025,8 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
 }
 
 void TxTree::setCurrentINode(ExecutionState &state) {
+  //   llvm::outs() << state.txTreeNode->isSpeculationNode() << "-" <<
+  // state.txTreeNode->isSpeculationFailedNode()<< "\n";
   TimerStatIncrementer t(setCurrentINodeTime);
   currentTxTreeNode = state.txTreeNode;
   currentTxTreeNode->setProgramPoint(state.pc->inst);
@@ -2011,6 +2034,20 @@ void TxTree::setCurrentINode(ExecutionState &state) {
     currentTxTreeNode->nodeSequenceNumber =
         TxTreeNode::nextNodeSequenceNumber++;
   TxTreeGraph::setCurrentNode(state, currentTxTreeNode->nodeSequenceNumber);
+}
+
+void TxTree::removeSpeculationFailedNodes(TxTreeNode *node) {
+  assert(!node->left && !node->right);
+  TxTreeNode *p = node->parent;
+  if (p) {
+    if (node == p->left) {
+      p->left = 0;
+    } else {
+      assert(node == p->right);
+      p->right = 0;
+    }
+  }
+  delete node;
 }
 
 void TxTree::remove(TxTreeNode *node, bool dumping) {
@@ -2073,6 +2110,7 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
 std::pair<TxTreeNode *, TxTreeNode *>
 TxTree::split(TxTreeNode *parent, ExecutionState *left, ExecutionState *right) {
   TimerStatIncrementer t(splitTime);
+
   parent->split(left, right);
   TxTreeGraph::addChildren(parent, parent->left, parent->right);
   std::pair<TxTreeNode *, TxTreeNode *> ret(parent->left, parent->right);
@@ -2126,6 +2164,16 @@ void TxTree::executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
   TimerStatIncrementer t(executeOnNodeTime);
   node->execute(instr, args, symbolicExecutionError);
   symbolicExecutionError = false;
+}
+
+bool TxTree::isSpeculationNode() {
+  return currentTxTreeNode->isSpeculationNode();
+}
+
+void TxTree::storeSpeculationUnsatCore(TimingSolver *solver,
+                                       std::vector<ref<Expr> > unsatCore,
+                                       llvm::BranchInst *binst) {
+  currentTxTreeNode->storeSpeculationUnsatCore(solver, unsatCore, binst);
 }
 
 void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
@@ -2225,6 +2273,12 @@ TxTreeNode::TxTreeNode(
   // Inherit the abstract dependency or NULL
   dependency = new TxDependency(_parent ? _parent->dependency : 0, _targetData,
                                 _globalAddresses);
+
+  // Set speculation flag to false
+  speculationFlag = 0;
+  speculationFailed = 0;
+  visitedProgramPoints = NULL;
+  specTime = NULL;
 }
 
 TxTreeNode::~TxTreeNode() {
@@ -2240,6 +2294,52 @@ ref<Expr> TxTreeNode::getInterpolant(
   return expr;
 }
 
+bool TxTreeNode::isSpeculationNode() { return speculationFlag; }
+
+void TxTreeNode::setSpeculationFlag() { speculationFlag = 1; }
+
+bool TxTreeNode::isSpeculationFailedNode() { return speculationFailed; }
+
+void TxTreeNode::setSpeculationFailed() { speculationFailed = 1; }
+
+void TxTreeNode::storeSpeculationUnsatCore(TimingSolver *solver,
+                                           std::vector<ref<Expr> > unsatCore,
+                                           llvm::BranchInst *binst) {
+  speculationSolver = solver;
+  speculationUnsatCore = unsatCore;
+  speculationBInst = binst;
+}
+
+void TxTreeNode::mark() {
+  int debugSubsumptionLevel = this->dependency->debugSubsumptionLevel;
+
+  llvm::BranchInst *binst = speculationBInst;
+  if (binst) {
+    ref<Expr> unknownExpression;
+    std::string reason = "";
+    if (debugSubsumptionLevel >= 1) {
+      llvm::raw_string_ostream stream(reason);
+      stream << "branch infeasibility [";
+      if (binst->getParent()->getParent()) {
+        stream << binst->getParent()->getParent()->getName().str() << ": ";
+      }
+      if (llvm::MDNode *n = binst->getMetadata("dbg")) {
+        llvm::DILocation loc(n);
+        stream << "Line " << loc.getLineNumber();
+      } else {
+        binst->print(stream);
+      }
+      stream << "]";
+      stream.flush();
+    }
+    this->dependency->markAllValues(binst->getCondition(), unknownExpression,
+                                    reason);
+  }
+
+  // We create path condition marking structure and mark core constraints
+  this->unsatCoreInterpolation(this->speculationUnsatCore);
+}
+
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
   TimerStatIncrementer t(addConstraintTime);
   ref<TxPCConstraint> pcConstraint =
@@ -2252,6 +2352,14 @@ void TxTreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
   assert(left == 0 && right == 0);
   leftData->txTreeNode = createLeftChild();
   rightData->txTreeNode = createRightChild();
+  if (this->speculationFlag) {
+    leftData->txTreeNode->setSpeculationFlag();
+    leftData->txTreeNode->visitedProgramPoints = this->visitedProgramPoints;
+    leftData->txTreeNode->specTime = this->specTime;
+    rightData->txTreeNode->setSpeculationFlag();
+    rightData->txTreeNode->visitedProgramPoints = this->visitedProgramPoints;
+    rightData->txTreeNode->specTime = this->specTime;
+  }
 }
 
 void TxTreeNode::execute(llvm::Instruction *instr,
@@ -2276,8 +2384,8 @@ void TxTreeNode::bindReturnValue(llvm::CallInst *site, llvm::Instruction *inst,
 }
 
 void TxTreeNode::getStoredExpressions(
-    const std::vector<llvm::Instruction *> &_callHistory,
-    bool &leftRetrieval, TxStore::TopStateStore &__internalStore,
+    const std::vector<llvm::Instruction *> &_callHistory, bool &leftRetrieval,
+    TxStore::TopStateStore &__internalStore,
     TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) const {
   TimerStatIncrementer t(getStoredExpressionsTime);
