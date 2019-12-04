@@ -112,6 +112,7 @@ public:
   std::map<uintptr_t, unsigned int> specRevisitedNoInter; // // fail because of
                                                           // revisited & no
                                                           // interpolant
+  std::vector<int> blackList;
   unsigned int specLimit;
   uintptr_t prevNodeSequence;
   double totalSpecFailTime;

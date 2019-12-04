@@ -1181,7 +1181,6 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
   llvm::BranchInst *binst =
       llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
   uintptr_t pp1 = current.txTreeNode->getProgramPoint();
-
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
@@ -5070,18 +5069,15 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
       outSpec << it->first << ": " << it->second.first << ","
               << it->second.second << ","
               << it->second.first - it->second.second << "\n";
+      if ((it->second.second) > 0 &&
+          (it->second.first - it->second.second) == 0) {
+        blackList.push_back(it->first);
+      }
     }
     // print the blacklist
     outSpec << "Blacklist of Program Points:\n";
-    for (std::map<uintptr_t, std::pair<unsigned int, unsigned int> >::iterator
-             it = currentCountsFreq.begin(),
-             ie = currentCountsFreq.end();
-         it != ie; ++it) {
-      if ((it->second.second) > 0 &&
-          (it->second.first - it->second.second) == 0) {
-        outSpec << it->first << "\n";
-      }
-    }
+    for (int i = 0; i < (int)blackList.size(); i++)
+      outSpec << blackList[i] << "\n";
   }
 
   if (BBCoverage >= 1) {
