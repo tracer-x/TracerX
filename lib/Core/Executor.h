@@ -104,6 +104,7 @@ public:
   int specCount;
   int specCloseCount;
   int specFail;
+  std::map<uintptr_t, std::pair<unsigned int, unsigned int> > currentCountsFreq;
   std::map<uintptr_t, unsigned int> specFailNew;     // fail because of new BB
   std::map<uintptr_t, unsigned int> specFailNoInter; // fail because of new BB &
                                                      // no interpolant

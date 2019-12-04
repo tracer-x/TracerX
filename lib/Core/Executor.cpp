@@ -1180,12 +1180,18 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
   llvm::BranchInst *binst =
       llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+  uintptr_t pp1 = current.txTreeNode->getProgramPoint();
 
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
       specCount++;
+      if (currentCountsFreq.find(pp1) != currentCountsFreq.end()) {
+        currentCountsFreq[pp1].first = currentCountsFreq[pp1].first + 1;
+      } else {
+        currentCountsFreq[pp1].first = 1;
+      }
       return addSpeculationNode(current, condition, isInternal, true);
     }
     return StatePair(&current, 0);
@@ -1194,6 +1200,11 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
       specCount++;
+      if (currentCountsFreq.find(pp1) != currentCountsFreq.end()) {
+        currentCountsFreq[pp1].first = currentCountsFreq[pp1].first + 1;
+      } else {
+        currentCountsFreq[pp1].first = 1;
+      }
       return addSpeculationNode(current, condition, isInternal, false);
     }
     return StatePair(0, &current);
@@ -1223,6 +1234,11 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
       txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
       specCount++;
+      if (currentCountsFreq.find(pp1) != currentCountsFreq.end()) {
+        currentCountsFreq[pp1].first = currentCountsFreq[pp1].first + 1;
+      } else {
+        currentCountsFreq[pp1].first = 1;
+      }
       return addSpeculationNode(current, condition, isInternal, true);
     }
 
@@ -1252,6 +1268,11 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
       txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
       specCount++;
+      if (currentCountsFreq.find(pp1) != currentCountsFreq.end()) {
+        currentCountsFreq[pp1].first = currentCountsFreq[pp1].first + 1;
+      } else {
+        currentCountsFreq[pp1].first = 1;
+      }
       return addSpeculationNode(current, condition, isInternal, false);
     }
 
@@ -1634,14 +1655,21 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 void Executor::speculativeBackJump(ExecutionState &current) {
 
   double thisSpecTreeTime = *(current.txTreeNode->specTime);
+
   // identify the speculation root
   TxTreeNode *currentNode = current.txTreeNode;
   TxTreeNode *parent = currentNode->getParent();
+
   while (parent && parent->isSpeculationNode()) {
     currentNode = parent;
     parent = parent->getParent();
   }
-
+  uintptr_t pp2 = parent->getProgramPoint();
+  if (currentCountsFreq.find(pp2) != currentCountsFreq.end()) {
+    currentCountsFreq[pp2].second = currentCountsFreq[pp2].second + 1;
+  } else {
+    currentCountsFreq[pp2].second = 1;
+  }
   // interpolant marking on parent node
   if (parent && !parent->speculationUnsatCore.empty()) {
     parent->mark();
@@ -2348,29 +2376,29 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     }
 
     // check new BB
-//    llvm::BasicBlock *currentBB = state.txTreeNode->getBasicBlock();
-//    if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
-//      if (specFailNew.find(pp) != specFailNew.end()) {
-//        specFailNew[pp] = specFailNew[pp] + 1;
-//      } else {
-//        specFailNew[pp] = 1;
-//      }
-//      // check interpolation at is program point
-//      bool hasInterpolation = TxSubsumptionTable::hasInterpolation(state);
-//      if (!hasInterpolation) {
-//        if (specFailNoInter.find(pp) != specFailNoInter.end()) {
-//          specFailNoInter[pp] = specFailNoInter[pp] + 1;
-//        } else {
-//          specFailNoInter[pp] = 1;
-//        }
-//      }
-//      // add to visited BB
-//      // This is disabled to not to count blocks in speculation subtree
-//      // visitedBlocks.insert(currentBB);
-//      specFail++;
-//      speculativeBackJump(state);
-//      return;
-//    }
+    //    llvm::BasicBlock *currentBB = state.txTreeNode->getBasicBlock();
+    //    if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
+    //      if (specFailNew.find(pp) != specFailNew.end()) {
+    //        specFailNew[pp] = specFailNew[pp] + 1;
+    //      } else {
+    //        specFailNew[pp] = 1;
+    //      }
+    //      // check interpolation at is program point
+    //      bool hasInterpolation = TxSubsumptionTable::hasInterpolation(state);
+    //      if (!hasInterpolation) {
+    //        if (specFailNoInter.find(pp) != specFailNoInter.end()) {
+    //          specFailNoInter[pp] = specFailNoInter[pp] + 1;
+    //        } else {
+    //          specFailNoInter[pp] = 1;
+    //        }
+    //      }
+    //      // add to visited BB
+    //      // This is disabled to not to count blocks in speculation subtree
+    //      // visitedBlocks.insert(currentBB);
+    //      specFail++;
+    //      speculativeBackJump(state);
+    //      return;
+    //    }
   }
 
   switch (i->getOpcode()) {
@@ -3848,7 +3876,6 @@ void Executor::run(ExecutionState &initialState) {
   prevNodeSequence = 0;
   totalSpecFailTime = 0.0;
   startingBBPlottingTime = time(0);
-
   // get interested source code
   size_t lastindex = InputFile.find_last_of(".");
   std::string InputFile1 = InputFile.substr(0, lastindex);
@@ -4994,9 +5021,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
   if (Speculation) {
     std::string outSpecFile = interpreterHandler->getOutputFilename("spec.txt");
     std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
-
-    outSpec << "Total Unchecked speculation: " << specCloseCount << "\n";
-    outSpec << "Total Checked speculation: " << specCount << "\n";
+    outSpec << "Total speculation count: " << specCount << "\n";
     outSpec << "Total speculation success: " << (specCount - specFail) << "\n";
     outSpec << "Total speculation failures: " << specFail << "\n";
 
@@ -5033,38 +5058,29 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
          it != ie; ++it) {
       failRevisitedNoInter += it->second;
     }
-
-    outSpec << "Total speculation failures because of New BB: " << failNew
-            << "\n";
-    outSpec << "Total speculation failures because of New BB with no "
-               "interpolation: " << failNewNoInter << "\n";
-
-    outSpec << "Total speculation failures because of Revisted: "
-            << failRevisited << "\n";
-    outSpec << "Total speculation failures because of Revisted with no "
-               "interpolation: " << failRevisitedNoInter << "\n";
-
-    outSpec << "Total speculation failures because of Bug Hit: "
-            << (specFail - failNew - failRevisited) << "\n";
-
     outSpec << "Total speculation fail time: "
             << totalSpecFailTime / double(CLOCKS_PER_SEC) << "\n";
 
     // print frequency of failure at each program point
-    outSpec << "Frequency of failures because New BB with no interpolation:\n";
-    for (std::map<uintptr_t, unsigned int>::iterator
-             it = specFailNoInter.begin(),
-             ie = specFailNoInter.end();
+    outSpec << "Statistics for each program points (Total, Fail, Success):\n";
+    for (std::map<uintptr_t, std::pair<unsigned int, unsigned int> >::iterator
+             it = currentCountsFreq.begin(),
+             ie = currentCountsFreq.end();
          it != ie; ++it) {
-      outSpec << it->first << ": " << it->second << "\n";
+      outSpec << it->first << ": " << it->second.first << ","
+              << it->second.second << ","
+              << it->second.first - it->second.second << "\n";
     }
-    outSpec
-        << "Frequency of failures because Revisted with no interpolation:\n";
-    for (std::map<uintptr_t, unsigned int>::iterator
-             it = specRevisitedNoInter.begin(),
-             ie = specRevisitedNoInter.end();
+    // print the blacklist
+    outSpec << "Blacklist of Program Points:\n";
+    for (std::map<uintptr_t, std::pair<unsigned int, unsigned int> >::iterator
+             it = currentCountsFreq.begin(),
+             ie = currentCountsFreq.end();
          it != ie; ++it) {
-      outSpec << it->first << ": " << it->second << "\n";
+      if ((it->second.second) > 0 &&
+          (it->second.first - it->second.second) == 0) {
+        outSpec << it->first << "\n";
+      }
     }
   }
 
