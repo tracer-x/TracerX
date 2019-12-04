@@ -1180,7 +1180,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
   llvm::BranchInst *binst =
       llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
-  uintptr_t pp1 = current.txTreeNode->getProgramPoint();
+  // uintptr_t pp1 = current.txTreeNode->getProgramPoint();
+  llvm::BasicBlock *pp1 = current.txTreeNode->getBasicBlock();
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
@@ -1485,6 +1486,7 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
 Executor::StatePair Executor::speculationFork(ExecutionState &current,
                                               ref<Expr> condition,
                                               bool isInternal) {
+
   //  klee_warning("Speculation node");
 
   Solver::Validity res;
@@ -1663,7 +1665,8 @@ void Executor::speculativeBackJump(ExecutionState &current) {
     currentNode = parent;
     parent = parent->getParent();
   }
-  uintptr_t pp2 = parent->getProgramPoint();
+  // uintptr_t pp2 = parent->getProgramPoint();
+  llvm::BasicBlock *pp2 = parent->getBasicBlock();
   if (currentCountsFreq.find(pp2) != currentCountsFreq.end()) {
     currentCountsFreq[pp2].second = currentCountsFreq[pp2].second + 1;
   } else {
@@ -3875,6 +3878,7 @@ void Executor::run(ExecutionState &initialState) {
   prevNodeSequence = 0;
   totalSpecFailTime = 0.0;
   startingBBPlottingTime = time(0);
+  phase1 = true;
   // get interested source code
   size_t lastindex = InputFile.find_last_of(".");
   std::string InputFile1 = InputFile.substr(0, lastindex);
@@ -5020,6 +5024,10 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
   if (Speculation) {
     std::string outSpecFile = interpreterHandler->getOutputFilename("spec.txt");
     std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
+
+    std::string outBlackListFile =
+        interpreterHandler->getOutputFilename("BlackList.txt");
+    std::ofstream outBlackList(outBlackListFile.c_str(), std::ofstream::app);
     outSpec << "Total speculation count: " << specCount << "\n";
     outSpec << "Total speculation success: " << (specCount - specFail) << "\n";
     outSpec << "Total speculation failures: " << specFail << "\n";
@@ -5059,25 +5067,31 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     }
     outSpec << "Total speculation fail time: "
             << totalSpecFailTime / double(CLOCKS_PER_SEC) << "\n";
-
     // print frequency of failure at each program point
     outSpec << "Statistics for each program points (Total, Fail, Success):\n";
-    for (std::map<uintptr_t, std::pair<unsigned int, unsigned int> >::iterator
+    for (std::map<llvm::BasicBlock *,
+                  std::pair<unsigned int, unsigned int> >::iterator
              it = currentCountsFreq.begin(),
              ie = currentCountsFreq.end();
          it != ie; ++it) {
-      outSpec << it->first << ": " << it->second.first << ","
-              << it->second.second << ","
-              << it->second.first - it->second.second << "\n";
-      if ((it->second.second) > 0 &&
-          (it->second.first - it->second.second) == 0) {
-        blackList.push_back(it->first);
-      }
+      int order = fBBOrder[(it->first)->getParent()][it->first];
+      outSpec << order << ": " << it->second.first << "," << it->second.second
+              << "," << it->second.first - it->second.second << "\n";
     }
     // print the blacklist
-    outSpec << "Blacklist of Program Points:\n";
-    for (int i = 0; i < (int)blackList.size(); i++)
-      outSpec << blackList[i] << "\n";
+    outBlackList << "Blacklist of Program Points:\n";
+    for (std::map<llvm::BasicBlock *,
+                  std::pair<unsigned int, unsigned int> >::iterator
+             it = currentCountsFreq.begin(),
+             ie = currentCountsFreq.end();
+         it != ie; ++it) {
+      if ((it->second.second) > 0 &&
+          (it->second.first - it->second.second) == 0) {
+        // outSpec << &(it->first) << "\n";
+        int order = fBBOrder[(it->first)->getParent()][it->first];
+        outBlackList << order << "\n";
+      }
+    }
   }
 
   if (BBCoverage >= 1) {

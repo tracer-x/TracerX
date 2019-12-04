@@ -104,7 +104,11 @@ public:
   int specCount;
   int specCloseCount;
   int specFail;
-  std::map<uintptr_t, std::pair<unsigned int, unsigned int> > currentCountsFreq;
+  bool phase1;
+  // std::map<uintptr_t, std::pair<unsigned int, unsigned int> >
+  // currentCountsFreq;
+  std::map<llvm::BasicBlock *, std::pair<unsigned int, unsigned int> >
+  currentCountsFreq;
   std::map<uintptr_t, unsigned int> specFailNew;     // fail because of new BB
   std::map<uintptr_t, unsigned int> specFailNoInter; // fail because of new BB &
                                                      // no interpolant
@@ -112,7 +116,7 @@ public:
   std::map<uintptr_t, unsigned int> specRevisitedNoInter; // // fail because of
                                                           // revisited & no
                                                           // interpolant
-  std::vector<int> blackList;
+  std::set<llvm::BasicBlock *> blackList;
   unsigned int specLimit;
   uintptr_t prevNodeSequence;
   double totalSpecFailTime;
