@@ -15,79 +15,82 @@
 #include <set>
 
 namespace llvm {
-  class BranchInst;
-  class Function;
-  class Instruction;
-  class raw_fd_ostream;
+class BranchInst;
+class BasicBlock;
+class Function;
+class Instruction;
+class raw_fd_ostream;
 }
 
 namespace klee {
-  class ExecutionState;
-  class Executor;  
-  class InstructionInfoTable;
-  class InterpreterHandler;
-  struct KInstruction;
-  struct StackFrame;
+class ExecutionState;
+class Executor;
+class InstructionInfoTable;
+class InterpreterHandler;
+struct KInstruction;
+struct StackFrame;
 
-  class StatsTracker {
-    friend class WriteStatsTimer;
-    friend class WriteIStatsTimer;
+class StatsTracker {
+  friend class WriteStatsTimer;
+  friend class WriteIStatsTimer;
 
-    Executor &executor;
-    std::string objectFilename;
+  Executor &executor;
+  std::string objectFilename;
 
-    llvm::raw_fd_ostream *statsFile, *istatsFile;
-    double startWallTime;
-    
-    unsigned numBranches;
-    unsigned fullBranches, partialBranches;
+  llvm::raw_fd_ostream *statsFile, *istatsFile;
+  double startWallTime;
 
-    CallPathManager callPathManager;    
+  unsigned numBranches;
+  unsigned fullBranches, partialBranches;
 
-    bool updateMinDistToUncovered;
+  CallPathManager callPathManager;
 
-  public:
-    static bool useStatistics();
+  bool updateMinDistToUncovered;
 
-  private:
-    void updateStateStatistics(uint64_t addend);
-    void writeStatsHeader();
-    void writeStatsLine();
-    void writeIStats();
+public:
+  static bool useStatistics();
 
-  public:
-    StatsTracker(Executor &_executor, std::string _objectFilename,
-                 bool _updateMinDistToUncovered);
-    ~StatsTracker();
+private:
+  void updateStateStatistics(uint64_t addend);
+  void writeStatsHeader();
+  void writeStatsLine();
+  void writeIStats();
 
-    // called after a new StackFrame has been pushed (for callpath tracing)
-    void framePushed(ExecutionState &es, StackFrame *parentFrame);
+public:
+  StatsTracker(Executor &_executor, std::string _objectFilename,
+               bool _updateMinDistToUncovered);
+  ~StatsTracker();
 
-    // called after a StackFrame has been popped 
-    void framePopped(ExecutionState &es);
+  // called after a new StackFrame has been pushed (for callpath tracing)
+  void framePushed(ExecutionState &es, StackFrame *parentFrame);
 
-    // called when some side of a branch has been visited. it is
-    // imperative that this be called when the statistics index is at
-    // the index for the branch itself.
-    void markBranchVisited(ExecutionState *visitedTrue, 
-                           ExecutionState *visitedFalse);
-    
-    // called when execution is done and stats files should be flushed
-    void done();
+  // called after a StackFrame has been popped
+  void framePopped(ExecutionState &es);
 
-    // process stats for a single instruction step, es is the state
-    // about to be stepped
-    void stepInstruction(ExecutionState &es);
+  // called when some side of a branch has been visited. it is
+  // imperative that this be called when the statistics index is at
+  // the index for the branch itself.
+  void markBranchVisited(ExecutionState *visitedTrue,
+                         ExecutionState *visitedFalse);
 
-    /// Return time in seconds since execution start.
-    double elapsed();
+  // called when execution is done and stats files should be flushed
+  void done();
 
-    void computeReachableUncovered();
-  };
+  // process stats for a single instruction step, es is the state
+  // about to be stepped
+  void stepInstruction(ExecutionState &es);
 
-  uint64_t computeMinDistToUncovered(const KInstruction *ki,
-                                     uint64_t minDistAtRA);
+  /// Return time in seconds since execution start.
+  double elapsed();
 
+  void computeReachableUncovered();
+
+  static std::map<llvm::BasicBlock *, std::vector<unsigned int> >
+  currentCountsFreq;
+};
+
+uint64_t computeMinDistToUncovered(const KInstruction *ki,
+                                   uint64_t minDistAtRA);
 }
 
 #endif

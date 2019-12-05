@@ -2056,7 +2056,21 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
   assert(!node->left && !node->right);
   do {
     TxTreeNode *p = node->parent;
+    // Speculation Success
+    if (node->isSpeculationNode() && !node->isSpeculationFailedNode() && p &&
+        !p->isSpeculationNode()) {
+      // Executor::specSuccess++;
+      // StatsTracker::currentCountsFreq[node->getBasicBlock()];
 
+      if (StatsTracker::currentCountsFreq.find(p->getBasicBlock()) ==
+          StatsTracker::currentCountsFreq.end()) {
+        StatsTracker::currentCountsFreq[p->getBasicBlock()].push_back(0);
+        StatsTracker::currentCountsFreq[p->getBasicBlock()].push_back(0);
+        StatsTracker::currentCountsFreq[p->getBasicBlock()].push_back(0);
+      }
+      StatsTracker::currentCountsFreq[p->getBasicBlock()][2] =
+          StatsTracker::currentCountsFreq[p->getBasicBlock()][2] + 1;
+    }
     // As the node is about to be deleted, it must have been completely
     // traversed, hence the correct time to table the interpolant.
     //

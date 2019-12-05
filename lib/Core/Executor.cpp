@@ -1187,11 +1187,15 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
       specCount++;
-      if (currentCountsFreq.find(pp1) != currentCountsFreq.end()) {
-        currentCountsFreq[pp1].first = currentCountsFreq[pp1].first + 1;
-      } else {
-        currentCountsFreq[pp1].first = 1;
+      if (StatsTracker::currentCountsFreq.find(pp1) ==
+          StatsTracker::currentCountsFreq.end()) {
+        StatsTracker::currentCountsFreq[pp1].push_back(0);
+        StatsTracker::currentCountsFreq[pp1].push_back(0);
+        StatsTracker::currentCountsFreq[pp1].push_back(0);
       }
+      StatsTracker::currentCountsFreq[pp1][0] =
+          StatsTracker::currentCountsFreq[pp1][0] + 1;
+
       return addSpeculationNode(current, condition, isInternal, true);
     }
     return StatePair(&current, 0);
@@ -1200,11 +1204,14 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
       specCount++;
-      if (currentCountsFreq.find(pp1) != currentCountsFreq.end()) {
-        currentCountsFreq[pp1].first = currentCountsFreq[pp1].first + 1;
-      } else {
-        currentCountsFreq[pp1].first = 1;
+      if (StatsTracker::currentCountsFreq.find(pp1) ==
+          StatsTracker::currentCountsFreq.end()) {
+        StatsTracker::currentCountsFreq[pp1].push_back(0);
+        StatsTracker::currentCountsFreq[pp1].push_back(0);
+        StatsTracker::currentCountsFreq[pp1].push_back(0);
       }
+      StatsTracker::currentCountsFreq[pp1][0] =
+          StatsTracker::currentCountsFreq[pp1][0] + 1;
       return addSpeculationNode(current, condition, isInternal, false);
     }
     return StatePair(0, &current);
@@ -1234,11 +1241,14 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
       txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
       specCount++;
-      if (currentCountsFreq.find(pp1) != currentCountsFreq.end()) {
-        currentCountsFreq[pp1].first = currentCountsFreq[pp1].first + 1;
-      } else {
-        currentCountsFreq[pp1].first = 1;
+      if (StatsTracker::currentCountsFreq.find(pp1) ==
+          StatsTracker::currentCountsFreq.end()) {
+        StatsTracker::currentCountsFreq[pp1].push_back(0);
+        StatsTracker::currentCountsFreq[pp1].push_back(0);
+        StatsTracker::currentCountsFreq[pp1].push_back(0);
       }
+      StatsTracker::currentCountsFreq[pp1][0] =
+          StatsTracker::currentCountsFreq[pp1][0] + 1;
       return addSpeculationNode(current, condition, isInternal, true);
     }
 
@@ -1268,11 +1278,14 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
       txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
       specCount++;
-      if (currentCountsFreq.find(pp1) != currentCountsFreq.end()) {
-        currentCountsFreq[pp1].first = currentCountsFreq[pp1].first + 1;
-      } else {
-        currentCountsFreq[pp1].first = 1;
+      if (StatsTracker::currentCountsFreq.find(pp1) ==
+          StatsTracker::currentCountsFreq.end()) {
+        StatsTracker::currentCountsFreq[pp1].push_back(0);
+        StatsTracker::currentCountsFreq[pp1].push_back(0);
+        StatsTracker::currentCountsFreq[pp1].push_back(0);
       }
+      StatsTracker::currentCountsFreq[pp1][0] =
+          StatsTracker::currentCountsFreq[pp1][0] + 1;
       return addSpeculationNode(current, condition, isInternal, false);
     }
 
@@ -1667,11 +1680,16 @@ void Executor::speculativeBackJump(ExecutionState &current) {
   }
   // uintptr_t pp2 = parent->getProgramPoint();
   llvm::BasicBlock *pp2 = parent->getBasicBlock();
-  if (currentCountsFreq.find(pp2) != currentCountsFreq.end()) {
-    currentCountsFreq[pp2].second = currentCountsFreq[pp2].second + 1;
-  } else {
-    currentCountsFreq[pp2].second = 1;
+
+  if (StatsTracker::currentCountsFreq.find(pp2) ==
+      StatsTracker::currentCountsFreq.end()) {
+    StatsTracker::currentCountsFreq[pp2].push_back(0);
+    StatsTracker::currentCountsFreq[pp2].push_back(0);
+    StatsTracker::currentCountsFreq[pp2].push_back(0);
   }
+  StatsTracker::currentCountsFreq[pp2][1] =
+      StatsTracker::currentCountsFreq[pp2][1] + 1;
+
   // interpolant marking on parent node
   if (parent && !parent->speculationUnsatCore.empty()) {
     parent->mark();
@@ -3878,7 +3896,7 @@ void Executor::run(ExecutionState &initialState) {
   prevNodeSequence = 0;
   totalSpecFailTime = 0.0;
   startingBBPlottingTime = time(0);
-  phase1 = true;
+
   // get interested source code
   size_t lastindex = InputFile.find_last_of(".");
   std::string InputFile1 = InputFile.substr(0, lastindex);
@@ -5031,7 +5049,6 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     outSpec << "Total speculation count: " << specCount << "\n";
     outSpec << "Total speculation success: " << (specCount - specFail) << "\n";
     outSpec << "Total speculation failures: " << specFail << "\n";
-
     // total fail
     // new
     unsigned int failNew = 0;
@@ -5069,24 +5086,21 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
             << totalSpecFailTime / double(CLOCKS_PER_SEC) << "\n";
     // print frequency of failure at each program point
     outSpec << "Statistics for each program points (Total, Fail, Success):\n";
-    for (std::map<llvm::BasicBlock *,
-                  std::pair<unsigned int, unsigned int> >::iterator
-             it = currentCountsFreq.begin(),
-             ie = currentCountsFreq.end();
+    for (std::map<llvm::BasicBlock *, std::vector<unsigned int> >::iterator
+             it = StatsTracker::currentCountsFreq.begin(),
+             ie = StatsTracker::currentCountsFreq.end();
          it != ie; ++it) {
       int order = fBBOrder[(it->first)->getParent()][it->first];
-      outSpec << order << ": " << it->second.first << "," << it->second.second
-              << "," << it->second.first - it->second.second << "\n";
+      outSpec << order << ": " << it->second[0] << "," << it->second[1] << ","
+              << it->second[2] << "\n";
     }
     // print the blacklist
     outBlackList << "Blacklist of Program Points:\n";
-    for (std::map<llvm::BasicBlock *,
-                  std::pair<unsigned int, unsigned int> >::iterator
-             it = currentCountsFreq.begin(),
-             ie = currentCountsFreq.end();
+    for (std::map<llvm::BasicBlock *, std::vector<unsigned int> >::iterator
+             it = StatsTracker::currentCountsFreq.begin(),
+             ie = StatsTracker::currentCountsFreq.end();
          it != ie; ++it) {
-      if ((it->second.second) > 0 &&
-          (it->second.first - it->second.second) == 0) {
+      if ((it->second[1]) > 0 && (it->second[2]) == 0) {
         // outSpec << &(it->first) << "\n";
         int order = fBBOrder[(it->first)->getParent()][it->first];
         outBlackList << order << "\n";

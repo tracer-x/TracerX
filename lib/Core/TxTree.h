@@ -29,6 +29,7 @@
 #include "TxDependency.h"
 #include "TxSpeculation.h"
 #include "llvm/Support/raw_ostream.h"
+#include "StatsTracker.h"
 
 namespace klee {
 
