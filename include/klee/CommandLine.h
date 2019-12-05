@@ -107,6 +107,8 @@ extern llvm::cl::opt<SpecType> SpecTypeToUse;
 
 extern llvm::cl::opt<SpecStrategy> SpecStrategyToUse;
 
+extern llvm::cl::opt<std::string> DependencyFolder;
+
 #endif
 
 #ifdef ENABLE_METASMT
