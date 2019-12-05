@@ -175,12 +175,23 @@ llvm::cl::opt<bool> TracerXPointerError(
                    "shadow memory (may be false positives)."),
     llvm::cl::init(false));
 
-llvm::cl::opt<bool> Speculation(
-    "speculation",
+llvm::cl::opt<SpecType>
+    SpecTypeToUse("spec-type",
+                  llvm::cl::desc("Speculation type: coverage or safety"),
+                  llvm::cl::values(clEnumValN(SAFETY, "safety", "safety"),
+                                   clEnumValN(COVERAGE, "coverage", "coverage"),
+                                   clEnumValEnd),
+                  llvm::cl::init(NO_SPEC));
+
+llvm::cl::opt<SpecStrategy> SpecStrategyToUse(
+    "spec-strategy",
     llvm::cl::desc(
-        "Perform speculation to remove infeasible paths from interpolants."
-        "Speculation should be used with Depth First Search."),
-    llvm::cl::init(false));
+        "Strategy used by speculation, timid, aggressive or custom."),
+    llvm::cl::values(clEnumValN(TIMID, "timid", "timid"),
+                     clEnumValN(AGGRESSIVE, "aggressive", "aggressive"),
+                     clEnumValN(CUSTOM, "custom", "custom"), clEnumValEnd),
+    llvm::cl::init(CUSTOM));
+
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT
