@@ -1044,7 +1044,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
                                          ref<Expr> condition, bool isInternal) {
   start = clock();
   // The current node is in the speculation node
-  if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode()) {
+  if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
+      txTree->isSpeculationNode()) {
     Executor::StatePair res = speculationFork(current, condition, isInternal);
     end = clock();
     txTree->incSpecTime(double(end - start));
@@ -1195,7 +1196,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
   llvm::BranchInst *binst =
       llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
   if (condition->isTrue()) {
-    if (INTERPOLATION_ENABLED && Speculation &&
+    if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // check independency
       std::set<std::string> vars = extractVarNames(current, binst);
@@ -1219,7 +1220,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       }
     }
   } else if (condition->isFalse()) {
-    if (INTERPOLATION_ENABLED && Speculation &&
+    if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       std::set<std::string> vars = extractVarNames(current, binst);
       if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
@@ -1258,7 +1259,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         current.pathOS << "1";
       }
     }
-    if (INTERPOLATION_ENABLED && Speculation &&
+    if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       std::set<std::string> vars = extractVarNames(current, binst);
       if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
@@ -1300,7 +1301,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       }
     }
 
-    if (INTERPOLATION_ENABLED && Speculation &&
+    if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       std::set<std::string> vars = extractVarNames(current, binst);
       if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
@@ -1571,7 +1572,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
 
   if (condition->isTrue()) {
-    if (INTERPOLATION_ENABLED && Speculation &&
+    if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       std::set<std::string> vars = extractVarNames(current, binst);
       if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
@@ -1595,7 +1596,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     }
     return StatePair(&current, 0);
   } else if (condition->isFalse()) {
-    if (INTERPOLATION_ENABLED && Speculation &&
+    if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       std::set<std::string> vars = extractVarNames(current, binst);
       if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
@@ -1632,7 +1633,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         current.pathOS << "1";
       }
     }
-    if (INTERPOLATION_ENABLED && Speculation &&
+    if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       std::set<std::string> vars = extractVarNames(current, binst);
       if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
@@ -1676,7 +1677,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       }
     }
 
-    if (INTERPOLATION_ENABLED && Speculation &&
+    if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       std::set<std::string> vars = extractVarNames(current, binst);
       if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
@@ -2114,7 +2115,7 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
   // BB Coverage
   bool isInterested = (fBBOrder.find(f) != fBBOrder.end());
   if (isInterested) {
-    bool isInSpecMode = (INTERPOLATION_ENABLED && Speculation &&
+    bool isInSpecMode = (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
                          state.txTreeNode->isSpeculationNode());
     processBBCoverage(BBCoverage, &(f->front()), isInSpecMode);
   }
@@ -2321,7 +2322,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   bool isInterested = (fBBOrder.find(dst->getParent()) != fBBOrder.end());
   if (isInterested) {
 
-    bool isInSpecMode = (INTERPOLATION_ENABLED && Speculation &&
+    bool isInSpecMode = (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
                          state.txTreeNode->isSpeculationNode());
     processBBCoverage(BBCoverage, dst, isInSpecMode);
   }
@@ -2453,7 +2454,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
   // if this is starting a new BB then
   // check for non-linear & new BB in speculation mode
-  if (INTERPOLATION_ENABLED && Speculation && txTree->isSpeculationNode() &&
+  if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
+      txTree->isSpeculationNode() &&
       (i == &state.txTreeNode->getBasicBlock()->front())) {
     // check non-linear
     uintptr_t pp = state.txTreeNode->getProgramPoint();
@@ -2484,28 +2486,30 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     }
 
     // check new BB
-    llvm::BasicBlock *currentBB = state.txTreeNode->getBasicBlock();
-    if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
-      if (specFailNew.find(pp) != specFailNew.end()) {
-        specFailNew[pp] = specFailNew[pp] + 1;
-      } else {
-        specFailNew[pp] = 1;
-      }
-      // check interpolation at is program point
-      bool hasInterpolation = TxSubsumptionTable::hasInterpolation(state);
-      if (!hasInterpolation) {
-        if (specFailNoInter.find(pp) != specFailNoInter.end()) {
-          specFailNoInter[pp] = specFailNoInter[pp] + 1;
+    if (SpecStrategyToUse == COVERAGE) {
+      llvm::BasicBlock *currentBB = state.txTreeNode->getBasicBlock();
+      if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
+        if (specFailNew.find(pp) != specFailNew.end()) {
+          specFailNew[pp] = specFailNew[pp] + 1;
         } else {
-          specFailNoInter[pp] = 1;
+          specFailNew[pp] = 1;
         }
+        // check interpolation at is program point
+        bool hasInterpolation = TxSubsumptionTable::hasInterpolation(state);
+        if (!hasInterpolation) {
+          if (specFailNoInter.find(pp) != specFailNoInter.end()) {
+            specFailNoInter[pp] = specFailNoInter[pp] + 1;
+          } else {
+            specFailNoInter[pp] = 1;
+          }
+        }
+        // add to visited BB
+        // This is disabled to not to count blocks in speculation subtree
+        // visitedBlocks.insert(currentBB);
+        specFail++;
+        speculativeBackJump(state);
+        return;
       }
-      // add to visited BB
-      // This is disabled to not to count blocks in speculation subtree
-      // visitedBlocks.insert(currentBB);
-      specFail++;
-      speculativeBackJump(state);
-      return;
     }
   }
 
@@ -4399,7 +4403,7 @@ void Executor::terminateStateOnError(ExecutionState &state,
   const InstructionInfo &ii =
       getLastNonKleeInternalInstruction(state, &lastInst);
 
-  if (INTERPOLATION_ENABLED && Speculation &&
+  if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
       state.txTreeNode->isSpeculationNode()) {
     //    llvm::outs() << "=== start jumpback because of error \n";
     specFail++;
@@ -5154,7 +5158,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 #endif
   }
 
-  if (Speculation) {
+  if (SpecTypeToUse != NO_SPEC) {
     std::string outSpecFile = interpreterHandler->getOutputFilename("spec.txt");
     std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
 
