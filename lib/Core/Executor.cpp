@@ -1046,10 +1046,12 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
   // The current node is in the speculation node
   if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
       txTree->isSpeculationNode()) {
-    Executor::StatePair res = speculationFork(current, condition, isInternal);
-    end = clock();
-    txTree->incSpecTime(double(end - start));
-    return res;
+    if (SpecStrategyToUse != TIMID) {
+      Executor::StatePair res = speculationFork(current, condition, isInternal);
+      end = clock();
+      txTree->incSpecTime(double(end - start));
+      return res;
+    }
   }
 
   Solver::Validity res;
@@ -1198,47 +1200,92 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      // check independency
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(&current, 0);
-      } else {
-        // open speculation & result may be success or fail and Now second check
-        independenceNo++;
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
+      if (SpecStrategyToUse == TIMID) {
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          independenceYes++;
+        } else {
+          independenceNo++;
+        }
+      } else if (SpecStrategyToUse == AGGRESSIVE) {
+        // check independency
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          // open speculation & assume success
+          independenceYes++;
+          return StatePair(&current, 0);
+        } else {
+          // open speculation & result may be success or fail
+          independenceNo++;
           return addSpeculationNode(current, condition, binst, isInternal,
                                     true);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
+        }
+      } else if (SpecStrategyToUse == CUSTOM) {
+        // check independency
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          // open speculation & assume success
+          independenceYes++;
           return StatePair(&current, 0);
+        } else {
+          // open speculation & result may be success or fail and Now second
+          // check
+          independenceNo++;
+          if (specSnap[binst] != visitedBlocks.size()) {
+            dynamicYes++;
+            return addSpeculationNode(current, condition, binst, isInternal,
+                                      true);
+          } else {
+            dynamicNo++;
+            // then close speculation & do marking as deletion
+            txTree->markPathCondition(current, unsatCore);
+            return StatePair(&current, 0);
+          }
         }
       }
     }
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(0, &current);
-      } else {
-        independenceNo++;
-        // open speculation & result may be success or fail and Now second check
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
+      if (SpecStrategyToUse == TIMID) {
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          independenceYes++;
+        } else {
+          independenceNo++;
+        }
+      } else if (SpecStrategyToUse == AGGRESSIVE) {
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          // open speculation & assume success
+          independenceYes++;
+          return StatePair(0, &current);
+        } else {
+          // open speculation & result may be success or fail
+          independenceNo++;
           return addSpeculationNode(current, condition, binst, isInternal,
                                     false);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
+        }
+      } else if (SpecStrategyToUse == CUSTOM) {
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          // open speculation & assume success
+          independenceYes++;
           return StatePair(0, &current);
+        } else {
+          independenceNo++;
+          // open speculation & result may be success or fail and Now second
+          // check
+          if (specSnap[binst] != visitedBlocks.size()) {
+            dynamicYes++;
+            return addSpeculationNode(current, condition, binst, isInternal,
+                                      false);
+          } else {
+            dynamicNo++;
+            // then close speculation & do marking as deletion
+            txTree->markPathCondition(current, unsatCore);
+            return StatePair(0, &current);
+          }
         }
       }
     }
@@ -1261,25 +1308,53 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     }
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(&current, 0);
-      } else {
-        independenceNo++;
-        // save unsat core
-        // open speculation & result may be success or fail
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
+      if (SpecStrategyToUse == TIMID) {
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          // open speculation & assume success
+          independenceYes++;
+          return StatePair(&current, 0);
+        } else {
+          // marking
+          independenceNo++;
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(&current, 0);
+        }
+      } else if (SpecStrategyToUse == AGGRESSIVE) {
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          // open speculation & assume success
+          independenceYes++;
+          return StatePair(&current, 0);
+        } else {
+          // save unsat core
+          // open speculation & result may be success or fail
+          independenceNo++;
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, binst, isInternal,
                                     true);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
+        }
+      } else if (SpecStrategyToUse == CUSTOM) {
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          // open speculation & assume success
+          independenceYes++;
           return StatePair(&current, 0);
+        } else {
+          independenceNo++;
+          // save unsat core
+          // open speculation & result may be success or fail
+          if (specSnap[binst] != visitedBlocks.size()) {
+            dynamicYes++;
+            txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+            return addSpeculationNode(current, condition, binst, isInternal,
+                                      true);
+          } else {
+            dynamicNo++;
+            // then close speculation & do marking as deletion
+            txTree->markPathCondition(current, unsatCore);
+            return StatePair(&current, 0);
+          }
         }
       }
     }
@@ -1303,25 +1378,54 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(0, &current);
-      } else {
-        independenceNo++;
-        // save unsat core
-        // open speculation & result may be success or fail
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
+      if (SpecStrategyToUse == TIMID) {
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          // open speculation & assume success
+          independenceYes++;
+          return StatePair(0, &current);
+        } else {
+          // marking
+          independenceNo++;
+          txTree->markPathCondition(current, unsatCore);
+          return StatePair(0, &current);
+        }
+      } else if (SpecStrategyToUse == AGGRESSIVE) {
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          // open speculation & assume success
+          independenceYes++;
+          return StatePair(0, &current);
+        } else {
+          // save unsat core
+          // open speculation & result may be success or fail
+          independenceNo++;
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, binst, isInternal,
                                     false);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
+        }
+      } else if (SpecStrategyToUse == CUSTOM) {
+
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          // open speculation & assume success
+          independenceYes++;
           return StatePair(0, &current);
+        } else {
+          independenceNo++;
+          // save unsat core
+          // open speculation & result may be success or fail
+          if (specSnap[binst] != visitedBlocks.size()) {
+            dynamicYes++;
+            txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+            return addSpeculationNode(current, condition, binst, isInternal,
+                                      false);
+          } else {
+            dynamicNo++;
+            // then close speculation & do marking as deletion
+            txTree->markPathCondition(current, unsatCore);
+            return StatePair(0, &current);
+          }
         }
       }
     }
@@ -1574,23 +1678,31 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(&current, 0);
-      } else {
-        independenceNo++;
+      if (SpecStrategyToUse == TIMID) {
+        // do nothing
+      } else if (SpecStrategyToUse == AGGRESSIVE) {
         // open speculation & result may be success or fail
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
-          return addSpeculationNode(current, condition, binst, isInternal,
-                                    true);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
+        return addSpeculationNode(current, condition, binst, isInternal, true);
+      } else if (SpecStrategyToUse == CUSTOM) {
+
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          // open speculation & assume success
+          independenceYes++;
           return StatePair(&current, 0);
+        } else {
+          independenceNo++;
+          // open speculation & result may be success or fail
+          if (specSnap[binst] != visitedBlocks.size()) {
+            dynamicYes++;
+            return addSpeculationNode(current, condition, binst, isInternal,
+                                      true);
+          } else {
+            dynamicNo++;
+            // then close speculation & do marking as deletion
+            txTree->markPathCondition(current, unsatCore);
+            return StatePair(&current, 0);
+          }
         }
       }
     }
@@ -1598,23 +1710,30 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(0, &current);
-      } else {
-        independenceNo++;
+      if (SpecStrategyToUse == TIMID) {
+        // do nothing
+      } else if (SpecStrategyToUse == AGGRESSIVE) {
         // open speculation & result may be success or fail
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
-          return addSpeculationNode(current, condition, binst, isInternal,
-                                    false);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
+        return addSpeculationNode(current, condition, binst, isInternal, false);
+      } else if (SpecStrategyToUse == CUSTOM) {
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          // open speculation & assume success
+          independenceYes++;
           return StatePair(0, &current);
+        } else {
+          independenceNo++;
+          // open speculation & result may be success or fail
+          if (specSnap[binst] != visitedBlocks.size()) {
+            dynamicYes++;
+            return addSpeculationNode(current, condition, binst, isInternal,
+                                      false);
+          } else {
+            dynamicNo++;
+            // then close speculation & do marking as deletion
+            txTree->markPathCondition(current, unsatCore);
+            return StatePair(0, &current);
+          }
         }
       }
     }
@@ -1635,25 +1754,32 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     }
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(&current, 0);
-      } else {
-        independenceNo++;
-        // save unsat core
-        // open speculation & result may be success or fail
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
-          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-          return addSpeculationNode(current, condition, binst, isInternal,
-                                    true);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
+      if (SpecStrategyToUse == TIMID) {
+        // do nothing
+      } else if (SpecStrategyToUse == AGGRESSIVE) {
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        return addSpeculationNode(current, condition, binst, isInternal, true);
+      } else if (SpecStrategyToUse == CUSTOM) {
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          // open speculation & assume success
+          independenceYes++;
           return StatePair(&current, 0);
+        } else {
+          independenceNo++;
+          // save unsat core
+          // open speculation & result may be success or fail
+          if (specSnap[binst] != visitedBlocks.size()) {
+            dynamicYes++;
+            txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+            return addSpeculationNode(current, condition, binst, isInternal,
+                                      true);
+          } else {
+            dynamicNo++;
+            // then close speculation & do marking as deletion
+            txTree->markPathCondition(current, unsatCore);
+            return StatePair(&current, 0);
+          }
         }
       }
     }
@@ -1679,25 +1805,33 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculativeRun::isStateSpeculable(current)) {
-      std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(0, &current);
-      } else {
-        independenceNo++;
-        // save unsat core
-        // open speculation & result may be success or fail
-        if (specSnap[binst] != visitedBlocks.size()) {
-          dynamicYes++;
-          txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
-          return addSpeculationNode(current, condition, binst, isInternal,
-                                    false);
-        } else {
-          dynamicNo++;
-          // then close speculation & do marking as deletion
-          txTree->markPathCondition(current, unsatCore);
+      if (SpecStrategyToUse == TIMID) {
+        // do nothing
+      } else if (SpecStrategyToUse == AGGRESSIVE) {
+        txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+        return addSpeculationNode(current, condition, binst, isInternal, false);
+      } else if (SpecStrategyToUse == CUSTOM) {
+
+        std::set<std::string> vars = extractVarNames(current, binst);
+        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+          // open speculation & assume success
+          independenceYes++;
           return StatePair(0, &current);
+        } else {
+          independenceNo++;
+          // save unsat core
+          // open speculation & result may be success or fail
+          if (specSnap[binst] != visitedBlocks.size()) {
+            dynamicYes++;
+            txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
+            return addSpeculationNode(current, condition, binst, isInternal,
+                                      false);
+          } else {
+            dynamicNo++;
+            // then close speculation & do marking as deletion
+            txTree->markPathCondition(current, unsatCore);
+            return StatePair(0, &current);
+          }
         }
       }
     }
@@ -4408,7 +4542,7 @@ void Executor::terminateStateOnError(ExecutionState &state,
       getLastNonKleeInternalInstruction(state, &lastInst);
 
   if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
-      state.txTreeNode->isSpeculationNode()) {
+      SpecStrategyToUse != TIMID && state.txTreeNode->isSpeculationNode()) {
     //    llvm::outs() << "=== start jumpback because of error \n";
     specFail++;
     speculativeBackJump(state);
