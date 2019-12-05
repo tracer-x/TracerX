@@ -192,6 +192,15 @@ llvm::cl::opt<SpecStrategy> SpecStrategyToUse(
                      clEnumValN(CUSTOM, "custom", "custom"), clEnumValEnd),
     llvm::cl::init(CUSTOM));
 
+llvm::cl::opt<std::string> DependencyFolder(
+    "spec-dependency",
+    llvm::cl::desc(
+        "Path to a folder containing basic blocks' dependency."
+        "One file for each BB with name format: \"BB_Dep_{order}.txt\""
+        "An initial file containing visited BBs with name \"InitialVisitedBB.txt\""
+        "also must be put in this folder"),
+    llvm::cl::init("."));
+
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT
