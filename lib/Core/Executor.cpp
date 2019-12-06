@@ -1199,10 +1199,10 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
-        TxSpeculativeRun::isStateSpeculable(current)) {
+        TxSpeculationHelper::isStateSpeculable(current)) {
       if (SpecStrategyToUse == TIMID) {
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           independenceYes++;
         } else {
           independenceNo++;
@@ -1210,7 +1210,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       } else if (SpecStrategyToUse == AGGRESSIVE) {
         // check independency
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
           return StatePair(&current, 0);
@@ -1223,7 +1223,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       } else if (SpecStrategyToUse == CUSTOM) {
         // check independency
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
           return StatePair(&current, 0);
@@ -1246,17 +1246,17 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     }
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
-        TxSpeculativeRun::isStateSpeculable(current)) {
+        TxSpeculationHelper::isStateSpeculable(current)) {
       if (SpecStrategyToUse == TIMID) {
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           independenceYes++;
         } else {
           independenceNo++;
         }
       } else if (SpecStrategyToUse == AGGRESSIVE) {
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
           return StatePair(0, &current);
@@ -1268,7 +1268,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         }
       } else if (SpecStrategyToUse == CUSTOM) {
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
           return StatePair(0, &current);
@@ -1307,10 +1307,10 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       }
     }
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
-        TxSpeculativeRun::isStateSpeculable(current)) {
+        TxSpeculationHelper::isStateSpeculable(current)) {
       if (SpecStrategyToUse == TIMID) {
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
           return StatePair(&current, 0);
@@ -1322,7 +1322,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         }
       } else if (SpecStrategyToUse == AGGRESSIVE) {
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
           return StatePair(&current, 0);
@@ -1336,7 +1336,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         }
       } else if (SpecStrategyToUse == CUSTOM) {
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
           return StatePair(&current, 0);
@@ -1377,10 +1377,10 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     }
 
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
-        TxSpeculativeRun::isStateSpeculable(current)) {
+        TxSpeculationHelper::isStateSpeculable(current)) {
       if (SpecStrategyToUse == TIMID) {
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
           return StatePair(0, &current);
@@ -1392,7 +1392,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         }
       } else if (SpecStrategyToUse == AGGRESSIVE) {
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
           return StatePair(0, &current);
@@ -1407,7 +1407,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       } else if (SpecStrategyToUse == CUSTOM) {
 
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
           return StatePair(0, &current);
@@ -1677,7 +1677,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
-        TxSpeculativeRun::isStateSpeculable(current)) {
+        TxSpeculationHelper::isStateSpeculable(current)) {
       if (SpecStrategyToUse == TIMID) {
         // do nothing
       } else if (SpecStrategyToUse == AGGRESSIVE) {
@@ -1686,7 +1686,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       } else if (SpecStrategyToUse == CUSTOM) {
 
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
           return StatePair(&current, 0);
@@ -1709,7 +1709,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     return StatePair(&current, 0);
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
-        TxSpeculativeRun::isStateSpeculable(current)) {
+        TxSpeculationHelper::isStateSpeculable(current)) {
       if (SpecStrategyToUse == TIMID) {
         // do nothing
       } else if (SpecStrategyToUse == AGGRESSIVE) {
@@ -1717,7 +1717,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         return addSpeculationNode(current, condition, binst, isInternal, false);
       } else if (SpecStrategyToUse == CUSTOM) {
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
           return StatePair(0, &current);
@@ -1753,7 +1753,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       }
     }
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
-        TxSpeculativeRun::isStateSpeculable(current)) {
+        TxSpeculationHelper::isStateSpeculable(current)) {
       if (SpecStrategyToUse == TIMID) {
         // do nothing
       } else if (SpecStrategyToUse == AGGRESSIVE) {
@@ -1761,7 +1761,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         return addSpeculationNode(current, condition, binst, isInternal, true);
       } else if (SpecStrategyToUse == CUSTOM) {
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
           return StatePair(&current, 0);
@@ -1804,7 +1804,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     }
 
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
-        TxSpeculativeRun::isStateSpeculable(current)) {
+        TxSpeculationHelper::isStateSpeculable(current)) {
       if (SpecStrategyToUse == TIMID) {
         // do nothing
       } else if (SpecStrategyToUse == AGGRESSIVE) {
@@ -1813,7 +1813,7 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       } else if (SpecStrategyToUse == CUSTOM) {
 
         std::set<std::string> vars = extractVarNames(current, binst);
-        if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+        if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
           return StatePair(0, &current);
@@ -4093,8 +4093,8 @@ Executor::readBBSpecAvoid(std::string fileName) {
       bb = atoi(str.c_str());
       isFirst = false;
     } else {
-      if (!TxSpeculativeRun::trim(str).empty())
-        avoid.insert(TxSpeculativeRun::trim(str));
+      if (!TxSpeculationHelper::trim(str).empty())
+        avoid.insert(TxSpeculationHelper::trim(str));
     }
   }
   in.close();
@@ -4105,7 +4105,7 @@ std::set<llvm::BasicBlock *> Executor::readVisitedBB(std::string fileName) {
   std::ifstream in(fileName.c_str());
   std::string str;
   while (std::getline(in, str)) {
-    if (!TxSpeculativeRun::trim(str).empty()) {
+    if (!TxSpeculationHelper::trim(str).empty()) {
       int bb = atoi(str.c_str());
       bbs.insert(bb);
     }
@@ -4147,7 +4147,7 @@ void Executor::run(ExecutionState &initialState) {
   std::string InputFile1 = InputFile.substr(0, lastindex);
   lastindex = InputFile1.find_last_of("/");
   std::string InputFile2 = InputFile1.substr(lastindex + 1);
-  interestedSourceFileName = InputFile2 + ".c";
+  covInterestedSourceFileName = InputFile2 + ".c";
 
   // BB to order
   allBlockCount = 0;
@@ -4163,7 +4163,7 @@ void Executor::run(ExecutionState &initialState) {
     std::size_t botDirPos = path.find_last_of("/");
     std::string sourceFileName = path.substr(botDirPos + 1, path.length());
     // if the source file is interested then loop over its BBs
-    if ((sourceFileName == interestedSourceFileName) &&
+    if ((sourceFileName == covInterestedSourceFileName) &&
         isCoverableFunction(f)) {
       // loop over BBs of function
       std::vector<llvm::BasicBlock *> bbs;

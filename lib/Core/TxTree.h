@@ -630,24 +630,20 @@ public:
 /// TxTree has several public member functions, most importantly, the various
 /// versions of the TxTree#execute function, including TxTree#executePHI,
 /// TxTree#executeMemoryOperation, TxTree#executeOnNode. These are called mainly
-/// from
-/// KLEE's Executor class, which is the core symbolic executor of KLEE.
+/// from KLEE's Executor class, which is the core symbolic executor of KLEE.
 /// The main functionality of the TxTree#execute versions
 /// themselves is to simply delegate the call to TxDependency#execute and
-/// related
-/// functions, which
-/// implements the construction of memory dependency used in computing the
-/// regions of memory
-/// that need to be kept as part of the interpolant stored in the subsumption
-/// table.
+/// related functions,
+/// which implements the construction of memory dependency used in computing the
+/// regions of memory that need to be kept as part of the interpolant stored in
+/// the subsumption table.
 ///
 /// The member function TxTree#subsumptionCheck is the topmost interface to the
 /// subsumption checking mechanism. The function consults the subsumption table
 /// (implemented by the TxSubsumptionTable class)
 /// to compare the current state to a state stored in the subsumption table.
-/// TxSubsumptionTable#insert is called from the
-/// TxTree#remove member function, which is invoked when the symbolic execution
-/// starting from a certain
+/// TxSubsumptionTable#insert is called from the TxTree#remove member function,
+/// which is invoked when the symbolic execution starting from a certain
 /// state has completed and the state is to be removed. The completion of
 /// the symbolic execution here is assumed to mean that the interpolants have
 /// been completely recorded from all the execution paths that start from the
@@ -682,8 +678,8 @@ public:
 /// <hr>
 ///
 /// For comparison, following is the pseudocode of Tracer-X KLEE. Please note
-/// that to
-/// support interpolation, each leaf is now augmented with a path condition.
+/// that to support interpolation, each leaf is now augmented with a path
+/// condition.
 /// We highlight the added procedures using CAPITAL LETTERS, and we note the
 /// functions involved.
 ///
@@ -696,11 +692,11 @@ public:
 ///       i. REGISTER IT FOR DELETION
 ///       ii. MARK CONSTRAINTS NEEDED FOR SUBSUMPTION
 ///       iii. GOTO d
-///    c. Symbolically execute the instruction (TxTree::execute,
-/// TxTree::executePHI,
-///       TxTree::executeMemoryOperation, TxTree::executeOnNode):
+///    c. Symbolically execute the instruction
+///       (TxTree::execute, TxTree::executePHI, TxTree::executeMemoryOperation,
+///       TxTree::executeOnNode):
 ///       i. If it is a branch instruction, test if one of branches is
-/// unsatisfiable
+///          unsatisfiable
 ///          * If yes, execute the instruction without creating tree node
 ///            MARK CONSTRAINTS NEEDED FOR UNSATISFIABILITY
 ///            (TxTree::markPathCondition)

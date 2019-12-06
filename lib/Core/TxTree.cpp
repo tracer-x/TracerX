@@ -2025,8 +2025,6 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
 }
 
 void TxTree::setCurrentINode(ExecutionState &state) {
-  //   llvm::outs() << state.txTreeNode->isSpeculationNode() << "-" <<
-  // state.txTreeNode->isSpeculationFailedNode()<< "\n";
   TimerStatIncrementer t(setCurrentINodeTime);
   currentTxTreeNode = state.txTreeNode;
   currentTxTreeNode->setProgramPoint(state.pc->inst);
@@ -2110,7 +2108,6 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
 std::pair<TxTreeNode *, TxTreeNode *>
 TxTree::split(TxTreeNode *parent, ExecutionState *left, ExecutionState *right) {
   TimerStatIncrementer t(splitTime);
-
   parent->split(left, right);
   TxTreeGraph::addChildren(parent, parent->left, parent->right);
   std::pair<TxTreeNode *, TxTreeNode *> ret(parent->left, parent->right);
@@ -2275,10 +2272,12 @@ TxTreeNode::TxTreeNode(
                                 _globalAddresses);
 
   // Set speculation flag to false
-  speculationFlag = 0;
-  speculationFailed = 0;
-  visitedProgramPoints = NULL;
-  specTime = NULL;
+  if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC) {
+    speculationFlag = 0;
+    speculationFailed = 0;
+    visitedProgramPoints = NULL;
+    specTime = NULL;
+  }
 }
 
 TxTreeNode::~TxTreeNode() {
@@ -2352,7 +2351,8 @@ void TxTreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
   assert(left == 0 && right == 0);
   leftData->txTreeNode = createLeftChild();
   rightData->txTreeNode = createRightChild();
-  if (this->speculationFlag) {
+  if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
+      this->speculationFlag) {
     leftData->txTreeNode->setSpeculationFlag();
     leftData->txTreeNode->visitedProgramPoints = this->visitedProgramPoints;
     leftData->txTreeNode->specTime = this->specTime;
