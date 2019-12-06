@@ -432,6 +432,10 @@ public:
         symbolicallyAddressedHistoricalStore);
   }
 
+  std::map<llvm::Value *, std::vector<ref<TxStateValue> > >& getValuesMap() {
+    return valuesMap;
+  }
+
   ref<TxStateValue>
   getLatestValue(llvm::Value *value,
                  const std::vector<llvm::Instruction *> &callHistory,

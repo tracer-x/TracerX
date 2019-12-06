@@ -1705,6 +1705,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #endif
   case Instruction::Br: {
     BranchInst *bi = cast<BranchInst>(i);
+    // stop collecting phi values for the current node
+    if (INTERPOLATION_ENABLED)
+      txTree->setPhiValuesFlag(0);
     if (bi->isUnconditional()) {
       transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), state);
       if (INTERPOLATION_ENABLED)
@@ -2015,6 +2018,20 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #else
       txTree->executePHI(i, state.incomingBBIndex * 2, result);
 #endif
+
+      // for fixing phi bug
+      if (txTree->getPhiValuesFlag()) {
+        txTree->setPhiValue(i, result);
+        // save operand for upward marking
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
+        llvm::Value *inputArg = i->getOperand(state.incomingBBIndex);
+#else
+        llvm::Value *inputArg = i->getOperand(state.incomingBBIndex * 2);
+#endif
+        if (isa<llvm::Instruction>(inputArg)) {
+          txTree->getCurrentTxTreeNode()->phiOperands.push_back(inputArg);
+        }
+      }
     }
 
     break;
@@ -3057,8 +3074,12 @@ void Executor::run(ExecutionState &initialState) {
 
   // first BB of main()
   KInstruction *ki = initialState.pc;
-  processBBCoverage(BBCoverage, ki->inst->getParent());
-
+  BasicBlock *firstBB = ki->inst->getParent();
+  if (fBBOrder.find(firstBB->getParent()) != fBBOrder.end() &&
+      fBBOrder[firstBB->getParent()].find(firstBB) !=
+          fBBOrder[firstBB->getParent()].end()) {
+    processBBCoverage(BBCoverage, ki->inst->getParent());
+  }
   bindModuleConstants();
 
   // Delay init till now so that ticks don't accrue during
