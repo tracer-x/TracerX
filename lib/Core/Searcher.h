@@ -112,6 +112,9 @@ namespace klee {
     void printName(llvm::raw_ostream &os) {
       os << "BFSSearcher\n";
     }
+    virtual std::vector<ExecutionState *> getStates() {
+      return std::vector<ExecutionState *>(states.begin(), states.end());
+    }
   };
 
   class RandomSearcher : public Searcher {
@@ -169,6 +172,9 @@ namespace klee {
       default                 : os << "<unknown type>\n"; return;
       }
     }
+    virtual std::vector<ExecutionState *> getStates() {
+	  return std::vector<ExecutionState *>();
+	}
   };
 
   class RandomPathSearcher : public Searcher {
@@ -186,6 +192,9 @@ namespace klee {
     void printName(llvm::raw_ostream &os) {
       os << "RandomPathSearcher\n";
     }
+    virtual std::vector<ExecutionState *> getStates() {
+	  return std::vector<ExecutionState *>();
+	}
   };
 
   class MergingSearcher : public Searcher {
@@ -209,6 +218,9 @@ namespace klee {
     void printName(llvm::raw_ostream &os) {
       os << "MergingSearcher\n";
     }
+    virtual std::vector<ExecutionState *> getStates() {
+	  return std::vector<ExecutionState *>();
+	}
   };
 
   class BumpMergingSearcher : public Searcher {
@@ -232,6 +244,9 @@ namespace klee {
     void printName(llvm::raw_ostream &os) {
       os << "BumpMergingSearcher\n";
     }
+    virtual std::vector<ExecutionState *> getStates() {
+	  return std::vector<ExecutionState *>();
+	}
   };
 
   class BatchingSearcher : public Searcher {
@@ -261,6 +276,9 @@ namespace klee {
       baseSearcher->printName(os);
       os << "</BatchingSearcher>\n";
     }
+    virtual std::vector<ExecutionState *> getStates() {
+	  return std::vector<ExecutionState *>();
+	}
   };
 
   class IterativeDeepeningTimeSearcher : public Searcher {
@@ -280,6 +298,9 @@ namespace klee {
     void printName(llvm::raw_ostream &os) {
       os << "IterativeDeepeningTimeSearcher\n";
     }
+    virtual std::vector<ExecutionState *> getStates() {
+	  return std::vector<ExecutionState *>();
+	}
   };
 
   class InterleavedSearcher : public Searcher {
@@ -305,6 +326,9 @@ namespace klee {
         (*it)->printName(os);
       os << "</InterleavedSearcher>\n";
     }
+    virtual std::vector<ExecutionState *> getStates() {
+	  return std::vector<ExecutionState *>();
+	}
   };
 
 }

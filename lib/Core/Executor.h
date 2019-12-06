@@ -97,10 +97,11 @@ public:
   bool allBlockCollected;
   std::set<llvm::BasicBlock *> visitedBlocks;
   float blockCoverage;
-  std::string interestedSourceFileName;
+  std::string covInterestedSourceFileName;
   std::map<llvm::Function *, std::map<llvm::BasicBlock *, int> > fBBOrder;
 
-  std::map<int, std::set<std::string> > bbOrderToSpecAvoid;
+  std::map<int, std::set<std::string> > bbOrderToSpecAvoid; // used in the
+                                                            // speculation mode.
   int independenceYes;
   int independenceNo;
   int dynamicYes;
@@ -251,17 +252,19 @@ private:
                      llvm::raw_ostream &file);
 
   void run(ExecutionState &initialState);
+
+  // functions used in speculation mode.
   bool isCoverableFunction(llvm::Function *f) {
     return !f->isIntrinsic() && (f->getName().str().substr(0, 5) != "klee_") &&
            (f->getName().str().substr(0, 3) != "tx_") &&
            (f->getName() != "memcpy") && (f->getName() != "memmove") &&
            (f->getName() != "mempcpy") && (f->getName() != "memset");
   }
-
   std::map<int, std::set<std::string> >
   readBBOrderToSpecAvoid(std::string folderName);
   std::pair<int, std::set<std::string> > readBBSpecAvoid(std::string fileName);
   std::set<llvm::BasicBlock *> readVisitedBB(std::string fileName);
+  // end functions used in speculation mode.
 
   // Given a concrete object in our [klee's] address space, add it to
   // objects checked code can reference.
@@ -351,6 +354,8 @@ private:
   // not hold, respectively. One of the states is necessarily the
   // current state, and one of the states may be null.
   StatePair fork(ExecutionState &current, ref<Expr> condition, bool isInternal);
+
+  // used in speculation mode
   StatePair branchFork(ExecutionState &current, ref<Expr> condition,
                        bool isInternal);
 
@@ -433,7 +438,6 @@ private:
 
   // remove state from queue and delete
   void terminateState(ExecutionState &state);
-
   // call subsumption handler and terminate state
   void terminateStateOnSubsumption(ExecutionState &state);
   // call exit handler and terminate state

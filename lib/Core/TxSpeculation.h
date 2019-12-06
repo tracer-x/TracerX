@@ -1,5 +1,4 @@
-//===-- Speculation.h - Tracer-X symbolic execution tree -------------*- C++
-//-*-===//
+//==- TxSpeculationHelper.h - Tracer-X symbolic execution tree -*- C++ -*-==//
 //
 //               The Tracer-X KLEE Symbolic Virtual Machine
 //
@@ -29,7 +28,7 @@
 namespace klee {
 
 /// \brief Implements the speculation mode
-class TxSpeculativeRun {
+class TxSpeculationHelper {
 public:
   static std::string WHITESPACE;
   static bool isStateSpeculable(ExecutionState &current);
