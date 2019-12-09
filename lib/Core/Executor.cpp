@@ -1025,7 +1025,6 @@ std::set<std::string> Executor::extractVarNames(ExecutionState &current,
       } else {
         res.insert(ai->getName().data());
       }
-
       break;
     }
     default: {
@@ -2471,9 +2470,6 @@ void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
       // add to visited BBs if not in speculation mode
       visitedBlocks.insert(bb);
     }
-    //		klee_warning("Visited Blocks Up to now=========================:
-    //%d\n",
-    //				int(visitedBlocks.size()));
     float percent = ((float)visitedBlocks.size() / (float)allBlockCount) * 100;
     // print percentage if this is a new BB
     if (BBCoverage >= 2 && isNew) {
@@ -4128,20 +4124,24 @@ std::set<llvm::BasicBlock *> Executor::readVisitedBB(std::string fileName) {
 }
 
 void Executor::run(ExecutionState &initialState) {
-
-  independenceYes = 0;
-  independenceNo = 0;
-  dynamicYes = 0;
-  dynamicNo = 0;
-  specFail = 0;
-  totalSpecFailTime = 0.0;
-  startingBBPlottingTime = time(0);
-  for (std::map<llvm::Instruction *, unsigned int>::iterator
-           it = specSnap.begin(),
-           ie = specSnap.end();
-       it != ie; ++it) {
-    it->second = 0;
+  if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC) {
+    independenceYes = 0;
+    independenceNo = 0;
+    dynamicYes = 0;
+    dynamicNo = 0;
+    specFail = 0;
+    totalSpecFailTime = 0.0;
+    for (std::map<llvm::Instruction *, unsigned int>::iterator
+             it = specSnap.begin(),
+             ie = specSnap.end();
+         it != ie; ++it) {
+      it->second = 0;
+    }
+    // load avoid BB
+    bbOrderToSpecAvoid = readBBOrderToSpecAvoid(DependencyFolder);
+    visitedBlocks = readVisitedBB(DependencyFolder + "/InitialVisitedBB.txt");
   }
+  startingBBPlottingTime = time(0);
   // get interested source code
   size_t lastindex = InputFile.find_last_of(".");
   std::string InputFile1 = InputFile.substr(0, lastindex);
@@ -4173,9 +4173,6 @@ void Executor::run(ExecutionState &initialState) {
     }
   }
 
-  // load avoid BB
-  bbOrderToSpecAvoid = readBBOrderToSpecAvoid(DependencyFolder);
-  visitedBlocks = readVisitedBB(DependencyFolder + "/InitialVisitedBB.txt");
   // first BB of main()
   KInstruction *ki = initialState.pc;
   BasicBlock *firstBB = ki->inst->getParent();
@@ -4313,7 +4310,7 @@ void Executor::run(ExecutionState &initialState) {
     }
 #endif
 
-    if (INTERPOLATION_ENABLED && !isa<llvm::PHINode>(state.pc->inst) &&
+    if (INTERPOLATION_ENABLED &&
         txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
       terminateStateOnSubsumption(state);
     } else {
@@ -4542,7 +4539,8 @@ void Executor::terminateStateOnError(ExecutionState &state,
     //    llvm::outs() << "=== start jumpback because of error \n";
     specFail++;
     speculativeBackJump(state);
-    klee_message("ERROR: %s:%d: %s", ii.file.c_str(), ii.line, message.c_str());
+    klee_message("Speculation Failed: %s:%d: %s", ii.file.c_str(), ii.line,
+                 message.c_str());
     return;
   }
 
@@ -5306,14 +5304,14 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
             << "\n";
 
     // total fail
-    // new
+    // fail because of new BBs
     unsigned int failNew = 0;
     for (std::map<uintptr_t, unsigned int>::iterator it = specFailNew.begin(),
                                                      ie = specFailNew.end();
          it != ie; ++it) {
       failNew += it->second;
     }
-    // revisted
+    // fail because of revisted BBs
     unsigned int failRevisited = 0;
     for (std::map<uintptr_t, unsigned int>::iterator it = specRevisited.begin(),
                                                      ie = specRevisited.end();
@@ -5322,7 +5320,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     }
 
     // fail & no interpolant
-    // new
+    // fail because of new BBs
     unsigned int failNewNoInter = 0;
     for (std::map<uintptr_t, unsigned int>::iterator
              it = specFailNoInter.begin(),
@@ -5330,7 +5328,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
          it != ie; ++it) {
       failNewNoInter += it->second;
     }
-    // revisted
+    // fail because of revisted BBs
     unsigned int failRevisitedNoInter = 0;
     for (std::map<uintptr_t, unsigned int>::iterator
              it = specRevisitedNoInter.begin(),
@@ -5403,17 +5401,11 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
          it != ie; ++it) {
 
       int order = fBBOrder[(*it)->getParent()][*it];
-      // visitedBBFileOut << "-- BlockScopeStarts --\n";
       std::string functionName = ((*it)->getParent())->getName();
-      // visitedBBFileOut << "Function: " << functionName << "\n";
-      // visitedBBFileOut << "Block Order: " << order;
       visitedBBFileOut << order << "\n";
-      // block content
       std::string tmp;
       raw_string_ostream tmpOS(tmp);
       (*it)->print(tmpOS);
-      // visitedBBFileOut << tmp;
-      // visitedBBFileOut << "-- BlockScopeEnds --\n\n";
     }
 
     visitedBBFileOut.close();
