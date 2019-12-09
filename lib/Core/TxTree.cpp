@@ -2070,6 +2070,16 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
       }
       StatsTracker::currentCountsFreq[p->getBasicBlock()][2] =
           StatsTracker::currentCountsFreq[p->getBasicBlock()][2] + 1;
+      if ((StatsTracker::currentCountsFreq[p->getBasicBlock()][1] > 0) &&
+          (StatsTracker::currentCountsFreq[p->getBasicBlock()][2] == 1)) {
+        std::cerr << p->getBasicBlock() << ": "
+                  << StatsTracker::currentCountsFreq[p->getBasicBlock()][0]
+                  << ", "
+                  << StatsTracker::currentCountsFreq[p->getBasicBlock()][1]
+                  << ", "
+                  << StatsTracker::currentCountsFreq[p->getBasicBlock()][2]
+                  << "\n";
+      }
     }
     // As the node is about to be deleted, it must have been completely
     // traversed, hence the correct time to table the interpolant.

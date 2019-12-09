@@ -1182,7 +1182,10 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
   // uintptr_t pp1 = current.txTreeNode->getProgramPoint();
   llvm::BasicBlock *pp1 = current.txTreeNode->getBasicBlock();
-  if (condition->isTrue()) {
+  int currentBBorder = fBBOrder[(pp1)->getParent()][pp1];
+  if (condition->isTrue() &&
+      !(std::find(avoidBlackList.begin(), avoidBlackList.end(),
+                  currentBBorder) != avoidBlackList.end())) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
@@ -1199,7 +1202,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       return addSpeculationNode(current, condition, isInternal, true);
     }
     return StatePair(&current, 0);
-  } else if (condition->isFalse()) {
+  } else if (condition->isFalse() &&
+             !(std::find(avoidBlackList.begin(), avoidBlackList.end(),
+                         currentBBorder) != avoidBlackList.end())) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       // create a new speculation execution node
@@ -1233,7 +1238,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       }
     }
     if (INTERPOLATION_ENABLED && Speculation &&
-        TxSpeculativeRun::isStateSpeculable(current)) {
+        TxSpeculativeRun::isStateSpeculable(current) &&
+        !(std::find(avoidBlackList.begin(), avoidBlackList.end(),
+                    currentBBorder) != avoidBlackList.end())) {
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
@@ -1270,7 +1277,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     }
 
     if (INTERPOLATION_ENABLED && Speculation &&
-        TxSpeculativeRun::isStateSpeculable(current)) {
+        TxSpeculativeRun::isStateSpeculable(current) &&
+        !(std::find(avoidBlackList.begin(), avoidBlackList.end(),
+                    currentBBorder) != avoidBlackList.end())) {
       // Storing the unsatCore and pointer to the solver
       // so, in case speculation fails the unsatcore can
       // be used to perform markings.
@@ -3887,6 +3896,29 @@ Executor::readBBSpecAvoid(std::string fileName) {
   return std::make_pair(bb, avoid);
 }
 
+// std::map<int, std::set<std::string> >
+// Executor::readBlacklistedBBOrder(std::string folderName) {
+//  std::map<int, std::set<std::string> > res;
+//  DIR *dirp = opendir(folderName.c_str());
+//  dirent *dp;
+//  while ((dp = readdir(dirp)) != NULL) {
+//    std::string name(dp->d_name);
+//    if (strcmp(name.substr(0, 10).c_str(), "BlackList") == 0) {
+//           std::ifstream in(name.c_str());
+//           std::string str;
+//             while (std::getline(in, str)) {
+//                 //bb = atoi(str.c_str());
+//                 std::cerr << "SANGHU NOW BLACK LIST " << str << "\n";
+//             }
+//
+//
+//           in.close();
+//    }
+//  }
+//  (void)closedir(dirp);
+//  return res;
+//}
+
 void Executor::run(ExecutionState &initialState) {
 
   specCount = 0;
@@ -3927,6 +3959,16 @@ void Executor::run(ExecutionState &initialState) {
       }
     }
   }
+  // Loading the blocks from black list
+  std::ifstream blackList;
+  blackList.open("BlackList.txt");
+  int output;
+  if (blackList.is_open()) {
+    while (blackList >> output) {
+      avoidBlackList.push_back(output);
+    }
+  }
+  blackList.close();
 
   // first BB of main()
   KInstruction *ki = initialState.pc;
@@ -5091,11 +5133,11 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
              ie = StatsTracker::currentCountsFreq.end();
          it != ie; ++it) {
       int order = fBBOrder[(it->first)->getParent()][it->first];
-      outSpec << order << ": " << it->second[0] << "," << it->second[1] << ","
-              << it->second[2] << "\n";
+      outSpec << order << ": " << it->first << ": " << it->second[0] << ","
+              << it->second[1] << "," << it->second[2] << "\n";
     }
     // print the blacklist
-    outBlackList << "Blacklist of Program Points:\n";
+    // outBlackList << "Blacklist of Program Points:\n";
     for (std::map<llvm::BasicBlock *, std::vector<unsigned int> >::iterator
              it = StatsTracker::currentCountsFreq.begin(),
              ie = StatsTracker::currentCountsFreq.end();

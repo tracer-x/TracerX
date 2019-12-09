@@ -116,6 +116,7 @@ public:
                                                           // revisited & no
                                                           // interpolant
   std::set<llvm::BasicBlock *> blackList;
+  std::vector<int> avoidBlackList;
   unsigned int specLimit;
   uintptr_t prevNodeSequence;
   double totalSpecFailTime;
@@ -263,7 +264,6 @@ private:
   std::map<int, std::set<std::string> >
   readBBOrderToSpecAvoid(std::string folderName);
   std::pair<int, std::set<std::string> > readBBSpecAvoid(std::string fileName);
-
   // Given a concrete object in our [klee's] address space, add it to
   // objects checked code can reference.
   MemoryObject *addExternalObject(ExecutionState &state, void *addr,
