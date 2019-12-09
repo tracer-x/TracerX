@@ -820,7 +820,16 @@ bool TxSubsumptionTableEntry::subsumed(
         std::vector<ref<TxStateValue> > txStateVal =
             valuesMap[dyn_cast<llvm::Value>(inputArg)];
         if (txStateVal.empty()) {
-          klee_warning("TxSubsumptionTableEntry::subsumed txStateVal is empty");
+          if (debugSubsumptionLevel >= 1) {
+            std::string msg;
+            std::string padding(makeTabs(1));
+            llvm::raw_string_ostream stream(msg);
+            stream.flush();
+            klee_message(
+                "#%lu=>#%lu: Check failure as in PHInode: txStateVal is "
+                "empty. Failing conservatively. ",
+                state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
+          }
           return false;
         }
         txStateVal.back()->getExpression()->dump();
@@ -829,11 +838,30 @@ bool TxSubsumptionTableEntry::subsumed(
           return false;
         }
       } else {
-        klee_warning("TxSubsumptionTableEntry::subsumed:parent doen't exist");
+        if (debugSubsumptionLevel >= 1) {
+          std::string msg;
+          std::string padding(makeTabs(1));
+          llvm::raw_string_ostream stream(msg);
+          stream.flush();
+          klee_message("#%lu=>#%lu: Check failure as in PHInode: parent node "
+                       "doen't exist. Failing conservatively. ",
+                       state.txTreeNode->getNodeSequenceNumber(),
+                       nodeSequenceNumber);
+        }
+        klee_warning("TxSubsumptionTableEntry::subsumed:");
         return false;
       }
     } else {
-      klee_warning("TxSubsumptionTableEntry::subsumed: not implemented yet");
+      if (debugSubsumptionLevel >= 1) {
+        std::string msg;
+        std::string padding(makeTabs(1));
+        llvm::raw_string_ostream stream(msg);
+        stream.flush();
+        klee_message(
+            "#%lu=>#%lu: Check failure as this part of PHInode check is not "
+            "implemented yet. Failing conservatively. ",
+            state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
+      }
       return false;
     }
   }
