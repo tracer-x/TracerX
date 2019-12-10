@@ -10,7 +10,6 @@
 #include "Executor.h"
 #include "Context.h"
 #include "CoreStats.h"
-#include "ExecutorTimerInfo.h"
 #include "ExternalDispatcher.h"
 #include "ImpliedValue.h"
 #include "Memory.h"
@@ -22,15 +21,21 @@
 #include "StatsTracker.h"
 #include "TimingSolver.h"
 #include "UserSearcher.h"
+#include "ExecutorTimerInfo.h"
 
-#include "TxShadowArray.h"
-#include "TxSpeculation.h"
-#include "TxTree.h"
-#include "klee/CommandLine.h"
-#include "klee/Common.h"
-#include "klee/Config/Version.h"
 #include "klee/ExecutionState.h"
 #include "klee/Expr.h"
+#include "klee/Interpreter.h"
+#include "klee/TimerStatIncrementer.h"
+#include "klee/CommandLine.h"
+#include "klee/Common.h"
+#include "klee/util/Assignment.h"
+#include "klee/util/ExprPPrinter.h"
+#include "klee/util/ExprSMTLIBPrinter.h"
+#include "klee/util/ExprUtil.h"
+#include "klee/util/GetElementPtrTypeIterator.h"
+#include "klee/util/TxPrintUtil.h"
+#include "klee/Config/Version.h"
 #include "klee/Internal/ADT/KTest.h"
 #include "klee/Internal/ADT/RNG.h"
 #include "klee/Internal/Module/Cell.h"
@@ -39,28 +44,24 @@
 #include "klee/Internal/Module/KModule.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "klee/Internal/Support/FloatEvaluation.h"
-#include "klee/Internal/System/MemoryUsage.h"
 #include "klee/Internal/System/Time.h"
-#include "klee/Interpreter.h"
+#include "klee/Internal/System/MemoryUsage.h"
 #include "klee/SolverStats.h"
-#include "klee/TimerStatIncrementer.h"
-#include "klee/util/Assignment.h"
-#include "klee/util/ExprPPrinter.h"
-#include "klee/util/ExprSMTLIBPrinter.h"
-#include "klee/util/ExprUtil.h"
-#include "klee/util/GetElementPtrTypeIterator.h"
-#include "klee/util/TxPrintUtil.h"
+#include "TxShadowArray.h"
+#include "TxTree.h"
+#include "TxSpeculation.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
+#include "llvm/IR/Function.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
-#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/TypeBuilder.h"
 #else
 #include "llvm/Attributes.h"
@@ -81,11 +82,11 @@
 #endif
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Analysis/MemoryDependenceAnalysis.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Analysis/MemoryDependenceAnalysis.h"
 
 #if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
 #include "llvm/Support/CallSite.h"
@@ -97,19 +98,19 @@
 #include "klee/Internal/Support/CompressionStream.h"
 #endif
 
-#include <algorithm>
 #include <cassert>
-#include <fstream>
+#include <algorithm>
 #include <iomanip>
 #include <iosfwd>
+#include <fstream>
 #include <sstream>
-#include <string>
 #include <vector>
+#include <string>
 
 #include <sys/mman.h>
 
-#include <cxxabi.h>
 #include <errno.h>
+#include <cxxabi.h>
 
 using namespace llvm;
 using namespace klee;
