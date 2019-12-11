@@ -5308,6 +5308,16 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     outSpec << "Total Independence No, Dynamic Yes & Fail: " << specFail
             << "\n";
 
+    unsigned int totalSpecSuccessFromTxTree = 0;
+    for (std::map<llvm::BasicBlock *, std::vector<unsigned int> >::iterator
+             it = StatsTracker::bbSpecCount.begin(),
+             ie = StatsTracker::bbSpecCount.end();
+         it != ie; ++it) {
+      totalSpecSuccessFromTxTree += it->second[2];
+    }
+    outSpec << "Total Speculation Success: " << totalSpecSuccessFromTxTree
+            << "\n";
+
     // total fail
     // fail because of new BBs
     unsigned int failNew = 0;

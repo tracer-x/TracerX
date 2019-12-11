@@ -656,6 +656,8 @@ uint64_t klee::computeMinDistToUncovered(const KInstruction *ki,
   }
 }
 
+std::map<llvm::BasicBlock *, std::vector<unsigned int> > StatsTracker::bbSpecCount;
+
 void StatsTracker::computeReachableUncovered() {
   KModule *km = executor.kmodule;
   Module *m = km->module;

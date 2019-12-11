@@ -2150,6 +2150,17 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
   do {
     TxTreeNode *p = node->parent;
 
+    // Speculation Success
+    if (node->isSpeculationNode() && !node->isSpeculationFailedNode() && p &&
+        !p->isSpeculationNode()) {
+      llvm::BasicBlock *pbb = p->getBasicBlock();
+      if (StatsTracker::bbSpecCount.find(pbb) ==
+          StatsTracker::bbSpecCount.end()) {
+        StatsTracker::bbSpecCount[pbb] = std::vector<unsigned int>(3, 0);
+      }
+      StatsTracker::bbSpecCount[pbb][2] = StatsTracker::bbSpecCount[pbb][2] + 1;
+    }
+
     // As the node is about to be deleted, it must have been completely
     // traversed, hence the correct time to table the interpolant.
     //
