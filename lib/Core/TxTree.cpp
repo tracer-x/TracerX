@@ -2059,11 +2059,7 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
     if (node->isSpeculationNode() && !node->isSpeculationFailedNode() && p &&
         !p->isSpeculationNode()) {
       llvm::BasicBlock *pbb = p->getBasicBlock();
-      if (StatsTracker::bbSpecCount.find(pbb) ==
-          StatsTracker::bbSpecCount.end()) {
-        StatsTracker::bbSpecCount[pbb] = std::vector<unsigned int>(3, 0);
-      }
-      StatsTracker::bbSpecCount[pbb][2] = StatsTracker::bbSpecCount[pbb][2] + 1;
+      StatsTracker::increaseEle(pbb, 2, false);
     }
 
     // As the node is about to be deleted, it must have been completely
