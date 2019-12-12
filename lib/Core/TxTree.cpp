@@ -804,23 +804,11 @@ bool TxSubsumptionTableEntry::subsumed(
     if (isa<llvm::PHINode>((*it).first)) {
       llvm::Instruction *phi = dyn_cast<llvm::Instruction>((*it).first);
       std::set<ref<Expr> > values = (*it).second;
-/*klee_warning("Start printing phiValues:");
-klee_warning("instruction");
-phi->dump();
-klee_warning("values");
-for (std::set<ref<Expr> >::const_iterator it1 = values.begin();
-         it1 != values.end(); ++it1) {
-        (*it1)->dump();
-}
-klee_warning("End printing phiValues");*/
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
       llvm::Value *inputArg = phi->getOperand(state.incomingBBIndex);
 #else
       llvm::Value *inputArg = phi->getOperand(state.incomingBBIndex * 2);
 #endif
-      /*klee_warning("Printing incoming instruction");
-      inputArg->dump();
-      klee_warning("Printing incoming value");*/
       if (state.txTreeNode->getParent() &&
           state.txTreeNode->getParent()->getDependency()) {
         std::map<llvm::Value *, std::vector<ref<TxStateValue> > > valuesMap =
@@ -828,7 +816,16 @@ klee_warning("End printing phiValues");*/
         std::vector<ref<TxStateValue> > txStateVal =
             valuesMap[dyn_cast<llvm::Value>(inputArg)];
         if (txStateVal.size() == 0) {
-          klee_warning("TxSubsumptionTableEntry::subsumed txStateVal is empty");
+          if (debugSubsumptionLevel >= 1) {
+            std::string msg;
+            std::string padding(makeTabs(1));
+            llvm::raw_string_ostream stream(msg);
+            stream.flush();
+            klee_message(
+                "#%lu=>#%lu: Check failure as in PHInode: txStateVal is "
+                "empty. Failing conservatively. ",
+                state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
+          }
           return false;
         }
         ref<Expr> inputVal = txStateVal.back()->getExpression();
@@ -838,11 +835,29 @@ klee_warning("End printing phiValues");*/
             return false;
         }
       } else {
-        klee_warning("TxSubsumptionTableEntry::subsumed:parent doen't exist");
+        if (debugSubsumptionLevel >= 1) {
+          std::string msg;
+          std::string padding(makeTabs(1));
+          llvm::raw_string_ostream stream(msg);
+          stream.flush();
+          klee_message("#%lu=>#%lu: Check failure as in PHInode: parent node "
+                       "doen't exist. Failing conservatively. ",
+                       state.txTreeNode->getNodeSequenceNumber(),
+                       nodeSequenceNumber);
+        }
         return false;
       }
     } else {
-      klee_warning("TxSubsumptionTableEntry::subsumed: not implemented yet");
+      if (debugSubsumptionLevel >= 1) {
+        std::string msg;
+        std::string padding(makeTabs(1));
+        llvm::raw_string_ostream stream(msg);
+        stream.flush();
+        klee_message(
+            "#%lu=>#%lu: Check failure as this part of PHInode check is not "
+            "implemented yet. Failing conservatively. ",
+            state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
+      }
       return false;
     }
   }
