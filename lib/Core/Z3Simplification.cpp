@@ -23,6 +23,9 @@ void Z3Simplification::test() {
 }
 
 ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
+  if (txe.isNull()) {
+    return txe;
+  }
   z3::context c;
   std::map<std::string, ref<Expr> > emap;
   z3::expr z3e = c.bool_val(false);
