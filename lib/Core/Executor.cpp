@@ -1182,19 +1182,6 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     }
   }
 
-  //  llvm::outs() << "====begin branchFork\n";
-  //  condition->dump();
-  //  llvm::outs() << "res=" << res << "\n";
-  //  for (ConstraintManager::const_iterator it = current.constraints.begin(),
-  //                                         ie = current.constraints.end();
-  //       it != ie; ++it) {
-  //    (*it)->dump();
-  //  }
-  //
-  //  llvm::outs() << "====end branchFork\n";
-
-  //  llvm::outs() << "******************\n";
-
   llvm::BranchInst *binst =
       llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
   llvm::BasicBlock* curBB = current.txTreeNode->getBasicBlock();
@@ -1311,7 +1298,6 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       }
     }
   }
-  //  llvm::outs() << "******************\n";
 
   // XXX - even if the constraint is provable one way or the other we
   // can probably benefit by adding this constraint and allowing it to
@@ -1395,7 +1381,6 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // We then extract the unsatisfiability core of antecedent and not
       // consequent as the Craig interpolant.
       txTree->markPathCondition(current, unsatCore);
-      return StatePair(&current, 0);
     }
 
     return StatePair(&current, 0);
@@ -1476,7 +1461,6 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // which means that antecedent -> not(consequent) is valid. In this
       // case also we extract the unsat core of the proof
       txTree->markPathCondition(current, unsatCore);
-      return StatePair(0, &current);
     }
 
     return StatePair(0, &current);
@@ -1683,8 +1667,9 @@ Executor::StatePair Executor::addSpeculationNode(ExecutionState &current,
 Executor::StatePair Executor::speculationFork(ExecutionState &current,
                                               ref<Expr> condition,
                                               bool isInternal) {
-  //  klee_warning("Speculation node");
 
+  // Anayzing Speculation node
+  // Seeding is removed intentionally
   Solver::Validity res;
 
   double timeout = coreSolverTimeout;
@@ -1702,16 +1687,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     terminateStateEarly(current, "Query timed out (fork).");
     return StatePair(0, 0);
   }
-
-  //  llvm::outs() << "====begin SpeculationFork\n";
-  //  condition->dump();
-  //  llvm::outs() << "res=" << res << "\n";
-  //  for (ConstraintManager::const_iterator it = current.constraints.begin(),
-  //                                         ie = current.constraints.end();
-  //       it != ie; ++it) {
-  //    (*it)->dump();
-  //  }
-  //  llvm::outs() << "====end SpeculationFork\n";
 
   llvm::BranchInst *binst =
       llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
@@ -2801,10 +2776,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // up with convenient instruction specific data.
       if (statsTracker && state.stack.back().kf->trackCoverage)
         statsTracker->markBranchVisited(branches.first, branches.second);
-
-      //      int brcount = branches.first? 1: 0;
-      //      brcount = branches.second? brcount+1: brcount;
-      //      llvm::outs() << "branches size=" << brcount << "\n";
 
       if (branches.first)
         transferToBasicBlock(bi->getSuccessor(0), bi->getParent(),
