@@ -1805,7 +1805,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       // We then extract the unsatisfiability core of antecedent and not
       // consequent as the Craig interpolant.
       txTree->markPathCondition(current, unsatCore);
-      return StatePair(&current, 0);
     }
 
     return StatePair(&current, 0);
@@ -1857,7 +1856,6 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       // which means that antecedent -> not(consequent) is valid. In this
       // case also we extract the unsat core of the proof
       txTree->markPathCondition(current, unsatCore);
-      return StatePair(0, &current);
     }
 
     return StatePair(0, &current);
@@ -5439,9 +5437,6 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
       int order = fBBOrder[(*it)->getParent()][*it];
       std::string functionName = ((*it)->getParent())->getName();
       visitedBBFileOut << order << "\n";
-      std::string tmp;
-      raw_string_ostream tmpOS(tmp);
-      (*it)->print(tmpOS);
     }
 
     visitedBBFileOut.close();
