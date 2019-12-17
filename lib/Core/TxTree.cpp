@@ -2151,7 +2151,8 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
     TxTreeNode *p = node->parent;
 
     // Speculation Success
-    if (node->isSpeculationNode() && !node->isSpeculationFailedNode() && p &&
+    if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
+        node->isSpeculationNode() && !node->isSpeculationFailedNode() && p &&
         !p->isSpeculationNode()) {
       llvm::BasicBlock *pbb = p->getBasicBlock();
       StatsTracker::increaseEle(pbb, 2, false);
