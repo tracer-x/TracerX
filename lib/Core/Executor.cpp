@@ -1182,12 +1182,13 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     }
   }
 
-  llvm::BranchInst *binst =
-      llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
-  llvm::BasicBlock* curBB = current.txTreeNode->getBasicBlock();
+
   if (condition->isTrue()) {
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculationHelper::isStateSpeculable(current)) {
+      llvm::BranchInst *binst =
+          llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+      llvm::BasicBlock *curBB = current.txTreeNode->getBasicBlock();
       if (SpecStrategyToUse == TIMID) {
         std::set<std::string> vars = extractVarNames(current, binst);
         if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
@@ -1245,6 +1246,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculationHelper::isStateSpeculable(current)) {
+      llvm::BranchInst *binst =
+          llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+      llvm::BasicBlock *curBB = current.txTreeNode->getBasicBlock();
       if (SpecStrategyToUse == TIMID) {
         std::set<std::string> vars = extractVarNames(current, binst);
         if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
@@ -1315,6 +1319,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     }
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculationHelper::isStateSpeculable(current)) {
+      llvm::BranchInst *binst =
+          llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+      llvm::BasicBlock *curBB = current.txTreeNode->getBasicBlock();
       if (SpecStrategyToUse == TIMID) {
         std::set<std::string> vars = extractVarNames(current, binst);
         if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
@@ -1394,6 +1401,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculationHelper::isStateSpeculable(current)) {
+      llvm::BranchInst *binst =
+          llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+      llvm::BasicBlock *curBB = current.txTreeNode->getBasicBlock();
       if (SpecStrategyToUse == TIMID) {
         std::set<std::string> vars = extractVarNames(current, binst);
         if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
