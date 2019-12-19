@@ -459,6 +459,8 @@ class TxTreeNode {
 public:
   bool isSubsumed;
 
+  std::vector<llvm::BasicBlock*> executedBBs;
+
   // \brief The unsat core from a infeasible path is temporarily stored here
   // and in case speculation is failed it's used to do marking related to
   // the infeasible path
@@ -955,6 +957,8 @@ public:
   uint64_t getDebugState() {
     return currentTxTreeNode->dependency->debugStateLevel;
   }
+
+  TxTreeNode *getCurrentTxTreeNode() { return currentTxTreeNode; }
 };
 }
 #endif /* TXTREE_H_ */

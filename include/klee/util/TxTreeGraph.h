@@ -19,6 +19,7 @@
 #include "klee/CommandLine.h"
 #include "klee/Expr.h"
 
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <map>
@@ -86,6 +87,8 @@ private:
     /// instruction is a return from a function named tracerx_mark.
     uint64_t markCount;
 
+    std::vector<llvm::BasicBlock*> executedBBs;
+
     /// \brief The addition to the number of interesting instruction executed
     /// while processing a node: The interesting instruction is a return from a
     /// function named tracerx_mark.
@@ -127,6 +130,8 @@ private:
     }
 
     std::string render() const;
+    TxTreeGraph::Node *getSource() { return source; };
+    TxTreeGraph::Node *getDest() { return destination; };
   };
 
   TxTreeGraph::Node *root;
@@ -197,6 +202,9 @@ public:
 
   /// \brief Save the graph
   static void save(std::string dotFileName);
+
+  static void copyTxTreeNodeData(TxTreeNode *txTreeNode);
+  static void generatePSSCFG();
 };
 }
 

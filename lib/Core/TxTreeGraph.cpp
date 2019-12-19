@@ -17,6 +17,7 @@
 
 #include "klee/ExecutionState.h"
 #include "klee/util/TxPrintUtil.h"
+#include "TxTree.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include "llvm/IR/BasicBlock.h"
@@ -425,4 +426,46 @@ void TxTreeGraph::save(std::string dotFileName) {
     out << g;
     out.close();
   }
+}
+
+void TxTreeGraph::copyTxTreeNodeData(TxTreeNode *txTreeNode) {
+  instance->txTreeNodeMap[txTreeNode]->executedBBs = txTreeNode->executedBBs;
+}
+
+void TxTreeGraph::generatePSSCFG() {
+  llvm::errs() << "START PSSCFGGenerator::print\n";
+  if (instance->root == NULL) {
+    return;
+  }
+
+  std::stack<Node *> wl;
+  wl.push(instance->root);
+  while (!wl.empty()) {
+    Node *t = wl.top();
+    wl.pop();
+    llvm::errs() << t->nodeSequenceNumber << "(" << t->subsumed << "): ";
+    for (std::vector<llvm::BasicBlock *>::iterator it = t->executedBBs.begin(),
+                                                   ie = t->executedBBs.end();
+         it != ie; ++it) {
+      // (*it)->dump();
+      llvm::errs() << (*it) << ";";
+    }
+    llvm::errs() << "\n";
+
+    if (t->falseTarget != NULL) {
+      wl.push(t->falseTarget);
+    }
+    if (t->trueTarget != NULL) {
+      wl.push(t->trueTarget);
+    }
+  }
+
+  for (std::vector<TxTreeGraph::NumberedEdge *>::iterator
+           it = instance->subsumptionEdges.begin(),
+           ie = instance->subsumptionEdges.end();
+       it != ie; ++it) {
+    llvm::errs() << (*it)->getSource()->nodeSequenceNumber << "->"
+                 << (*it)->getDest()->nodeSequenceNumber << "\n";
+  }
+  llvm::errs() << "END PSSCFGGenerator::print: \n";
 }

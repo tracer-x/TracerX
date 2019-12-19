@@ -2286,6 +2286,9 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                          state.txTreeNode->isSpeculationNode());
     processBBCoverage(BBCoverage, &(f->front()), isInSpecMode);
   }
+  if (INTERPOLATION_ENABLED && !f->empty()) {
+    txTree->getCurrentTxTreeNode()->executedBBs.push_back(&(f->front()));
+  }
 
   Instruction *i = ki->inst;
   if (f && f->isDeclaration()) {
@@ -2483,6 +2486,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   if (INTERPOLATION_ENABLED) {
     // blockCount increased to count all visited Basic Blocks
     TxTree::blockCount++;
+    txTree->getCurrentTxTreeNode()->executedBBs.push_back(dst);
   }
 
   // process BB Coverage
@@ -4211,6 +4215,10 @@ void Executor::run(ExecutionState &initialState) {
           fBBOrder[firstBB->getParent()].end()) {
     processBBCoverage(BBCoverage, ki->inst->getParent(), false);
   }
+  if (INTERPOLATION_ENABLED) {
+    txTree->getCurrentTxTreeNode()->executedBBs.push_back(
+        ki->inst->getParent());
+  }
 
   bindModuleConstants();
 
@@ -5309,6 +5317,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 
   if (INTERPOLATION_ENABLED) {
     TxTreeGraph::save(interpreterHandler->getOutputFilename("tree.dot"));
+    TxTreeGraph::generatePSSCFG();
     TxTreeGraph::deallocate();
 
     delete txTree;

@@ -2087,6 +2087,7 @@ void TxTree::remove(TxTreeNode *node, bool dumping) {
                                  node->entryCallHistory, entry);
 
       TxTreeGraph::addTableEntryMapping(node, entry);
+      TxTreeGraph::copyTxTreeNodeData(node);
 
       if (debugSubsumptionLevel >= 2) {
         std::string msg;
