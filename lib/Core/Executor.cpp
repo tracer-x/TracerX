@@ -1184,6 +1184,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
 
 
   if (condition->isTrue()) {
+    // do speculation if SpecTypeToUse is SAFETY or COVERAGE
+    // the default is NO_SPEC
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculationHelper::isStateSpeculable(current)) {
       llvm::BranchInst *binst =
@@ -1244,6 +1246,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       }
     }
   } else if (condition->isFalse()) {
+    // do speculation if SpecTypeToUse is SAFETY or COVERAGE
+    // the default is NO_SPEC
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculationHelper::isStateSpeculable(current)) {
       llvm::BranchInst *binst =
@@ -1317,6 +1321,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         current.pathOS << "1";
       }
     }
+    // do speculation if SpecTypeToUse is SAFETY or COVERAGE
+    // the default is NO_SPEC
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculationHelper::isStateSpeculable(current)) {
       llvm::BranchInst *binst =
@@ -1398,7 +1404,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         current.pathOS << "0";
       }
     }
-
+    // do speculation if SpecTypeToUse is SAFETY or COVERAGE
+    // the default is NO_SPEC
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculationHelper::isStateSpeculable(current)) {
       llvm::BranchInst *binst =
