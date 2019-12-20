@@ -177,6 +177,11 @@ class TxSubsumptionTableEntry {
 
   std::set<const Array *> existentials;
 
+  // Used to ensure at subsumption the value of the phiNodes in the subsumed
+  // tree remain the same
+  uintptr_t prevProgramPoint;
+  std::map<llvm::Value *, std::vector<ref<Expr> > > phiValues;
+
   /// \brief A procedure for building subsumption check constraints using
   /// symbolically-addressed store elements
   ///
@@ -298,12 +303,12 @@ public:
 
   ~TxSubsumptionTableEntry();
 
-  bool subsumed(
-      TimingSolver *solver, ExecutionState &state, double timeout,
-      bool leftRetrieval, TxStore::TopStateStore &__internalStore,
-      TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
-      TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
-      int debugSubsumptionLevel);
+  bool
+  subsumed(TimingSolver *solver, ExecutionState &state, double timeout,
+           bool leftRetrieval, TxStore::TopStateStore &__internalStore,
+           TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
+           TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
+           int debugSubsumptionLevel);
 
   /// Tests if the argument is a variable. A variable here is defined to be
   /// either a symbolic concatenation or a symbolic read. A concatenation in
@@ -373,6 +378,12 @@ class TxTreeNode {
 
   uintptr_t programPoint;
 
+  // Used to ensure at subsumption the value of the phiNodes in the subsumed
+  // tree remain the same
+  uintptr_t prevProgramPoint;
+  std::map<llvm::Value *, std::vector<ref<Expr> > > phiValues;
+  bool phiValuesFlag;
+
   uint64_t nodeSequenceNumber;
 
   bool storable;
@@ -394,14 +405,18 @@ class TxTreeNode {
   /// \brief Indicates that a generic error was encountered in this node
   bool genericEarlyTermination;
 
-  void setProgramPoint(llvm::Instruction *instr) {
-    if (!programPoint)
+  void setProgramPoint(llvm::Instruction *instr, llvm::Instruction *prevInstr) {
+    if (!programPoint) {
       programPoint = reinterpret_cast<uintptr_t>(instr);
+      prevProgramPoint = reinterpret_cast<uintptr_t>(prevInstr);
+    }
 
     // Disabling the subsumption check within KLEE's own API
     // (call sites of klee_ and at any location within the klee_ function)
-    // by never store a table entry for KLEE's own API, marked with flag storable.
-    storable = !(instr->getParent()->getParent()->getName().substr(0, 5).equals("klee_"));
+    // by never store a table entry for KLEE's own API, marked with flag
+    // storable.
+    storable = !(instr->getParent()->getParent()->getName().substr(0, 5).equals(
+                    "klee_"));
   }
 
   /// \brief for printing member function running time statistics
@@ -447,7 +462,23 @@ public:
 
   uintptr_t getProgramPoint() { return programPoint; }
 
+  uintptr_t getPrevProgramPoint() { return prevProgramPoint; }
+
+  TxTreeNode *getParent() { return parent; }
+
+  bool getPhiValuesFlag() { return phiValuesFlag; }
+
+  void setPhiValuesFlag(bool _phiValuesFlag) { phiValuesFlag = _phiValuesFlag; }
+
   uint64_t getNodeSequenceNumber() { return nodeSequenceNumber; }
+
+  TxDependency *getDependency() { return dependency; }
+
+  std::map<llvm::Value *, std::vector<ref<Expr> > > getPhiValue() {
+    return phiValues;
+  };
+
+  void setPhiValue(llvm::Value *instr, ref<Expr> value);
 
   /// \brief Retrieve the interpolant for this node as KLEE expression object
   ///
@@ -486,8 +517,8 @@ public:
   /// arguments a pair of the store part indexed by constants, and the store
   /// part indexed by symbolic expressions.
   void getStoredExpressions(
-      const std::vector<llvm::Instruction *> &callHistory,
-      bool &leftRetrieval, TxStore::TopStateStore &__internalStore,
+      const std::vector<llvm::Instruction *> &callHistory, bool &leftRetrieval,
+      TxStore::TopStateStore &__internalStore,
       TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
       TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore) const;
 
@@ -572,7 +603,8 @@ public:
 /// from
 /// KLEE's Executor class, which is the core symbolic executor of KLEE.
 /// The main functionality of the TxTree#execute versions
-/// themselves is to simply delegate the call to TxDependency#execute and related
+/// themselves is to simply delegate the call to TxDependency#execute and
+/// related
 /// functions, which
 /// implements the construction of memory dependency used in computing the
 /// regions of memory
@@ -619,7 +651,8 @@ public:
 /// </pre>
 /// <hr>
 ///
-/// For comparison, following is the pseudocode of Tracer-X KLEE. Please note that to
+/// For comparison, following is the pseudocode of Tracer-X KLEE. Please note
+/// that to
 /// support interpolation, each leaf is now augmented with a path condition.
 /// We highlight the added procedures using CAPITAL LETTERS, and we note the
 /// functions involved.
@@ -633,7 +666,8 @@ public:
 ///       i. REGISTER IT FOR DELETION
 ///       ii. MARK CONSTRAINTS NEEDED FOR SUBSUMPTION
 ///       iii. GOTO d
-///    c. Symbolically execute the instruction (TxTree::execute, TxTree::executePHI,
+///    c. Symbolically execute the instruction (TxTree::execute,
+/// TxTree::executePHI,
 ///       TxTree::executeMemoryOperation, TxTree::executeOnNode):
 ///       i. If it is a branch instruction, test if one of branches is
 /// unsatisfiable
@@ -725,6 +759,19 @@ public:
   ///
   /// \param state The KLEE execution state to associate the current node with.
   void setCurrentINode(ExecutionState &state);
+
+  // \brief stop collecting phi values for the current node
+  void setPhiValuesFlag(bool phiValuesFlag) {
+    currentTxTreeNode->setPhiValuesFlag(phiValuesFlag);
+  }
+
+  // \brief get the flag to store phi values for the current node
+  bool getPhiValuesFlag() { return currentTxTreeNode->getPhiValuesFlag(); }
+
+  // \brief stop collecting phi values for the current node
+  void setPhiValue(llvm::Value *instr, ref<Expr> value) {
+    currentTxTreeNode->setPhiValue(instr, value);
+  }
 
   /// \brief Deletes the Tracer-X tree node
   ///
