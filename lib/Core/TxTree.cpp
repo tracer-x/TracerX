@@ -796,7 +796,23 @@ bool TxSubsumptionTableEntry::subsumed(
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
 
-  // PhiNode Check 1 (checking the value of phi instructions at subsumption
+  // PhiNode Check 1 (checking previous BB is the same at subsumption point)
+  if (isa<llvm::PHINode>(state.pc->inst) &&
+      prevProgramPoint != reinterpret_cast<uintptr_t>(state.prevPC->inst)) {
+    if (debugSubsumptionLevel >= 1) {
+      std::string msg;
+      std::string padding(makeTabs(1));
+      llvm::raw_string_ostream stream(msg);
+      stream.flush();
+      klee_message("#%lu=>#%lu: Check failure due to different predessor for "
+                   "the PHInode.",
+                   state.txTreeNode->getNodeSequenceNumber(),
+                   nodeSequenceNumber);
+    }
+    return false;
+  }
+
+  // PhiNode Check 2 (checking the value of phi instructions at subsumption
   // point)
   for (std::map<llvm::Value *, std::vector<ref<Expr> > >::const_iterator it =
            phiValues.begin();
@@ -804,9 +820,8 @@ bool TxSubsumptionTableEntry::subsumed(
     if (isa<llvm::PHINode>((*it).first)) {
       llvm::Instruction *phi = dyn_cast<llvm::Instruction>((*it).first);
       std::vector<ref<Expr> > values = (*it).second;
-      if (values.empty()) {
+      if (values.empty())
         continue;
-      }
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
       llvm::Value *inputArg = phi->getOperand(state.incomingBBIndex);
 #else
@@ -832,9 +847,17 @@ bool TxSubsumptionTableEntry::subsumed(
           }
           return false;
         }
-        txStateVal.back()->getExpression()->dump();
-        values.back()->dump();
         if (txStateVal.back()->getExpression().compare(values.back()) != 0) {
+          if (debugSubsumptionLevel >= 1) {
+            std::string msg;
+            std::string padding(makeTabs(1));
+            llvm::raw_string_ostream stream(msg);
+            stream.flush();
+            klee_message("#%lu=>#%lu: Check failure as in PHInode: phi values "
+                         "don't match ",
+                         state.txTreeNode->getNodeSequenceNumber(),
+                         nodeSequenceNumber);
+          }
           return false;
         }
       } else {
@@ -848,7 +871,6 @@ bool TxSubsumptionTableEntry::subsumed(
                        state.txTreeNode->getNodeSequenceNumber(),
                        nodeSequenceNumber);
         }
-        klee_warning("TxSubsumptionTableEntry::subsumed:");
         return false;
       }
     } else {
@@ -864,11 +886,6 @@ bool TxSubsumptionTableEntry::subsumed(
       }
       return false;
     }
-  }
-
-  // PhiNode Check 2 (checking previous BB is the same at subsumption point)
-  if (prevProgramPoint != reinterpret_cast<uintptr_t>(state.prevPC->inst)) {
-    return false;
   }
 
   // Tell the solver implementation that we are checking for subsumption for
