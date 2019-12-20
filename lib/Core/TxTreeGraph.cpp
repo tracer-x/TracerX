@@ -34,6 +34,9 @@
 #else
 #include <llvm/Analysis/DebugInfo.h>
 #endif
+#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/IR/Module.h"
 
 #include <fstream>
 #include <string>
@@ -429,15 +432,21 @@ void TxTreeGraph::save(std::string dotFileName) {
 }
 
 void TxTreeGraph::copyTxTreeNodeData(TxTreeNode *txTreeNode) {
-  instance->txTreeNodeMap[txTreeNode]->executedBBs = txTreeNode->executedBBs;
+  for (std::vector<llvm::BasicBlock *>::iterator
+           it = txTreeNode->executedBBs.begin(),
+           ie = txTreeNode->executedBBs.end();
+       it != ie; ++it) {
+    instance->txTreeNodeMap[txTreeNode]->executedBBs.push_back(*it);
+    instance->executedFuncs.insert((*it)->getParent());
+  }
 }
 
-void TxTreeGraph::generatePSSCFG() {
-  llvm::errs() << "START PSSCFGGenerator::print\n";
+void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
   if (instance->root == NULL) {
     return;
   }
 
+  llvm::errs() << "START generatePSSCFG::print\n";
   std::stack<Node *> wl;
   wl.push(instance->root);
   while (!wl.empty()) {
@@ -448,7 +457,7 @@ void TxTreeGraph::generatePSSCFG() {
                                                    ie = t->executedBBs.end();
          it != ie; ++it) {
       // (*it)->dump();
-      llvm::errs() << (*it) << ";";
+      llvm::errs() << (*it) << "-" << (*it)->getParent()->getName().str() << "-" << (*it)->getParent() << ";";
     }
     llvm::errs() << "\n";
 
@@ -467,5 +476,31 @@ void TxTreeGraph::generatePSSCFG() {
     llvm::errs() << (*it)->getSource()->nodeSequenceNumber << "->"
                  << (*it)->getDest()->nodeSequenceNumber << "\n";
   }
-  llvm::errs() << "END PSSCFGGenerator::print: \n";
+  llvm::errs() << "END generatePSSCFG::print: \n";
+
+  // collect functions
+  llvm::errs() << "Executed functions\n";
+  for (std::set<llvm::Function *>::iterator
+           it = instance->executedFuncs.begin(),
+           ie = instance->executedFuncs.end();
+       it != ie; ++it) {
+    llvm::errs() << (*it)->getName().str() << "\n";
+  }
+  llvm::errs() << "End Executed functions\n";
+
+  // modify module
+  llvm::Module *newModule = llvm::CloneModule(kmodule->module);
+  for (llvm::Module::iterator f = newModule->begin(), fend = newModule->end();
+       f != fend; ++f) {
+	  llvm::errs() << "Checking " << f->getName().str() << "-" << f << "-" << &(*f) << "\n";
+	  if (instance->executedFuncs.find(f) != instance->executedFuncs.end()) {
+    	llvm::errs() << "Empty function: " << f->getName().str() << "\n";
+      f->getBasicBlockList().clear();
+    }
+  }
+
+  std::string EC;
+  llvm::raw_fd_ostream OS("module.bc", EC, llvm::sys::fs::F_None);
+  WriteBitcodeToFile(newModule, OS);
+  OS.flush();
 }

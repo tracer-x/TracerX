@@ -18,11 +18,13 @@
 
 #include "klee/CommandLine.h"
 #include "klee/Expr.h"
+#include "klee/Internal/Module/KModule.h"
 
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <map>
+#include <set>
 
 namespace klee {
 
@@ -139,6 +141,7 @@ private:
   std::map<TxSubsumptionTableEntry *, TxTreeGraph::Node *> tableEntryMap;
   std::vector<TxTreeGraph::NumberedEdge *> subsumptionEdges;
   std::map<TxPCConstraint *, TxTreeGraph::Node *> pathConditionMap;
+  std::set<llvm::Function*> executedFuncs;
 
   /// \brief The set of known leaves
   std::set<TxTreeGraph::Node *> leaves;
@@ -204,7 +207,7 @@ public:
   static void save(std::string dotFileName);
 
   static void copyTxTreeNodeData(TxTreeNode *txTreeNode);
-  static void generatePSSCFG();
+  static void generatePSSCFG(KModule *kmodule);
 };
 }
 
