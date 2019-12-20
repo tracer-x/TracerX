@@ -1792,6 +1792,18 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
   } else if (isa<llvm::GetElementPtrInst>(val)) {
     llvm::GetElementPtrInst *gep = dyn_cast<llvm::GetElementPtrInst>(val);
     ret = getGepInst(gep);
+  } else if (isa<llvm::Constant>(val)) {
+    if (isa<llvm::ConstantPointerNull>(val)) {
+      return Expr::createPointer(0);
+    } else {
+      llvm::errs() << "Value:";
+      val->dump();
+      llvm::errs() << "\nType:";
+      val->getType()->dump();
+      klee_error(
+          "\nTxWeakestPreCondition::generateExprFromOperand, This constant"
+          " case not implemented yet\n");
+    }
   } else {
     llvm::errs() << "Value:";
     val->dump();
