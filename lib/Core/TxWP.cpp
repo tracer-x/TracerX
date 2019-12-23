@@ -1091,17 +1091,17 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
     }
   }
 
-  // revmoving __shadow__ from var names
+  // removing __shadow__ from var names
   std::set<std::string> pimiuVars2;
   for (std::set<std::string>::iterator it1 = pimiuVars.begin(),
                                        ie1 = pimiuVars.end();
        it1 != ie1; ++it1) {
     std::string toErase = "__shadow__";
     size_t pos = (*it1).find(toErase);
-    if (pos != std::string::npos) {
-      std::string str = (*it1);
-      str.erase(pos, toErase.length());
-      pimiuVars2.insert(str);
+    if (pos == std::string::npos) {
+//      std::string str = (*it1);
+//      str.erase(pos, toErase.length());
+      pimiuVars2.insert(*it1);
     }
   }
 
