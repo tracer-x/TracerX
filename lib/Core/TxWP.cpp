@@ -1099,8 +1099,6 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
     std::string toErase = "__shadow__";
     size_t pos = (*it1).find(toErase);
     if (pos == std::string::npos) {
-//      std::string str = (*it1);
-//      str.erase(pos, toErase.length());
       pimiuVars2.insert(*it1);
     }
   }
@@ -1856,10 +1854,10 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
     }
     }
   } else if (llvm::isa<llvm::PHINode>(value)) {
-	llvm::PHINode *phi = dyn_cast<llvm::PHINode>(value);
-	result = getPhiInst(phi);
-	if (result.isNull())
-		return result;
+    llvm::PHINode *phi = dyn_cast<llvm::PHINode>(value);
+    result = getPhiInst(phi);
+    if (result.isNull())
+      return result;
   } else {
     value->dump();
     klee_error("TxWeakestPreCondition::getCondition: value is not "
@@ -2301,15 +2299,12 @@ ref<Expr> TxWeakestPreCondition::getSwitchInst(llvm::SwitchInst *si) {
 }
 
 ref<Expr> TxWeakestPreCondition::getPhiInst(llvm::PHINode *phi) {
-  ref<Expr> result;
-  // Please retrieve incomingBBIndex and pass to this function from state and implement the following:
-  // #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
-  //  llvm::Value *inputArg = phi->getOperand(state.incomingBBIndex);
-  // #else
-  //  llvm::Value *inputArg = phi->getOperand(state.incomingBBIndex * 2);
-  // #endif
-  // ref<Expr> result = this->generateExprFromOperand(inputArg);
-  klee_error("Not Implemented Yet!");
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
+  llvm::Value *inputArg = phi->getOperand(node->phiNodeArg[phi]);
+#else
+  llvm::Value *inputArg = phi->getOperand(node->phiNodeArg[phi] * 2);
+#endif
+  ref<Expr> result = this->generateExprFromOperand(inputArg);
   return result;
 }
 

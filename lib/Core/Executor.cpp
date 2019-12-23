@@ -1612,7 +1612,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
 
   if (INTERPOLATION_ENABLED && WPInterpolant)
-    txTree->storeInstruction(ki);
+    txTree->storeInstruction(ki, state.incomingBBIndex);
 
   switch (i->getOpcode()) {
   // Control flow

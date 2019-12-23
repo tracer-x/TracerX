@@ -506,6 +506,7 @@ public:
   /// Second argument is 2 means negation of the instruction is dependent to a
   /// target
   std::vector<std::pair<KInstruction *, int> > reverseInstructionList;
+  std::map<llvm::Instruction *, unsigned> phiNodeArg;
 
   /// \brief The entry call history
   std::vector<llvm::Instruction *> entryCallHistory;
@@ -974,7 +975,7 @@ public:
 
   /// \brief Store instruction stores the list of instructions in a node
   /// in reverse order for computing weakest precondition interpolant
-  void storeInstruction(KInstruction *instr);
+  void storeInstruction(KInstruction *instr, unsigned incomingBB);
 
   /// \brief Mark an instruction in a node which contributes to computing
   /// weakest precondition interpolant

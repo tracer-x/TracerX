@@ -2302,9 +2302,13 @@ void TxTree::executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
   symbolicExecutionError = false;
 }
 
-void TxTree::storeInstruction(KInstruction *instr) {
+void TxTree::storeInstruction(KInstruction *instr, unsigned incomingBB) {
   currentTxTreeNode->reverseInstructionList.push_back(
       std::pair<KInstruction *, bool>(instr, 0));
+  if (llvm::isa<llvm::PHINode>(instr->inst)) {
+    currentTxTreeNode->phiNodeArg.insert(
+        std::pair<llvm::Instruction *, unsigned>(instr->inst, incomingBB));
+  }
 }
 
 void TxTree::markInstruction(KInstruction *instr, bool branchFlag) {
