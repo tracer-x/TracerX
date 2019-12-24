@@ -4104,7 +4104,8 @@ Executor::readBBOrderToSpecAvoid(std::string folderName) {
   while ((dp = readdir(dirp)) != NULL) {
     std::string name(dp->d_name);
     if (strcmp(name.substr(0, 10).c_str(), "SpecAvoid_") == 0) {
-      std::pair<int, std::set<std::string> > tmp = readBBSpecAvoid(name);
+      std::string absPath = folderName + "/" + name;
+      std::pair<int, std::set<std::string> > tmp = readBBSpecAvoid(absPath);
       res[tmp.first] = tmp.second;
     }
   }
