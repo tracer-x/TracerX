@@ -1222,8 +1222,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
-          StatsTracker::increaseEle(curBB, 0, true);
-          StatsTracker::increaseEle(curBB, 2, false);
+          //          StatsTracker::increaseEle(curBB, 0, true);
+          //          StatsTracker::increaseEle(curBB, 2, false);
           return StatePair(&current, 0);
         } else {
           // open speculation & result may be success or fail and Now second
@@ -1236,7 +1236,6 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
                                       true);
           } else {
             dynamicNo++;
-            StatsTracker::increaseEle(curBB, 1, true);
             // then close speculation & do marking as deletion
             txTree->markPathCondition(current, unsatCore);
             return StatePair(&current, 0);
@@ -1282,8 +1281,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
-          StatsTracker::increaseEle(curBB, 0, true);
-          StatsTracker::increaseEle(curBB, 2, false);
+          //          StatsTracker::increaseEle(curBB, 0, true);
+          //          StatsTracker::increaseEle(curBB, 2, false);
           return StatePair(0, &current);
         } else {
           independenceNo++;
@@ -1296,7 +1295,6 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
                                       false);
           } else {
             dynamicNo++;
-            StatsTracker::increaseEle(curBB, 1, true);
             // then close speculation & do marking as deletion
             txTree->markPathCondition(current, unsatCore);
             return StatePair(0, &current);
@@ -1364,8 +1362,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
-          StatsTracker::increaseEle(curBB, 0, true);
-          StatsTracker::increaseEle(curBB, 2, false);
+          //          StatsTracker::increaseEle(curBB, 0, true);
+          //          StatsTracker::increaseEle(curBB, 2, false);
           return StatePair(&current, 0);
         } else {
           independenceNo++;
@@ -1379,7 +1377,6 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
                                       true);
           } else {
             dynamicNo++;
-            StatsTracker::increaseEle(curBB, 1, true);
             // then close speculation & do marking as deletion
             txTree->markPathCondition(current, unsatCore);
             return StatePair(&current, 0);
@@ -1448,8 +1445,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
           independenceYes++;
-          StatsTracker::increaseEle(curBB, 0, true);
-          StatsTracker::increaseEle(curBB, 2, false);
+          //          StatsTracker::increaseEle(curBB, 0, true);
+          //          StatsTracker::increaseEle(curBB, 2, false);
           return StatePair(0, &current);
         } else {
           independenceNo++;
@@ -1463,7 +1460,6 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
                                       false);
           } else {
             dynamicNo++;
-            StatsTracker::increaseEle(curBB, 1, true);
             // then close speculation & do marking as deletion
             txTree->markPathCondition(current, unsatCore);
             return StatePair(0, &current);
@@ -1720,17 +1716,17 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         std::set<std::string> vars = extractVarNames(current, binst);
         if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
-          independenceYes++;
+          //          independenceYes++;
           return StatePair(&current, 0);
         } else {
-          independenceNo++;
+          //          independenceNo++;
           // open speculation & result may be success or fail
           if (specSnap[binst] != visitedBlocks.size()) {
-            dynamicYes++;
+            //            dynamicYes++;
             return addSpeculationNode(current, condition, binst, isInternal,
                                       true);
           } else {
-            dynamicNo++;
+            //            dynamicNo++;
             // then close speculation & do marking as deletion
             txTree->markPathCondition(current, unsatCore);
             return StatePair(&current, 0);
@@ -1751,17 +1747,17 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         std::set<std::string> vars = extractVarNames(current, binst);
         if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
-          independenceYes++;
+          //          independenceYes++;
           return StatePair(0, &current);
         } else {
-          independenceNo++;
+          //          independenceNo++;
           // open speculation & result may be success or fail
           if (specSnap[binst] != visitedBlocks.size()) {
-            dynamicYes++;
+            //            dynamicYes++;
             return addSpeculationNode(current, condition, binst, isInternal,
                                       false);
           } else {
-            dynamicNo++;
+            //            dynamicNo++;
             // then close speculation & do marking as deletion
             txTree->markPathCondition(current, unsatCore);
             return StatePair(0, &current);
@@ -1795,19 +1791,19 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         std::set<std::string> vars = extractVarNames(current, binst);
         if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
-          independenceYes++;
+          //          independenceYes++;
           return StatePair(&current, 0);
         } else {
-          independenceNo++;
+          //          independenceNo++;
           // save unsat core
           // open speculation & result may be success or fail
           if (specSnap[binst] != visitedBlocks.size()) {
-            dynamicYes++;
+            //            dynamicYes++;
             txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
             return addSpeculationNode(current, condition, binst, isInternal,
                                       true);
           } else {
-            dynamicNo++;
+            //            dynamicNo++;
             // then close speculation & do marking as deletion
             txTree->markPathCondition(current, unsatCore);
             return StatePair(&current, 0);
@@ -1842,23 +1838,22 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         return addSpeculationNode(current, condition, binst, isInternal, false);
       } else if (SpecStrategyToUse == CUSTOM) {
-
         std::set<std::string> vars = extractVarNames(current, binst);
         if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
           // open speculation & assume success
-          independenceYes++;
+          //          independenceYes++;
           return StatePair(0, &current);
         } else {
-          independenceNo++;
+          //          independenceNo++;
           // save unsat core
           // open speculation & result may be success or fail
           if (specSnap[binst] != visitedBlocks.size()) {
-            dynamicYes++;
+            //            dynamicYes++;
             txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
             return addSpeculationNode(current, condition, binst, isInternal,
                                       false);
           } else {
-            dynamicNo++;
+            //            dynamicNo++;
             // then close speculation & do marking as deletion
             txTree->markPathCondition(current, unsatCore);
             return StatePair(0, &current);
