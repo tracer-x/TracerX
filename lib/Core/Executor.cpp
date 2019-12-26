@@ -1182,7 +1182,6 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     }
   }
 
-
   if (condition->isTrue()) {
     // do speculation if SpecTypeToUse is SAFETY or COVERAGE
     // the default is NO_SPEC
@@ -5331,12 +5330,19 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 
     outSpec << "Total Independence Yes: " << independenceYes << "\n";
     outSpec << "Total Independence No: " << independenceNo << "\n";
-    outSpec << "Total Dynamic Yes: " << dynamicYes << "\n";
-    outSpec << "Total Dynamic No: " << dynamicNo << "\n";
-    outSpec << "Total Independence No, Dynamic Yes & Success: "
-            << (dynamicYes - specFail) << "\n";
-    outSpec << "Total Independence No, Dynamic Yes & Fail: " << specFail
-            << "\n";
+
+    if (SpecStrategyToUse == AGGRESSIVE) {
+      outSpec << "Total Independence No & Success: "
+              << (independenceNo - specFail) << "\n";
+      outSpec << "Total Independence No & Fail: " << specFail << "\n";
+    } else if (SpecStrategyToUse == CUSTOM) {
+      outSpec << "Total Dynamic Yes: " << dynamicYes << "\n";
+      outSpec << "Total Dynamic No: " << dynamicNo << "\n";
+      outSpec << "Total Independence No, Dynamic Yes & Success: "
+              << (dynamicYes - specFail) << "\n";
+      outSpec << "Total Independence No, Dynamic Yes & Fail: " << specFail
+              << "\n";
+    }
 
     unsigned int statsTrackerTotal = 0;
     unsigned int statsTrackerFail = 0;
@@ -5390,14 +5396,12 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     outSpec << "Total speculation failures because of New BB: " << failNew
             << "\n";
     outSpec << "Total speculation failures because of New BB with no "
-               "interpolation: "
-            << failNewNoInter << "\n";
+               "interpolation: " << failNewNoInter << "\n";
 
     outSpec << "Total speculation failures because of Revisted: "
             << failRevisited << "\n";
     outSpec << "Total speculation failures because of Revisted with no "
-               "interpolation: "
-            << failRevisitedNoInter << "\n";
+               "interpolation: " << failRevisitedNoInter << "\n";
 
     outSpec << "Total speculation failures because of Bug Hit: "
             << (specFail - failNew - failRevisited) << "\n";
