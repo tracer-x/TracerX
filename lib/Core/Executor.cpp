@@ -2650,7 +2650,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     }
 
     // check new BB
-    if (SpecStrategyToUse == COVERAGE) {
+    if (SpecTypeToUse == COVERAGE) {
       llvm::BasicBlock *currentBB = state.txTreeNode->getBasicBlock();
       if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
         if (specFailNew.find(pp) != specFailNew.end()) {
