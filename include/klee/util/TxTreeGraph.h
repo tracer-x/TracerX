@@ -21,6 +21,7 @@
 #include "klee/Internal/Module/KModule.h"
 
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <map>
