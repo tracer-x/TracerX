@@ -2605,11 +2605,11 @@ TxTreeNode::TxTreeNode(
   }
 
   // Set the child WP Interpolants to false
-  if (INTERPOLATION_ENABLED && WPInterpolant) {
+  // if (INTERPOLATION_ENABLED && WPInterpolant) {
     wp = new TxWeakestPreCondition(this, dependency, _targetData);
     childWPInterpolant[0] = wp->True();
     childWPInterpolant[1] = wp->True();
-  }
+  //}
 }
 
 TxTreeNode::~TxTreeNode() {
