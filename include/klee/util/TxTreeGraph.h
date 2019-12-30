@@ -90,7 +90,7 @@ private:
     /// instruction is a return from a function named tracerx_mark.
     uint64_t markCount;
 
-    std::vector<llvm::BasicBlock*> executedBBs;
+    std::vector<std::pair<llvm::BasicBlock *, llvm::Function *> > executedBBFs;
 
     /// \brief The addition to the number of interesting instruction executed
     /// while processing a node: The interesting instruction is a return from a
@@ -133,8 +133,12 @@ private:
     }
 
     std::string render() const;
-    TxTreeGraph::Node *getSource() { return source; };
-    TxTreeGraph::Node *getDest() { return destination; };
+    TxTreeGraph::Node *getSource() {
+      return source;
+    };
+    TxTreeGraph::Node *getDest() {
+      return destination;
+    };
   };
 
   TxTreeGraph::Node *root;
@@ -142,7 +146,7 @@ private:
   std::map<TxSubsumptionTableEntry *, TxTreeGraph::Node *> tableEntryMap;
   std::vector<TxTreeGraph::NumberedEdge *> subsumptionEdges;
   std::map<TxPCConstraint *, TxTreeGraph::Node *> pathConditionMap;
-  std::set<llvm::Function*> executedFuncs;
+  std::set<llvm::Function *> executedFuncs;
 
   /// \brief The set of known leaves
   std::set<TxTreeGraph::Node *> leaves;

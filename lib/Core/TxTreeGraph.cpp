@@ -432,12 +432,12 @@ void TxTreeGraph::save(std::string dotFileName) {
 }
 
 void TxTreeGraph::copyTxTreeNodeData(TxTreeNode *txTreeNode) {
-  for (std::vector<llvm::BasicBlock *>::iterator
-           it = txTreeNode->executedBBs.begin(),
-           ie = txTreeNode->executedBBs.end();
+  for (std::vector<std::pair<llvm::BasicBlock *, llvm::Function *> >::iterator
+           it = txTreeNode->executedBBFs.begin(),
+           ie = txTreeNode->executedBBFs.end();
        it != ie; ++it) {
-    instance->txTreeNodeMap[txTreeNode]->executedBBs.push_back(*it);
-    instance->executedFuncs.insert((*it)->getParent());
+    instance->txTreeNodeMap[txTreeNode]->executedBBFs.push_back(*it);
+    instance->executedFuncs.insert(it->second);
   }
 }
 
@@ -447,21 +447,18 @@ void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
   }
 
   llvm::errs() << "Collecting BBs\n";
-  std::vector<llvm::BasicBlock *> allBBs;
+  std::vector<std::pair<llvm::BasicBlock *, llvm::Function *> > allBBFs;
   std::stack<Node *> wl;
   wl.push(instance->root);
   while (!wl.empty()) {
     Node *t = wl.top();
     wl.pop();
-//    llvm::errs() << t->nodeSequenceNumber << "(" << t->subsumed << "): ";
-    for (std::vector<llvm::BasicBlock *>::iterator it = t->executedBBs.begin(),
-                                                   ie = t->executedBBs.end();
+    for (std::vector<std::pair<llvm::BasicBlock *, llvm::Function *> >::iterator
+             it = t->executedBBFs.begin(),
+             ie = t->executedBBFs.end();
          it != ie; ++it) {
-//      llvm::errs() << (*it) << "-" << (*it)->getParent()->getName().str() << "-" << (*it)->getParent() << ";";
-    	allBBs.push_back(*it);
+      allBBFs.push_back(*it);
     }
-//    llvm::errs() << "\n";
-
     if (t->falseTarget != NULL) {
       wl.push(t->falseTarget);
     }
@@ -470,15 +467,6 @@ void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
     }
   }
   llvm::errs() << "End Collecting BBs\n\n";
-
-
-//  for (std::vector<TxTreeGraph::NumberedEdge *>::iterator
-//           it = instance->subsumptionEdges.begin(),
-//           ie = instance->subsumptionEdges.end();
-//       it != ie; ++it) {
-//    llvm::errs() << (*it)->getSource()->nodeSequenceNumber << "->"
-//                 << (*it)->getDest()->nodeSequenceNumber << "\n";
-//  }
 
   // executed functions
   llvm::errs() << "Print Executed functions\n";
@@ -493,10 +481,15 @@ void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
   // modify module
   llvm::errs() << "Empty Executed functions in module\n";
   llvm::Module *newModule = kmodule->module;
+  for (std::vector<std::pair<llvm::BasicBlock *, llvm::Function *> >::iterator
+             it = allBBFs.begin(),
+             ie = allBBFs.end();
+         it != ie; ++it) {
+      it->first->removeFromParent();
+    }
+
   for (llvm::Module::iterator f = newModule->begin(), fend = newModule->end();
        f != fend; ++f) {
-//    llvm::errs() << "Checking " << f->getName().str() << "-" << f << "-"
-//                 << &(*f) << "\n";
     if (instance->executedFuncs.find(f) != instance->executedFuncs.end()) {
       f->getBasicBlockList().clear();
     }
@@ -504,17 +497,13 @@ void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
   llvm::errs() << "End Empty Executed functions in module\n\n";
 
   llvm::errs() << "Add BBs to functions\n";
-    for (std::vector<llvm::BasicBlock *>::iterator
-             it =  allBBs.begin(),
-             ie = allBBs.end();
-         it != ie; ++it) {
-//    	llvm::errs() << "Comming here\n";
-    	llvm::Function::BasicBlockListType &bbl = (*it)->getParent()->getBasicBlockList();
-//    	llvm::errs() << "Comming here1: " << bbl << "\n";
-      llvm::errs() << "bbl.size() = " << bbl.size() << "\n";
-//      bbl.insert(bbl.end(), *it);
-    }
-    llvm::errs() << "End Adding BBs to functions\n\n";
+  for (std::vector<std::pair<llvm::BasicBlock *, llvm::Function *> >::iterator
+           it = allBBFs.begin(),
+           ie = allBBFs.end();
+       it != ie; ++it) {
+    it->second->getBasicBlockList().push_back(it->first);
+  }
+  llvm::errs() << "End Adding BBs to functions\n\n";
 
   std::string EC;
   llvm::raw_fd_ostream OS("module.bc", EC, llvm::sys::fs::F_None);
