@@ -656,6 +656,17 @@ uint64_t klee::computeMinDistToUncovered(const KInstruction *ki,
   }
 }
 
+std::map<llvm::BasicBlock *, std::vector<unsigned int> > StatsTracker::bbSpecCount;
+
+void StatsTracker::increaseEle(llvm::BasicBlock *bb, int indx, bool check) {
+  if (check) {
+    if (StatsTracker::bbSpecCount.find(bb) == StatsTracker::bbSpecCount.end()) {
+      StatsTracker::bbSpecCount[bb] = std::vector<unsigned int>(3, 0);
+    }
+  }
+  StatsTracker::bbSpecCount[bb][indx] = StatsTracker::bbSpecCount[bb][indx] + 1;
+}
+
 void StatsTracker::computeReachableUncovered() {
   KModule *km = executor.kmodule;
   Module *m = km->module;

@@ -17,18 +17,18 @@
 
 #include "TimingSolver.h"
 
+#include "TxDependency.h"
+#include "TxShadowArray.h"
+#include <fstream>
 #include <klee/CommandLine.h>
 #include <klee/Expr.h>
+#include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/Solver.h>
 #include <klee/SolverStats.h>
-#include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ExprPPrinter.h>
 #include <klee/util/TxExprUtil.h>
 #include <klee/util/TxPrintUtil.h>
-#include <fstream>
 #include <vector>
-#include "TxDependency.h"
-#include "TxShadowArray.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
@@ -1953,6 +1953,27 @@ bool TxSubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
   return false;
 }
 
+bool TxSubsumptionTable::hasInterpolation(ExecutionState &state) {
+
+  CallHistoryIndexedTable *subTable = 0;
+  TxTreeNode *txTreeNode = state.txTreeNode;
+
+  std::map<uintptr_t, CallHistoryIndexedTable *>::iterator it =
+      instance.find(state.txTreeNode->getProgramPoint());
+  if (it == instance.end()) {
+    return false;
+  }
+  subTable = it->second;
+
+  bool found;
+  subTable->find(txTreeNode->entryCallHistory, found);
+  if (!found) {
+    return false;
+  }
+
+  return true;
+}
+
 void TxSubsumptionTable::clear() {
   for (std::map<uintptr_t, CallHistoryIndexedTable *>::iterator
            it = instance.begin(),
@@ -2108,12 +2129,34 @@ void TxTree::setCurrentINode(ExecutionState &state) {
   TxTreeGraph::setCurrentNode(state, currentTxTreeNode->nodeSequenceNumber);
 }
 
+void TxTree::removeSpeculationFailedNodes(TxTreeNode *node) {
+  assert(!node->left && !node->right);
+  TxTreeNode *p = node->parent;
+  if (p) {
+    if (node == p->left) {
+      p->left = 0;
+    } else {
+      assert(node == p->right);
+      p->right = 0;
+    }
+  }
+  delete node;
+}
+
 void TxTree::remove(TxTreeNode *node, bool dumping) {
 #ifdef ENABLE_Z3
   TimerStatIncrementer t(removeTime);
   assert(!node->left && !node->right);
   do {
     TxTreeNode *p = node->parent;
+
+    // Speculation Success
+    if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
+        node->isSpeculationNode() && !node->isSpeculationFailedNode() && p &&
+        !p->isSpeculationNode()) {
+      llvm::BasicBlock *pbb = p->getBasicBlock();
+      StatsTracker::increaseEle(pbb, 2, false);
+    }
 
     // As the node is about to be deleted, it must have been completely
     // traversed, hence the correct time to table the interpolant.
@@ -2223,6 +2266,16 @@ void TxTree::executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
   symbolicExecutionError = false;
 }
 
+bool TxTree::isSpeculationNode() {
+  return currentTxTreeNode->isSpeculationNode();
+}
+
+void TxTree::storeSpeculationUnsatCore(TimingSolver *solver,
+                                       std::vector<ref<Expr> > unsatCore,
+                                       llvm::BranchInst *binst) {
+  currentTxTreeNode->storeSpeculationUnsatCore(solver, unsatCore, binst);
+}
+
 void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
                        std::string edges) const {
   if (n->left != 0) {
@@ -2327,6 +2380,14 @@ TxTreeNode::TxTreeNode(
   // Inherit the abstract dependency or NULL
   dependency = new TxDependency(_parent ? _parent->dependency : 0, _targetData,
                                 _globalAddresses);
+
+  // Set speculation flag to false
+  if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC) {
+    speculationFlag = 0;
+    speculationFailed = 0;
+    visitedProgramPoints = NULL;
+    specTime = NULL;
+  }
 }
 
 TxTreeNode::~TxTreeNode() {
@@ -2342,6 +2403,52 @@ ref<Expr> TxTreeNode::getInterpolant(
   return expr;
 }
 
+bool TxTreeNode::isSpeculationNode() { return speculationFlag; }
+
+void TxTreeNode::setSpeculationFlag() { speculationFlag = 1; }
+
+bool TxTreeNode::isSpeculationFailedNode() { return speculationFailed; }
+
+void TxTreeNode::setSpeculationFailed() { speculationFailed = 1; }
+
+void TxTreeNode::storeSpeculationUnsatCore(TimingSolver *solver,
+                                           std::vector<ref<Expr> > unsatCore,
+                                           llvm::BranchInst *binst) {
+  speculationSolver = solver;
+  speculationUnsatCore = unsatCore;
+  speculationBInst = binst;
+}
+
+void TxTreeNode::mark() {
+  int debugSubsumptionLevel = this->dependency->debugSubsumptionLevel;
+
+  llvm::BranchInst *binst = speculationBInst;
+  if (binst) {
+    ref<Expr> unknownExpression;
+    std::string reason = "";
+    if (debugSubsumptionLevel >= 1) {
+      llvm::raw_string_ostream stream(reason);
+      stream << "branch infeasibility [";
+      if (binst->getParent()->getParent()) {
+        stream << binst->getParent()->getParent()->getName().str() << ": ";
+      }
+      if (llvm::MDNode *n = binst->getMetadata("dbg")) {
+        llvm::DILocation loc(n);
+        stream << "Line " << loc.getLineNumber();
+      } else {
+        binst->print(stream);
+      }
+      stream << "]";
+      stream.flush();
+    }
+    this->dependency->markAllValues(binst->getCondition(), unknownExpression,
+                                    reason);
+  }
+
+  // We create path condition marking structure and mark core constraints
+  this->unsatCoreInterpolation(this->speculationUnsatCore);
+}
+
 void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
   TimerStatIncrementer t(addConstraintTime);
   ref<TxPCConstraint> pcConstraint =
@@ -2354,6 +2461,15 @@ void TxTreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
   assert(left == 0 && right == 0);
   leftData->txTreeNode = createLeftChild();
   rightData->txTreeNode = createRightChild();
+  if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
+      this->speculationFlag) {
+    leftData->txTreeNode->setSpeculationFlag();
+    leftData->txTreeNode->visitedProgramPoints = this->visitedProgramPoints;
+    leftData->txTreeNode->specTime = this->specTime;
+    rightData->txTreeNode->setSpeculationFlag();
+    rightData->txTreeNode->visitedProgramPoints = this->visitedProgramPoints;
+    rightData->txTreeNode->specTime = this->specTime;
+  }
 }
 
 void TxTreeNode::execute(llvm::Instruction *instr,

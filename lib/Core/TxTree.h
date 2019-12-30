@@ -26,8 +26,10 @@
 #include "klee/util/ExprVisitor.h"
 #include "klee/util/TxTreeGraph.h"
 
-#include "llvm/Support/raw_ostream.h"
 #include "TxDependency.h"
+#include "TxSpeculation.h"
+#include "StatsTracker.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace klee {
 
@@ -107,6 +109,8 @@ public:
 
   static bool check(TimingSolver *solver, ExecutionState &state, double timeout,
                     int debugSubsumptionLevel);
+
+  static bool hasInterpolation(ExecutionState &state);
 
   static void clear();
 
@@ -374,9 +378,21 @@ class TxTreeNode {
   /// \brief Value dependencies
   TxDependency *dependency;
 
+  // \brief The pointer to solver is temporarily stored here and in case
+  // speculation is failed it's used to do marking related to the infeasible
+  // path
+  TimingSolver *speculationSolver;
+
+  // \brief Used to identify if the node is in the speculation mode
+  bool speculationFlag;
+
+  // \brief Set if the speculation has failed and the node should be removed
+  bool speculationFailed;
+
   TxTreeNode *parent, *left, *right;
 
   uintptr_t programPoint;
+  llvm::BasicBlock *basicBlock;
 
   // Used to ensure at subsumption the value of the phiNodes in the subsumed
   // tree remain the same
@@ -409,6 +425,7 @@ class TxTreeNode {
     if (!programPoint) {
       programPoint = reinterpret_cast<uintptr_t>(instr);
       prevProgramPoint = reinterpret_cast<uintptr_t>(prevInstr);
+      basicBlock = instr->getParent();
     }
 
     // Disabling the subsumption check within KLEE's own API
@@ -454,6 +471,14 @@ class TxTreeNode {
 public:
   bool isSubsumed;
 
+  // \brief The unsat core from a infeasible path is temporarily stored here
+  // and in case speculation is failed it's used to do marking related to
+  // the infeasible path
+  std::vector<ref<Expr> > speculationUnsatCore;
+  llvm::BranchInst *speculationBInst;
+  llvm::Instruction *secondCheckInst;
+  void mark();
+
   /// \brief The entry call history
   std::vector<llvm::Instruction *> entryCallHistory;
 
@@ -461,6 +486,7 @@ public:
   std::vector<llvm::Instruction *> callHistory;
 
   uintptr_t getProgramPoint() { return programPoint; }
+  llvm::BasicBlock *getBasicBlock() { return basicBlock; }
 
   uintptr_t getPrevProgramPoint() { return prevProgramPoint; }
 
@@ -488,6 +514,37 @@ public:
   ref<Expr> getInterpolant(std::set<const Array *> &replacements,
                            std::map<ref<Expr>, ref<Expr> > &substitution) const;
 
+  // \brief This object contains the visited program points in the speculation
+  // node
+  std::set<uintptr_t> *visitedProgramPoints;
+  double *specTime;
+
+  /// \brief Check if the current node is a speculation node
+  bool isSpeculationNode();
+
+  /// \brief Set the speculation flag
+  void setSpeculationFlag();
+
+  /// \brief Check if the current respective state of the node should be
+  /// terminated since speculation has failed
+  bool isSpeculationFailedNode();
+
+  /// \brief Set the respective state of the node to be terminated since
+  /// speculation has failed
+  void setSpeculationFailed();
+
+  /// \brief Returning the left node
+  TxTreeNode *getLeft() { return left; }
+
+  /// \brief Returning the right node
+  TxTreeNode *getRight() { return right; }
+
+  /// \brief Store the solver and unsatcore temporarily, so they can be used for
+  /// markings if speculation fails
+  void storeSpeculationUnsatCore(TimingSolver *solver,
+                                 std::vector<ref<Expr> > unsatCore,
+                                 llvm::BranchInst *binst);
+
   /// \brief Extend the path condition with another constraint
   ///
   /// \param constraint The constraint to extend the current path condition with
@@ -497,8 +554,7 @@ public:
   /// \brief Creates fresh interpolation data holder for the two given KLEE
   /// execution states.
   /// This member function is to be invoked after KLEE splits its own state due
-  /// to state
-  /// forking.
+  /// to state forking.
   ///
   /// \param leftData The first KLEE execution state
   /// \param rightData The second KLEE execution state
@@ -600,24 +656,20 @@ public:
 /// TxTree has several public member functions, most importantly, the various
 /// versions of the TxTree#execute function, including TxTree#executePHI,
 /// TxTree#executeMemoryOperation, TxTree#executeOnNode. These are called mainly
-/// from
-/// KLEE's Executor class, which is the core symbolic executor of KLEE.
+/// from KLEE's Executor class, which is the core symbolic executor of KLEE.
 /// The main functionality of the TxTree#execute versions
 /// themselves is to simply delegate the call to TxDependency#execute and
-/// related
-/// functions, which
-/// implements the construction of memory dependency used in computing the
-/// regions of memory
-/// that need to be kept as part of the interpolant stored in the subsumption
-/// table.
+/// related functions,
+/// which implements the construction of memory dependency used in computing the
+/// regions of memory that need to be kept as part of the interpolant stored in
+/// the subsumption table.
 ///
 /// The member function TxTree#subsumptionCheck is the topmost interface to the
 /// subsumption checking mechanism. The function consults the subsumption table
 /// (implemented by the TxSubsumptionTable class)
 /// to compare the current state to a state stored in the subsumption table.
-/// TxSubsumptionTable#insert is called from the
-/// TxTree#remove member function, which is invoked when the symbolic execution
-/// starting from a certain
+/// TxSubsumptionTable#insert is called from the TxTree#remove member function,
+/// which is invoked when the symbolic execution starting from a certain
 /// state has completed and the state is to be removed. The completion of
 /// the symbolic execution here is assumed to mean that the interpolants have
 /// been completely recorded from all the execution paths that start from the
@@ -652,8 +704,8 @@ public:
 /// <hr>
 ///
 /// For comparison, following is the pseudocode of Tracer-X KLEE. Please note
-/// that to
-/// support interpolation, each leaf is now augmented with a path condition.
+/// that to support interpolation, each leaf is now augmented with a path
+/// condition.
 /// We highlight the added procedures using CAPITAL LETTERS, and we note the
 /// functions involved.
 ///
@@ -666,11 +718,11 @@ public:
 ///       i. REGISTER IT FOR DELETION
 ///       ii. MARK CONSTRAINTS NEEDED FOR SUBSUMPTION
 ///       iii. GOTO d
-///    c. Symbolically execute the instruction (TxTree::execute,
-/// TxTree::executePHI,
-///       TxTree::executeMemoryOperation, TxTree::executeOnNode):
+///    c. Symbolically execute the instruction
+///       (TxTree::execute, TxTree::executePHI, TxTree::executeMemoryOperation,
+///       TxTree::executeOnNode):
 ///       i. If it is a branch instruction, test if one of branches is
-/// unsatisfiable
+///          unsatisfiable
 ///          * If yes, execute the instruction without creating tree node
 ///            MARK CONSTRAINTS NEEDED FOR UNSATISFIABILITY
 ///            (TxTree::markPathCondition)
@@ -781,6 +833,8 @@ public:
   /// table entry.
   void remove(TxTreeNode *node, bool dumping);
 
+  void removeSpeculationFailedNodes(TxTreeNode *node);
+
   /// \brief Invokes the subsumption check
   bool subsumptionCheck(TimingSolver *solver, ExecutionState &state,
                         double timeout);
@@ -789,6 +843,9 @@ public:
   /// the given KLEE execution state.
   void markPathCondition(ExecutionState &state,
                          std::vector<ref<Expr> > &unsatCore);
+
+  void markPathConditionWithBrInst(llvm::BranchInst *binst,
+                                   std::vector<ref<Expr> > &unsatCore);
 
   /// \brief Creates fresh interpolation data holder for the two given KLEE
   /// execution states.
@@ -907,6 +964,19 @@ public:
   /// dependency information, given a particular interpolation tree node.
   static void executeOnNode(TxTreeNode *node, llvm::Instruction *instr,
                             std::vector<ref<Expr> > &args);
+
+  /// \brief Check if the current node is a speculation node
+  bool isSpeculationNode();
+  void incSpecTime(double ts) {
+    //	llvm::errs() << "currentTxTreeNode->specTime=" <<
+    // currentTxTreeNode->specTime << "\n";
+    if (currentTxTreeNode->specTime != NULL)
+      *currentTxTreeNode->specTime += ts;
+  }
+
+  void storeSpeculationUnsatCore(TimingSolver *solver,
+                                 std::vector<ref<Expr> > unsatCore,
+                                 llvm::BranchInst *binst);
 
   /// \brief Print the content of the tree node object into a stream.
   ///

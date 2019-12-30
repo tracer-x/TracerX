@@ -174,6 +174,33 @@ llvm::cl::opt<bool> TracerXPointerError(
     llvm::cl::desc("Enables detection of more memory errors by interpolation "
                    "shadow memory (may be false positives)."),
     llvm::cl::init(false));
+
+llvm::cl::opt<SpecType>
+    SpecTypeToUse("spec-type",
+                  llvm::cl::desc("Speculation type: coverage or safety"),
+                  llvm::cl::values(clEnumValN(SAFETY, "safety", "safety"),
+                                   clEnumValN(COVERAGE, "coverage", "coverage"),
+                                   clEnumValEnd),
+                  llvm::cl::init(NO_SPEC));
+
+llvm::cl::opt<SpecStrategy> SpecStrategyToUse(
+    "spec-strategy",
+    llvm::cl::desc(
+        "Strategy used by speculation, timid, aggressive or custom."),
+    llvm::cl::values(clEnumValN(TIMID, "timid", "timid"),
+                     clEnumValN(AGGRESSIVE, "aggressive", "aggressive"),
+                     clEnumValN(CUSTOM, "custom", "custom"), clEnumValEnd),
+    llvm::cl::init(CUSTOM));
+
+llvm::cl::opt<std::string> DependencyFolder(
+    "spec-dependency",
+    llvm::cl::desc(
+        "Path to a folder containing basic blocks' dependency."
+        "One file for each BB with name format: \"BB_Dep_{order}.txt\""
+        "An initial file containing visited BBs with name \"InitialVisitedBB.txt\""
+        "also must be put in this folder"),
+    llvm::cl::init("."));
+
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT

@@ -66,6 +66,11 @@ enum CoreSolverType {
   Z3_SOLVER,
   NO_SOLVER
 };
+
+enum SpecType { NO_SPEC, SAFETY, COVERAGE };
+
+enum SpecStrategy { TIMID, AGGRESSIVE, CUSTOM };
+
 extern llvm::cl::opt<CoreSolverType> CoreSolverToUse;
 
 extern llvm::cl::opt<CoreSolverType> DebugCrossCheckCoreSolverWith;
@@ -97,6 +102,12 @@ extern llvm::cl::opt<bool> SpecialFunctionBoundInterpolation;
 extern llvm::cl::opt<bool> TracerXPointerError;
 
 extern llvm::cl::opt<bool> EmitAllErrorsInSamePath;
+
+extern llvm::cl::opt<SpecType> SpecTypeToUse;
+
+extern llvm::cl::opt<SpecStrategy> SpecStrategyToUse;
+
+extern llvm::cl::opt<std::string> DependencyFolder;
 
 #endif
 
