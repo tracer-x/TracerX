@@ -480,11 +480,11 @@ void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
   llvm::errs() << "\n\n";
 
   // modify module
-  llvm::errs() << "Empty Executed functions in module\n";
-  llvm::Module *newModule = kmodule->module;
+  std::map<llvm::BasicBlock *, llvm::Function *> bb2f;
   for (std::vector<llvm::BasicBlock *>::iterator it = allBBs.begin(),
                                                  ie = allBBs.end();
        it != ie; ++it) {
+    bb2f[*it] = (*it)->getParent();
     (*it)->removeFromParent();
   }
   for (std::set<llvm::Function *>::iterator
@@ -493,19 +493,17 @@ void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
        it != ie; ++it) {
     (*it)->getBasicBlockList().clear();
   }
-  llvm::errs() << "End Empty Executed functions in module\n\n";
 
-  //  llvm::errs() << "Add BBs to functions\n";
-  //  for (std::vector<llvm::BasicBlock * >::iterator
-  //           it = allBBFs.begin(),
-  //           ie = allBBFs.end();
-  //       it != ie; ++it) {
-  //    it->second->getBasicBlockList().push_back(it->first);
-  //  }
-  llvm::errs() << "End Adding BBs to functions\n\n";
+  // add BBs back to functions
+  for (std::map<llvm::BasicBlock *, llvm::Function *>::iterator
+           it = bb2f.begin(),
+           ie = bb2f.end();
+       it != ie; ++it) {
+    it->second->getBasicBlockList().push_back(it->first);
+  }
 
   std::string EC;
   llvm::raw_fd_ostream OS("module.bc", EC, llvm::sys::fs::F_None);
-  WriteBitcodeToFile(newModule, OS);
+  WriteBitcodeToFile(kmodule->module, OS);
   OS.flush();
 }
