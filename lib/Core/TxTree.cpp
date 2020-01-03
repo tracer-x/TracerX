@@ -229,13 +229,15 @@ TxSubsumptionTableEntry::simplifyArithmeticBody(ref<Expr> existsExpr,
   // which may contain both normal and shadow variables.
   ref<Expr> body = expr->body;
 
-  // We only simplify a conjunction of interpolant and equalities
-  if (!llvm::isa<AndExpr>(body))
-    return existsExpr;
-
   // If the post-simplified body was a constant, simply return the body;
   if (llvm::isa<ConstantExpr>(body))
     return body;
+
+  // We only simplify a conjunction of interpolant and equalities
+  if (!llvm::isa<AndExpr>(body)) {
+    hasExistentialsOnly = !hasVariableNotInSet(expr->variables, body);
+    return existsExpr;
+  }
 
   // The equality constraint is only a single disjunctive clause
   // of a CNF formula. In this case we simplify nothing.
@@ -1853,12 +1855,10 @@ void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
 
 void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
                                       const std::string &prefix) const {
-  if (WPInterpolant) {
     stream << prefix << "\nwp interpolant = [";
     if (!wpInterpolant.isNull())
       wpInterpolant->print(stream);
     stream << "]\n";
-  }
 }
 
 void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
@@ -2327,32 +2327,8 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
           new TxSubsumptionTableEntry(node, node->entryCallHistory);
 
       if (WPInterpolant) {
-        //        Solver::Validity result;
-        //        std::vector<ref<Expr> > unsatCore;
         ref<Expr> WPExpr = entry->getWPInterpolant();
-
-        //        llvm::errs() << "TxTree::remove Node " <<
-        // node->getNodeSequenceNumber()
-        //                     << "\n";
-        //        if (!WPExpr.isNull()) {
-        //          WPExpr->dump();
-        //        } else {
-        //          llvm::errs() << "WPExpr is null\n";
-        //        }
-
         if (!WPExpr.isNull()) {
-          //          bool success = solver->evaluate(*state, WPExpr, result,
-          //          unsatCore);
-          //          if (success != true)
-          //            klee_error("TxTree::remove: WP Expr implication test
-          //            failed");
-          //          if (WPExpr != node->wp->False() && result ==
-          //          Solver::False) {
-          //            state->txTreeNode->dependency->dump();
-          //            WPExpr->dump();
-          //            klee_error("TxTree::remove: WP Expr implication test is
-          //            false");
-          //          }
           entry = node->wp->updateSubsumptionTableEntry(entry);
         }
       }
@@ -2366,7 +2342,9 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         std::string msg;
         llvm::raw_string_ostream out(msg);
         entry->print(out);
-        entry->printWP(out);
+        if (WPInterpolant) {
+          entry->printWP(out);
+        }
         out.flush();
         klee_message("%s", msg.c_str());
       }
@@ -2605,17 +2583,17 @@ TxTreeNode::TxTreeNode(
   }
 
   // Set the child WP Interpolants to false
-  // if (INTERPOLATION_ENABLED && WPInterpolant) {
+  if (WPInterpolant) {
     wp = new TxWeakestPreCondition(this, dependency, _targetData);
     childWPInterpolant[0] = wp->True();
     childWPInterpolant[1] = wp->True();
-  //}
+  }
 }
 
 TxTreeNode::~TxTreeNode() {
   if (dependency)
     delete dependency;
-  if (wp) {
+  if (WPInterpolant && wp) {
     delete wp;
   }
 }
@@ -2677,39 +2655,25 @@ void TxTreeNode::mark() {
 ref<Expr> TxTreeNode::generateWPInterpolant() {
   TimerStatIncrementer t(getWPInterpolantTime);
 
-  //  for (std::vector<std::pair<KInstruction *, int> >::iterator
-  //           it = reverseInstructionList.begin(),
-  //           ie = reverseInstructionList.end();
-  //       it != ie; ++it) {
-  //    it->first->inst->dump();
-  //    llvm::errs() << (it->second) << "\n";
-  //  }
-
   ref<Expr> expr;
   if (assertionFail && emitAllErrors) {
-    //    llvm::errs() << "1--\n";
     expr = wp->False();
   } else if (assertionFail) {
-    //    llvm::errs() << "2--\n";
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->True();
   } else if (childWPInterpolant[0].isNull() || childWPInterpolant[1].isNull()) {
-    //    llvm::errs() << "3--\n";
     expr = childWPInterpolant[0].isNull() ? childWPInterpolant[0]
                                           : childWPInterpolant[1];
   } else if (childWPInterpolant[0] == wp->False() ||
              childWPInterpolant[1] == wp->False()) {
-    //    llvm::errs() << "4--\n";
     expr = wp->False();
   } else if (childWPInterpolant[0] == wp->True() &&
              childWPInterpolant[1] == wp->True()) {
-    //    llvm::errs() << "5--\n";
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
     expr = wp->PushUp(reverseInstructionList);
   } else {
-    //    llvm::errs() << "6--\n";
     // Get branch condition
     llvm::Instruction *i = reverseInstructionList.back().first->inst;
     if (i->getOpcode() == llvm::Instruction::Br) {
@@ -2730,21 +2694,8 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
     } else {
       expr = branchCondition; // expr is null
     }
-    //    llvm::outs() << "****** Simplify 6 -- *******\n";
-    //    expr->dump();
-    //    llvm::outs() << "------\n";
     expr = Z3Simplification::simplify(expr);
-    //    expr->dump();
-    //    llvm::outs() << "******* End Flag = 0 *******\n";
   }
-
-  //    llvm::errs() << "TxTreeNode::generateWPInterpolant Node "
-  //                 << getNodeSequenceNumber() << "\n";
-  //    if (expr.isNull()) {
-  //      llvm::errs() << "expr is null\n";
-  //    } else {
-  //      expr->dump();
-  //    }
 
   // set to parent node
   if (parent) {

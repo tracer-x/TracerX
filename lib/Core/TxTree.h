@@ -367,8 +367,10 @@ public:
   void dump() const {
     this->print(llvm::errs());
     llvm::errs() << "\n";
-    this->printWP(llvm::errs());
-    llvm::errs() << "\n";
+    if (WPInterpolant) {
+      this->printWP(llvm::errs());
+      llvm::errs() << "\n";
+    }
   }
 
   void print(llvm::raw_ostream &stream) const;
