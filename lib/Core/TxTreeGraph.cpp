@@ -436,8 +436,12 @@ void TxTreeGraph::copyTxTreeNodeData(TxTreeNode *txTreeNode) {
            it = txTreeNode->executedBBs.begin(),
            ie = txTreeNode->executedBBs.end();
        it != ie; ++it) {
-    instance->txTreeNodeMap[txTreeNode]->executedBBs.push_back(*it);
     instance->executedFuncs.insert((*it)->getParent());
+
+    // make a copy of BB from TxTreeNode in Graph Node
+    llvm::BasicBlock *copiedBB = NULL;
+    // TODO: create a new BB, modify branch instruction to next BB
+    instance->txTreeNodeMap[txTreeNode]->executedBBs.push_back(copiedBB);
   }
 }
 
