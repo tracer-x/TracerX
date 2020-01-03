@@ -432,12 +432,12 @@ void TxTreeGraph::save(std::string dotFileName) {
 }
 
 void TxTreeGraph::copyTxTreeNodeData(TxTreeNode *txTreeNode) {
-  for (std::vector<std::pair<llvm::BasicBlock *, llvm::Function *> >::iterator
-           it = txTreeNode->executedBBFs.begin(),
-           ie = txTreeNode->executedBBFs.end();
+  for (std::vector<llvm::BasicBlock *>::iterator
+           it = txTreeNode->executedBBs.begin(),
+           ie = txTreeNode->executedBBs.end();
        it != ie; ++it) {
-    instance->txTreeNodeMap[txTreeNode]->executedBBFs.push_back(*it);
-    instance->executedFuncs.insert(it->second);
+    instance->txTreeNodeMap[txTreeNode]->executedBBs.push_back(*it);
+    instance->executedFuncs.insert((*it)->getParent());
   }
 }
 
@@ -446,19 +446,21 @@ void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
     return;
   }
 
-  llvm::errs() << "Collecting BBs\n";
-  std::vector<std::pair<llvm::BasicBlock *, llvm::Function *> > allBBFs;
+  // Collecting BBs
+  std::vector<llvm::BasicBlock *> allBBs;
   std::stack<Node *> wl;
   wl.push(instance->root);
   while (!wl.empty()) {
     Node *t = wl.top();
     wl.pop();
-    for (std::vector<std::pair<llvm::BasicBlock *, llvm::Function *> >::iterator
-             it = t->executedBBFs.begin(),
-             ie = t->executedBBFs.end();
+    for (std::vector<llvm::BasicBlock *>::iterator it = t->executedBBs.begin(),
+                                                   ie = t->executedBBs.end();
          it != ie; ++it) {
-      allBBFs.push_back(*it);
+      allBBs.push_back(*it);
+      //      llvm::errs() << it->second->getName().str() << "\n";
+      //      it->first->dump();
     }
+    //    llvm::errs() << "---------\n";
     if (t->falseTarget != NULL) {
       wl.push(t->falseTarget);
     }
@@ -466,43 +468,40 @@ void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
       wl.push(t->trueTarget);
     }
   }
-  llvm::errs() << "End Collecting BBs\n\n";
 
   // executed functions
-  llvm::errs() << "Print Executed functions\n";
+  llvm::errs() << "Executed functions: ";
   for (std::set<llvm::Function *>::iterator
            it = instance->executedFuncs.begin(),
            ie = instance->executedFuncs.end();
        it != ie; ++it) {
-    llvm::errs() << (*it)->getName().str() << "\n";
+    llvm::errs() << (*it)->getName().str() << ";";
   }
-  llvm::errs() << "End Printing Executed functions\n\n";
+  llvm::errs() << "\n\n";
 
   // modify module
   llvm::errs() << "Empty Executed functions in module\n";
   llvm::Module *newModule = kmodule->module;
-  for (std::vector<std::pair<llvm::BasicBlock *, llvm::Function *> >::iterator
-             it = allBBFs.begin(),
-             ie = allBBFs.end();
-         it != ie; ++it) {
-      it->first->removeFromParent();
-    }
-
-  for (llvm::Module::iterator f = newModule->begin(), fend = newModule->end();
-       f != fend; ++f) {
-    if (instance->executedFuncs.find(f) != instance->executedFuncs.end()) {
-      f->getBasicBlockList().clear();
-    }
+  for (std::vector<llvm::BasicBlock *>::iterator it = allBBs.begin(),
+                                                 ie = allBBs.end();
+       it != ie; ++it) {
+    (*it)->removeFromParent();
+  }
+  for (std::set<llvm::Function *>::iterator
+           it = instance->executedFuncs.begin(),
+           ie = instance->executedFuncs.end();
+       it != ie; ++it) {
+    (*it)->getBasicBlockList().clear();
   }
   llvm::errs() << "End Empty Executed functions in module\n\n";
 
-  llvm::errs() << "Add BBs to functions\n";
-  for (std::vector<std::pair<llvm::BasicBlock *, llvm::Function *> >::iterator
-           it = allBBFs.begin(),
-           ie = allBBFs.end();
-       it != ie; ++it) {
-    it->second->getBasicBlockList().push_back(it->first);
-  }
+  //  llvm::errs() << "Add BBs to functions\n";
+  //  for (std::vector<llvm::BasicBlock * >::iterator
+  //           it = allBBFs.begin(),
+  //           ie = allBBFs.end();
+  //       it != ie; ++it) {
+  //    it->second->getBasicBlockList().push_back(it->first);
+  //  }
   llvm::errs() << "End Adding BBs to functions\n\n";
 
   std::string EC;

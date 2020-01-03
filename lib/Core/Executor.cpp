@@ -2286,8 +2286,7 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
     processBBCoverage(BBCoverage, &(f->front()), isInSpecMode);
   }
   if (INTERPOLATION_ENABLED && !f->empty()) {
-    txTree->getCurrentTxTreeNode()->executedBBFs.push_back(
-        std::make_pair(&(f->front()), f));
+    txTree->getCurrentTxTreeNode()->executedBBs.push_back(&(f->front()));
   }
 
   Instruction *i = ki->inst;
@@ -2486,8 +2485,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   if (INTERPOLATION_ENABLED) {
     // blockCount increased to count all visited Basic Blocks
     TxTree::blockCount++;
-    txTree->getCurrentTxTreeNode()->executedBBFs.push_back(
-        std::make_pair(dst, dst->getParent()));
+    txTree->getCurrentTxTreeNode()->executedBBs.push_back(dst);
   }
 
   // process BB Coverage
@@ -4217,8 +4215,8 @@ void Executor::run(ExecutionState &initialState) {
     processBBCoverage(BBCoverage, ki->inst->getParent(), false);
   }
   if (INTERPOLATION_ENABLED) {
-    txTree->getCurrentTxTreeNode()->executedBBFs.push_back(std::make_pair(
-        ki->inst->getParent(), ki->inst->getParent()->getParent()));
+    txTree->getCurrentTxTreeNode()->executedBBs.push_back(
+        ki->inst->getParent());
   }
 
   bindModuleConstants();

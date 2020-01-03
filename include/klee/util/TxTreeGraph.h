@@ -90,7 +90,7 @@ private:
     /// instruction is a return from a function named tracerx_mark.
     uint64_t markCount;
 
-    std::vector<std::pair<llvm::BasicBlock *, llvm::Function *> > executedBBFs;
+    std::vector<llvm::BasicBlock *> executedBBs;
 
     /// \brief The addition to the number of interesting instruction executed
     /// while processing a node: The interesting instruction is a return from a

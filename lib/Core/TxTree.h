@@ -459,7 +459,7 @@ class TxTreeNode {
 public:
   bool isSubsumed;
 
-  std::vector<std::pair<llvm::BasicBlock *, llvm::Function *> > executedBBFs;
+  std::vector<llvm::BasicBlock *> executedBBs;
 
   // \brief The unsat core from a infeasible path is temporarily stored here
   // and in case speculation is failed it's used to do marking related to
