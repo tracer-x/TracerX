@@ -2516,6 +2516,7 @@ void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
                             << allBlockCount << "," << percent << "]\n";
       livePercentCovFileOut.close();
     }
+
     // print live BB
     if (BBCoverage >= 3 && isNew) {
       std::string liveBBFile =
@@ -4218,7 +4219,6 @@ void Executor::run(ExecutionState &initialState) {
           fBBOrder[firstBB->getParent()].end()) {
     processBBCoverage(BBCoverage, ki->inst->getParent(), false);
   }
-
   bindModuleConstants();
 
   // Delay init till now so that ticks don't accrue during

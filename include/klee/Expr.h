@@ -448,8 +448,6 @@ public:
 
   std::string getName() const { return name; }
 
-  llvm::Value *getAddress() const { return address; }
-
   int compareContents(const Expr &b) const;
 
   virtual ref<Expr> rebuild(ref<Expr> kids[]) const {
