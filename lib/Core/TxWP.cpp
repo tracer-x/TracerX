@@ -162,11 +162,13 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
     }
   }
 
-  // removing __shadow__ from var names
+  // add normal names of __shadow__ variables
   std::set<std::string> pimiuVars2;
   for (std::set<std::string>::iterator it1 = pimiuVars.begin(),
                                        ie1 = pimiuVars.end();
        it1 != ie1; ++it1) {
+    // keep both normal & __shadow__
+    pimiuVars2.insert((*it1));
     std::string toErase = "__shadow__";
     size_t pos = (*it1).find(toErase);
     if (pos == std::string::npos) {
