@@ -65,13 +65,7 @@ public:
   combineSharedSingleVarExprs(std::vector<ref<Expr> > exprs);
   static Bound getBound(ref<Expr> expr);
   static bool isaVar(ref<Expr> e);
-  //  static bool isFalse(ref<Expr> e);
 
-  //  static ref<Expr> removeShadowExprs(ref<Expr> e,
-  //                                     std::set<const Array *> shadowArrays);
-
-  //  static void extractArrays(ref<Expr> e, std::set<const Array *>
-  //  &readArrays);
 };
 }
 #endif /* LIB_CORE_TXEXPRHELPER_H_ */
