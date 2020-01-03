@@ -15,15 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "TxDependency.h"
-//#include "TxWP.h"
-//#include <klee/util/ArrayCache.h>
 
 #include "Context.h"
-#include "TxShadowArray.h"
 #include "klee/CommandLine.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "klee/util/GetElementPtrTypeIterator.h"
 #include "klee/util/TxPrintUtil.h"
+#include "TxShadowArray.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
@@ -87,7 +85,7 @@ ref<TxStateValue> TxDependency::getLatestValueNoConstantCheck(
   assert(value && "value cannot be null");
 
   std::map<llvm::Value *, std::vector<ref<TxStateValue> > >::const_iterator
-      valuesMapIter = valuesMap.find(value);
+  valuesMapIter = valuesMap.find(value);
 
   if (valuesMapIter != valuesMap.end()) {
     if (!valueExpr.isNull()) {
@@ -447,8 +445,8 @@ void TxDependency::execute(llvm::Instruction *instr,
               returnValue);
         }
       } else if (std::mismatch(getValuePrefix.begin(), getValuePrefix.end(),
-                               calleeName.begin())
-                         .first == getValuePrefix.end() &&
+                               calleeName.begin()).first ==
+                     getValuePrefix.end() &&
                  args.size() == 2) {
         addDependencyViaExternalFunction(
             callHistory,
@@ -549,8 +547,8 @@ void TxDependency::execute(llvm::Instruction *instr,
       if (!val.isNull()) {
         addDependency(val, getNewTxStateValue(instr, callHistory, argExpr));
       } else if (!llvm::isa<llvm::Constant>(instr->getOperand(0)))
-      // Constants would kill dependencies, the remaining is for
-      // cases that may actually require dependencies.
+          // Constants would kill dependencies, the remaining is for
+          // cases that may actually require dependencies.
       {
         if (instr->getOperand(0)->getType()->isPointerTy()) {
           uint64_t size = targetData->getTypeStoreSize(
@@ -789,8 +787,8 @@ void TxDependency::execute(llvm::Instruction *instr,
               val, getNewTxStateValue(instr, callHistory, result));
         }
       } else if (!llvm::isa<llvm::Constant>(instr->getOperand(0)))
-      // Constants would kill dependencies, the remaining is for
-      // cases that may actually require dependencies.
+          // Constants would kill dependencies, the remaining is for
+          // cases that may actually require dependencies.
       {
         if (instr->getOperand(0)->getType()->isPointerTy()) {
           uint64_t size = targetData->getTypeStoreSize(
@@ -952,10 +950,10 @@ void TxDependency::executeMakeSymbolic(
                      storedValue);
 }
 
-void TxDependency::executePHI(
-    llvm::Instruction *instr, unsigned int incomingBlock,
-    const std::vector<llvm::Instruction *> &callHistory, ref<Expr> valueExpr,
-    bool symbolicExecutionError) {
+void
+TxDependency::executePHI(llvm::Instruction *instr, unsigned int incomingBlock,
+                         const std::vector<llvm::Instruction *> &callHistory,
+                         ref<Expr> valueExpr, bool symbolicExecutionError) {
   llvm::PHINode *node = llvm::dyn_cast<llvm::PHINode>(instr);
   llvm::Value *llvmArgValue = node->getIncomingValue(incomingBlock);
   ref<TxStateValue> val = getLatestValue(llvmArgValue, callHistory, valueExpr);
@@ -1027,9 +1025,10 @@ bool TxDependency::executeMemoryOperation(
   return ret;
 }
 
-void TxDependency::bindCallArguments(
-    llvm::Instruction *i, std::vector<llvm::Instruction *> &callHistory,
-    std::vector<ref<Expr> > &arguments) {
+void
+TxDependency::bindCallArguments(llvm::Instruction *i,
+                                std::vector<llvm::Instruction *> &callHistory,
+                                std::vector<ref<Expr> > &arguments) {
   llvm::CallInst *site = llvm::dyn_cast<llvm::CallInst>(i);
 
   if (!site)
@@ -1063,9 +1062,10 @@ void TxDependency::bindCallArguments(
   }
 }
 
-void TxDependency::bindReturnValue(
-    llvm::CallInst *site, std::vector<llvm::Instruction *> &callHistory,
-    llvm::Instruction *i, ref<Expr> returnValue) {
+void
+TxDependency::bindReturnValue(llvm::CallInst *site,
+                              std::vector<llvm::Instruction *> &callHistory,
+                              llvm::Instruction *i, ref<Expr> returnValue) {
   llvm::ReturnInst *retInst = llvm::dyn_cast<llvm::ReturnInst>(i);
   if (site && retInst &&
       retInst->getReturnValue() // For functions returning void
@@ -1208,9 +1208,8 @@ ref<TxStateValue> TxDependency::evalConstant(
                    llvm::dyn_cast<llvm::ConstantDataSequential>(c)) {
       std::vector<ref<Expr> > kids;
       for (unsigned i = 0, e = cds->getNumElements(); i != e; ++i) {
-        ref<Expr> kid =
-            evalConstant(cds->getElementAsConstant(i), emptyCallHistory)
-                ->getExpression();
+        ref<Expr> kid = evalConstant(cds->getElementAsConstant(i),
+                                     emptyCallHistory)->getExpression();
         kids.push_back(kid);
       }
       return createConstantValue(
