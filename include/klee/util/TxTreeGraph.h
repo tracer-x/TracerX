@@ -212,6 +212,8 @@ public:
   static void save(std::string dotFileName);
 
   static void copyTxTreeNodeData(TxTreeNode *txTreeNode);
+  static llvm::BasicBlock *copyBB(llvm::BasicBlock *bb,
+                                  llvm::BasicBlock *nextBB);
   static void generatePSSCFG(KModule *kmodule);
 };
 }

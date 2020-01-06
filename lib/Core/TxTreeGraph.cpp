@@ -432,17 +432,25 @@ void TxTreeGraph::save(std::string dotFileName) {
 }
 
 void TxTreeGraph::copyTxTreeNodeData(TxTreeNode *txTreeNode) {
-  for (std::vector<llvm::BasicBlock *>::iterator
-           it = txTreeNode->executedBBs.begin(),
-           ie = txTreeNode->executedBBs.end();
-       it != ie; ++it) {
-    instance->executedFuncs.insert((*it)->getParent());
+  for (unsigned i = 0; i < txTreeNode->executedBBs.size(); ++i) {
+    instance->executedFuncs.insert(txTreeNode->executedBBs[i]->getParent());
 
-    // make a copy of BB from TxTreeNode in Graph Node
+    // copy BB
     llvm::BasicBlock *copiedBB = NULL;
-    // TODO: create a new BB, modify branch instruction to next BB
+    if (i == txTreeNode->executedBBs.size() - 1) {
+      copiedBB = copyBB(txTreeNode->executedBBs[i], NULL);
+    } else {
+      copiedBB =
+          copyBB(txTreeNode->executedBBs[i], txTreeNode->executedBBs[i + 1]);
+    }
     instance->txTreeNodeMap[txTreeNode]->executedBBs.push_back(copiedBB);
   }
+}
+
+llvm::BasicBlock *TxTreeGraph::copyBB(llvm::BasicBlock *bb,
+                                      llvm::BasicBlock *nextBB) {
+  // TODO: make a new BB, modify branch instruction to next BB
+  return bb;
 }
 
 void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
