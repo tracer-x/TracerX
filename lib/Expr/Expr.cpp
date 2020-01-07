@@ -152,6 +152,9 @@ void Expr::printKind(llvm::raw_ostream &os, Kind k) {
     X(Sgt);
     X(Sge);
     X(Exists);
+    X(WPVar);
+    X(Sel);
+    X(Upd);
 #undef X
   default:
     assert(0 && "invalid kind");
@@ -214,6 +217,27 @@ unsigned ReadExpr::computeHash() {
   unsigned res = index->hash() * Expr::MAGIC_HASH_CONSTANT;
   res ^= updates.hash();
   hashValue = res;
+  return hashValue;
+}
+
+unsigned WPVarExpr::computeHash() {
+  unsigned hash = 0;
+  for (unsigned i = 0; i < name.size(); i++) {
+    hash = (hash * Expr::MAGIC_HASH_CONSTANT) + name[i];
+  }
+  unsigned res = index->hash() * Expr::MAGIC_HASH_CONSTANT * hash;
+  hashValue = res;
+  return hashValue;
+}
+
+unsigned SelExpr::computeHash() {
+  hashValue = array->hash() * index->hash() * Expr::MAGIC_HASH_CONSTANT;
+  return hashValue;
+}
+
+unsigned UpdExpr::computeHash() {
+  hashValue =
+      array->hash() * index->hash() * value->hash() * Expr::MAGIC_HASH_CONSTANT;
   return hashValue;
 }
 
@@ -554,8 +578,69 @@ ref<Expr> ReadExpr::create(const UpdateList &ul, ref<Expr> index) {
   return ReadExpr::alloc(ul, index);
 }
 
-int ReadExpr::compareContents(const Expr &b) const { 
+int ReadExpr::compareContents(const Expr &b) const {
   return updates.compare(static_cast<const ReadExpr&>(b).updates);
+}
+
+ref<Expr> WPVarExpr::create(llvm::Value *address, std::string name,
+                            ref<Expr> index) {
+  return WPVarExpr::alloc(address, name, index);
+}
+
+int WPVarExpr::compareContents(const Expr &b) const {
+  return this->address == static_cast<const WPVarExpr &>(b).address;
+}
+
+void WPVarExpr::print(llvm::raw_ostream &os) const {
+  os << "(WPVar ";
+  os << name;
+  os << ")";
+}
+
+ref<Expr> SelExpr::create(ref<Expr> array, ref<Expr> index) {
+  return SelExpr::alloc(array, index);
+}
+
+int SelExpr::compareContents(const Expr &b) const {
+  const SelExpr &sb = static_cast<const SelExpr &>(b);
+  if (array != sb.array)
+    return array < sb.array ? -1 : 1;
+  if (index != sb.index)
+    return index < sb.index ? -1 : 1;
+  return 0;
+}
+
+void SelExpr::print(llvm::raw_ostream &os) const {
+  os << "(Sel < ";
+  array->print(os);
+  os << "> [ ";
+  index->print(os);
+  os << "] )";
+}
+
+ref<Expr> UpdExpr::create(ref<Expr> array, ref<Expr> index, ref<Expr> value) {
+  return UpdExpr::alloc(array, index, value);
+}
+
+int UpdExpr::compareContents(const Expr &b) const {
+  const UpdExpr &ub = static_cast<const UpdExpr &>(b);
+  if (array != ub.array)
+    return array < ub.array ? -1 : 1;
+  if (index != ub.index)
+    return index < ub.index ? -1 : 1;
+  if (value != ub.value)
+    return value < ub.value ? -1 : 1;
+  return 0;
+}
+
+void UpdExpr::print(llvm::raw_ostream &os) const {
+  os << "(Upd < ";
+  array->print(os);
+  os << "> [ ";
+  index->print(os);
+  os << "] = ";
+  value->print(os);
+  os << " )";
 }
 
 ref<Expr> SelectExpr::create(ref<Expr> c, ref<Expr> t, ref<Expr> f) {
@@ -569,7 +654,7 @@ ref<Expr> SelectExpr::create(ref<Expr> c, ref<Expr> t, ref<Expr> f) {
   } else if (t==f) {
     return t;
   } else if (kt==Expr::Bool) { // c ? t : f  <=> (c and t) or (not c and f)
-    if (ConstantExpr *CE = dyn_cast<ConstantExpr>(t)) {      
+    if (ConstantExpr *CE = dyn_cast<ConstantExpr>(t)) {
       if (CE->isTrue()) {
         return OrExpr::create(c, f);
       } else {
@@ -583,7 +668,7 @@ ref<Expr> SelectExpr::create(ref<Expr> c, ref<Expr> t, ref<Expr> f) {
       }
     }
   }
-  
+
   return SelectExpr::alloc(c, t, f);
 }
 

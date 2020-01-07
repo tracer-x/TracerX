@@ -260,3 +260,11 @@ ExprVisitor::Action ExprVisitor::visitSge(const SgeExpr&) {
 ExprVisitor::Action ExprVisitor::visitExists(const ExistsExpr&) {
   return Action::doChildren();
 }
+
+ExprVisitor::Action ExprVisitor::visitSel(const SelExpr &) {
+  return Action::doChildren();
+}
+
+ExprVisitor::Action ExprVisitor::visitUpd(const UpdExpr &) {
+  return Action::doChildren();
+}

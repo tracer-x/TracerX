@@ -201,6 +201,11 @@ llvm::cl::opt<std::string> DependencyFolder(
         "also must be put in this folder"),
     llvm::cl::init("."));
 
+llvm::cl::opt<bool>
+    WPInterpolant("wp-interpolant",
+                  llvm::cl::desc("Perform weakest-precondition interpolation"),
+                  llvm::cl::init(false));
+
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT
