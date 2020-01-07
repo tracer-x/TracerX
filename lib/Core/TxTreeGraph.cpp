@@ -496,8 +496,10 @@ void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
   for (std::vector<llvm::BasicBlock *>::iterator it = allBBs.begin(),
                                                  ie = allBBs.end();
        it != ie; ++it) {
-    bb2f[*it] = (*it)->getParent();
-    (*it)->removeFromParent();
+    if ((*it)->getParent() != NULL) {
+      bb2f[*it] = (*it)->getParent();
+      (*it)->removeFromParent();
+    }
   }
   for (std::set<llvm::Function *>::iterator
            it = instance->executedFuncs.begin(),
