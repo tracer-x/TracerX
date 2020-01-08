@@ -91,6 +91,7 @@ private:
     uint64_t markCount;
 
     std::vector<llvm::BasicBlock *> executedBBs;
+    std::vector<llvm::BasicBlock *> newExecutedBBs;
 
     /// \brief The addition to the number of interesting instruction executed
     /// while processing a node: The interesting instruction is a return from a
@@ -146,7 +147,6 @@ private:
   std::map<TxSubsumptionTableEntry *, TxTreeGraph::Node *> tableEntryMap;
   std::vector<TxTreeGraph::NumberedEdge *> subsumptionEdges;
   std::map<TxPCConstraint *, TxTreeGraph::Node *> pathConditionMap;
-  std::set<llvm::Function *> executedFuncs;
 
   /// \brief The set of known leaves
   std::set<TxTreeGraph::Node *> leaves;
@@ -212,8 +212,7 @@ public:
   static void save(std::string dotFileName);
 
   static void copyTxTreeNodeData(TxTreeNode *txTreeNode);
-  static llvm::BasicBlock *copyBB(llvm::BasicBlock *bb,
-                                  llvm::BasicBlock *nextBB);
+
   static void generatePSSCFG(KModule *kmodule);
 };
 }
