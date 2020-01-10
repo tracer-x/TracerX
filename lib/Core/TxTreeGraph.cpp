@@ -37,7 +37,7 @@
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/IR/Module.h"
-
+#include "llvm/IR/IRBuilder.h"
 #include <fstream>
 #include <string>
 
@@ -433,6 +433,13 @@ void TxTreeGraph::save(std::string dotFileName) {
 
 void TxTreeGraph::copyTxTreeNodeData(TxTreeNode *txTreeNode) {
   instance->txTreeNodeMap[txTreeNode]->executedBBs = txTreeNode->executedBBs;
+  // printing the three
+  //  llvm::errs() << "Node sequence = " << txTreeNode->getNodeSequenceNumber()
+  //               << "\n";
+  //  for (unsigned i = 0; i < txTreeNode->executedBBs.size(); ++i) {
+  //    txTreeNode->executedBBs[i]->dump();
+  //  }
+  //  llvm::errs() << "==============\n\n";
 }
 
 void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
@@ -461,9 +468,8 @@ void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
 
   // Collect information & update new BBs for each graph node
   std::set<llvm::Function *> executedFuncs;
-  std::set<llvm::BasicBlock *> allBBs;
   std::map<llvm::BasicBlock *, llvm::Function *> bb2f;
-  std::vector<llvm::BasicBlock *> duplicatedBBs;
+  std::map<llvm::BasicBlock *, std::vector<llvm::BasicBlock *> > duplicatedBBs;
   for (unsigned i = 0; i < graphNodes.size(); ++i) {
     Node *t = graphNodes[i];
     for (unsigned j = 0; j < t->executedBBs.size(); ++j) {
@@ -472,13 +478,16 @@ void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
       llvm::Function *f = tbb->getParent();
       executedFuncs.insert(f);
 
-      // make a new copy if seen
-      if (allBBs.find(tbb) != allBBs.end()) {
-        duplicatedBBs.push_back(tbb);
-
+      // make a new copy if seen before
+      if (bb2f.find(tbb) != bb2f.end()) {
         // make a new copy
         llvm::ValueToValueMapTy VMap;
         llvm::BasicBlock *newBB = llvm::CloneBasicBlock(tbb, VMap, "", f);
+
+        if (duplicatedBBs.find(tbb) == duplicatedBBs.end()) {
+          duplicatedBBs[tbb] = std::vector<llvm::BasicBlock *>();
+        }
+        duplicatedBBs[tbb].push_back(newBB);
 
         //        llvm::errs() << "== New BB ==\n";
         //        newBB->dump();
@@ -486,40 +495,85 @@ void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
         //        tbb->dump();
 
         t->newExecutedBBs.push_back(newBB);
-        allBBs.insert(newBB);
         bb2f[newBB] = f;
       } else {
         t->newExecutedBBs.push_back(tbb);
-        allBBs.insert(tbb);
         bb2f[tbb] = f;
       }
     }
   }
 
+  // print graph
+  for (unsigned i = 0; i < graphNodes.size(); ++i) {
+    llvm::errs() << "Node " << graphNodes[i]->nodeSequenceNumber << "\n";
+    printExecutedBBs(graphNodes[i]);
+    llvm::errs() << "====================\n";
+  }
+  for (unsigned i = 0; i < graphNodes.size(); ++i) {
+    llvm::errs() << "Node " << graphNodes[i]->nodeSequenceNumber << "\n";
+    printNewExecutedBBs(graphNodes[i]);
+    llvm::errs() << "====================\n";
+  }
+
+  //  // modify terminal of BB in each node
+  //  for (unsigned i = 0; i < graphNodes.size(); ++i) {
+  //    Node *t = graphNodes[i];
+  //    llvm::errs() << "Node Sequence = " << t->nodeSequenceNumber <<
+  //    "-----\n"; llvm::errs() << "Size = " << t->newExecutedBBs.size() <<
+  //    "-----\n"; for (unsigned j = 0; j < t->newExecutedBBs.size(); ++j) {
+  //      llvm::errs() << "order = " << j << "-----\n";
+  //      llvm::BasicBlock *b1 = t->newExecutedBBs[j];
+  //      if (j < t->newExecutedBBs.size() - 1) {
+  //        llvm::BasicBlock *b2 = t->newExecutedBBs[j + 1];
+  //
+  //                b1->dump();
+  //                b2->dump();
+  //                llvm::errs() << "-----\n";
+  //
+  //        b1->getTerminator()->removeFromParent();
+  //        llvm::IRBuilder<> Builder(b1);
+  //        Builder.CreateBr(b2);
+  //
+  //                b1->dump();
+  //                b2->dump();
+  //                llvm::errs() << "===========\n";
+  //
+  //      } else { // the last BB
+  //        llvm::BranchInst *br =
+  //        dyn_cast<llvm::BranchInst>(b1->getTerminator()); br->dump(); if
+  //        (t->falseTarget != NULL && !t->falseTarget->newExecutedBBs.empty())
+  //        {
+  //          b1->getTerminator()->removeFromParent();
+  //          llvm::IRBuilder<> Builder(b1);
+  //          Builder.CreateCondBr(br->getCondition(), br->getSuccessor(0),
+  //                               t->falseTarget->newExecutedBBs[0]);
+  //        }
+  //        if (t->trueTarget != NULL && !t->trueTarget->newExecutedBBs.empty())
+  //        {
+  //          b1->getTerminator()->removeFromParent();
+  //          llvm::IRBuilder<> Builder(b1);
+  //          Builder.CreateCondBr(br->getCondition(),
+  //                               t->falseTarget->newExecutedBBs[0],
+  //                               br->getSuccessor(1));
+  //        }
+  //      }
+  //    }
+  //    llvm::errs() << "****************************\n";
+  //  }
+
   // clear parent of all BBs & empty all functions
-  for (std::set<llvm::BasicBlock *>::iterator it = allBBs.begin(),
-                                              ie = allBBs.end();
+  for (std::map<llvm::BasicBlock *, llvm::Function *>::iterator
+           it = bb2f.begin(),
+           ie = bb2f.end();
        it != ie; ++it) {
-    if ((*it)->getParent() != NULL) {
-      (*it)->removeFromParent();
+    if (it->first->getParent() != NULL) {
+      it->first->removeFromParent();
     }
   }
   for (std::set<llvm::Function *>::iterator it = executedFuncs.begin(),
                                             ie = executedFuncs.end();
        it != ie; ++it) {
     (*it)->getBasicBlockList().clear();
-  }
-
-  // modify terminal of BB in each node
-  for (unsigned i = 0; i < graphNodes.size(); ++i) {
-    Node *t = graphNodes[i];
-    for (unsigned j = 0; j < t->executedBBs.size(); ++j) {
-      if (j < t->executedBBs.size() - 1) {
-        llvm::BasicBlock *b1 = t->executedBBs[j];
-        llvm::BasicBlock *b2 = t->executedBBs[j + 1];
-        // TODO: change terminator of b1 to b2
-      }
-    }
   }
 
   // add BBs back to functions

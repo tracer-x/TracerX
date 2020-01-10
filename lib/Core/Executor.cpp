@@ -2485,7 +2485,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   if (INTERPOLATION_ENABLED) {
     // blockCount increased to count all visited Basic Blocks
     TxTree::blockCount++;
-    txTree->getCurrentTxTreeNode()->executedBBs.push_back(dst);
+    state.txTreeNode->executedBBs.push_back(dst);
   }
 
   // process BB Coverage
@@ -5314,20 +5314,6 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
   delete processTree;
   processTree = 0;
 
-  if (INTERPOLATION_ENABLED) {
-    TxTreeGraph::save(interpreterHandler->getOutputFilename("tree.dot"));
-    TxTreeGraph::generatePSSCFG(kmodule);
-    TxTreeGraph::deallocate();
-
-    delete txTree;
-    txTree = 0;
-
-#ifdef ENABLE_Z3
-    // Print interpolation time statistics
-    interpreterHandler->assignSubsumptionStats(TxTree::getInterpolationStat());
-#endif
-  }
-
   if (SpecTypeToUse != NO_SPEC) {
     std::string outSpecFile = interpreterHandler->getOutputFilename("spec.txt");
     std::ofstream outSpec(outSpecFile.c_str(), std::ofstream::app);
@@ -5459,6 +5445,20 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     }
 
     visitedBBFileOut.close();
+  }
+
+  if (INTERPOLATION_ENABLED) {
+    TxTreeGraph::save(interpreterHandler->getOutputFilename("tree.dot"));
+    TxTreeGraph::generatePSSCFG(kmodule);
+    TxTreeGraph::deallocate();
+
+    delete txTree;
+    txTree = 0;
+
+#ifdef ENABLE_Z3
+    // Print interpolation time statistics
+    interpreterHandler->assignSubsumptionStats(TxTree::getInterpolationStat());
+#endif
   }
 
   // hack to clear memory objects

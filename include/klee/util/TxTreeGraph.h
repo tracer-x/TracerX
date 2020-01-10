@@ -22,6 +22,7 @@
 
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
+
 #include "llvm/Support/raw_ostream.h"
 
 #include <map>
@@ -116,6 +117,8 @@ private:
     static TxTreeGraph::Node *createNode(uint64_t markCount) {
       return new TxTreeGraph::Node(markCount);
     }
+
+
   };
 
   class NumberedEdge {
@@ -214,6 +217,18 @@ public:
   static void copyTxTreeNodeData(TxTreeNode *txTreeNode);
 
   static void generatePSSCFG(KModule *kmodule);
+
+  static void printExecutedBBs(TxTreeGraph::Node *n) {
+    for (unsigned i = 0; i < n->executedBBs.size(); ++i) {
+      n->executedBBs[i]->dump();
+    }
+  }
+
+  static void printNewExecutedBBs(TxTreeGraph::Node *n) {
+    for (unsigned i = 0; i < n->newExecutedBBs.size(); ++i) {
+      n->newExecutedBBs[i]->dump();
+    }
+  }
 };
 }
 
