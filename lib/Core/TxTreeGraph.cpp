@@ -515,52 +515,6 @@ void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
     llvm::errs() << "====================\n";
   }
 
-  //  // modify terminal of BB in each node
-  //  for (unsigned i = 0; i < graphNodes.size(); ++i) {
-  //    Node *t = graphNodes[i];
-  //    llvm::errs() << "Node Sequence = " << t->nodeSequenceNumber <<
-  //    "-----\n"; llvm::errs() << "Size = " << t->newExecutedBBs.size() <<
-  //    "-----\n"; for (unsigned j = 0; j < t->newExecutedBBs.size(); ++j) {
-  //      llvm::errs() << "order = " << j << "-----\n";
-  //      llvm::BasicBlock *b1 = t->newExecutedBBs[j];
-  //      if (j < t->newExecutedBBs.size() - 1) {
-  //        llvm::BasicBlock *b2 = t->newExecutedBBs[j + 1];
-  //
-  //                b1->dump();
-  //                b2->dump();
-  //                llvm::errs() << "-----\n";
-  //
-  //        b1->getTerminator()->removeFromParent();
-  //        llvm::IRBuilder<> Builder(b1);
-  //        Builder.CreateBr(b2);
-  //
-  //                b1->dump();
-  //                b2->dump();
-  //                llvm::errs() << "===========\n";
-  //
-  //      } else { // the last BB
-  //        llvm::BranchInst *br =
-  //        dyn_cast<llvm::BranchInst>(b1->getTerminator()); br->dump(); if
-  //        (t->falseTarget != NULL && !t->falseTarget->newExecutedBBs.empty())
-  //        {
-  //          b1->getTerminator()->removeFromParent();
-  //          llvm::IRBuilder<> Builder(b1);
-  //          Builder.CreateCondBr(br->getCondition(), br->getSuccessor(0),
-  //                               t->falseTarget->newExecutedBBs[0]);
-  //        }
-  //        if (t->trueTarget != NULL && !t->trueTarget->newExecutedBBs.empty())
-  //        {
-  //          b1->getTerminator()->removeFromParent();
-  //          llvm::IRBuilder<> Builder(b1);
-  //          Builder.CreateCondBr(br->getCondition(),
-  //                               t->falseTarget->newExecutedBBs[0],
-  //                               br->getSuccessor(1));
-  //        }
-  //      }
-  //    }
-  //    llvm::errs() << "****************************\n";
-  //  }
-
   // clear parent of all BBs & empty all functions
   for (std::map<llvm::BasicBlock *, llvm::Function *>::iterator
            it = bb2f.begin(),
@@ -588,4 +542,84 @@ void TxTreeGraph::generatePSSCFG(KModule *kmodule) {
   llvm::raw_fd_ostream OS("module.bc", EC, llvm::sys::fs::F_None);
   WriteBitcodeToFile(kmodule->module, OS);
   OS.flush();
+}
+
+void TxTreeGraph::generatePSSCFG1(KModule *kmodule) {
+  if (instance->root == NULL) {
+    return;
+  }
+  //  std::map<llvm::Instruction *, llvm::Instruction *> inm;
+  std::vector<llvm::Instruction *> currentPath;
+  std::vector<Node *> wl;
+  wl.push_back(instance->root);
+  while (!wl.empty()) {
+    Node *t = wl.back();
+    if (!t->isProcessed) {
+      // mark & process
+      t->isProcessed = true;
+      // TODO: adjust instructions in currentPath
+      llvm::errs() << "Node " << t->nodeSequenceNumber << "\n\n";
+      for (unsigned i = 0; i < currentPath.size(); ++i) {
+        currentPath[i]->dump();
+      }
+      llvm::errs() << "----------\n";
+      for (unsigned i = 0; i < t->executedBBs.size(); ++i) {
+        llvm::BasicBlock *bb = t->executedBBs[i];
+        for (llvm::BasicBlock::iterator it = bb->begin(), ie = bb->end();
+             it != ie; ++it) {
+          it->dump();
+          currentPath.push_back(it);
+        }
+      }
+      llvm::errs() << "===========\n\n";
+
+      if (t->trueTarget == NULL && t->trueTarget == NULL) {
+        // remove from stack & the current path
+        wl.pop_back();
+        currentPath.resize(currentPath.size() - t->getExecutedInstNum());
+      } else {
+        // add 2 children to work list
+        if (t->trueTarget != NULL) {
+          wl.push_back(t->trueTarget);
+        }
+        if (t->falseTarget != NULL) {
+          wl.push_back(t->falseTarget);
+        }
+      }
+    } else {
+      // remove from stack & the current path
+      wl.pop_back();
+      currentPath.resize(currentPath.size() - t->getExecutedInstNum());
+    }
+  }
+}
+
+void TxTreeGraph::printTree(KModule *kmodule) {
+  if (instance->root == NULL) {
+    return;
+  }
+
+  // collect all nodes in graph using DFS
+  std::vector<Node *> graphNodes;
+  std::vector<Node *> wl;
+  wl.push_back(instance->root);
+  while (!wl.empty()) {
+    Node *t = wl.back();
+    wl.pop_back();
+    graphNodes.push_back(t);
+    // add 2 children to work list
+    if (t->trueTarget != NULL) {
+      wl.push_back(t->trueTarget);
+    }
+    if (t->falseTarget != NULL) {
+      wl.push_back(t->falseTarget);
+    }
+  }
+
+  // print graph
+  for (unsigned i = 0; i < graphNodes.size(); ++i) {
+    llvm::errs() << "Node " << graphNodes[i]->nodeSequenceNumber << "\n";
+    printExecutedBBs(graphNodes[i]);
+    llvm::errs() << "====================\n";
+  }
 }

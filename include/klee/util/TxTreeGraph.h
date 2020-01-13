@@ -93,6 +93,14 @@ private:
 
     std::vector<llvm::BasicBlock *> executedBBs;
     std::vector<llvm::BasicBlock *> newExecutedBBs;
+    bool isProcessed;
+    unsigned getExecutedInstNum() {
+      unsigned total = 0;
+      for (unsigned i = 0; i < executedBBs.size(); ++i) {
+        total += executedBBs[i]->size();
+      }
+      return total;
+    }
 
     /// \brief The addition to the number of interesting instruction executed
     /// while processing a node: The interesting instruction is a return from a
@@ -102,7 +110,7 @@ private:
     Node(uint64_t _markCount)
         : nodeSequenceNumber(0), internalNodeId(0), parent(0), falseTarget(0),
           trueTarget(0), subsumed(false), errorType(TxTreeGraph::NONE),
-          errorPath(false), markCount(_markCount), markAddition(0) {}
+          errorPath(false), markCount(_markCount), isProcessed(false), markAddition(0) {}
 
     ~Node() {
       if (falseTarget)
@@ -217,6 +225,8 @@ public:
   static void copyTxTreeNodeData(TxTreeNode *txTreeNode);
 
   static void generatePSSCFG(KModule *kmodule);
+  static void generatePSSCFG1(KModule *kmodule);
+  static void printTree(KModule *kmodule);
 
   static void printExecutedBBs(TxTreeGraph::Node *n) {
     for (unsigned i = 0; i < n->executedBBs.size(); ++i) {
