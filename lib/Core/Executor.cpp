@@ -5449,8 +5449,10 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 
   if (INTERPOLATION_ENABLED) {
     TxTreeGraph::save(interpreterHandler->getOutputFilename("tree.dot"));
-    TxTreeGraph::printTree(kmodule);
+//    TxTreeGraph::printOriginBB(kmodule);
+//    TxTreeGraph::printDupBB(kmodule);
     TxTreeGraph::generatePSSCFG1(kmodule);
+
     TxTreeGraph::deallocate();
 
     delete txTree;

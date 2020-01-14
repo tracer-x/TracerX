@@ -22,6 +22,7 @@
 
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
+#include "llvm/Transforms/Utils/ValueMapper.h"
 
 #include "llvm/Support/raw_ostream.h"
 
@@ -92,7 +93,7 @@ private:
     uint64_t markCount;
 
     std::vector<llvm::BasicBlock *> executedBBs;
-    std::vector<llvm::BasicBlock *> newExecutedBBs;
+    std::vector<llvm::Instruction *> newExecutedBBs;
     bool isProcessed;
     unsigned getExecutedInstNum() {
       unsigned total = 0;
@@ -224,9 +225,13 @@ public:
 
   static void copyTxTreeNodeData(TxTreeNode *txTreeNode);
 
-  static void generatePSSCFG(KModule *kmodule);
   static void generatePSSCFG1(KModule *kmodule);
+  static void updateRef(llvm::Instruction* ins, llvm::ValueToValueMapTy &vmap);
+  static void removeVal(llvm::ValueToValueMapTy& vmap, std::vector<llvm::BasicBlock *> executedBBs);
+  static void printMap(llvm::ValueToValueMapTy &vmap);
   static void printTree(KModule *kmodule);
+  static void printOriginBB(KModule *kmodule);
+  static void printDupBB(KModule *kmodule);
 
   static void printExecutedBBs(TxTreeGraph::Node *n) {
     for (unsigned i = 0; i < n->executedBBs.size(); ++i) {
