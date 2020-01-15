@@ -5447,12 +5447,14 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     visitedBBFileOut.close();
   }
 
+  if (statsTracker)
+    statsTracker->done();
+
   if (INTERPOLATION_ENABLED) {
     TxTreeGraph::save(interpreterHandler->getOutputFilename("tree.dot"));
-//    TxTreeGraph::printOriginBB(kmodule);
-//    TxTreeGraph::printDupBB(kmodule);
+    TxTreeGraph::printBBs(kmodule,0);
     TxTreeGraph::generatePSSCFG1(kmodule);
-
+    TxTreeGraph::printBBs(kmodule,1);
     TxTreeGraph::deallocate();
 
     delete txTree;
@@ -5470,9 +5472,6 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 
   globalObjects.clear();
   globalAddresses.clear();
-
-  if (statsTracker)
-    statsTracker->done();
 
   if (atMemoryLimit)
     klee_warning("Memory cap exceeded!!!\n");

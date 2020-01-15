@@ -93,7 +93,7 @@ private:
     uint64_t markCount;
 
     std::vector<llvm::BasicBlock *> executedBBs;
-    std::vector<llvm::Instruction *> newExecutedBBs;
+    std::vector<llvm::BasicBlock *> newExecutedBBs;
     bool isProcessed;
     unsigned getExecutedInstNum() {
       unsigned total = 0;
@@ -111,7 +111,8 @@ private:
     Node(uint64_t _markCount)
         : nodeSequenceNumber(0), internalNodeId(0), parent(0), falseTarget(0),
           trueTarget(0), subsumed(false), errorType(TxTreeGraph::NONE),
-          errorPath(false), markCount(_markCount), isProcessed(false), markAddition(0) {}
+          errorPath(false), markCount(_markCount), isProcessed(false),
+          markAddition(0) {}
 
     ~Node() {
       if (falseTarget)
@@ -126,8 +127,6 @@ private:
     static TxTreeGraph::Node *createNode(uint64_t markCount) {
       return new TxTreeGraph::Node(markCount);
     }
-
-
   };
 
   class NumberedEdge {
@@ -226,11 +225,13 @@ public:
   static void copyTxTreeNodeData(TxTreeNode *txTreeNode);
 
   static void generatePSSCFG1(KModule *kmodule);
-  static void updateRef(llvm::Instruction* ins, llvm::ValueToValueMapTy &vmap);
-  static void removeVal(llvm::ValueToValueMapTy& vmap, std::vector<llvm::BasicBlock *> executedBBs);
+  static void updateRef(llvm::Instruction *ins, llvm::ValueToValueMapTy &vmap);
+  static void removeVal(llvm::ValueToValueMapTy &vmap,
+                        std::vector<llvm::BasicBlock *> executedBBs);
+  static void updateBranchInsts();
   static void printMap(llvm::ValueToValueMapTy &vmap);
   static void printTree(KModule *kmodule);
-  static void printOriginBB(KModule *kmodule);
+  static void printBBs(KModule *kmodule, int id);
   static void printDupBB(KModule *kmodule);
 
   static void printExecutedBBs(TxTreeGraph::Node *n) {

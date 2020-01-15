@@ -447,6 +447,7 @@ void TxTreeGraph::generatePSSCFG1(KModule *kmodule) {
     return;
   }
 
+  std::set<llvm::BasicBlock *> visitedBBs;
   std::set<llvm::Instruction *> executedInsts;
   llvm::ValueToValueMapTy vmap;
   std::vector<Node *> wl;
@@ -458,35 +459,54 @@ void TxTreeGraph::generatePSSCFG1(KModule *kmodule) {
       t->isProcessed = true;
       for (unsigned i = 0; i < t->executedBBs.size(); ++i) {
         llvm::BasicBlock *bb = t->executedBBs[i];
-        for (llvm::BasicBlock::iterator it = bb->begin(), ie = bb->end();
-             it != ie; ++it) {
-          llvm::Instruction *newIns = it;
-          if (executedInsts.find(it) != executedInsts.end()) {
-            newIns = it->clone();
-            // TODO: update reference based on vmap
+        // create a new BB if existed
+        bool isExisted = visitedBBs.find(bb) != visitedBBs.end();
+        if (isExisted) {
+          // duplicate basic block
+          llvm::ValueToValueMapTy bvmap;
+          llvm::BasicBlock *newBB =
+              llvm::CloneBasicBlock(bb, bvmap, "", bb->getParent());
+          newBB->getInstList().clear();
+          t->newExecutedBBs.push_back(newBB);
 
-            /*
-            llvm::errs() << "-- Size = " << vmap.size() << "--\n";
-            printMap(vmap);
-            llvm::errs() << "Node " << t->nodeSequenceNumber << "\n";
-            it->dump();
-            llvm::errs() << "------\n";
-            newIns->dump();
-            llvm::errs() << "------\n";
-            llvm::RemapInstruction(newIns, vmap);
-            newIns->dump();
-            llvm::errs() << "******\n\n";
-            */
+          // copy instructions
+          for (llvm::BasicBlock::iterator it = bb->begin(), ie = bb->end();
+               it != ie; ++it) {
+            llvm::Instruction *newIns = it->clone();
+            newBB->getInstList().push_back(newIns);
+
+            // update reference based on vmap
+            //            llvm::errs() << "*** Size = " << vmap.size() << "
+            // ***\n";
+            //            llvm::errs() << "Node " << t->nodeSequenceNumber <<
+            // "\n";
+            //            it->dump();
+            //            llvm::errs() << "------\n";
+            //            newIns->dump();
+            //            llvm::errs() << "------\n";
+
+            updateRef(newIns, vmap);
+
+            //            newIns->dump();
+            //            llvm::errs() << "*** End Updating Instruction
+            // ***\n\n";
+
+            // add to vmap
+            vmap[it] = newIns;
           }
-          vmap[it] = newIns;
-          t->newExecutedBBs.push_back(newIns);
-          executedInsts.insert(newIns);
+        } else {
+          for (llvm::BasicBlock::iterator it = bb->begin(), ie = bb->end();
+               it != ie; ++it) {
+            vmap[it] = it;
+          }
+          t->newExecutedBBs.push_back(bb);
+          visitedBBs.insert(bb);
         }
       }
 
       if (t->trueTarget == NULL && t->trueTarget == NULL) {
         wl.pop_back();
-        removeVal(vmap, t->executedBBs);
+        removeVal(vmap, t->newExecutedBBs);
       } else {
         if (t->trueTarget != NULL) {
           wl.push_back(t->trueTarget);
@@ -497,19 +517,84 @@ void TxTreeGraph::generatePSSCFG1(KModule *kmodule) {
       }
     } else {
       wl.pop_back();
-      removeVal(vmap, t->executedBBs);
+      removeVal(vmap, t->newExecutedBBs);
+    }
+  }
+
+  // update branch instruction
+  //  llvm::errs() << "Update Branch ============\n";
+  updateBranchInsts();
+
+  // dump to a new module
+  std::string EC;
+  llvm::raw_fd_ostream OS("module.bc", EC, llvm::sys::fs::F_None);
+  WriteBitcodeToFile(kmodule->module, OS);
+  OS.flush();
+}
+
+void TxTreeGraph::updateBranchInsts() {
+  if (instance->root == NULL) {
+    return;
+  }
+
+  // collect all nodes in graph using DFS
+  std::vector<Node *> wl;
+  wl.push_back(instance->root);
+  while (!wl.empty()) {
+    Node *t = wl.back();
+    wl.pop_back();
+
+    for (unsigned i = 0; i < t->newExecutedBBs.size(); ++i) {
+      llvm::BasicBlock *bb = t->newExecutedBBs[i];
+      if (i == t->newExecutedBBs.size() - 1) { // the last
+        if (llvm::isa<llvm::BranchInst>(&bb->back())) {
+          llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(&bb->back());
+          if (t->falseTarget != NULL && t->trueTarget != NULL) {
+            br->setSuccessor(0, t->trueTarget->newExecutedBBs.front());
+            br->setSuccessor(1, t->falseTarget->newExecutedBBs.front());
+          }
+        }
+      } else { // internal
+        bb->getInstList().pop_back();
+        llvm::IRBuilder<> Builder(bb);
+        Builder.CreateBr(t->newExecutedBBs[i + 1]);
+      }
+    }
+
+    // add 2 children to work list
+    if (t->trueTarget != NULL) {
+      wl.push_back(t->trueTarget);
+    }
+    if (t->falseTarget != NULL) {
+      wl.push_back(t->falseTarget);
     }
   }
 }
 
 void TxTreeGraph::updateRef(llvm::Instruction *ins,
                             llvm::ValueToValueMapTy &vmap) {
-  for (unsigned i = 0; i < ins->getNumOperands(); ++i) {
-    llvm::Value *o = ins->getOperand(i);
-    if (vmap.find(o) != vmap.end()) {
-      llvm::Value *newO = vmap[o];
+  //  llvm::errs() << "-- update ref --\n";
+  if (llvm::isa<llvm::BranchInst>(ins)) {
+    llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(ins);
+    if (br->isConditional()) {
+      llvm::Value *cond = br->getCondition();
+      //      cond->dump();
+      if (vmap.find(cond) != vmap.end()) {
+        //        vmap[cond]->dump();
+        br->setCondition(vmap[cond]);
+      }
+    }
+  } else {
+    for (unsigned i = 0; i < ins->getNumOperands(); ++i) {
+      llvm::Value *o = ins->getOperand(i);
+      //      o->dump();
+      if (vmap.find(o) != vmap.end()) {
+        //        vmap[o]->dump();
+        ins->setOperand(i, vmap[o]);
+      }
     }
   }
+  //  llvm::errs() << "-- end update ref --\n";
 }
 
 void TxTreeGraph::removeVal(llvm::ValueToValueMapTy &vmap,
@@ -561,7 +646,7 @@ void TxTreeGraph::printTree(KModule *kmodule) {
   }
 }
 
-void TxTreeGraph::printOriginBB(KModule *kmodule) {
+void TxTreeGraph::printBBs(KModule *kmodule, int id) {
   if (instance->root == NULL) {
     return;
   }
@@ -574,7 +659,11 @@ void TxTreeGraph::printOriginBB(KModule *kmodule) {
     Node *t = wl.back();
     wl.pop_back();
 
-    graphBBs.push_back(t->executedBBs);
+    if (id == 0) {
+      graphBBs.push_back(t->executedBBs);
+    } else {
+      graphBBs.push_back(t->newExecutedBBs);
+    }
 
     // add 2 children to work list
     if (t->trueTarget != NULL) {
