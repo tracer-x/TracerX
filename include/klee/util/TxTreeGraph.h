@@ -157,6 +157,7 @@ private:
   std::map<TxTreeNode *, TxTreeGraph::Node *> txTreeNodeMap;
   std::map<TxSubsumptionTableEntry *, TxTreeGraph::Node *> tableEntryMap;
   std::vector<TxTreeGraph::NumberedEdge *> subsumptionEdges;
+  std::map<TxTreeGraph::Node *, TxTreeGraph::Node *> subsumptionMap;
   std::map<TxPCConstraint *, TxTreeGraph::Node *> pathConditionMap;
 
   /// \brief The set of known leaves
@@ -229,6 +230,7 @@ public:
   static void removeVal(llvm::ValueToValueMapTy &vmap,
                         std::vector<llvm::BasicBlock *> executedBBs);
   static void updateBranchInsts();
+  static void createSubsumedBB(TxTreeGraph::Node *n);
   static void printMap(llvm::ValueToValueMapTy &vmap);
   static void printTree(KModule *kmodule);
   static void printBBs(KModule *kmodule, int id);

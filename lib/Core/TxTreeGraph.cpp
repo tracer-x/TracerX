@@ -349,6 +349,7 @@ void TxTreeGraph::markAsSubsumed(TxTreeNode *txTreeNode,
   TxTreeGraph::Node *subsuming = instance->tableEntryMap[entry];
   instance->subsumptionEdges.push_back(new TxTreeGraph::NumberedEdge(
       node, subsuming, ++(instance->subsumptionEdgeNumber)));
+  instance->subsumptionMap[node] = subsuming;
 }
 
 void TxTreeGraph::addPathCondition(TxTreeNode *txTreeNode,
@@ -543,32 +544,50 @@ void TxTreeGraph::updateBranchInsts() {
   while (!wl.empty()) {
     Node *t = wl.back();
     wl.pop_back();
-
-    for (unsigned i = 0; i < t->newExecutedBBs.size(); ++i) {
-      llvm::BasicBlock *bb = t->newExecutedBBs[i];
-      if (i == t->newExecutedBBs.size() - 1) { // the last
-        if (llvm::isa<llvm::BranchInst>(&bb->back())) {
-          llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(&bb->back());
-          if (t->falseTarget != NULL && t->trueTarget != NULL) {
-            br->setSuccessor(0, t->trueTarget->newExecutedBBs.front());
-            br->setSuccessor(1, t->falseTarget->newExecutedBBs.front());
+    if (!t->subsumed) {
+      for (unsigned i = 0; i < t->newExecutedBBs.size(); ++i) {
+        llvm::BasicBlock *bb = t->newExecutedBBs[i];
+        if (i == t->newExecutedBBs.size() - 1) { // the last BB in this node
+          if (llvm::isa<llvm::BranchInst>(&bb->back())) {
+            llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(&bb->back());
+            if (t->falseTarget != NULL && t->trueTarget != NULL) {
+              if (t->falseTarget->subsumed) {
+                createSubsumedBB(t->falseTarget);
+              }
+              if (t->trueTarget->subsumed) {
+                createSubsumedBB(t->trueTarget);
+              }
+              br->setSuccessor(0, t->trueTarget->newExecutedBBs.front());
+              br->setSuccessor(1, t->falseTarget->newExecutedBBs.front());
+            }
           }
+        } else { // internal
+          bb->getInstList().pop_back();
+          llvm::IRBuilder<> Builder(bb);
+          Builder.CreateBr(t->newExecutedBBs[i + 1]);
         }
-      } else { // internal
-        bb->getInstList().pop_back();
-        llvm::IRBuilder<> Builder(bb);
-        Builder.CreateBr(t->newExecutedBBs[i + 1]);
+      }
+      // add 2 children to work list
+      if (t->trueTarget != NULL) {
+        wl.push_back(t->trueTarget);
+      }
+      if (t->falseTarget != NULL) {
+        wl.push_back(t->falseTarget);
       }
     }
-
-    // add 2 children to work list
-    if (t->trueTarget != NULL) {
-      wl.push_back(t->trueTarget);
-    }
-    if (t->falseTarget != NULL) {
-      wl.push_back(t->falseTarget);
-    }
   }
+}
+
+void TxTreeGraph::createSubsumedBB(TxTreeGraph::Node *n) {
+  assert(n->subsumed && "Not a subsumed node!");
+  llvm::ValueToValueMapTy tmpvm;
+  llvm::BasicBlock *nextBB = instance->subsumptionMap[n]->executedBBs.front();
+  llvm::BasicBlock *prevBB =
+      llvm::CloneBasicBlock(nextBB, tmpvm, "", nextBB->getParent());
+  prevBB->getInstList().clear();
+  llvm::IRBuilder<> builder(prevBB);
+  builder.CreateBr(nextBB);
+  n->newExecutedBBs.push_back(prevBB);
 }
 
 void TxTreeGraph::updateRef(llvm::Instruction *ins,
