@@ -17,6 +17,7 @@
 
 #include "klee/ExecutionState.h"
 #include "klee/util/TxPrintUtil.h"
+#include "TxTree.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include "llvm/IR/BasicBlock.h"
@@ -425,4 +426,8 @@ void TxTreeGraph::save(std::string dotFileName) {
     out << g;
     out.close();
   }
+}
+
+void TxTreeGraph::copyTxTreeNodeData(TxTreeNode *txTreeNode) {
+  instance->txTreeNodeMap[txTreeNode]->executedBBs = txTreeNode->executedBBs;
 }

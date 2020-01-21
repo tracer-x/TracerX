@@ -20,6 +20,7 @@
 #include "klee/Expr.h"
 
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/BasicBlock.h"
 
 #include <map>
 
@@ -85,6 +86,8 @@ private:
     /// \brief The number of marked instruction visited along the path. A marked
     /// instruction is a return from a function named tracerx_mark.
     uint64_t markCount;
+
+    std::vector<llvm::BasicBlock *> executedBBs;
 
     /// \brief The addition to the number of interesting instruction executed
     /// while processing a node: The interesting instruction is a return from a
@@ -197,6 +200,8 @@ public:
 
   /// \brief Save the graph
   static void save(std::string dotFileName);
+
+  static void copyTxTreeNodeData(TxTreeNode *txTreeNode);
 };
 }
 

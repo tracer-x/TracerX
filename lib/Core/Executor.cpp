@@ -2284,6 +2284,9 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
                          state.txTreeNode->isSpeculationNode());
     processBBCoverage(BBCoverage, &(f->front()), isInSpecMode);
   }
+  if (INTERPOLATION_ENABLED && !f->empty()) {
+    state.txTreeNode->executedBBs.push_back(&(f->front()));
+  }
 
   Instruction *i = ki->inst;
   if (f && f->isDeclaration()) {
@@ -2481,6 +2484,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
   if (INTERPOLATION_ENABLED) {
     // blockCount increased to count all visited Basic Blocks
     TxTree::blockCount++;
+    state.txTreeNode->executedBBs.push_back(dst);
   }
 
   // process BB Coverage
@@ -4219,6 +4223,10 @@ void Executor::run(ExecutionState &initialState) {
           fBBOrder[firstBB->getParent()].end()) {
     processBBCoverage(BBCoverage, ki->inst->getParent(), false);
   }
+  if (INTERPOLATION_ENABLED) {
+    initialState.txTreeNode->executedBBs.push_back(ki->inst->getParent());
+  }
+
   bindModuleConstants();
 
   // Delay init till now so that ticks don't accrue during

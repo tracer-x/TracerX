@@ -49,6 +49,8 @@
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Bitcode/ReaderWriter.h"
 
 #if LLVM_VERSION_CODE < LLVM_VERSION(3, 0)
 #include "llvm/Target/TargetSelect.h"
@@ -1420,6 +1422,15 @@ int main(int argc, char **argv, char **envp) {
                ec.message().c_str());
   }
 #endif
+
+  // duplicate module
+  ValueToValueMapTy vm;
+  Module *cpModule = llvm::CloneModule(mainModule, vm);
+//  std::string EC;
+//  llvm::raw_fd_ostream OS("module.bc", EC, llvm::sys::fs::F_None);
+//  WriteBitcodeToFile(cpModule, OS);
+//  OS.flush();
+  //---------
 
   if (WithPOSIXRuntime) {
     int r = initEnv(mainModule);
