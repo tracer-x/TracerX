@@ -34,7 +34,9 @@
 #else
 #include <llvm/Analysis/DebugInfo.h>
 #endif
-
+#include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/IR/IRBuilder.h"
 #include <fstream>
 #include <string>
 
@@ -55,6 +57,9 @@ std::string TxTreeGraph::NumberedEdge::render() const {
 uint64_t TxTreeGraph::nodeCount = 1;
 
 TxTreeGraph *TxTreeGraph::instance = 0;
+
+llvm::Module *TxTreeGraph::dupModule = NULL;
+llvm::ValueToValueMapTy TxTreeGraph::vm;
 
 std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
   std::ostringstream stream;
@@ -346,6 +351,7 @@ void TxTreeGraph::markAsSubsumed(TxTreeNode *txTreeNode,
   TxTreeGraph::Node *subsuming = instance->tableEntryMap[entry];
   instance->subsumptionEdges.push_back(new TxTreeGraph::NumberedEdge(
       node, subsuming, ++(instance->subsumptionEdgeNumber)));
+  instance->subsumptionMap[node] = subsuming;
 }
 
 void TxTreeGraph::addPathCondition(TxTreeNode *txTreeNode,
@@ -430,4 +436,299 @@ void TxTreeGraph::save(std::string dotFileName) {
 
 void TxTreeGraph::copyTxTreeNodeData(TxTreeNode *txTreeNode) {
   instance->txTreeNodeMap[txTreeNode]->executedBBs = txTreeNode->executedBBs;
+}
+
+void TxTreeGraph::updateBBInCpModule() {
+  std::vector<std::vector<llvm::BasicBlock *> > graphBBs;
+  std::vector<Node *> wl;
+  wl.push_back(instance->root);
+  while (!wl.empty()) {
+    Node *t = wl.back();
+    wl.pop_back();
+
+    std::vector<llvm::BasicBlock *> tmp;
+    for (unsigned i = 0; i < t->executedBBs.size(); ++i) {
+      if (vm.find(t->executedBBs[i]) != vm.end()) {
+        tmp.push_back(dyn_cast<llvm::BasicBlock>(vm[t->executedBBs[i]]));
+      }
+    }
+    t->executedBBs.swap(tmp);
+
+    // add 2 children to work list
+    if (t->trueTarget != NULL) {
+      wl.push_back(t->trueTarget);
+    }
+    if (t->falseTarget != NULL) {
+      wl.push_back(t->falseTarget);
+    }
+  }
+}
+
+void TxTreeGraph::generatePSSCFG() {
+  if (instance->root == NULL) {
+    return;
+  }
+
+  std::set<llvm::BasicBlock *> visitedBBs;
+  std::set<llvm::Instruction *> executedInsts;
+  llvm::ValueToValueMapTy vmap;
+  std::vector<Node *> wl;
+  wl.push_back(instance->root);
+  while (!wl.empty()) {
+    Node *t = wl.back();
+    if (!t->isProcessed) {
+      // mark & process
+      t->isProcessed = true;
+      for (unsigned i = 0; i < t->executedBBs.size(); ++i) {
+        llvm::BasicBlock *bb = t->executedBBs[i];
+        // create a new BB if existed
+        bool isExisted = visitedBBs.find(bb) != visitedBBs.end();
+        if (isExisted) {
+          // duplicate basic block
+          llvm::ValueToValueMapTy bvmap;
+          llvm::BasicBlock *newBB =
+              llvm::CloneBasicBlock(bb, bvmap, "", bb->getParent());
+          newBB->getInstList().clear();
+          t->newExecutedBBs.push_back(newBB);
+
+          // copy instructions
+          for (llvm::BasicBlock::iterator it = bb->begin(), ie = bb->end();
+               it != ie; ++it) {
+            llvm::Instruction *newIns = it->clone();
+            newBB->getInstList().push_back(newIns);
+
+            // update reference based on vmap
+            //            llvm::errs() << "*** Size = " << vmap.size() << "
+            // ***\n";
+            //            llvm::errs() << "Node " << t->nodeSequenceNumber <<
+            // "\n";
+            //            it->dump();
+            //            llvm::errs() << "------\n";
+            //            newIns->dump();
+            //            llvm::errs() << "------\n";
+
+            updateRef(newIns, vmap);
+
+            //            newIns->dump();
+            //            llvm::errs() << "*** End Updating Instruction
+            // ***\n\n";
+
+            // add to vmap
+            vmap[it] = newIns;
+          }
+        } else {
+          for (llvm::BasicBlock::iterator it = bb->begin(), ie = bb->end();
+               it != ie; ++it) {
+            vmap[it] = it;
+          }
+          t->newExecutedBBs.push_back(bb);
+          visitedBBs.insert(bb);
+        }
+      }
+
+      if (t->trueTarget == NULL && t->trueTarget == NULL) {
+        wl.pop_back();
+        removeVal(vmap, t->newExecutedBBs);
+      } else {
+        if (t->trueTarget != NULL) {
+          wl.push_back(t->trueTarget);
+        }
+        if (t->falseTarget != NULL) {
+          wl.push_back(t->falseTarget);
+        }
+      }
+    } else {
+      wl.pop_back();
+      removeVal(vmap, t->newExecutedBBs);
+    }
+  }
+
+  // update branch instruction
+  //  llvm::errs() << "Update Branch ============\n";
+  updateBranchInsts();
+
+  // dump to a new module
+  std::string EC;
+  llvm::raw_fd_ostream OS("module.bc", EC, llvm::sys::fs::F_None);
+  WriteBitcodeToFile(dupModule, OS);
+  OS.flush();
+}
+
+void TxTreeGraph::updateBranchInsts() {
+  if (instance->root == NULL) {
+    return;
+  }
+
+  // collect all nodes in graph using DFS
+  std::vector<Node *> wl;
+  wl.push_back(instance->root);
+  while (!wl.empty()) {
+    Node *t = wl.back();
+    wl.pop_back();
+    if (!t->subsumed) {
+      for (unsigned i = 0; i < t->newExecutedBBs.size(); ++i) {
+        llvm::BasicBlock *bb = t->newExecutedBBs[i];
+        if (i == t->newExecutedBBs.size() - 1) { // the last BB in this node
+          if (llvm::isa<llvm::BranchInst>(&bb->back())) {
+            llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(&bb->back());
+            if (t->falseTarget != NULL && t->trueTarget != NULL) {
+              if (t->falseTarget->subsumed) {
+                createSubsumedBB(t->falseTarget);
+              }
+              if (t->trueTarget->subsumed) {
+                createSubsumedBB(t->trueTarget);
+              }
+              br->setSuccessor(0, t->trueTarget->newExecutedBBs.front());
+              br->setSuccessor(1, t->falseTarget->newExecutedBBs.front());
+            }
+          }
+        } else { // internal
+          bb->getInstList().pop_back();
+          llvm::IRBuilder<> Builder(bb);
+          Builder.CreateBr(t->newExecutedBBs[i + 1]);
+        }
+      }
+      // add 2 children to work list
+      if (t->trueTarget != NULL) {
+        wl.push_back(t->trueTarget);
+      }
+      if (t->falseTarget != NULL) {
+        wl.push_back(t->falseTarget);
+      }
+    }
+  }
+}
+
+void TxTreeGraph::createSubsumedBB(TxTreeGraph::Node *n) {
+  assert(n->subsumed && "Not a subsumed node!");
+  llvm::ValueToValueMapTy tmpvm;
+  llvm::BasicBlock *nextBB = instance->subsumptionMap[n]->executedBBs.front();
+  llvm::BasicBlock *prevBB =
+      llvm::CloneBasicBlock(nextBB, tmpvm, "", nextBB->getParent());
+  prevBB->getInstList().clear();
+  llvm::IRBuilder<> builder(prevBB);
+  builder.CreateBr(nextBB);
+  n->newExecutedBBs.push_back(prevBB);
+}
+
+void TxTreeGraph::updateRef(llvm::Instruction *ins,
+                            llvm::ValueToValueMapTy &vmap) {
+  //  llvm::errs() << "-- update ref --\n";
+  if (llvm::isa<llvm::BranchInst>(ins)) {
+    llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(ins);
+    if (br->isConditional()) {
+      llvm::Value *cond = br->getCondition();
+      //      cond->dump();
+      if (vmap.find(cond) != vmap.end()) {
+        //        vmap[cond]->dump();
+        br->setCondition(vmap[cond]);
+      }
+    }
+  } else {
+    for (unsigned i = 0; i < ins->getNumOperands(); ++i) {
+      llvm::Value *o = ins->getOperand(i);
+      //      o->dump();
+      if (vmap.find(o) != vmap.end()) {
+        //        vmap[o]->dump();
+        ins->setOperand(i, vmap[o]);
+      }
+    }
+  }
+  //  llvm::errs() << "-- end update ref --\n";
+}
+
+void TxTreeGraph::removeVal(llvm::ValueToValueMapTy &vmap,
+                            std::vector<llvm::BasicBlock *> executedBBs) {
+  for (unsigned i = 0; i < executedBBs.size(); ++i) {
+    llvm::BasicBlock *bb = executedBBs[i];
+    for (llvm::BasicBlock::iterator it = bb->begin(), ie = bb->end(); it != ie;
+         ++it) {
+      vmap.erase(it);
+    }
+  }
+}
+
+void TxTreeGraph::printBBs(int id) {
+  if (instance->root == NULL) {
+    return;
+  }
+
+  // collect all nodes in graph using DFS
+  std::vector<std::vector<llvm::BasicBlock *> > graphBBs;
+  std::vector<Node *> wl;
+  wl.push_back(instance->root);
+  while (!wl.empty()) {
+    Node *t = wl.back();
+    wl.pop_back();
+
+    if (id == 0) {
+      graphBBs.push_back(t->executedBBs);
+    } else {
+      graphBBs.push_back(t->newExecutedBBs);
+    }
+
+    // add 2 children to work list
+    if (t->trueTarget != NULL) {
+      wl.push_back(t->trueTarget);
+    }
+    if (t->falseTarget != NULL) {
+      wl.push_back(t->falseTarget);
+    }
+  }
+
+  // print graph
+  for (unsigned i = 0; i < graphBBs.size(); ++i) {
+    llvm::errs() << "Node " << (i + 1) << "\n";
+    for (unsigned j = 0; j < graphBBs[i].size(); ++j) {
+      graphBBs[i][j]->dump();
+    }
+    llvm::errs() << "============\n\n";
+  }
+}
+
+void TxTreeGraph::printDupBBs() {
+  if (instance->root == NULL) {
+    return;
+  }
+
+  // collect all nodes in graph using DFS
+  std::set<llvm::BasicBlock *> bbs;
+  std::vector<std::vector<llvm::BasicBlock *> > graphBBs;
+  std::vector<Node *> wl;
+  wl.push_back(instance->root);
+  while (!wl.empty()) {
+    Node *t = wl.back();
+    wl.pop_back();
+
+    std::vector<llvm::BasicBlock *> newBBs;
+    for (unsigned i = 0; i < t->executedBBs.size(); ++i) {
+      if (bbs.find(t->executedBBs[i]) == bbs.end()) {
+        newBBs.push_back(t->executedBBs[i]);
+        bbs.insert(t->executedBBs[i]);
+      } else {
+        llvm::ValueToValueMapTy VMap;
+        llvm::BasicBlock *tbb = llvm::CloneBasicBlock(
+            t->executedBBs[i], VMap, "", t->executedBBs[i]->getParent());
+        newBBs.push_back(tbb);
+      }
+    }
+    graphBBs.push_back(newBBs);
+
+    // add 2 children to work list
+    if (t->trueTarget != NULL) {
+      wl.push_back(t->trueTarget);
+    }
+    if (t->falseTarget != NULL) {
+      wl.push_back(t->falseTarget);
+    }
+  }
+
+  // print graph
+  for (unsigned i = 0; i < graphBBs.size(); ++i) {
+    llvm::errs() << "Node " << (i + 1) << "\n";
+    for (unsigned j = 0; j < graphBBs[i].size(); ++j) {
+      graphBBs[i][j]->dump();
+    }
+    llvm::errs() << "============\n\n";
+  }
 }

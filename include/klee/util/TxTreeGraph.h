@@ -21,6 +21,8 @@
 
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
 #include <map>
 
@@ -88,6 +90,8 @@ private:
     uint64_t markCount;
 
     std::vector<llvm::BasicBlock *> executedBBs;
+    std::vector<llvm::BasicBlock *> newExecutedBBs;
+    bool isProcessed;
 
     /// \brief The addition to the number of interesting instruction executed
     /// while processing a node: The interesting instruction is a return from a
@@ -97,7 +101,8 @@ private:
     Node(uint64_t _markCount)
         : nodeSequenceNumber(0), internalNodeId(0), parent(0), falseTarget(0),
           trueTarget(0), subsumed(false), errorType(TxTreeGraph::NONE),
-          errorPath(false), markCount(_markCount), markAddition(0) {}
+          errorPath(false), markCount(_markCount), isProcessed(false),
+          markAddition(0) {}
 
     ~Node() {
       if (falseTarget)
@@ -136,6 +141,7 @@ private:
   std::map<TxTreeNode *, TxTreeGraph::Node *> txTreeNodeMap;
   std::map<TxSubsumptionTableEntry *, TxTreeGraph::Node *> tableEntryMap;
   std::vector<TxTreeGraph::NumberedEdge *> subsumptionEdges;
+  std::map<TxTreeGraph::Node *, TxTreeGraph::Node *> subsumptionMap;
   std::map<TxPCConstraint *, TxTreeGraph::Node *> pathConditionMap;
 
   /// \brief The set of known leaves
@@ -158,7 +164,8 @@ private:
 
 public:
   static uint64_t nodeCount;
-
+  static llvm::Module *dupModule;
+  static llvm::ValueToValueMapTy vm;
   static void initialize(TxTreeNode *root) {
     if (!OUTPUT_INTERPOLATION_TREE)
       return;
@@ -202,6 +209,17 @@ public:
   static void save(std::string dotFileName);
 
   static void copyTxTreeNodeData(TxTreeNode *txTreeNode);
+  static void updateBBInCpModule();
+
+  static void generatePSSCFG();
+  static void updateRef(llvm::Instruction *ins, llvm::ValueToValueMapTy &vmap);
+  static void removeVal(llvm::ValueToValueMapTy &vmap,
+                        std::vector<llvm::BasicBlock *> executedBBs);
+  static void updateBranchInsts();
+  static void createSubsumedBB(TxTreeGraph::Node *n);
+
+  static void printBBs(int id);
+  static void printDupBBs();
 };
 }
 

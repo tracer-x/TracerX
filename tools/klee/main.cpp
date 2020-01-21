@@ -1424,12 +1424,8 @@ int main(int argc, char **argv, char **envp) {
 #endif
 
   // duplicate module
-  ValueToValueMapTy vm;
-  Module *cpModule = llvm::CloneModule(mainModule, vm);
-//  std::string EC;
-//  llvm::raw_fd_ostream OS("module.bc", EC, llvm::sys::fs::F_None);
-//  WriteBitcodeToFile(cpModule, OS);
-//  OS.flush();
+  ValueToValueMapTy dupVM;
+  TxTreeGraph::dupModule = llvm::CloneModule(mainModule, TxTreeGraph::vm);
   //---------
 
   if (WithPOSIXRuntime) {
