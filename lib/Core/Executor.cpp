@@ -2518,7 +2518,7 @@ void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
     }
 
     // print live BB
-    if (BBCoverage >= 3 && isNew) {
+    if (BBCoverage >= 3 && isNew && !isInSpecMode) {
       std::string liveBBFile =
           interpreterHandler->getOutputFilename("LiveBB.txt");
       std::ofstream liveBBFileOut(liveBBFile.c_str(), std::ofstream::app);
