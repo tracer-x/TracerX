@@ -184,7 +184,7 @@ class TxSubsumptionTableEntry {
 
   ref<Expr> wpInterpolant;
 
-  std::map<llvm::Value*, ref<Expr> > globalVariables;
+  std::map<llvm::Value *, ref<Expr> > markedGlobal;
 
   std::set<const Array *> existentials;
 

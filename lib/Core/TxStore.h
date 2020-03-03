@@ -35,8 +35,6 @@ public:
   typedef std::map<ref<TxVariable>, ref<TxStoreEntry> > LowerStateStore;
   typedef std::map<ref<TxAllocationContext>, MiddleStateStore> TopStateStore;
 
-  std::map<llvm::Value*, ref<Expr> > globalVariables;
-
   class MiddleStateStore {
   private:
     LowerStateStore concretelyAddressedStore;
@@ -185,6 +183,14 @@ private:
 public:
   ~TxStore() {}
 
+  bool isInInternalStateStore(ref<TxAllocationContext> ctx) {
+    TopStateStore::iterator middleStoreIter = internalStore.find(ctx);
+    if (middleStoreIter == internalStore.end()) {
+      return false;
+    }
+    return true;
+  }
+
   static TxStore *create(TxStore *src) {
     TxStore *ret = new TxStore();
     if (!src) {
@@ -296,8 +302,8 @@ public:
   bool markPointerFlow(ref<TxStateValue> target,
                        ref<TxStateValue> checkedOffset,
                        const std::string &reason) const {
-      std::set<uint64_t> bounds;
-      return markPointerFlow(target, checkedOffset, bounds, reason);
+    std::set<uint64_t> bounds;
+    return markPointerFlow(target, checkedOffset, bounds, reason);
   }
 
   /// \brief Mark as core all the pointer values and that flows to the target;
