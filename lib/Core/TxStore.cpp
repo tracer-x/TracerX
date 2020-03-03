@@ -674,6 +674,17 @@ void TxStore::markFlow(ref<TxStateValue> target,
            ie = allowBoundEntryList.end();
        it != ie; ++it) {
     recursivelyMarkFlow(*it, isInLeftSubtree((*it)->getDepth()), reason);
+    if (isa<llvm::GlobalVariable>((*it)
+                                      ->getAddress()
+                                      ->getAllocationInfo()
+                                      ->getContext()
+                                      ->getValue())) {
+      llvm::errs() << "This is global variable\n";
+      ref<TxAllocationContext> ctx =
+          (*it)->getAddress()->getAllocationInfo()->getContext();
+      ref<Expr> expr = (*it)->getContent()->getExpression();
+      markGlobalVariables(ctx, expr);
+    }
   }
 
   const std::set<ref<TxStoreEntry> > &disableBoundEntryList(
@@ -683,6 +694,16 @@ void TxStore::markFlow(ref<TxStateValue> target,
            ie = disableBoundEntryList.end();
        it != ie; ++it) {
     recursivelyMarkFlow(*it, isInLeftSubtree((*it)->getDepth()), reason);
+  }
+}
+
+void TxStore::markGlobalVariables(ref<TxAllocationContext> ctx, ref<Expr> expr) const {
+  if (parent) {
+    TopStateStore::iterator middleStoreIter = parent->internalStore.find(ctx);
+    if (middleStoreIter == parent->internalStore.end()) {
+      parent->globalVariables[ctx->getValue()] = expr;
+      parent->markGlobalVariables(ctx, expr);
+    }
   }
 }
 

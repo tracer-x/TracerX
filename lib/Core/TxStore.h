@@ -35,6 +35,8 @@ public:
   typedef std::map<ref<TxVariable>, ref<TxStoreEntry> > LowerStateStore;
   typedef std::map<ref<TxAllocationContext>, MiddleStateStore> TopStateStore;
 
+  std::map<llvm::Value*, ref<Expr> > globalVariables;
+
   class MiddleStateStore {
   private:
     LowerStateStore concretelyAddressedStore;
@@ -284,6 +286,8 @@ public:
   /// \brief Mark as core all the values and locations that flows to the
   /// target
   void markFlow(ref<TxStateValue> target, const std::string &reason) const;
+
+  void markGlobalVariables(ref<TxAllocationContext> ctx, ref<Expr> expr) const;
 
   /// \brief Mark as core all the pointer values and that flows to the target;
   /// and adjust its offset bound for memory bounds interpolation (a.k.a.

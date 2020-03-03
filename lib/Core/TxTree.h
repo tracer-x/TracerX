@@ -184,6 +184,8 @@ class TxSubsumptionTableEntry {
 
   ref<Expr> wpInterpolant;
 
+  std::map<llvm::Value*, ref<Expr> > globalVariables;
+
   std::set<const Array *> existentials;
 
   // Used to ensure at subsumption the value of the phiNodes in the subsumed

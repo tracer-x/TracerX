@@ -63,6 +63,15 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
       symbolicallyAddressedHistoricalStore);
 
+  globalVariables = node->getDependency()->getStore()->globalVariables;
+
+  llvm::errs() << "Entry at Node " << node->getNodeSequenceNumber() << "\n";
+  for(std::map<llvm::Value*, ref<Expr> >::iterator it = globalVariables.begin(),ie=globalVariables.end();
+		  it!=ie;++it){
+	  it->first->dump();
+	  it->second->dump();
+  }
+
   if (WPInterpolant)
     wpInterpolant = node->generateWPInterpolant();
 }
@@ -796,6 +805,33 @@ bool TxSubsumptionTableEntry::subsumed(
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
+
+  // Global check
+  bool globalSat = true;
+  std::map<llvm::Value *, ref<Expr> > stateGlobals =
+      state.txTreeNode->getDependency()->getStore()->globalVariables;
+  for (std::map<llvm::Value *, ref<Expr> >::iterator
+           it = globalVariables.begin(),
+           ie = globalVariables.end();
+       it != ie; ++it) {
+    std::map<llvm::Value *, ref<Expr> >::iterator tmp =
+        stateGlobals.find(it->first);
+    if (tmp == stateGlobals.end()) {
+      globalSat = false;
+    } else {
+      if (tmp->second != it->second) {
+        globalSat = false;
+      }
+    }
+  }
+  if (!globalSat) {
+    if (debugSubsumptionLevel >= 1) {
+      klee_message("#%lu=>#%lu: Check failure at global check ",
+                   state.txTreeNode->getNodeSequenceNumber(),
+                   nodeSequenceNumber);
+    }
+    return false;
+  }
 
   // WP interpolant check
   if (WPInterpolant && !wpInterpolant.isNull()) {
@@ -2401,6 +2437,8 @@ void TxTree::markPathCondition(ExecutionState &state,
       stream << "]";
       stream.flush();
     }
+
+    llvm::errs() << "Marking at Node " << currentTxTreeNode->getNodeSequenceNumber() << "\n";
     currentTxTreeNode->dependency->markAllValues(binst->getCondition(),
                                                  unknownExpression, reason);
   }
