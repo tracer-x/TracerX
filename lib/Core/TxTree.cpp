@@ -1770,6 +1770,16 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
 
   stream << prefix << "------------ Subsumption Table Entry ------------\n";
   stream << prefix << "Program point = " << programPoint << "\n";
+  stream << prefix << "global = [";
+  for (std::map<llvm::Value *, ref<Expr> >::const_iterator
+           it = globalVariables.begin(),
+           ie = globalVariables.end();
+       it != ie; ++it) {
+    it->first->print(stream);
+    stream << "=>";
+    it->second->print(stream);
+  }
+  stream << "]\n";
   stream << prefix << "interpolant = ";
   if (!interpolant.isNull())
     interpolant->print(stream);
