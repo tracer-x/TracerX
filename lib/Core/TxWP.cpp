@@ -722,10 +722,27 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
   ref<Expr> index, result;
   if (isa<llvm::AllocaInst>(p->getOperand(0))) {
     llvm::AllocaInst *alc = dyn_cast<llvm::AllocaInst>(p->getOperand(0));
-    width = getAllocaInstSize(alc);
-    index = ConstantExpr::create(0, width);
-    result =
-        WPVarExpr::create(p->getOperand(0), p->getOperand(0)->getName(), index);
+    if (alc->getName().empty()) {
+      llvm::Instruction *tmp = alc->getNextNode();
+      while (true) {
+        if (isa<llvm::StoreInst>(tmp) && tmp->getOperand(1) == alc) {
+          llvm::Value *arg = tmp->getOperand(0);
+          width = arg->getType()->getScalarSizeInBits();
+          index = ConstantExpr::create(0, width);
+          result = WPVarExpr::create(arg, arg->getName(), index);
+          // llvm::errs() << "width = " << width << "\n";
+          break;
+        } else {
+          tmp = tmp->getNextNode();
+        }
+      }
+    } else {
+
+      width = getAllocaInstSize(alc);
+      index = ConstantExpr::create(0, width);
+      result = WPVarExpr::create(p->getOperand(0), p->getOperand(0)->getName(),
+                                 index);
+    }
   } else if (isa<llvm::GlobalValue>(p->getOperand(0))) {
     llvm::GlobalValue *gv = dyn_cast<llvm::GlobalValue>(p->getOperand(0));
     width = getGlobalVariabletSize(gv);
