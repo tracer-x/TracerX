@@ -28,10 +28,32 @@ bool TxWPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
 
   case Expr::WPVar: {
     ref<WPVarExpr> wp1 = dyn_cast<WPVarExpr>(expr);
-    if (wp1->address == inst) {
+    // if inst is an alloca & empty name
+    // find its corresponding function argument
+    llvm::Value *arg = 0;
+    if (isa<llvm::AllocaInst>(inst)) {
+      llvm::AllocaInst *alc = dyn_cast<llvm::AllocaInst>(inst);
+      if (alc->getName().empty()) {
+        llvm::Instruction *tmp = alc->getNextNode();
+        while (true) {
+          if (isa<llvm::StoreInst>(tmp) && tmp->getOperand(1) == alc) {
+            arg = tmp->getOperand(0);
+            break;
+          } else {
+            tmp = tmp->getNextNode();
+          }
+        }
+      }
+    }
+    if (arg && arg == wp1->address) {
       return true;
-    } else
-      return false;
+    } else {
+      if (wp1->address == inst) {
+        return true;
+      } else {
+        return false;
+      }
+    }
   }
 
   case Expr::NotOptimized:

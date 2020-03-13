@@ -384,7 +384,6 @@ ref<Expr> TxWeakestPreCondition::PushUp(
       if (TxWPHelper::isTargetDependent(i->getOperand(1), WPExpr)) {
         ref<Expr> left = this->generateExprFromOperand(i->getOperand(0));
         ref<Expr> right = this->generateExprFromOperand(i->getOperand(1));
-
         if (left.isNull() || right.isNull()) {
           ref<Expr> result;
           return result;
@@ -426,6 +425,7 @@ ref<Expr> TxWeakestPreCondition::PushUp(
       }
     }
   }
+
   return WPExpr;
 }
 
@@ -656,7 +656,6 @@ ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
   unsigned width;
   ref<Expr> index, result;
   // klee_warning("PUSHUP2");
-  return result;
   width = getFunctionArgumentSize(arg);
   index = ConstantExpr::create(0, width);
   result = WPVarExpr::create(arg, arg->getName(), index);
@@ -740,8 +739,7 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
 
       width = getAllocaInstSize(alc);
       index = ConstantExpr::create(0, width);
-      result = WPVarExpr::create(p->getOperand(0), p->getOperand(0)->getName(),
-                                 index);
+      result = WPVarExpr::create(alc, alc->getName(), index);
     }
   } else if (isa<llvm::GlobalValue>(p->getOperand(0))) {
     llvm::GlobalValue *gv = dyn_cast<llvm::GlobalValue>(p->getOperand(0));
@@ -759,9 +757,26 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
 ref<Expr> TxWeakestPreCondition::getAllocaInst(llvm::AllocaInst *alc) {
   unsigned width;
   ref<Expr> index, result;
-  width = getAllocaInstSize(alc);
-  index = ConstantExpr::create(0, width);
-  result = WPVarExpr::create(alc, alc->getName(), index);
+
+  if (alc->getName().empty()) {
+    llvm::Instruction *tmp = alc->getNextNode();
+    while (true) {
+      if (isa<llvm::StoreInst>(tmp) && tmp->getOperand(1) == alc) {
+        llvm::Value *arg = tmp->getOperand(0);
+        width = arg->getType()->getScalarSizeInBits();
+        index = ConstantExpr::create(0, width);
+        result = WPVarExpr::create(alc, arg->getName(), index);
+        // llvm::errs() << "width = " << width << "\n";
+        break;
+      } else {
+        tmp = tmp->getNextNode();
+      }
+    }
+  } else {
+    width = getAllocaInstSize(alc);
+    index = ConstantExpr::create(0, width);
+    result = WPVarExpr::create(alc, alc->getName(), index);
+  }
   return result;
 }
 
