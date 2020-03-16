@@ -161,11 +161,50 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
            it1 = concretelyAddressedStore.begin(),
            ie1 = concretelyAddressedStore.end();
        it1 != ie1; ++it1) {
-    if (strcmp(it1->first->getValue()->getName().data(), "") != 0) {
-      pimiuVars.insert(it1->first->getValue()->getName().data());
-      std::set<std::string> right = TxPartitionHelper::getExprVars(
-          it1->second.begin()->second->getExpression());
-      pimiuVars.insert(right.begin(), right.end());
+
+    // if the row is function argument
+	bool isArgAlc = false;
+    if (isa<llvm::AllocaInst>(it1->first->getValue())) {
+      llvm::Instruction *alc =
+          dyn_cast<llvm::Instruction>(it1->first->getValue());
+      // alloca for function argument
+      if (alc->getName().empty() ||
+          (alc->getName().size() > 5 &&
+           alc->getName().substr(alc->getName().size() - 5, 5) == ".addr")) {
+    	isArgAlc = true;
+
+
+    	// search for argument
+        llvm::Instruction *tmp = alc->getNextNode();
+        while (true) {
+          if (isa<llvm::StoreInst>(tmp) && tmp->getOperand(1) == alc) {
+            pimiuVars.insert(tmp->getOperand(0)->getName().data());
+//            llvm::errs() << "Alloca for function argument ...\n";
+//            alc->dump();
+//            llvm::errs() << tmp->getOperand(0)->getName().data() << "\n";
+            break;
+          } else {
+            tmp = tmp->getNextNode();
+          }
+        }
+
+        // add the right
+        std::set<std::string> right = TxPartitionHelper::getExprVars(
+            it1->second.begin()->second->getExpression());
+        pimiuVars.insert(right.begin(), right.end());
+      }
+    }
+
+    if (!isArgAlc) {
+      if (!it1->first->getValue()->getName().empty()) {
+        pimiuVars.insert(it1->first->getValue()->getName().data());
+        std::set<std::string> right = TxPartitionHelper::getExprVars(
+            it1->second.begin()->second->getExpression());
+        pimiuVars.insert(right.begin(), right.end());
+      } else {
+        llvm::errs() << "Name is empty\n";
+        it1->first->getValue()->dump();
+      }
     }
   }
 
@@ -228,7 +267,40 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
            ie1 = concretelyAddressedStore.end();
        it1 != ie1; ++it1) {
     std::set<std::string> tmp;
-    if (strcmp(it1->first->getValue()->getName().data(), "") == 0) {
+
+    // if the row is function argument
+    bool isArgAlc = false;
+    if (isa<llvm::AllocaInst>(it1->first->getValue())) {
+      llvm::Instruction *alc =
+          dyn_cast<llvm::Instruction>(it1->first->getValue());
+      // alloca for function argument
+      if (alc->getName().empty() ||
+          (alc->getName().size() > 5 &&
+           alc->getName().substr(alc->getName().size() - 5, 5) == ".addr")) {
+        isArgAlc = true;
+
+        // get name
+        llvm::Instruction *tmpIns = alc->getNextNode();
+        while (true) {
+          if (isa<llvm::StoreInst>(tmpIns) && tmpIns->getOperand(1) == alc) {
+            tmp.insert(tmpIns->getOperand(0)->getName().data());
+            break;
+          } else {
+            tmpIns = tmpIns->getNextNode();
+          }
+        }
+
+        // the right
+        std::set<std::string> right = TxPartitionHelper::getExprVars(
+            it1->second.begin()->second->getExpression());
+        tmp.insert(right.begin(), right.end());
+        if (TxPartitionHelper::isShared(tmp, v1star)) {
+          v1star.insert(tmp.begin(), tmp.end());
+        }
+      }
+    }
+
+    if (!isArgAlc) {
       tmp.insert(it1->first->getValue()->getName().data());
       std::set<std::string> right = TxPartitionHelper::getExprVars(
           it1->second.begin()->second->getExpression());
@@ -294,7 +366,40 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
            ie1 = concretelyAddressedStore.end();
        it1 != ie1; ++it1) {
     std::set<std::string> tmp;
-    if (strcmp(it1->first->getValue()->getName().data(), "") != 0) {
+
+    // if the row is function argument
+    bool isArgAlc = false;
+    if (isa<llvm::AllocaInst>(it1->first->getValue())) {
+      llvm::Instruction *alc =
+          dyn_cast<llvm::Instruction>(it1->first->getValue());
+      // alloca for function argument
+      if (alc->getName().empty() ||
+          (alc->getName().size() > 5 &&
+           alc->getName().substr(alc->getName().size() - 5, 5) == ".addr")) {
+        isArgAlc = true;
+
+        // get name
+        llvm::Instruction *tmpIns = alc->getNextNode();
+        while (true) {
+          if (isa<llvm::StoreInst>(tmpIns) && tmpIns->getOperand(1) == alc) {
+            tmp.insert(tmpIns->getOperand(0)->getName().data());
+            break;
+          } else {
+            tmpIns = tmpIns->getNextNode();
+          }
+        }
+
+        // the right
+        std::set<std::string> right = TxPartitionHelper::getExprVars(
+            it1->second.begin()->second->getExpression());
+        tmp.insert(right.begin(), right.end());
+        if (!TxPartitionHelper::isShared(tmp, v1star)) {
+          dels.insert(it1->first);
+        }
+      }
+    }
+
+    if (!isArgAlc) {
       tmp.insert(it1->first->getValue()->getName().data());
       std::set<std::string> right = TxPartitionHelper::getExprVars(
           it1->second.begin()->second->getExpression());
