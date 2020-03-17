@@ -428,6 +428,9 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
  */
 ref<Expr> TxWeakestPreCondition::PushUp(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
+//  llvm::errs() << "Start PushUp \n";
+//  WPExpr->dump();
+//  llvm::errs() << "-----\n";
 
   for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
@@ -435,6 +438,8 @@ ref<Expr> TxWeakestPreCondition::PushUp(
        it != ie; ++it) {
     llvm::Instruction *i = (*it).first->inst;
     int flag = (*it).second;
+//    i->dump();
+//    llvm::errs() << "flag=" << flag << "\n";
     if (flag == 1) {
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- create and expression from the condition and this->WPExpr
@@ -528,8 +533,36 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         //        llvm::outs() << "****** End Flag = 0 for Update Array
         // *******\n";
       }
+    } else if (i->getOpcode() == llvm::Instruction::Call) {
+      llvm::CallInst *callInst = dyn_cast<llvm::CallInst>(i);
+      std::string fname = callInst->getCalledFunction()->getName().data();
+      bool ismakesym = (fname == "klee_make_symbolic");
+      if (!ismakesym) {
+        std::vector<ref<Expr> > passedVals;
+        for (unsigned u = 0; u < callInst->getNumArgOperands(); ++u) {
+          passedVals.push_back(
+              generateExprFromOperand(callInst->getArgOperand(u)));
+        }
+        std::vector<ref<Expr> > args;
+        for (llvm::Function::arg_iterator
+                 ait = callInst->getCalledFunction()->getArgumentList().begin(),
+                 aie = callInst->getCalledFunction()->getArgumentList().end();
+             ait != aie; ++ait) {
+          args.push_back(generateExprFromOperand(ait));
+        }
+        for (unsigned u = 0; u < passedVals.size(); ++u) {
+          WPExpr = TxWPHelper::substituteExpr(WPExpr, args[u], passedVals[u]);
+        }
+      }
     }
+
+//    WPExpr->dump();
+//    llvm::errs() << "-----\n";
   }
+
+  //  llvm::errs() << "End PushUp \n";
+  //  WPExpr->dump();
+  //  llvm::errs() << "-----\n";
 
   return WPExpr;
 }
