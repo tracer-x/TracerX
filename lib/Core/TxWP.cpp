@@ -161,50 +161,16 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
            it1 = concretelyAddressedStore.begin(),
            ie1 = concretelyAddressedStore.end();
        it1 != ie1; ++it1) {
-
-    // if the row is function argument
-	bool isArgAlc = false;
-    if (isa<llvm::AllocaInst>(it1->first->getValue())) {
-      llvm::Instruction *alc =
-          dyn_cast<llvm::Instruction>(it1->first->getValue());
-      // alloca for function argument
-      if (alc->getName().empty() ||
-          (alc->getName().size() > 5 &&
-           alc->getName().substr(alc->getName().size() - 5, 5) == ".addr")) {
-        isArgAlc = true;
-
-        // search for argument
-        llvm::Instruction *tmp = alc->getNextNode();
-        while (true) {
-          if (isa<llvm::StoreInst>(tmp) && tmp->getOperand(1) == alc) {
-            pimiuVars.insert(tmp->getOperand(0)->getName().data());
-//            llvm::errs() << "Alloca for function argument ...\n";
-//            alc->dump();
-//            llvm::errs() << tmp->getOperand(0)->getName().data() << "\n";
-            break;
-          } else {
-            tmp = tmp->getNextNode();
-          }
-        }
-
-        // add the right
-        std::set<std::string> right = TxPartitionHelper::getExprVars(
-            it1->second.begin()->second->getExpression());
-        pimiuVars.insert(right.begin(), right.end());
-      }
+    std::string name;
+    if (it1->first->getValue()->getName().empty()) {
+      name = TxWPHelper::getNoNameInst(it1->first->getValue());
+    } else {
+      name = it1->first->getValue()->getName().str();
     }
-
-    if (!isArgAlc) {
-      if (!it1->first->getValue()->getName().empty()) {
-        pimiuVars.insert(it1->first->getValue()->getName().data());
-        std::set<std::string> right = TxPartitionHelper::getExprVars(
-            it1->second.begin()->second->getExpression());
-        pimiuVars.insert(right.begin(), right.end());
-      } else {
-        llvm::errs() << "Name is empty\n";
-        it1->first->getValue()->dump();
-      }
-    }
+    pimiuVars.insert(name);
+    std::set<std::string> right = TxPartitionHelper::getExprVars(
+        it1->second.begin()->second->getExpression());
+    pimiuVars.insert(right.begin(), right.end());
   }
 
   // add normal names of __shadow__ variables
@@ -266,47 +232,18 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
            ie1 = concretelyAddressedStore.end();
        it1 != ie1; ++it1) {
     std::set<std::string> tmp;
-
-    // if the row is function argument
-    bool isArgAlc = false;
-    if (isa<llvm::AllocaInst>(it1->first->getValue())) {
-      llvm::Instruction *alc =
-          dyn_cast<llvm::Instruction>(it1->first->getValue());
-      // alloca for function argument
-      if (alc->getName().empty() ||
-          (alc->getName().size() > 5 &&
-           alc->getName().substr(alc->getName().size() - 5, 5) == ".addr")) {
-        isArgAlc = true;
-
-        // get name
-        llvm::Instruction *tmpIns = alc->getNextNode();
-        while (true) {
-          if (isa<llvm::StoreInst>(tmpIns) && tmpIns->getOperand(1) == alc) {
-            tmp.insert(tmpIns->getOperand(0)->getName().data());
-            break;
-          } else {
-            tmpIns = tmpIns->getNextNode();
-          }
-        }
-
-        // the right
-        std::set<std::string> right = TxPartitionHelper::getExprVars(
-            it1->second.begin()->second->getExpression());
-        tmp.insert(right.begin(), right.end());
-        if (TxPartitionHelper::isShared(tmp, v1star)) {
-          v1star.insert(tmp.begin(), tmp.end());
-        }
-      }
+    std::string name;
+    if (it1->first->getValue()->getName().empty()) {
+      name = TxWPHelper::getNoNameInst(it1->first->getValue());
+    } else {
+      name = it1->first->getValue()->getName().str();
     }
-
-    if (!isArgAlc) {
-      tmp.insert(it1->first->getValue()->getName().data());
-      std::set<std::string> right = TxPartitionHelper::getExprVars(
-          it1->second.begin()->second->getExpression());
-      tmp.insert(right.begin(), right.end());
-      if (TxPartitionHelper::isShared(tmp, v1star)) {
-        v1star.insert(tmp.begin(), tmp.end());
-      }
+    tmp.insert(name);
+    std::set<std::string> right = TxPartitionHelper::getExprVars(
+        it1->second.begin()->second->getExpression());
+    tmp.insert(right.begin(), right.end());
+    if (TxPartitionHelper::isShared(tmp, v1star)) {
+      v1star.insert(tmp.begin(), tmp.end());
     }
   }
 
@@ -365,47 +302,18 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
            ie1 = concretelyAddressedStore.end();
        it1 != ie1; ++it1) {
     std::set<std::string> tmp;
-
-    // if the row is function argument
-    bool isArgAlc = false;
-    if (isa<llvm::AllocaInst>(it1->first->getValue())) {
-      llvm::Instruction *alc =
-          dyn_cast<llvm::Instruction>(it1->first->getValue());
-      // alloca for function argument
-      if (alc->getName().empty() ||
-          (alc->getName().size() > 5 &&
-           alc->getName().substr(alc->getName().size() - 5, 5) == ".addr")) {
-        isArgAlc = true;
-
-        // get name
-        llvm::Instruction *tmpIns = alc->getNextNode();
-        while (true) {
-          if (isa<llvm::StoreInst>(tmpIns) && tmpIns->getOperand(1) == alc) {
-            tmp.insert(tmpIns->getOperand(0)->getName().data());
-            break;
-          } else {
-            tmpIns = tmpIns->getNextNode();
-          }
-        }
-
-        // the right
-        std::set<std::string> right = TxPartitionHelper::getExprVars(
-            it1->second.begin()->second->getExpression());
-        tmp.insert(right.begin(), right.end());
-        if (!TxPartitionHelper::isShared(tmp, v1star)) {
-          dels.insert(it1->first);
-        }
-      }
+    std::string name;
+    if (it1->first->getValue()->getName().empty()) {
+      name = TxWPHelper::getNoNameInst(it1->first->getValue());
+    } else {
+      name = it1->first->getValue()->getName().str();
     }
-
-    if (!isArgAlc) {
-      tmp.insert(it1->first->getValue()->getName().data());
-      std::set<std::string> right = TxPartitionHelper::getExprVars(
-          it1->second.begin()->second->getExpression());
-      tmp.insert(right.begin(), right.end());
-      if (!TxPartitionHelper::isShared(tmp, v1star)) {
-        dels.insert(it1->first);
-      }
+    tmp.insert(name);
+    std::set<std::string> right = TxPartitionHelper::getExprVars(
+        it1->second.begin()->second->getExpression());
+    tmp.insert(right.begin(), right.end());
+    if (!TxPartitionHelper::isShared(tmp, v1star)) {
+      dels.insert(it1->first);
     }
   }
   for (std::set<ref<TxAllocationContext> >::iterator it = dels.begin(),
@@ -858,28 +766,15 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
   ref<Expr> index, result;
   if (isa<llvm::AllocaInst>(p->getOperand(0))) {
     llvm::AllocaInst *alc = dyn_cast<llvm::AllocaInst>(p->getOperand(0));
-    if (alc->getName().empty() ||
-        (alc->getName().size() > 5 &&
-         alc->getName().substr(alc->getName().size() - 5, 5) == ".addr")) {
-      llvm::Instruction *tmp = alc->getNextNode();
-      while (true) {
-        if (isa<llvm::StoreInst>(tmp) && tmp->getOperand(1) == alc) {
-          llvm::Value *arg = tmp->getOperand(0);
-          width = arg->getType()->getScalarSizeInBits();
-          index = ConstantExpr::create(0, width);
-          result = WPVarExpr::create(arg, arg->getName(), index);
-          // llvm::errs() << "width = " << width << "\n";
-          break;
-        } else {
-          tmp = tmp->getNextNode();
-        }
-      }
+    std::string name;
+    if (alc->getName().empty()) {
+      name = TxWPHelper::getNoNameInst(alc);
     } else {
-
-      width = getAllocaInstSize(alc);
-      index = ConstantExpr::create(0, width);
-      result = WPVarExpr::create(alc, alc->getName(), index);
+      name = alc->getName().str();
     }
+    width = getAllocaInstSize(alc);
+    index = ConstantExpr::create(0, width);
+    result = WPVarExpr::create(alc, name, index);
   } else if (isa<llvm::GlobalValue>(p->getOperand(0))) {
     llvm::GlobalValue *gv = dyn_cast<llvm::GlobalValue>(p->getOperand(0));
     width = getGlobalVariabletSize(gv);
@@ -896,28 +791,16 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
 ref<Expr> TxWeakestPreCondition::getAllocaInst(llvm::AllocaInst *alc) {
   unsigned width;
   ref<Expr> index, result;
-
-  if (alc->getName().empty() ||
-      (alc->getName().size() > 5 &&
-       alc->getName().substr(alc->getName().size() - 5, 5) == ".addr")) {
-    llvm::Instruction *tmp = alc->getNextNode();
-    while (true) {
-      if (isa<llvm::StoreInst>(tmp) && tmp->getOperand(1) == alc) {
-        llvm::Value *arg = tmp->getOperand(0);
-        width = arg->getType()->getScalarSizeInBits();
-        index = ConstantExpr::create(0, width);
-        result = WPVarExpr::create(alc, arg->getName(), index);
-        // llvm::errs() << "width = " << width << "\n";
-        break;
-      } else {
-        tmp = tmp->getNextNode();
-      }
-    }
+  std::string name;
+  if (alc->getName().empty()) {
+    name = TxWPHelper::getNoNameInst(alc);
   } else {
-    width = getAllocaInstSize(alc);
-    index = ConstantExpr::create(0, width);
-    result = WPVarExpr::create(alc, alc->getName(), index);
+    name = alc->getName().str();
   }
+  width = getAllocaInstSize(alc);
+  index = ConstantExpr::create(0, width);
+  result = WPVarExpr::create(alc, name, index);
+
   return result;
 }
 

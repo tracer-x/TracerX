@@ -24,6 +24,7 @@
 #include <klee/Internal/Support/ErrorHandling.h>
 #include <klee/util/ArrayCache.h>
 #include <vector>
+#include "TxSpeculation.h"
 
 namespace klee {
 
@@ -38,6 +39,15 @@ public:
   static ref<Expr> substituteExpr(ref<Expr> base, const ref<Expr> lhs,
                                   const ref<Expr> rhs);
 
+  static std::string getNoNameInst(const llvm::Value *i) {
+    if (!i->getName().empty())
+      return i->getName().str();
+    std::string Str;
+    llvm::raw_string_ostream OS(Str);
+    i->print(OS);
+    unsigned pos = OS.str().find("=");
+    return TxSpeculationHelper::trim(OS.str().substr(0, pos));
+  }
 };
 
 } /* namespace klee */
