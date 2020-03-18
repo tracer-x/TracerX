@@ -171,10 +171,9 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
       if (alc->getName().empty() ||
           (alc->getName().size() > 5 &&
            alc->getName().substr(alc->getName().size() - 5, 5) == ".addr")) {
-    	isArgAlc = true;
+        isArgAlc = true;
 
-
-    	// search for argument
+        // search for argument
         llvm::Instruction *tmp = alc->getNextNode();
         while (true) {
           if (isa<llvm::StoreInst>(tmp) && tmp->getOperand(1) == alc) {
@@ -859,7 +858,9 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
   ref<Expr> index, result;
   if (isa<llvm::AllocaInst>(p->getOperand(0))) {
     llvm::AllocaInst *alc = dyn_cast<llvm::AllocaInst>(p->getOperand(0));
-    if (alc->getName().empty()) {
+    if (alc->getName().empty() ||
+        (alc->getName().size() > 5 &&
+         alc->getName().substr(alc->getName().size() - 5, 5) == ".addr")) {
       llvm::Instruction *tmp = alc->getNextNode();
       while (true) {
         if (isa<llvm::StoreInst>(tmp) && tmp->getOperand(1) == alc) {
@@ -896,7 +897,9 @@ ref<Expr> TxWeakestPreCondition::getAllocaInst(llvm::AllocaInst *alc) {
   unsigned width;
   ref<Expr> index, result;
 
-  if (alc->getName().empty()) {
+  if (alc->getName().empty() ||
+      (alc->getName().size() > 5 &&
+       alc->getName().substr(alc->getName().size() - 5, 5) == ".addr")) {
     llvm::Instruction *tmp = alc->getNextNode();
     while (true) {
       if (isa<llvm::StoreInst>(tmp) && tmp->getOperand(1) == alc) {
