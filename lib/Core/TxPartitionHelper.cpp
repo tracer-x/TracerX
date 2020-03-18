@@ -47,7 +47,7 @@ std::set<std::string> TxPartitionHelper::getExprVars(ref<Expr> expr) {
 
   case Expr::WPVar: {
     ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(expr);
-    vars.insert(WPVar->address->getName());
+    vars.insert(WPVar->name);
     return vars;
   }
 
