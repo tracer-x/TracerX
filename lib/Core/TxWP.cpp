@@ -535,8 +535,8 @@ ref<Expr> TxWeakestPreCondition::PushUp(
     } else if (i->getOpcode() == llvm::Instruction::Call) {
       llvm::CallInst *callInst = dyn_cast<llvm::CallInst>(i);
       std::string fname = callInst->getCalledFunction()->getName().data();
-      bool ismakesym = (fname == "klee_make_symbolic");
-      if (!ismakesym) {
+      bool isignore = (fname.substr(0, 5) == "klee_") || (fname.substr(0, 3) == "tx_");
+      if (!isignore) {
         std::vector<ref<Expr> > passedVals;
         for (unsigned u = 0; u < callInst->getNumArgOperands(); ++u) {
           passedVals.push_back(
