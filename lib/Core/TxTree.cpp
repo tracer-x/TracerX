@@ -19,6 +19,7 @@
 
 #include "TxDependency.h"
 #include "TxShadowArray.h"
+#include "Memory.h"
 #include <fstream>
 #include <klee/CommandLine.h>
 #include <klee/Expr.h>
@@ -803,28 +804,53 @@ bool TxSubsumptionTableEntry::subsumed(
 
   // Global check
   bool globalSat = true;
-  std::map<llvm::Value *, ref<Expr> > stateGlobals =
-      state.txTreeNode->getDependency()->getMarkedGlobal();
+  std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses =
+      state.txTreeNode->getGlobalAddresses();
   for (std::map<llvm::Value *, ref<Expr> >::iterator it = markedGlobal.begin(),
                                                      ie = markedGlobal.end();
        it != ie; ++it) {
-    std::map<llvm::Value *, ref<Expr> >::iterator tmp =
-        stateGlobals.find(it->first);
-    if (tmp == stateGlobals.end()) {
+    const llvm::GlobalValue *gv = dyn_cast<llvm::GlobalValue>(it->first);
+    std::map<const llvm::GlobalValue *, ref<ConstantExpr> >::iterator
+        globalAddrIt = globalAddresses->find(gv);
+    if (globalAddrIt == globalAddresses->end()) {
       globalSat = false;
+      break;
     } else {
-      if (tmp->second != it->second) {
+      ref<klee::ConstantExpr> addr = globalAddrIt->second;
+      ObjectPair op;
+      bool resolve = state.addressSpace.resolveOne(addr, op);
+      if (!resolve) {
         globalSat = false;
+        break;
+      } else {
+        Expr::Width type =
+            gv->getType()->getElementType()->getIntegerBitWidth();
+        ref<Expr> p = cast<klee::Expr>(addr);
+
+        const ObjectState *os = op.second;
+        const MemoryObject *mo = op.first;
+        ref<Expr> result = os->read(mo->getOffsetExpr(addr), type);
+        if (result != it->second) {
+          globalSat = false;
+          break;
+        }
       }
     }
   }
+
   if (!globalSat) {
     if (debugSubsumptionLevel >= 1) {
-      klee_message("#%lu=>#%lu: Check failure at global check ",
+      klee_message("#%lu=>#%lu: Global check fail",
                    state.txTreeNode->getNodeSequenceNumber(),
                    nodeSequenceNumber);
     }
     return false;
+  } else {
+    if (debugSubsumptionLevel >= 1) {
+      klee_message("#%lu=>#%lu: Global check success",
+                   state.txTreeNode->getNodeSequenceNumber(),
+                   nodeSequenceNumber);
+    }
   }
 
   // WP interpolant check
