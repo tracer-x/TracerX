@@ -140,13 +140,13 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
   std::set<std::string> wpVars;
   if (!entry->getWPInterpolant().isNull())
     wpVars = TxPartitionHelper::getExprVars(entry->getWPInterpolant());
-  std::set<std::string> newWpVars;
-  for (std::set<std::string>::iterator it = wpVars.begin(), ie = wpVars.end();
-       it != ie; ++it) {
-    newWpVars.insert(*it);
-    newWpVars.insert("__shadow__" + (*it));
-  }
-  wpVars.swap(newWpVars);
+//  std::set<std::string> newWpVars;
+//  for (std::set<std::string>::iterator it = wpVars.begin(), ie = wpVars.end();
+//       it != ie; ++it) {
+//    newWpVars.insert(*it);
+//    newWpVars.insert("__shadow__" + (*it));
+//  }
+//  wpVars.swap(newWpVars);
 
   // get vars(pi, miu)
   // vars(pi)
@@ -174,43 +174,41 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
   }
 
   // add normal names of __shadow__ variables
-  std::set<std::string> pimiuVars2;
-  for (std::set<std::string>::iterator it1 = pimiuVars.begin(),
-                                       ie1 = pimiuVars.end();
-       it1 != ie1; ++it1) {
-    // keep both normal & __shadow__
-    pimiuVars2.insert((*it1));
-    std::string toErase = "__shadow__";
-    size_t pos = (*it1).find(toErase);
-    if (pos == std::string::npos) {
-      pimiuVars2.insert(*it1);
-    }
-  }
+//  std::set<std::string> pimiuVars2;
+//  for (std::set<std::string>::iterator it1 = pimiuVars.begin(),
+//                                       ie1 = pimiuVars.end();
+//       it1 != ie1; ++it1) {
+//    // keep both normal & __shadow__
+//    pimiuVars2.insert((*it1));
+//    std::string toErase = "__shadow__";
+//    size_t pos = (*it1).find(toErase);
+//    if (pos == std::string::npos) {
+//      pimiuVars2.insert(*it1);
+//    }
+//  }
 
   // get v1 = vars(pi,miu) - vars(w)
-  std::set<std::string> v1 = TxPartitionHelper::diff(pimiuVars2, wpVars);
+  std::set<std::string> v1 = TxPartitionHelper::diff(pimiuVars, wpVars);
 
-  /*
-  llvm::errs() << "Vars(pi,miu):\n";
-  for (std::set<std::string>::iterator it = pimiuVars2.begin(),
-                                       ie = pimiuVars2.end();
-       it != ie; ++it) {
-    llvm::errs() << (*it) << "; ";
-  }
-  llvm::errs() << "\n-------------\n";
-  llvm::errs() << "Vars(w):\n";
-  for (std::set<std::string>::iterator it = wpVars.begin(), ie = wpVars.end();
-       it != ie; ++it) {
-    llvm::errs() << (*it) << "; ";
-  }
-  llvm::errs() << "\n-------------\n";
-  llvm::errs() << "Vars(v1) = Vars(pi,miu) - Vars(w):\n";
-  for (std::set<std::string>::iterator it = v1.begin(), ie = v1.end(); it != ie;
-       ++it) {
-    llvm::errs() << (*it) << "; ";
-  }
-  llvm::errs() << "\n-------------\n";
-  */
+//  llvm::errs() << "Vars(pi,miu):\n";
+//  for (std::set<std::string>::iterator it = pimiuVars.begin(),
+//                                       ie = pimiuVars.end();
+//       it != ie; ++it) {
+//    llvm::errs() << (*it) << "; ";
+//  }
+//  llvm::errs() << "\n-------------\n";
+//  llvm::errs() << "Vars(w):\n";
+//  for (std::set<std::string>::iterator it = wpVars.begin(), ie = wpVars.end();
+//       it != ie; ++it) {
+//    llvm::errs() << (*it) << "; ";
+//  }
+//  llvm::errs() << "\n-------------\n";
+//  llvm::errs() << "Vars(v1) = Vars(pi,miu) - Vars(w):\n";
+//  for (std::set<std::string>::iterator it = v1.begin(), ie = v1.end(); it != ie;
+//       ++it) {
+//    llvm::errs() << (*it) << "; ";
+//  }
+//  llvm::errs() << "\n-------------\n";
 
   // closure(pi,miu,v1)
   std::set<std::string> v1star = v1;
@@ -250,20 +248,18 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
   // v2
   std::set<std::string> v2 = TxPartitionHelper::diff(wpVars, v1star);
 
-  /*
-  llvm::errs() << "Vars(v1star) = Closure(pi,miu, v1):\n";
-  for (std::set<std::string>::iterator it = v1star.begin(), ie = v1star.end();
-       it != ie; ++it) {
-    llvm::errs() << (*it) << "; ";
-  }
-  llvm::errs() << "\n-------------\n";
-  llvm::errs() << "Vars(v2) = Vars(w) − Vars(v1star):\n";
-  for (std::set<std::string>::iterator it = v2.begin(), ie = v2.end();
-       it != ie; ++it) {
-    llvm::errs() << (*it) << "; ";
-  }
-  llvm::errs() << "\n-------------\n";
-  */
+//  llvm::errs() << "Vars(v1star) = Closure(pi,miu, v1):\n";
+//  for (std::set<std::string>::iterator it = v1star.begin(), ie = v1star.end();
+//       it != ie; ++it) {
+//    llvm::errs() << (*it) << "; ";
+//  }
+//  llvm::errs() << "\n-------------\n";
+//  llvm::errs() << "Vars(v2) = Vars(w) − Vars(v1star):\n";
+//  for (std::set<std::string>::iterator it = v2.begin(), ie = v2.end();
+//       it != ie; ++it) {
+//    llvm::errs() << (*it) << "; ";
+//  }
+//  llvm::errs() << "\n-------------\n";
 
   // update pi by (wp,v2) and (pi,v1star)
   std::vector<ref<Expr> > wpComps =
