@@ -1100,31 +1100,25 @@ void TxDependency::markGlobalVars(ref<TxStateValue> value,
            it = allowBoundEntryList.begin(),
            ie = allowBoundEntryList.end();
        it != ie; ++it) {
-    if (isa<llvm::GlobalVariable>((*it)
-                                      ->getAddress()
-                                      ->getAllocationInfo()
-                                      ->getContext()
-                                      ->getValue())) {
-      ref<TxAllocationContext> ctx =
-          (*it)->getAddress()->getAllocationInfo()->getContext();
-      ref<Expr> expr = (*it)->getContent()->getExpression();
+    ref<TxStoreEntry> se = (*it);
+    if (isa<llvm::GlobalVariable>(
+            se->getAddress()->getAllocationInfo()->getContext()->getValue())) {
 
       // keep at current node & parent nodes
-      markedGlobal[ctx->getValue()] = expr;
+      markedGlobal.insert(se);
       if (parent) {
-        parent->recursivelyMarkGlobalVars(ctx, expr);
+        parent->recursivelyMarkGlobalVars(se);
       }
     }
   }
 }
 
-void TxDependency::recursivelyMarkGlobalVars(ref<TxAllocationContext> ctx,
-                                             ref<Expr> expr) {
-  if (!store->isInInternalStateStore(ctx)) {
-    markedGlobal[ctx->getValue()] = expr;
+void TxDependency::recursivelyMarkGlobalVars(ref<TxStoreEntry> se) {
+  if (!store->isInInternalStateStore(se->getAddress()->getContext())) {
+    markedGlobal.insert(se);
   }
   if (parent) {
-    parent->recursivelyMarkGlobalVars(ctx, expr);
+    parent->recursivelyMarkGlobalVars(se);
   }
 }
 

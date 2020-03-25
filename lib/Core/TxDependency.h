@@ -193,7 +193,7 @@ class TxDependency {
   /// variable is just a pointer to the one in klee::Executor.
   std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
 
-  std::map<llvm::Value *, ref<Expr> > markedGlobal;
+  std::set< ref<TxStoreEntry> > markedGlobal;
 
   /// \brief Tests if a pointer points to a main function's argument
   static bool isMainArgument(const llvm::Value *loc);
@@ -334,7 +334,7 @@ public:
 
   ~TxDependency();
 
-  std::map<llvm::Value *, ref<Expr> > &getMarkedGlobal() {
+  std::set< ref<TxStoreEntry> > &getMarkedGlobal() {
     return markedGlobal;
   }
 
@@ -500,7 +500,7 @@ public:
 
   void markGlobalVars(ref<TxStateValue> value, const std::string &reason);
 
-  void recursivelyMarkGlobalVars(ref<TxAllocationContext>, ref<Expr> expr);
+  void recursivelyMarkGlobalVars(ref<TxStoreEntry> se);
 
   /// \brief Given an LLVM value which is used as an address, retrieve all its
   /// sources and mark them as in the core. Returns true if bounds error was

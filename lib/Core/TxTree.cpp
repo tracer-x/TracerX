@@ -804,36 +804,36 @@ bool TxSubsumptionTableEntry::subsumed(
 
   // Global check
   bool globalSat = true;
-  std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses =
-      state.txTreeNode->getGlobalAddresses();
-  for (std::map<llvm::Value *, ref<Expr> >::iterator it = markedGlobal.begin(),
-                                                     ie = markedGlobal.end();
+
+  llvm::errs() << "Global checking: " << state.txTreeNode->getNodeSequenceNumber() << "\n";
+
+  for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
+                                                 ie = markedGlobal.end();
        it != ie; ++it) {
-    const llvm::GlobalValue *gv = dyn_cast<llvm::GlobalValue>(it->first);
-    std::map<const llvm::GlobalValue *, ref<ConstantExpr> >::iterator
-        globalAddrIt = globalAddresses->find(gv);
-    if (globalAddrIt == globalAddresses->end()) {
+    ref<Expr> entryVal = (*it)->getContent()->getExpression();
+
+
+    ref<Expr> addr = (*it)->getAddress()->getAddress();
+    ref<Expr> offset = (*it)->getAddress()->getOffset();
+    unsigned type = (*it)->getValue()->getType()->getIntegerBitWidth();
+
+    ObjectPair op;
+    bool resolve = state.addressSpace.resolveOne(cast<klee::ConstantExpr>(addr), op);
+    if (!resolve) {
       globalSat = false;
       break;
     } else {
-      ref<klee::ConstantExpr> addr = globalAddrIt->second;
-      ObjectPair op;
-      bool resolve = state.addressSpace.resolveOne(addr, op);
-      if (!resolve) {
+      const ObjectState *os = op.second;
+      ref<Expr> result = os->read(offset, type);
+
+      (*it)->getAddress()->dump();
+      entryVal->dump();
+      result->dump();
+      llvm::errs() << "--------\n";
+
+      if (result != entryVal) {
         globalSat = false;
         break;
-      } else {
-        Expr::Width type =
-            gv->getType()->getElementType()->getIntegerBitWidth();
-        ref<Expr> p = cast<klee::Expr>(addr);
-
-        const ObjectState *os = op.second;
-        const MemoryObject *mo = op.first;
-        ref<Expr> result = os->read(mo->getOffsetExpr(addr), type);
-        if (result != it->second) {
-          globalSat = false;
-          break;
-        }
       }
     }
   }
@@ -1787,16 +1787,16 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
 
   stream << prefix << "------------ Subsumption Table Entry ------------\n";
   stream << prefix << "Program point = " << programPoint << "\n";
-  stream << prefix << "global = [";
-  for (std::map<llvm::Value *, ref<Expr> >::const_iterator
-           it = markedGlobal.begin(),
-           ie = markedGlobal.end();
-       it != ie; ++it) {
-    it->first->print(stream);
-    stream << "=>";
-    it->second->print(stream);
-  }
-  stream << "]\n";
+//  stream << prefix << "global = [";
+//  for (std::map<llvm::Value *, ref<Expr> >::const_iterator
+//           it = markedGlobal.begin(),
+//           ie = markedGlobal.end();
+//       it != ie; ++it) {
+//    it->first->print(stream);
+//    stream << "=>";
+//    it->second->print(stream);
+//  }
+//  stream << "]\n";
   stream << prefix << "interpolant = ";
   if (!interpolant.isNull())
     interpolant->print(stream);
