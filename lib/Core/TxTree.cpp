@@ -805,8 +805,6 @@ bool TxSubsumptionTableEntry::subsumed(
   // Global check
   bool globalSat = true;
 
-  llvm::errs() << "Global checking: " << state.txTreeNode->getNodeSequenceNumber() << "\n";
-
   for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
                                                  ie = markedGlobal.end();
        it != ie; ++it) {
@@ -825,11 +823,6 @@ bool TxSubsumptionTableEntry::subsumed(
     } else {
       const ObjectState *os = op.second;
       ref<Expr> result = os->read(offset, type);
-
-      (*it)->getAddress()->dump();
-      entryVal->dump();
-      result->dump();
-      llvm::errs() << "--------\n";
 
       if (result != entryVal) {
         globalSat = false;
@@ -1787,16 +1780,13 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
 
   stream << prefix << "------------ Subsumption Table Entry ------------\n";
   stream << prefix << "Program point = " << programPoint << "\n";
-//  stream << prefix << "global = [";
-//  for (std::map<llvm::Value *, ref<Expr> >::const_iterator
-//           it = markedGlobal.begin(),
-//           ie = markedGlobal.end();
-//       it != ie; ++it) {
-//    it->first->print(stream);
-//    stream << "=>";
-//    it->second->print(stream);
-//  }
-//  stream << "]\n";
+  stream << prefix << "global = [";
+  for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
+                                              ie = markedGlobal.end();
+       it != ie; ++it) {
+    (*it)->print(stream);
+  }
+  stream << "]\n";
   stream << prefix << "interpolant = ";
   if (!interpolant.isNull())
     interpolant->print(stream);
