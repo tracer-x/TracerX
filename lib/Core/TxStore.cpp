@@ -686,16 +686,6 @@ void TxStore::markFlow(ref<TxStateValue> target,
   }
 }
 
-// void TxStore::markGlobalVariables(ref<TxAllocationContext> ctx, ref<Expr>
-// expr) const {
-//  if (parent) {
-//    TopStateStore::iterator middleStoreIter = parent->internalStore.find(ctx);
-//    if (middleStoreIter == parent->internalStore.end()) {
-//      parent->globalVariables[ctx->getValue()] = expr;
-//      parent->markGlobalVariables(ctx, expr);
-//    }
-//  }
-//}
 
 bool TxStore::recursivelyMarkPointerFlow(ref<TxStoreEntry> entry,
                                          bool leftMarking,
