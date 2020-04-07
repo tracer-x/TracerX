@@ -808,9 +808,10 @@ bool TxSubsumptionTableEntry::subsumed(
   for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
                                                  ie = markedGlobal.end();
        it != ie; ++it) {
+    if((*it)->getValue()->getType()->isPointerTy()) {
+      continue;
+    }
     ref<Expr> entryVal = (*it)->getContent()->getExpression();
-
-
     ref<Expr> addr = (*it)->getAddress()->getAddress();
     ref<Expr> offset = (*it)->getAddress()->getOffset();
     unsigned type = (*it)->getValue()->getType()->getIntegerBitWidth();
