@@ -686,7 +686,6 @@ void TxStore::markFlow(ref<TxStateValue> target,
   }
 }
 
-
 bool TxStore::recursivelyMarkPointerFlow(ref<TxStoreEntry> entry,
                                          bool leftMarking,
                                          ref<TxStateValue> checkedAddress,

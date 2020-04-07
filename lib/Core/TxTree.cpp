@@ -2451,7 +2451,6 @@ void TxTree::markPathCondition(ExecutionState &state,
       stream << "]";
       stream.flush();
     }
-
     currentTxTreeNode->dependency->markAllValues(binst->getCondition(),
                                                  unknownExpression, reason);
   }
