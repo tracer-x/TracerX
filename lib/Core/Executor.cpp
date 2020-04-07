@@ -1476,7 +1476,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // case also we extract the unsat core of the proof
       txTree->markPathCondition(current, unsatCore);
       if (WPInterpolant)
-        txTree->markInstruction(current.prevPC, true);
+        txTree->markInstruction(current.prevPC, false);
     }
 
     return StatePair(0, &current);

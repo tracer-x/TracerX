@@ -183,6 +183,14 @@ private:
 public:
   ~TxStore() {}
 
+  bool isInInternalStateStore(ref<TxAllocationContext> ctx) {
+    TopStateStore::iterator middleStoreIter = internalStore.find(ctx);
+    if (middleStoreIter == internalStore.end()) {
+      return false;
+    }
+    return true;
+  }
+
   static TxStore *create(TxStore *src) {
     TxStore *ret = new TxStore();
     if (!src) {
@@ -285,6 +293,8 @@ public:
   /// target
   void markFlow(ref<TxStateValue> target, const std::string &reason) const;
 
+  void markGlobalVariables(ref<TxAllocationContext> ctx, ref<Expr> expr) const;
+
   /// \brief Mark as core all the pointer values and that flows to the target;
   /// and adjust its offset bound for memory bounds interpolation (a.k.a.
   /// slackening). Returns true if memory bounds violation is detected; false
@@ -292,8 +302,8 @@ public:
   bool markPointerFlow(ref<TxStateValue> target,
                        ref<TxStateValue> checkedOffset,
                        const std::string &reason) const {
-      std::set<uint64_t> bounds;
-      return markPointerFlow(target, checkedOffset, bounds, reason);
+    std::set<uint64_t> bounds;
+    return markPointerFlow(target, checkedOffset, bounds, reason);
   }
 
   /// \brief Mark as core all the pointer values and that flows to the target;

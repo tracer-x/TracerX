@@ -30,6 +30,7 @@
 #include "TxDependency.h"
 #include "TxSpeculation.h"
 #include "TxWP.h"
+#include "llvm/IR/GlobalValue.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace klee {
@@ -183,6 +184,8 @@ class TxSubsumptionTableEntry {
   TxStore::TopInterpolantStore symbolicallyAddressedStore;
 
   ref<Expr> wpInterpolant;
+
+  std::set< ref<TxStoreEntry> > markedGlobal;
 
   std::set<const Array *> existentials;
 
@@ -538,6 +541,11 @@ public:
   llvm::BranchInst *speculationBInst;
   llvm::Instruction *secondCheckInst;
   void mark();
+
+  std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
+  getGlobalAddresses() {
+    return globalAddresses;
+  }
 
   /// \brief List of the instructions in the node in a reverse order (used only
   /// in WP interpolation)

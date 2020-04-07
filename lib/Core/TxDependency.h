@@ -123,8 +123,10 @@ namespace klee {
 /// - The <i>path condition</i> TxDependency#pathCondition. This field
 ///   maintains all the constraints accumulated through the execution.
 ///
-/// - The <i>store</i> TxDependency#store. This field points to an object of TxStore
-///   class. The store is essentially a continer of mappings from addresses to values.
+/// - The <i>store</i> TxDependency#store. This field points to an object of
+/// TxStore
+///   class. The store is essentially a continer of mappings from addresses to
+/// values.
 ///   The store has two such mappings, depending on whether the address is
 ///   concrete or is a symbolic expression.
 ///   Each entry in the mappings represents an element of the mapping.
@@ -190,6 +192,8 @@ class TxDependency {
   /// that have no representative object (i.e. functions). This member
   /// variable is just a pointer to the one in klee::Executor.
   std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
+
+  std::set<ref<TxStoreEntry> > markedGlobal;
 
   /// \brief Tests if a pointer points to a main function's argument
   static bool isMainArgument(const llvm::Value *loc);
@@ -329,6 +333,19 @@ public:
                    _globalAddresses);
 
   ~TxDependency();
+
+  std::set<ref<TxStoreEntry> > &getMarkedGlobal() { return markedGlobal; }
+
+  ref<TxStoreEntry> getMarkedGlobal(ref<TxStoreEntry> se) {
+    if (!parent)
+      return se;
+    ref<TxStoreEntry> pse = parent->getStore()->find(se->getAddress());
+    if (!pse.isNull()) {
+      return pse;
+    } else {
+      return se;
+    }
+  }
 
   TxDependency *cdr() const;
 
@@ -489,6 +506,10 @@ public:
   /// \brief Given a state value, retrieve all its sources and mark them as in
   /// the core
   void markAllValues(ref<TxStateValue> value, const std::string &reason);
+
+  void markGlobalVars(ref<TxStateValue> value, const std::string &reason);
+
+  void recursivelyMarkGlobalVars(ref<TxStoreEntry> se);
 
   /// \brief Given an LLVM value which is used as an address, retrieve all its
   /// sources and mark them as in the core. Returns true if bounds error was

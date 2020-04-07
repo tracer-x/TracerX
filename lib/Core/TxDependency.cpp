@@ -1089,6 +1089,35 @@ void TxDependency::markAllValues(ref<TxStateValue> value,
 
   store->markUsed(value->getAllowBoundEntryList());
   store->markUsed(value->getDisableBoundEntryList());
+  markGlobalVars(value, reason);
+}
+
+void TxDependency::markGlobalVars(ref<TxStateValue> value,
+                                  const std::string &reason) {
+  const std::set<ref<TxStoreEntry> > &allowBoundEntryList(
+      value->getAllowBoundEntryList());
+  for (std::set<ref<TxStoreEntry> >::const_iterator
+           it = allowBoundEntryList.begin(),
+           ie = allowBoundEntryList.end();
+       it != ie; ++it) {
+    ref<TxStoreEntry> se = (*it);
+    if (isa<llvm::GlobalVariable>(
+            se->getAddress()->getAllocationInfo()->getContext()->getValue())) {
+
+      // keep at current node & parent nodes
+      markedGlobal.insert(getMarkedGlobal(se));
+      if (parent) {
+        parent->recursivelyMarkGlobalVars(se);
+      }
+    }
+  }
+}
+
+void TxDependency::recursivelyMarkGlobalVars(ref<TxStoreEntry> se) {
+  markedGlobal.insert(getMarkedGlobal(se));
+  if (parent) {
+    parent->recursivelyMarkGlobalVars(se);
+  }
 }
 
 bool TxDependency::markAllPointerValues(ref<TxStateValue> value,
