@@ -1105,7 +1105,7 @@ void TxDependency::markGlobalVars(ref<TxStateValue> value,
             se->getAddress()->getAllocationInfo()->getContext()->getValue())) {
 
       // keep at current node & parent nodes
-      markedGlobal.insert(se);
+      markedGlobal.insert(getMarkedGlobal(se));
       if (parent) {
         parent->recursivelyMarkGlobalVars(se);
       }
@@ -1114,7 +1114,7 @@ void TxDependency::markGlobalVars(ref<TxStateValue> value,
 }
 
 void TxDependency::recursivelyMarkGlobalVars(ref<TxStoreEntry> se) {
-  markedGlobal.insert(se);
+  markedGlobal.insert(getMarkedGlobal(se));
   if (parent) {
     parent->recursivelyMarkGlobalVars(se);
   }

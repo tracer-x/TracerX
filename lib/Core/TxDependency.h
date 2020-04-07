@@ -193,7 +193,7 @@ class TxDependency {
   /// variable is just a pointer to the one in klee::Executor.
   std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
 
-  std::set< ref<TxStoreEntry> > markedGlobal;
+  std::set<ref<TxStoreEntry> > markedGlobal;
 
   /// \brief Tests if a pointer points to a main function's argument
   static bool isMainArgument(const llvm::Value *loc);
@@ -334,8 +334,17 @@ public:
 
   ~TxDependency();
 
-  std::set< ref<TxStoreEntry> > &getMarkedGlobal() {
-    return markedGlobal;
+  std::set<ref<TxStoreEntry> > &getMarkedGlobal() { return markedGlobal; }
+
+  ref<TxStoreEntry> getMarkedGlobal(ref<TxStoreEntry> se) {
+    if (!parent)
+      return se;
+    ref<TxStoreEntry> pse = parent->getStore()->find(se->getAddress());
+    if (!pse.isNull()) {
+      return pse;
+    } else {
+      return se;
+    }
   }
 
   TxDependency *cdr() const;
