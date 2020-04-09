@@ -1191,29 +1191,29 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
         TxSpeculativeRun::isStateSpeculable(current)) {
       // check independency
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(&current, 0);
-      } else {
+//      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+//        // open speculation & assume success
+//        independenceYes++;
+//        return StatePair(&current, 0);
+//      } else {
         // open speculation & result may be success or fail
         independenceNo++;
         return addSpeculationNode(current, condition, isInternal, true);
-      }
+//      }
     }
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(0, &current);
-      } else {
+//      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+//        // open speculation & assume success
+//        independenceYes++;
+//        return StatePair(0, &current);
+//      } else {
         // open speculation & result may be success or fail
         independenceNo++;
         return addSpeculationNode(current, condition, isInternal, false);
-      }
+//      }
     }
   }
   //  llvm::outs() << "******************\n";
@@ -1235,17 +1235,17 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(&current, 0);
-      } else {
+//      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+//        // open speculation & assume success
+//        independenceYes++;
+//        return StatePair(&current, 0);
+//      } else {
         // save unsat core
         // open speculation & result may be success or fail
         independenceNo++;
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         return addSpeculationNode(current, condition, isInternal, true);
-      }
+//      }
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -1268,17 +1268,17 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     if (INTERPOLATION_ENABLED && Speculation &&
         TxSpeculativeRun::isStateSpeculable(current)) {
       std::set<std::string> vars = extractVarNames(current, binst);
-      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
-        // open speculation & assume success
-        independenceYes++;
-        return StatePair(0, &current);
-      } else {
+//      if (TxSpeculativeRun::isIndependent(vars, bbOrderToSpecAvoid)) {
+//        // open speculation & assume success
+//        independenceYes++;
+//        return StatePair(0, &current);
+//      } else {
         // save unsat core
         // open speculation & result may be success or fail
         independenceNo++;
         txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
         return addSpeculationNode(current, condition, isInternal, false);
-      }
+//      }
     }
 
     if (INTERPOLATION_ENABLED) {
@@ -2376,6 +2376,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     }
 
     // check new BB
+    /*
     llvm::BasicBlock *currentBB = state.txTreeNode->getBasicBlock();
     if (visitedBlocks.find(currentBB) == visitedBlocks.end()) {
       if (specFailNew.find(pp) != specFailNew.end()) {
@@ -2398,7 +2399,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       specFail++;
       speculativeBackJump(state);
       return;
-    }
+    }*/
   }
 
   switch (i->getOpcode()) {
