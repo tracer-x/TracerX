@@ -19,48 +19,59 @@ using namespace llvm;
 using namespace klee;
 
 namespace {
-  cl::list<Searcher::CoreSearchType>
-  CoreSearch("search", cl::desc("Specify the search heuristic (default=random-path interleaved with nurs:covnew)"),
-	     cl::values(clEnumValN(Searcher::DFS, "dfs", "use Depth First Search (DFS)"),
-			clEnumValN(Searcher::BFS, "bfs", "use Breadth First Search (BFS)"),
-			clEnumValN(Searcher::RandomState, "random-state", "randomly select a state to explore"),
-			clEnumValN(Searcher::RandomPath, "random-path", "use Random Path Selection (see OSDI'08 paper)"),
-			clEnumValN(Searcher::NURS_CovNew, "nurs:covnew", "use Non Uniform Random Search (NURS) with Coverage-New"),
-			clEnumValN(Searcher::NURS_MD2U, "nurs:md2u", "use NURS with Min-Dist-to-Uncovered"),
-			clEnumValN(Searcher::NURS_Depth, "nurs:depth", "use NURS with 2^depth"),
-			clEnumValN(Searcher::NURS_ICnt, "nurs:icnt", "use NURS with Instr-Count"),
-			clEnumValN(Searcher::NURS_CPICnt, "nurs:cpicnt", "use NURS with CallPath-Instr-Count"),
-			clEnumValN(Searcher::NURS_QC, "nurs:qc", "use NURS with Query-Cost"),
-			clEnumValEnd));
+cl::list<Searcher::CoreSearchType> CoreSearch(
+    "search", cl::desc("Specify the search heuristic (default=random-path "
+                       "interleaved with nurs:covnew)"),
+    cl::values(
+        clEnumValN(Searcher::DFS, "dfs", "use Depth First Search (DFS)"),
+        clEnumValN(Searcher::BFS, "bfs", "use Breadth First Search (BFS)"),
+        clEnumValN(Searcher::RandomState, "random-state",
+                   "randomly select a state to explore"),
+        clEnumValN(Searcher::RandomPath, "random-path",
+                   "use Random Path Selection (see OSDI'08 paper)"),
+        clEnumValN(Searcher::RandomIntp, "random-intp",
+                   "use Random Path with Interpolation (maximize creation of "
+                   "interpolants in random strategy)"),
+        clEnumValN(Searcher::NURS_CovNew, "nurs:covnew",
+                   "use Non Uniform Random Search (NURS) with Coverage-New"),
+        clEnumValN(Searcher::NURS_MD2U, "nurs:md2u",
+                   "use NURS with Min-Dist-to-Uncovered"),
+        clEnumValN(Searcher::NURS_Depth, "nurs:depth", "use NURS with 2^depth"),
+        clEnumValN(Searcher::NURS_ICnt, "nurs:icnt",
+                   "use NURS with Instr-Count"),
+        clEnumValN(Searcher::NURS_CPICnt, "nurs:cpicnt",
+                   "use NURS with CallPath-Instr-Count"),
+        clEnumValN(Searcher::NURS_QC, "nurs:qc", "use NURS with Query-Cost"),
+        clEnumValEnd));
 
-  cl::opt<bool>
-  UseIterativeDeepeningTimeSearch("use-iterative-deepening-time-search", 
+cl::opt<bool>
+    UseIterativeDeepeningTimeSearch("use-iterative-deepening-time-search",
                                     cl::desc("(experimental)"));
 
-  cl::opt<bool>
-  UseBatchingSearch("use-batching-search", 
-		    cl::desc("Use batching searcher (keep running selected state for N instructions/time, see --batch-instructions and --batch-time)"),
-		    cl::init(false));
+cl::opt<bool> UseBatchingSearch(
+    "use-batching-search",
+    cl::desc("Use batching searcher (keep running selected state for N "
+             "instructions/time, see --batch-instructions and --batch-time)"),
+    cl::init(false));
 
-  cl::opt<unsigned>
-  BatchInstructions("batch-instructions",
-                    cl::desc("Number of instructions to batch when using --use-batching-search"),
-                    cl::init(10000));
-  
-  cl::opt<double>
-  BatchTime("batch-time",
-            cl::desc("Amount of time to batch when using --use-batching-search"),
-            cl::init(5.0));
+cl::opt<unsigned> BatchInstructions(
+    "batch-instructions",
+    cl::desc(
+        "Number of instructions to batch when using --use-batching-search"),
+    cl::init(10000));
 
+cl::opt<double> BatchTime(
+    "batch-time",
+    cl::desc("Amount of time to batch when using --use-batching-search"),
+    cl::init(5.0));
 
-  cl::opt<bool>
-  UseMerge("use-merge", 
-           cl::desc("Enable support for klee_merge() (experimental)"));
- 
-  cl::opt<bool>
-  UseBumpMerge("use-bump-merge", 
-           cl::desc("Enable support for klee_merge() (extra experimental)"));
+cl::opt<bool>
+    UseMerge("use-merge",
+             cl::desc("Enable support for klee_merge() (experimental)"));
 
+cl::opt<bool> UseBumpMerge(
+    "use-bump-merge",
+    cl::desc("Enable support for klee_merge() (extra experimental)"));
 }
 
 
@@ -80,6 +91,9 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
   case Searcher::BFS: searcher = new BFSSearcher(); break;
   case Searcher::RandomState: searcher = new RandomSearcher(); break;
   case Searcher::RandomPath: searcher = new RandomPathSearcher(executor); break;
+  case Searcher::RandomIntp:
+    searcher = new RandomIntpSearcher();
+    break;
   case Searcher::NURS_CovNew: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::CoveringNew); break;
   case Searcher::NURS_MD2U: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::MinDistToUncovered); break;
   case Searcher::NURS_Depth: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::Depth); break;

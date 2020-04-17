@@ -164,6 +164,38 @@ RandomSearcher::update(ExecutionState *current,
 
 ///
 
+ExecutionState &RandomIntpSearcher::selectState() { return *states.back(); }
+
+void RandomIntpSearcher::update(
+    ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
+    const std::vector<ExecutionState *> &removedStates) {
+  states.insert(states.end(), addedStates.begin(), addedStates.end());
+  for (std::vector<ExecutionState *>::const_iterator it = removedStates.begin(),
+                                                     ie = removedStates.end();
+       it != ie; ++it) {
+    ExecutionState *es = *it;
+    if (es == states.back()) {
+      states.pop_back();
+    } else {
+      bool ok = false;
+
+      for (std::vector<ExecutionState *>::iterator it = states.begin(),
+                                                   ie = states.end();
+           it != ie; ++it) {
+        if (es == *it) {
+          states.erase(it);
+          ok = true;
+          break;
+        }
+      }
+
+      assert(ok && "invalid state removed");
+    }
+  }
+}
+
+///
+
 WeightedRandomSearcher::WeightedRandomSearcher(WeightType _type)
   : states(new DiscretePDF<ExecutionState*>()),
     type(_type) {

@@ -75,6 +75,7 @@ namespace klee {
       BFS,
       RandomState,
       RandomPath,
+      RandomIntp,
       NURS_CovNew,
       NURS_MD2U,
       NURS_Depth,
@@ -195,6 +196,20 @@ namespace klee {
     virtual std::vector<ExecutionState *> getStates() {
 	  return std::vector<ExecutionState *>();
 	}
+  };
+
+  class RandomIntpSearcher : public Searcher {
+    std::vector<ExecutionState *> states;
+
+  public:
+    ExecutionState &selectState();
+    void update(ExecutionState *current,
+                const std::vector<ExecutionState *> &addedStates,
+                const std::vector<ExecutionState *> &removedStates);
+    bool empty() { return states.empty(); }
+    void printName(llvm::raw_ostream &os) { os << "RandomIntpSearcher\n"; }
+
+    virtual std::vector<ExecutionState *> getStates() { return states; }
   };
 
   class MergingSearcher : public Searcher {
