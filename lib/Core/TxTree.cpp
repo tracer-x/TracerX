@@ -2060,6 +2060,8 @@ void TxSubsumptionTable::CallHistoryIndexedTable::print(
 std::map<uintptr_t, TxSubsumptionTable::CallHistoryIndexedTable *>
 TxSubsumptionTable::instance;
 
+uintptr_t TxSubsumptionTable::lastInterpolant;
+
 void
 TxSubsumptionTable::insert(uintptr_t id,
                            const std::vector<llvm::Instruction *> &callHistory,
@@ -2147,6 +2149,12 @@ bool TxSubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
   }
   return false;
 }
+
+void TxSubsumptionTable::setLastInterpolantPP(uintptr_t programPoint) {
+  lastInterpolant = programPoint;
+}
+
+uintptr_t TxSubsumptionTable::getLastInterpolantPP() { return lastInterpolant; }
 
 bool TxSubsumptionTable::hasInterpolation(ExecutionState &state) {
 
@@ -2383,7 +2391,11 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         }
       }
 
-      TxSubsumptionTable::insert(node->getProgramPoint(),
+      /// Storing the respective program point of the last generated inteprolant
+      /// This is used in the random-intp search strategy.
+      TxSubsumptionTable::setLastInterpolantPP(node->getProgramPoint());
+
+      TxSubsumptionTable::insert(TxSubsumptionTable::getLastInterpolantPP(),
                                  node->entryCallHistory, entry);
 
       TxTreeGraph::addTableEntryMapping(node, entry);

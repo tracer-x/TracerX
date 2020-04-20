@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Searcher.h"
+#include "TxTree.h"
 
 #include "CoreStats.h"
 #include "Executor.h"
@@ -164,7 +165,23 @@ RandomSearcher::update(ExecutionState *current,
 
 ///
 
-ExecutionState &RandomIntpSearcher::selectState() { return *states.back(); }
+ExecutionState &RandomIntpSearcher::selectState() {
+
+  uintptr_t lastInterpolant = TxSubsumptionTable::getLastInterpolantPP();
+  for (std::vector<ExecutionState *>::const_iterator it = states.begin(),
+                                                     ie = states.end();
+       it != ie; ++it) {
+    ExecutionState *es = *it;
+    if (lastInterpolant != 0 &&
+        es->txTreeNode->getProgramPoint() == lastInterpolant)
+      return *es;
+    if (es->txTreeNode->getParent() && !es->txTreeNode->getParent()->getLeft())
+      return *es;
+    if (es->txTreeNode->getParent() && !es->txTreeNode->getParent()->getRight())
+      return *es;
+  }
+  return *states.back();
+}
 
 void RandomIntpSearcher::update(
     ExecutionState *current, const std::vector<ExecutionState *> &addedStates,

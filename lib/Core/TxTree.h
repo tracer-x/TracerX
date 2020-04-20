@@ -106,6 +106,11 @@ class TxSubsumptionTable {
 
   static std::map<uintptr_t, CallHistoryIndexedTable *> instance;
 
+  /// This field keeps the respective program point of the last generated
+  /// inteprolant
+  /// This is used in the random-intp search strategy.
+  static uintptr_t lastInterpolant;
+
 public:
   static void insert(uintptr_t id,
                      const std::vector<llvm::Instruction *> &callHistory,
@@ -115,6 +120,10 @@ public:
                     int debugSubsumptionLevel);
 
   static bool hasInterpolation(ExecutionState &state);
+
+  static void setLastInterpolantPP(uintptr_t programPoint);
+
+  static uintptr_t getLastInterpolantPP();
 
   static void clear();
 
