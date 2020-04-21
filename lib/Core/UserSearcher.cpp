@@ -29,9 +29,9 @@ cl::list<Searcher::CoreSearchType> CoreSearch(
                    "randomly select a state to explore"),
         clEnumValN(Searcher::RandomPath, "random-path",
                    "use Random Path Selection (see OSDI'08 paper)"),
-        clEnumValN(Searcher::RandomIntp, "random-intp",
-                   "use Random Path with Interpolation (maximize creation of "
-                   "interpolants in random strategy)"),
+        clEnumValN(Searcher::Interpolation, "interpolation",
+                   "use Interpolation (pick a node which has a high chance of "
+                   "getting subsumed or create a new interpolant)"),
         clEnumValN(Searcher::NURS_CovNew, "nurs:covnew",
                    "use Non Uniform Random Search (NURS) with Coverage-New"),
         clEnumValN(Searcher::NURS_MD2U, "nurs:md2u",
@@ -91,8 +91,8 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
   case Searcher::BFS: searcher = new BFSSearcher(); break;
   case Searcher::RandomState: searcher = new RandomSearcher(); break;
   case Searcher::RandomPath: searcher = new RandomPathSearcher(executor); break;
-  case Searcher::RandomIntp:
-    searcher = new RandomIntpSearcher();
+  case Searcher::Interpolation:
+    searcher = new IntpSearcher();
     break;
   case Searcher::NURS_CovNew: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::CoveringNew); break;
   case Searcher::NURS_MD2U: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::MinDistToUncovered); break;

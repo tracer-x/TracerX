@@ -75,7 +75,7 @@ namespace klee {
       BFS,
       RandomState,
       RandomPath,
-      RandomIntp,
+      Interpolation,
       NURS_CovNew,
       NURS_MD2U,
       NURS_Depth,
@@ -198,7 +198,7 @@ namespace klee {
 	}
   };
 
-  class RandomIntpSearcher : public Searcher {
+  class IntpSearcher : public Searcher {
     std::vector<ExecutionState *> states;
 
   public:
@@ -207,7 +207,7 @@ namespace klee {
                 const std::vector<ExecutionState *> &addedStates,
                 const std::vector<ExecutionState *> &removedStates);
     bool empty() { return states.empty(); }
-    void printName(llvm::raw_ostream &os) { os << "RandomIntpSearcher\n"; }
+    void printName(llvm::raw_ostream &os) { os << "IntpSearcher\n"; }
 
     virtual std::vector<ExecutionState *> getStates() { return states; }
   };

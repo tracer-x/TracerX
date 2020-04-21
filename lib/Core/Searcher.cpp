@@ -165,9 +165,11 @@ RandomSearcher::update(ExecutionState *current,
 
 ///
 
-ExecutionState &RandomIntpSearcher::selectState() {
+ExecutionState &IntpSearcher::selectState() {
 
   uintptr_t lastInterpolant = TxSubsumptionTable::getLastInterpolantPP();
+  int noSiblingFlag = false;
+  ExecutionState *noSiblingNode;
   for (std::vector<ExecutionState *>::const_iterator it = states.begin(),
                                                      ie = states.end();
        it != ie; ++it) {
@@ -175,17 +177,26 @@ ExecutionState &RandomIntpSearcher::selectState() {
     if (lastInterpolant != 0 &&
         es->txTreeNode->getProgramPoint() == lastInterpolant)
       return *es;
-    if (es->txTreeNode->getParent() && !es->txTreeNode->getParent()->getLeft())
-      return *es;
-    if (es->txTreeNode->getParent() && !es->txTreeNode->getParent()->getRight())
-      return *es;
+    if (!noSiblingFlag && es->txTreeNode->getParent() &&
+        !es->txTreeNode->getParent()->getLeft()) {
+      noSiblingNode = es;
+      noSiblingFlag = true;
+    } else if (!noSiblingFlag && es->txTreeNode->getParent() &&
+               !es->txTreeNode->getParent()->getRight()) {
+      noSiblingNode = es;
+      noSiblingFlag = true;
+    }
   }
+
+  if (noSiblingFlag)
+    return *noSiblingNode;
+
   return *states.back();
 }
 
-void RandomIntpSearcher::update(
-    ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
-    const std::vector<ExecutionState *> &removedStates) {
+void IntpSearcher::update(ExecutionState *current,
+                          const std::vector<ExecutionState *> &addedStates,
+                          const std::vector<ExecutionState *> &removedStates) {
   states.insert(states.end(), addedStates.begin(), addedStates.end());
   for (std::vector<ExecutionState *>::const_iterator it = removedStates.begin(),
                                                      ie = removedStates.end();
