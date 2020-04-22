@@ -116,6 +116,9 @@ public:
                      const std::vector<llvm::Instruction *> &callHistory,
                      TxSubsumptionTableEntry *entry);
 
+  /// Checking if a node has interpolant
+  static bool checkHasInterpolant(ExecutionState &state);
+
   static bool check(TimingSolver *solver, ExecutionState &state, double timeout,
                     int debugSubsumptionLevel);
 
