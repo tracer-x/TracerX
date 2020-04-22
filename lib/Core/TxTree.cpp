@@ -806,9 +806,11 @@ bool TxSubsumptionTableEntry::subsumed(
   bool globalSat = true;
 
   for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
-                                                 ie = markedGlobal.end();
+                                              ie = markedGlobal.end();
        it != ie; ++it) {
-    if((*it)->getValue()->getType()->isPointerTy()) {
+
+    if ((*it)->getValue()->getType()->isPointerTy() ||
+        (*it)->getValue()->getType()->getTypeID() == 0) {
       continue;
     }
     ref<Expr> entryVal = (*it)->getContent()->getExpression();
@@ -817,14 +819,14 @@ bool TxSubsumptionTableEntry::subsumed(
     unsigned type = (*it)->getValue()->getType()->getIntegerBitWidth();
 
     ObjectPair op;
-    bool resolve = state.addressSpace.resolveOne(cast<klee::ConstantExpr>(addr), op);
+    bool resolve =
+        state.addressSpace.resolveOne(cast<klee::ConstantExpr>(addr), op);
     if (!resolve) {
       globalSat = false;
       break;
     } else {
       const ObjectState *os = op.second;
       ref<Expr> result = os->read(offset, type);
-
       if (result != entryVal) {
         globalSat = false;
         break;
