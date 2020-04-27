@@ -1225,6 +1225,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
             independenceNo++;
             StatsTracker::increaseEle(curBB, 1, true);
           }
+          return StatePair(&current, 0);
         } else if (SpecStrategyToUse == AGGRESSIVE) {
           // check independency
           std::set<std::string> vars = extractVarNames(current, binst);
@@ -1312,6 +1313,7 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
             independenceNo++;
             StatsTracker::increaseEle(curBB, 1, true);
           }
+          return StatePair(0, &current);
         } else if (SpecStrategyToUse == AGGRESSIVE) {
           std::set<std::string> vars = extractVarNames(current, binst);
           if (TxSpeculationHelper::isIndependent(vars, bbOrderToSpecAvoid)) {
@@ -1843,7 +1845,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         }
       } else {
         if (SpecStrategyToUse == TIMID) {
-          // do nothing
+          klee_error(
+              "SPECULATION: timid strategy never runs in speculationFork!");
         } else if (SpecStrategyToUse == AGGRESSIVE) {
           // open speculation & result may be success or fail
           return addSpeculationNode(current, condition, binst, isInternal,
@@ -1898,7 +1901,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         }
       } else {
         if (SpecStrategyToUse == TIMID) {
-          // do nothing
+          klee_error(
+              "SPECULATION: timid strategy never runs in speculationFork!");
         } else if (SpecStrategyToUse == AGGRESSIVE) {
           // open speculation & result may be success or fail
           return addSpeculationNode(current, condition, binst, isInternal,
@@ -1967,7 +1971,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         }
       } else {
         if (SpecStrategyToUse == TIMID) {
-          // do nothing
+          klee_error(
+              "SPECULATION: timid strategy never runs in speculationFork!");
         } else if (SpecStrategyToUse == AGGRESSIVE) {
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, binst, isInternal,
@@ -2044,7 +2049,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
         }
       } else {
         if (SpecStrategyToUse == TIMID) {
-          // do nothing
+          klee_error(
+              "SPECULATION: timid strategy never runs in speculationFork!");
         } else if (SpecStrategyToUse == AGGRESSIVE) {
           txTree->storeSpeculationUnsatCore(solver, unsatCore, binst);
           return addSpeculationNode(current, condition, binst, isInternal,
