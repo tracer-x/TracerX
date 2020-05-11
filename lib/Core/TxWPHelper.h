@@ -33,7 +33,6 @@ class TxWPArrayStore;
 class TxWPHelper {
 
 public:
-
   static bool isTargetDependent(llvm::Value *inst, ref<Expr> expr);
 
   static ref<Expr> substituteExpr(ref<Expr> base, const ref<Expr> lhs,
@@ -47,6 +46,14 @@ public:
     i->print(OS);
     unsigned pos = OS.str().find("=");
     return TxSpeculationHelper::trim(OS.str().substr(0, pos));
+  }
+
+  static bool isSkipPushUp(std::string fname) {
+    if ((fname.substr(0, 5) == "klee_") || (fname.substr(0, 3) == "tx_") ||
+        (fname == "printf") || (fname.substr(0, 6) == "check_")) {
+      return true;
+    }
+    return false;
   }
 };
 
