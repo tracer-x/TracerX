@@ -64,7 +64,9 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
       symbolicallyAddressedHistoricalStore);
 
-  markedGlobal = node->getDependency()->getMarkedGlobal();
+  if (MarkGlobal) {
+    markedGlobal = node->getDependency()->getMarkedGlobal();
+  }
 
   if (WPInterpolant)
     wpInterpolant = node->generateWPInterpolant();
@@ -802,50 +804,52 @@ bool TxSubsumptionTableEntry::subsumed(
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
 
-  // Global check
-  bool globalSat = true;
+  if (MarkGlobal) {
+    // Global check
+    bool globalSat = true;
 
-  for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
-                                              ie = markedGlobal.end();
-       it != ie; ++it) {
+    for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
+                                                ie = markedGlobal.end();
+         it != ie; ++it) {
 
-    if ((*it)->getValue()->getType()->isPointerTy() ||
-        (*it)->getValue()->getType()->getTypeID() == 0) {
-      continue;
-    }
-    ref<Expr> entryVal = (*it)->getContent()->getExpression();
-    ref<Expr> addr = (*it)->getAddress()->getAddress();
-    ref<Expr> offset = (*it)->getAddress()->getOffset();
-    unsigned type = (*it)->getValue()->getType()->getIntegerBitWidth();
+      if ((*it)->getValue()->getType()->isPointerTy() ||
+          (*it)->getValue()->getType()->getTypeID() == 0) {
+        continue;
+      }
+      ref<Expr> entryVal = (*it)->getContent()->getExpression();
+      ref<Expr> addr = (*it)->getAddress()->getAddress();
+      ref<Expr> offset = (*it)->getAddress()->getOffset();
+      unsigned type = (*it)->getValue()->getType()->getIntegerBitWidth();
 
-    ObjectPair op;
-    bool resolve =
-        state.addressSpace.resolveOne(cast<klee::ConstantExpr>(addr), op);
-    if (!resolve) {
-      globalSat = false;
-      break;
-    } else {
-      const ObjectState *os = op.second;
-      ref<Expr> result = os->read(offset, type);
-      if (result != entryVal) {
+      ObjectPair op;
+      bool resolve =
+          state.addressSpace.resolveOne(cast<klee::ConstantExpr>(addr), op);
+      if (!resolve) {
         globalSat = false;
         break;
+      } else {
+        const ObjectState *os = op.second;
+        ref<Expr> result = os->read(offset, type);
+        if (result != entryVal) {
+          globalSat = false;
+          break;
+        }
       }
     }
-  }
 
-  if (!globalSat) {
-    if (debugSubsumptionLevel >= 1) {
-      klee_message("#%lu=>#%lu: Global check fail",
-                   state.txTreeNode->getNodeSequenceNumber(),
-                   nodeSequenceNumber);
-    }
-    return false;
-  } else {
-    if (debugSubsumptionLevel >= 1) {
-      klee_message("#%lu=>#%lu: Global check success",
-                   state.txTreeNode->getNodeSequenceNumber(),
-                   nodeSequenceNumber);
+    if (!globalSat) {
+      if (debugSubsumptionLevel >= 1) {
+        klee_message("#%lu=>#%lu: Global check fail",
+                     state.txTreeNode->getNodeSequenceNumber(),
+                     nodeSequenceNumber);
+      }
+      return false;
+    } else {
+      if (debugSubsumptionLevel >= 1) {
+        klee_message("#%lu=>#%lu: Global check success",
+                     state.txTreeNode->getNodeSequenceNumber(),
+                     nodeSequenceNumber);
+      }
     }
   }
 
@@ -1783,13 +1787,15 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
 
   stream << prefix << "------------ Subsumption Table Entry ------------\n";
   stream << prefix << "Program point = " << programPoint << "\n";
-  stream << prefix << "global = [";
-  for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
-                                              ie = markedGlobal.end();
-       it != ie; ++it) {
-    (*it)->print(stream);
+  if (MarkGlobal) {
+    stream << prefix << "global = [";
+    for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
+                                                ie = markedGlobal.end();
+         it != ie; ++it) {
+      (*it)->print(stream);
+    }
+    stream << "]\n";
   }
-  stream << "]\n";
   stream << prefix << "interpolant = ";
   if (!interpolant.isNull())
     interpolant->print(stream);

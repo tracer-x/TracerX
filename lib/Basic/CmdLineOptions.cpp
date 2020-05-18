@@ -176,12 +176,12 @@ llvm::cl::opt<bool> TracerXPointerError(
     llvm::cl::init(false));
 
 llvm::cl::opt<SpecType>
-    SpecTypeToUse("spec-type",
-                  llvm::cl::desc("Speculation type: coverage or safety"),
-                  llvm::cl::values(clEnumValN(SAFETY, "safety", "safety"),
-                                   clEnumValN(COVERAGE, "coverage", "coverage"),
-                                   clEnumValEnd),
-                  llvm::cl::init(NO_SPEC));
+SpecTypeToUse("spec-type",
+              llvm::cl::desc("Speculation type: coverage or safety"),
+              llvm::cl::values(clEnumValN(SAFETY, "safety", "safety"),
+                               clEnumValN(COVERAGE, "coverage", "coverage"),
+                               clEnumValEnd),
+              llvm::cl::init(NO_SPEC));
 
 llvm::cl::opt<SpecStrategy> SpecStrategyToUse(
     "spec-strategy",
@@ -197,14 +197,20 @@ llvm::cl::opt<std::string> DependencyFolder(
     llvm::cl::desc(
         "Path to a folder containing basic blocks' dependency."
         "One file for each BB with name format: \"BB_Dep_{order}.txt\""
-        "An initial file containing visited BBs with name \"InitialVisitedBB.txt\""
+        "An initial file containing visited BBs with name "
+        "\"InitialVisitedBB.txt\""
         "also must be put in this folder"),
     llvm::cl::init("."));
 
 llvm::cl::opt<bool>
-    WPInterpolant("wp-interpolant",
-                  llvm::cl::desc("Perform weakest-precondition interpolation"),
-                  llvm::cl::init(false));
+WPInterpolant("wp-interpolant",
+              llvm::cl::desc("Perform weakest-precondition interpolation"),
+              llvm::cl::init(false));
+
+llvm::cl::opt<bool>
+MarkGlobal("mark-global",
+           llvm::cl::desc("Decide whether global variables are marked or not"),
+           llvm::cl::init(false));
 
 #endif // ENABLE_Z3
 
