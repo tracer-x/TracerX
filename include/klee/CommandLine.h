@@ -43,10 +43,10 @@ extern llvm::cl::opt<bool> CoreSolverOptimizeDivides;
 
 /// The different query logging solvers that can switched on/off
 enum QueryLoggingSolverType {
-  ALL_PC,       ///< Log all queries (un-optimised) in .pc (KQuery) format
-  ALL_SMTLIB,   ///< Log all queries (un-optimised)  .smt2 (SMT-LIBv2) format
-  SOLVER_PC,    ///< Log queries passed to solver (optimised) in .pc (KQuery)
-                ///format
+  ALL_PC,     ///< Log all queries (un-optimised) in .pc (KQuery) format
+  ALL_SMTLIB, ///< Log all queries (un-optimised)  .smt2 (SMT-LIBv2) format
+  SOLVER_PC,  ///< Log queries passed to solver (optimised) in .pc (KQuery)
+  /// format
   SOLVER_SMTLIB ///< Log queries passed to solver (optimised) in .smt2
                 ///(SMT-LIBv2) format
 };
@@ -67,9 +67,17 @@ enum CoreSolverType {
   NO_SOLVER
 };
 
-enum SpecType { NO_SPEC, SAFETY, COVERAGE };
+enum SpecType {
+  NO_SPEC,
+  SAFETY,
+  COVERAGE
+};
 
-enum SpecStrategy { TIMID, AGGRESSIVE, CUSTOM };
+enum SpecStrategy {
+  TIMID,
+  AGGRESSIVE,
+  CUSTOM
+};
 
 extern llvm::cl::opt<CoreSolverType> CoreSolverToUse;
 
@@ -110,6 +118,8 @@ extern llvm::cl::opt<SpecStrategy> SpecStrategyToUse;
 extern llvm::cl::opt<std::string> DependencyFolder;
 
 extern llvm::cl::opt<bool> WPInterpolant;
+
+extern llvm::cl::opt<bool> MarkGlobal;
 
 #endif
 

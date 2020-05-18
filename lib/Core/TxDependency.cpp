@@ -1089,7 +1089,9 @@ void TxDependency::markAllValues(ref<TxStateValue> value,
 
   store->markUsed(value->getAllowBoundEntryList());
   store->markUsed(value->getDisableBoundEntryList());
-  markGlobalVars(value, reason);
+  if (MarkGlobal) {
+    markGlobalVars(value, reason);
+  }
 }
 
 void TxDependency::markGlobalVars(ref<TxStateValue> value,
