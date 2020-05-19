@@ -2838,8 +2838,8 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     }
     // wpInterpolant->dump();
     // dependency->getStore()->dump();
-    klee_warning(
-        "TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
+//    klee_warning(
+//        "TxTreeNode::instantiateWPatSubsumption: Instantiation WPVar failed!");
     ref<Expr> dummy;
     return dummy;
 
