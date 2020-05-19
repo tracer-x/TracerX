@@ -345,6 +345,7 @@ ref<Expr> TxWeakestPreCondition::PushUp(
        it != ie; ++it) {
     llvm::Instruction *i = (*it).first->inst;
     int flag = (*it).second;
+    //    llvm::errs() << "Start 1 loop ---\n";
     //    i->dump();
     //    llvm::errs() << "flag=" << flag << "\n";
     if (flag == 1) {
@@ -356,11 +357,6 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         return WPExpr;
       }
       ref<Expr> cond = result;
-
-      //      llvm::outs() << "****** Flag = 1 ******\n";
-      //      cond->dump();
-      //      llvm::outs() << "****** End Flag = 1 ******\n";
-
       if (True() == WPExpr) {
         WPExpr = cond;
       } else {
@@ -371,7 +367,6 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 
         WPExpr = AndExpr::create(WPExpr, cond);
       }
-
     } else if (flag == 2) {
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- generate not(condition): expr::not(condition)
@@ -382,10 +377,6 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         return WPExpr;
       }
       ref<Expr> negCond = NotExpr::create(result);
-      //      llvm::outs() << "****** Flag = 2 ******\n";
-      //      negCond->dump();
-      //      llvm::outs() << "****** End Flag = 2 ******\n";
-
       if (True() == WPExpr) {
         WPExpr = negCond;
       } else {
@@ -396,7 +387,6 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 
         WPExpr = AndExpr::create(WPExpr, negCond);
       }
-
     } else if (i->getOpcode() == llvm::Instruction::Store) {
       if (TxWPHelper::isTargetDependent(i->getOperand(1), WPExpr)) {
         ref<Expr> left = this->generateExprFromOperand(i->getOperand(0));
@@ -405,14 +395,8 @@ ref<Expr> TxWeakestPreCondition::PushUp(
           ref<Expr> result;
           return result;
         }
-
         WPExpr = TxWPHelper::substituteExpr(WPExpr, right, left);
-        //        llvm::outs() << "****** Flag = 0 *******\n";
-        //        WPExpr->dump();
-        //        llvm::outs() << "------\n";
         WPExpr = Z3Simplification::simplify(WPExpr);
-        //        WPExpr->dump();
-        //        llvm::outs() << "******* End Flag = 0 *******\n";
       } else if (isa<llvm::GetElementPtrInst>(
                      i->getOperand(1))) { // Update Array
         llvm::GetElementPtrInst *parentGEP =
@@ -432,13 +416,7 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         if (val.isNull())
           return val;
         ref<Expr> update = UpdExpr::create(pair.second, pair.first, val);
-        //        llvm::outs() << "****** Flag = 0 for Update Array *******\n";
-        //        i->dump();
-        //        WPExpr->dump();
         WPExpr = TxWPHelper::substituteExpr(WPExpr, pair.second, update);
-        //        WPExpr->dump();
-        //        llvm::outs() << "****** End Flag = 0 for Update Array
-        // *******\n";
       }
     } else if (i->getOpcode() == llvm::Instruction::Call) {
       llvm::CallInst *callInst = dyn_cast<llvm::CallInst>(i);
@@ -464,7 +442,7 @@ ref<Expr> TxWeakestPreCondition::PushUp(
     }
 
     //    WPExpr->dump();
-    //    llvm::errs() << "-----\n";
+    //    llvm::errs() << "End 1 loop ---\n";
   }
 
   //  llvm::errs() << "End PushUp \n";
