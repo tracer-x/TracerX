@@ -2393,16 +2393,16 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       TxSubsumptionTableEntry *entry =
           new TxSubsumptionTableEntry(node, node->entryCallHistory);
 
-//      llvm::errs() << "UpdateSubsumptionTableEntry --- \n";
-//      entry->dump();
-//      llvm::errs() << "--------------------------------\n";
+      //      llvm::errs() << "UpdateSubsumptionTableEntry --- \n";
+      //      entry->dump();
+      //      llvm::errs() << "--------------------------------\n";
       if (WPInterpolant) {
         ref<Expr> WPExpr = entry->getWPInterpolant();
         if (!WPExpr.isNull()) {
           entry = node->wp->updateSubsumptionTableEntry(entry);
         }
       }
-//      llvm::errs() << "End UpdateSubsumptionTableEntry --- \n";
+      //      llvm::errs() << "End UpdateSubsumptionTableEntry --- \n";
 
       TxSubsumptionTable::insert(node->getProgramPoint(),
                                  node->entryCallHistory, entry);
@@ -2959,8 +2959,13 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
               entry->getContent()->getExpression(), wpInterpolant->getWidth());
           return result;
         }
+      } else {
+        ref<Expr> nullref;
+        return nullref;
       }
     } else {
+      ref<Expr> nullref;
+      return nullref;
     }
 
     wpInterpolant->dump();

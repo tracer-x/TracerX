@@ -625,7 +625,7 @@ ref<Expr> TxWeakestPreCondition::getConstantFP(llvm::ConstantFP *CI) {
 ref<Expr> TxWeakestPreCondition::getConstantExpr(llvm::ConstantExpr *ce) {
   ref<Expr> result;
   // klee_warning("PUSHUP1");
-  return result;
+  //  return result;
 
   switch (ce->getOpcode()) {
   case llvm::Instruction::GetElementPtr: {
@@ -688,7 +688,7 @@ std::pair<ref<Expr>, ref<Expr> >
 TxWeakestPreCondition::getPointer(llvm::GetElementPtrInst *gep) {
   std::pair<ref<Expr>, ref<Expr> > pair;
   // klee_warning("PUSHUP3");
-  return pair;
+  //  return pair;
   if (isa<llvm::GetElementPtrInst>(gep->getOperand(0))) {
     llvm::GetElementPtrInst *parentGEP =
         dyn_cast<llvm::GetElementPtrInst>(gep->getOperand(0));
@@ -1024,17 +1024,14 @@ ref<Expr> TxWeakestPreCondition::getCmpCondition(llvm::CmpInst *cmp) {
 
 ref<Expr> TxWeakestPreCondition::getGepInst(llvm::GetElementPtrInst *gep) {
   ref<Expr> result;
-  /*
   gep->dump();
-  if (gep->getNumOperands() == 2){
-          gep->getOperand(0)->dump();
-          gep->getOperand(1)->dump();
-          ref<Expr> offset = this->generateExprFromOperand(gep->getOperand(1));
-          offset->dump();
-          result = this->generateExprFromOperand(gep->getOperand(0));
-
-
-  }*/
+  if (gep->getNumOperands() == 2) {
+    gep->getOperand(0)->dump();
+    gep->getOperand(1)->dump();
+    ref<Expr> offset = this->generateExprFromOperand(gep->getOperand(1));
+    offset->dump();
+    result = this->generateExprFromOperand(gep->getOperand(0));
+  }
   // klee_warning("PUSHUP5");
   return result;
 }
