@@ -22,9 +22,7 @@ namespace klee {
 bool TxWPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
   switch (expr->getKind()) {
   case Expr::InvalidKind:
-  case Expr::Constant: {
-    return false;
-  }
+  case Expr::Constant: { return false; }
 
   case Expr::WPVar: {
     ref<WPVarExpr> wp1 = dyn_cast<WPVarExpr>(expr);
@@ -41,6 +39,9 @@ bool TxWPHelper::isTargetDependent(llvm::Value *inst, ref<Expr> expr) {
             break;
           } else {
             tmp = tmp->getNextNode();
+            if (tmp->isTerminator()) {
+              break;
+            }
           }
         }
       }
@@ -142,9 +143,7 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
   } else {
     switch (base->getKind()) {
     case Expr::InvalidKind:
-    case Expr::Constant: {
-      return base;
-    }
+    case Expr::Constant: { return base; }
 
     case Expr::WPVar: {
       ref<WPVarExpr> wp1 = dyn_cast<WPVarExpr>(base);
