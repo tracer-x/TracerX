@@ -744,7 +744,19 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
   if (isa<llvm::AllocaInst>(p->getOperand(0))) {
     llvm::AllocaInst *alc = dyn_cast<llvm::AllocaInst>(p->getOperand(0));
     std::string name;
-    if (alc->getName().empty()) {
+    int nthParamAlloca = TxWPHelper::isParamAlloca(alc);
+    if (nthParamAlloca != -1) {
+      llvm::Instruction *callIns = TxWPHelper::getNearestCallInst(alc, node);
+      callIns->getOperand(nthParamAlloca)->dump();
+      if (isa<llvm::GetElementPtrInst>(callIns->getOperand(nthParamAlloca))) {
+        return generateExprFromOperand(dyn_cast<llvm::Instruction>(
+            callIns->getOperand(nthParamAlloca))->getOperand(0));
+      } else {
+        return generateExprFromOperand(callIns->getOperand(nthParamAlloca));
+      }
+    }
+
+    if (TxWPHelper::isRetAlloca(alc)) {
       name = TxWPHelper::getNoNameInst(alc);
     } else {
       name = alc->getName().str();

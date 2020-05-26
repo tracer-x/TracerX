@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TxWPHelper.h"
+#include "TxTree.h"
 
 namespace klee {
 
@@ -242,6 +243,34 @@ ref<Expr> TxWPHelper::substituteExpr(ref<Expr> base, const ref<Expr> lhs,
   }
 
   return base;
+}
+
+llvm::Instruction *TxWPHelper::getNearestCallInst(const llvm::Value *ins,
+                                                  TxTreeNode *txNode) {
+  TxTreeNode *tmp = txNode;
+  llvm::Instruction *lastCall = NULL;
+  while (tmp != NULL) {
+    bool found = false;
+    for (std::vector<std::pair<KInstruction *, int> >::iterator
+             it = tmp->reverseInstructionList.begin(),
+             ie = tmp->reverseInstructionList.end();
+         it != ie; ++it) {
+      if (isa<llvm::CallInst>(it->first->inst)) {
+        lastCall = (it->first->inst);
+      }
+      if (ins == it->first->inst) {
+        found = true;
+        break;
+      }
+    }
+
+    if (found) {
+      break;
+    } else {
+      tmp = tmp->getParent();
+    }
+  }
+  return lastCall;
 }
 
 } /* namespace klee */
