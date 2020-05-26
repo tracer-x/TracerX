@@ -743,10 +743,11 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
   ref<Expr> index, result;
   if (isa<llvm::AllocaInst>(p->getOperand(0))) {
     llvm::AllocaInst *alc = dyn_cast<llvm::AllocaInst>(p->getOperand(0));
-    std::string name;
     int nthParamAlloca = TxWPHelper::isParamAlloca(alc);
+    // is param alloca
     if (nthParamAlloca != -1) {
       llvm::Instruction *callIns = TxWPHelper::getNearestCallInst(alc, node);
+      llvm::errs() << "Load param alloca ...\n";
       callIns->getOperand(nthParamAlloca)->dump();
       if (isa<llvm::GetElementPtrInst>(callIns->getOperand(nthParamAlloca))) {
         return generateExprFromOperand(dyn_cast<llvm::Instruction>(
@@ -755,8 +756,8 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
         return generateExprFromOperand(callIns->getOperand(nthParamAlloca));
       }
     }
-
-    if (TxWPHelper::isRetAlloca(alc)) {
+    std::string name;
+    if (TxWPHelper::isRetAlloca(alc)) { // return alloca
       name = TxWPHelper::getNoNameInst(alc);
     } else {
       name = alc->getName().str();
@@ -780,8 +781,21 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
 ref<Expr> TxWeakestPreCondition::getAllocaInst(llvm::AllocaInst *alc) {
   unsigned width;
   ref<Expr> index, result;
+  int nthParamAlloca = TxWPHelper::isParamAlloca(alc);
+  // is param alloca
+  if (nthParamAlloca != -1) {
+    llvm::Instruction *callIns = TxWPHelper::getNearestCallInst(alc, node);
+    llvm::errs() << "getAllocaInst param alloca ...\n";
+    callIns->getOperand(nthParamAlloca)->dump();
+    if (isa<llvm::GetElementPtrInst>(callIns->getOperand(nthParamAlloca))) {
+      return generateExprFromOperand(dyn_cast<llvm::Instruction>(
+          callIns->getOperand(nthParamAlloca))->getOperand(0));
+    } else {
+      return generateExprFromOperand(callIns->getOperand(nthParamAlloca));
+    }
+  }
   std::string name;
-  if (alc->getName().empty()) {
+  if (TxWPHelper::isRetAlloca(alc)) { // return alloca
     name = TxWPHelper::getNoNameInst(alc);
   } else {
     name = alc->getName().str();
