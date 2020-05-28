@@ -41,6 +41,22 @@ public:
   static llvm::Instruction *getNearestCallInst(const llvm::Value *ins,
                                                TxTreeNode *txNode);
 
+  // get function argument
+    static  llvm::Value* getnthArgument(const llvm::Value *ins, int nth) {
+    	const llvm::Function *f =
+          dyn_cast<llvm::Instruction>(ins)->getParent()->getParent();
+      if(f->getArgumentList().empty()) {
+    	  return NULL;
+      }
+      int i=0;
+      const llvm::Argument* a=f->getArgumentList().begin();
+      while(i<nth){
+    	  a=a->getNextNode();
+    	  ++i;
+      }
+      return const_cast<llvm::Argument*>(a);
+    }
+
   // return the order of parameter of the function
   // if ins is not allocation for parameter then return -1
   static int isParamAlloca(const llvm::Value *ins) {

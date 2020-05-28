@@ -746,15 +746,9 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
     int nthParamAlloca = TxWPHelper::isParamAlloca(alc);
     // is param alloca
     if (nthParamAlloca != -1) {
-      llvm::Instruction *callIns = TxWPHelper::getNearestCallInst(alc, node);
-      llvm::errs() << "Load param alloca ...\n";
-      callIns->getOperand(nthParamAlloca)->dump();
-      if (isa<llvm::GetElementPtrInst>(callIns->getOperand(nthParamAlloca))) {
-        return generateExprFromOperand(dyn_cast<llvm::Instruction>(
-            callIns->getOperand(nthParamAlloca))->getOperand(0));
-      } else {
-        return generateExprFromOperand(callIns->getOperand(nthParamAlloca));
-      }
+      // generate WP of corresponding function's argument
+      return generateExprFromOperand(
+          TxWPHelper::getnthArgument(alc, nthParamAlloca));
     }
     std::string name;
     if (TxWPHelper::isRetAlloca(alc)) { // return alloca
@@ -784,15 +778,8 @@ ref<Expr> TxWeakestPreCondition::getAllocaInst(llvm::AllocaInst *alc) {
   int nthParamAlloca = TxWPHelper::isParamAlloca(alc);
   // is param alloca
   if (nthParamAlloca != -1) {
-    llvm::Instruction *callIns = TxWPHelper::getNearestCallInst(alc, node);
-    llvm::errs() << "getAllocaInst param alloca ...\n";
-    callIns->getOperand(nthParamAlloca)->dump();
-    if (isa<llvm::GetElementPtrInst>(callIns->getOperand(nthParamAlloca))) {
-      return generateExprFromOperand(dyn_cast<llvm::Instruction>(
-          callIns->getOperand(nthParamAlloca))->getOperand(0));
-    } else {
-      return generateExprFromOperand(callIns->getOperand(nthParamAlloca));
-    }
+    return generateExprFromOperand(
+        TxWPHelper::getnthArgument(alc, nthParamAlloca));
   }
   std::string name;
   if (TxWPHelper::isRetAlloca(alc)) { // return alloca
