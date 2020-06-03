@@ -1191,7 +1191,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
           llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
       llvm::BasicBlock *curBB = current.txTreeNode->getBasicBlock();
 
-      if (SpecTypeToUse == SAFETY) {
+      if (SpecTypeToUse == SAFETY ||
+          (SpecTypeToUse == COVERAGE && !SpecIndependence)) {
         if (SpecStrategyToUse == TIMID) {
           klee_error("SPECULATION: timid is not supported with safety!");
         } else if (SpecStrategyToUse == AGGRESSIVE) {
@@ -1279,7 +1280,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
           llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
       llvm::BasicBlock *curBB = current.txTreeNode->getBasicBlock();
 
-      if (SpecTypeToUse == SAFETY) {
+      if (SpecTypeToUse == SAFETY ||
+          (SpecTypeToUse == COVERAGE && !SpecIndependence)) {
         if (SpecStrategyToUse == TIMID) {
           klee_error("SPECULATION: timid is not supported with safety!");
         } else if (SpecStrategyToUse == AGGRESSIVE) {
@@ -1380,7 +1382,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
           llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
       llvm::BasicBlock *curBB = current.txTreeNode->getBasicBlock();
 
-      if (SpecTypeToUse == SAFETY) {
+      if (SpecTypeToUse == SAFETY ||
+          (SpecTypeToUse == COVERAGE && !SpecIndependence)) {
         if (SpecStrategyToUse == TIMID) {
           klee_error("SPECULATION: timid is not supported with safety!");
         } else if (SpecStrategyToUse == AGGRESSIVE) {
@@ -1493,7 +1496,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
           llvm::dyn_cast<llvm::BranchInst>(current.prevPC->inst);
       llvm::BasicBlock *curBB = current.txTreeNode->getBasicBlock();
 
-      if (SpecTypeToUse == SAFETY) {
+      if (SpecTypeToUse == SAFETY ||
+          (SpecTypeToUse == COVERAGE && !SpecIndependence)) {
         if (SpecStrategyToUse == TIMID) {
           klee_error("SPECULATION: timid is not supported with safety!");
         } else if (SpecStrategyToUse == AGGRESSIVE) {
@@ -1823,7 +1827,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculationHelper::isStateSpeculable(current)) {
 
-      if (SpecTypeToUse == SAFETY) {
+      if (SpecTypeToUse == SAFETY ||
+          (SpecTypeToUse == COVERAGE && !SpecIndependence)) {
         if (SpecStrategyToUse == TIMID) {
           klee_error("SPECULATION: timid is not supported with safety!");
         } else if (SpecStrategyToUse == AGGRESSIVE) {
@@ -1879,7 +1884,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
   } else if (condition->isFalse()) {
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculationHelper::isStateSpeculable(current)) {
-      if (SpecTypeToUse == SAFETY) {
+      if (SpecTypeToUse == SAFETY ||
+          (SpecTypeToUse == COVERAGE && !SpecIndependence)) {
         if (SpecStrategyToUse == TIMID) {
           klee_error("SPECULATION: timid is not supported with safety!");
         } else if (SpecStrategyToUse == AGGRESSIVE) {
@@ -1947,7 +1953,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
     }
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculationHelper::isStateSpeculable(current)) {
-      if (SpecStrategyToUse == SAFETY) {
+      if (SpecStrategyToUse == SAFETY ||
+          (SpecTypeToUse == COVERAGE && !SpecIndependence)) {
         if (SpecStrategyToUse == TIMID) {
           klee_error("SPECULATION: timid is not supported with safety!");
         } else if (SpecStrategyToUse == AGGRESSIVE) {
@@ -2025,7 +2032,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 
     if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
         TxSpeculationHelper::isStateSpeculable(current)) {
-      if (SpecTypeToUse == SAFETY) {
+      if (SpecTypeToUse == SAFETY ||
+          (SpecTypeToUse == COVERAGE && !SpecIndependence)) {
         if (SpecStrategyToUse == TIMID) {
           klee_error("SPECULATION: timid is not supported with safety!");
         } else if (SpecStrategyToUse == AGGRESSIVE) {
