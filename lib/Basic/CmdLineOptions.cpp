@@ -212,6 +212,11 @@ MarkGlobal("mark-global",
            llvm::cl::desc("Decide whether global variables are marked or not"),
            llvm::cl::init(false));
 
+llvm::cl::opt<bool>
+SpecIndependence("-spec-independence",
+                 llvm::cl::desc("Decide whether independence is check or not"),
+                 llvm::cl::init(false));
+
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT
