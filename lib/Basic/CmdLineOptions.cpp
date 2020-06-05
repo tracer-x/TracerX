@@ -146,7 +146,9 @@ BBCoverage("write-BB-cov",
                           "= 1 Only report Basic Block Coverage\n"
                           "= 2 Also Report Covered Basic Blocks\n"
                           "= 3 Report Live Coverage\n"
-                          "= 4 Generate Coverage by Time Plot\n"),
+                          "= 4 Report ICMP/Atomic Condition Coverage. Note: "
+                          "Useful to compare coverage with CBMC\n"
+                          "= 5 Generate Coverage by Time Plot\n"),
            llvm::cl::init(0));
 
 llvm::cl::opt<bool> EmitAllErrorsInSamePath(
