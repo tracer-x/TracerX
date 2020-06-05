@@ -925,6 +925,7 @@ static const char *modelledExternals[] = {
   "tracerx_debug_state_off"
   "tracerx_memo"
   "tracerx_memo_check"
+  "tracerx_half_speculation"
 };
 // Symbols we aren't going to warn about
 static const char *dontCareExternals[] = {

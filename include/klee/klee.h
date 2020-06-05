@@ -181,6 +181,10 @@ extern "C" {
   /* Check if a vector of integers is stored previously. */
   void tracerx_memo_check();
 
+  /* Start the half speculation process. When the argument is set to 1
+   * the nodes from there onwards will be processed in speculation mode. */
+  void tracerx_half_speculation();
+
 #ifdef __cplusplus
 }
 #endif

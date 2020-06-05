@@ -125,6 +125,7 @@ namespace klee {
     HANDLER(handleDebugSubsumptionOff);
     HANDLER(handleMemoCheck);
     HANDLER(handleMemo);
+    HANDLER(handleHalfSpeculation);
     HANDLER(handleDefineFixedObject);
     HANDLER(handleDelete);    
     HANDLER(handleDeleteArray);

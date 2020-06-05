@@ -141,6 +141,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_debug_state_off", handleDebugStateOff, false),
     add("tracerx_memo_check", handleMemoCheck, true),
     add("tracerx_memo", handleMemo, false),
+    add("tracerx_half_speculation", handleHalfSpeculation, false),
 #undef addDNR
 #undef add
 };
@@ -732,6 +733,17 @@ void SpecialFunctionHandler::handleMemo(ExecutionState &state,
     obj.push_back(item->getAPValue().getSExtValue());
   }
 
+  po.insert(obj);
+}
+
+void SpecialFunctionHandler::handleHalfSpeculation(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr> > &arguments) {
+  assert(arguments[0]->getKind() == 0 &&
+         "invalid length variable, the first argument should be constant");
+  ref<ConstantExpr> halfSpeculation = dyn_cast<ConstantExpr>(arguments[0]);
+  std::vector<int> obj;
+  obj.push_back(halfSpeculation->getAPValue().getSExtValue());
   po.insert(obj);
 }
 
