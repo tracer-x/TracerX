@@ -742,9 +742,8 @@ void SpecialFunctionHandler::handleHalfSpeculation(
   assert(arguments[0]->getKind() == 0 &&
          "invalid length variable, the first argument should be constant");
   ref<ConstantExpr> halfSpeculation = dyn_cast<ConstantExpr>(arguments[0]);
-  std::vector<int> obj;
-  obj.push_back(halfSpeculation->getAPValue().getSExtValue());
-  po.insert(obj);
+  state.txTreeNode->setHalfSpeculation(
+      halfSpeculation->getAPValue().getSExtValue());
 }
 
 void SpecialFunctionHandler::handleGetValue(

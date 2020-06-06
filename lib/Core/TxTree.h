@@ -439,6 +439,9 @@ class TxTreeNode {
   // \brief Set if the speculation has failed and the node should be removed
   bool speculationFailed;
 
+  // \brief If set make the node a speculation node and all its children too
+  bool halfSpeculation;
+
   // \brief Instance of weakest precondition class used to generate WP
   // interpolant
   TxWeakestPreCondition *wp;
@@ -609,6 +612,15 @@ public:
   /// \brief Set the respective state of the node to be terminated since
   /// speculation has failed
   void setSpeculationFailed();
+
+  /// \brief Check if the half_speculation flag value
+  bool getHalfSpeculation() { return halfSpeculation; };
+
+  /// \brief Check if the half_speculation flag value
+  void setHalfSpeculation(int _halfSpeculation) {
+    halfSpeculation = _halfSpeculation;
+    llvm::errs() << "Half Speculation set to:" << halfSpeculation << "\n";
+  };
 
   /// \brief Returning the left node
   TxTreeNode *getLeft() { return left; }
