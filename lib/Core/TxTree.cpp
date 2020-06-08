@@ -818,20 +818,27 @@ bool TxSubsumptionTableEntry::subsumed(
         continue;
       }
       // data in entry
-      ref<Expr> entryVal = (*it)->getContent()->getExpression();
       ref<Expr> addr = (*it)->getAddress()->getAddress();
       ref<Expr> offset = (*it)->getAddress()->getOffset();
       unsigned type = (*it)->getAddress()->getSize();
-      ObjectPair op;
-      bool resolve = state.addressSpace.resolveOne(
-          cast<klee::ConstantExpr>(addr), op);
-      if (!resolve) {
+      ObjectPair initOp;
+      bool initResolve = TxTree::initialStateCopy->addressSpace.resolveOne(
+          cast<klee::ConstantExpr>(addr), initOp);
+
+      ObjectPair currentOp;
+      bool currentResolve = state.addressSpace.resolveOne(
+          cast<klee::ConstantExpr>(addr), currentOp);
+
+      if (!initResolve || !currentResolve) {
         globalSat = false;
         break;
       } else {
-        const ObjectState *os = op.second;
-        ref<Expr> result = os->read(offset, type);
-        if (result != entryVal) {
+        const ObjectState *initOs = initOp.second;
+        ref<Expr> initValue = initOs->read(offset, type);
+        const ObjectState *currentOs = currentOp.second;
+        ref<Expr> currentValue = currentOs->read(offset, type);
+
+        if (initValue != currentValue) {
           globalSat = false;
           break;
         }
