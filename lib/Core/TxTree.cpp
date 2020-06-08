@@ -807,12 +807,9 @@ bool TxSubsumptionTableEntry::subsumed(
   if (MarkGlobal) {
     // Global check
     bool globalSat = true;
-    llvm::errs() << "Global Check ...\n";
     for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
                                                 ie = markedGlobal.end();
          it != ie; ++it) {
-      (*it)->dump();
-
       if ((*it)->getValue()->getType()->isPointerTy() ||
           (*it)->getValue()->getType()->getTypeID() == 0) {
         continue;
