@@ -185,7 +185,7 @@ class TxSubsumptionTableEntry {
 
   ref<Expr> wpInterpolant;
 
-  std::set< ref<TxStoreEntry> > markedGlobal;
+  std::set<ref<TxStoreEntry> > markedGlobal;
 
   std::set<const Array *> existentials;
 
@@ -908,6 +908,7 @@ public:
 
   /// \brief The root node of the tree
   TxTreeNode *root;
+  static ExecutionState *initialStateCopy;
 
   /// \brief This static member variable is to indicate if we recovered from an
   /// error,
@@ -919,7 +920,10 @@ public:
          std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
              _globalAddresses);
 
-  ~TxTree() { TxSubsumptionTable::clear(); }
+  ~TxTree() {
+    TxSubsumptionTable::clear();
+    delete initialStateCopy;
+  }
 
   /// \brief Set the reference to the KLEE state in the current interpolation
   /// data holder (Tracer-X tree node) that is currently being processed.

@@ -1105,18 +1105,17 @@ void TxDependency::markGlobalVars(ref<TxStateValue> value,
     ref<TxStoreEntry> se = (*it);
     if (isa<llvm::GlobalVariable>(
             se->getAddress()->getAllocationInfo()->getContext()->getValue())) {
-
-      // keep at current node & parent nodes
-      markedGlobal.insert(getMarkedGlobal(se));
-      if (parent) {
-        parent->recursivelyMarkGlobalVars(se);
-      }
+      recursivelyMarkGlobalVars(se);
     }
   }
 }
 
 void TxDependency::recursivelyMarkGlobalVars(ref<TxStoreEntry> se) {
-  markedGlobal.insert(getMarkedGlobal(se));
+  if (store->find(se->getAddress()).isNull()) {
+    //	  llvm::errs() << "Not in internal store => need to add to G\n";
+    //	  se->dump();
+    markedGlobal.insert(se);
+  }
   if (parent) {
     parent->recursivelyMarkGlobalVars(se);
   }
