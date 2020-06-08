@@ -336,14 +336,14 @@ public:
 
   std::set<ref<TxStoreEntry> > &getMarkedGlobal() { return markedGlobal; }
 
-  ref<TxStoreEntry> getMarkedGlobal(ref<TxStoreEntry> se) {
+  bool isEntryInParent(ref<TxStoreEntry> se) {
     if (!parent)
-      return se;
+      return false;
     ref<TxStoreEntry> pse = parent->getStore()->find(se->getAddress());
-    if (!pse.isNull()) {
-      return pse;
+    if (pse.isNull()) {
+      return false;
     } else {
-      return se;
+      return true;
     }
   }
 
