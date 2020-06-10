@@ -210,7 +210,7 @@ WPInterpolant("wp-interpolant",
 llvm::cl::opt<bool>
 MarkGlobal("mark-global",
            llvm::cl::desc("Decide whether global variables are marked or not"),
-           llvm::cl::init(false));
+           llvm::cl::init(true));
 
 #endif // ENABLE_Z3
 
