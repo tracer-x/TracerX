@@ -1113,7 +1113,19 @@ void TxDependency::markGlobalVars(ref<TxStateValue> value,
 
 void TxDependency::recursivelyMarkGlobalVars(ref<TxStoreEntry> se) {
   if (!isEntryInParent(se)) {
-    markedGlobal.insert(se);
+    bool isIn = false;
+    for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
+                                                ie = markedGlobal.end();
+         it != ie; ++it) {
+      if ((*it)->getAddress()->getAsVariable() ==
+          se->getAddress()->getAsVariable()) {
+        isIn = true;
+        break;
+      }
+    }
+    if (!isIn) {
+      markedGlobal.insert(se);
+    }
   }
   if (parent) {
     parent->recursivelyMarkGlobalVars(se);
