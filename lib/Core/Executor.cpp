@@ -333,6 +333,8 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
     allBlockCount = 0;
     allBlockCollected = false;
     blockCoverage = 0;
+    allICMPCount = 0;
+    coveredICMPCount = 0;
   }
 
   if (coreSolverTimeout)
@@ -2750,7 +2752,30 @@ void Executor::processBBCoverage(int BBCoverage, llvm::BasicBlock *bb,
       liveBBFileOut << "-- BlockScopeEnds --\n\n";
       liveBBFileOut.close();
     }
-    if (BBCoverage >= 4) {
+    if (BBCoverage >= 4 && isNew && !isInSpecMode) {
+      // Print covered atomic condition covered
+      std::string liveBBFileICMP =
+          interpreterHandler->getOutputFilename("coveredICMP.txt");
+      std::ofstream liveBBFileICMPOut(liveBBFileICMP.c_str(),
+                                      std::ofstream::app);
+
+      // block content
+      std::string tmpICMP;
+      raw_string_ostream tmpICMPOS(tmpICMP);
+      for (llvm::BasicBlock::iterator icmp = bb->begin(); icmp != bb->end();
+           icmp++) {
+        if (llvm::isa<llvm::ICmpInst>(icmp)) {
+          coveredICMPCount++;
+          liveBBFileICMPOut << "Function: " << bb->getParent()->getName().str()
+                            << " ";
+          liveBBFileICMPOut << "Block Order: " << order;
+          icmp->print(tmpICMPOS);
+          liveBBFileICMPOut << tmpICMP << "\n";
+        }
+      }
+      liveBBFileICMPOut.close();
+    }
+    if (BBCoverage >= 5) {
       double diff = time(0) - startingBBPlottingTime;
       std::string bbPlottingFile =
           interpreterHandler->getOutputFilename("BBPlotting.txt");
@@ -4424,6 +4449,29 @@ void Executor::run(ExecutionState &initialState) {
       std::vector<llvm::BasicBlock *> bbs;
       for (llvm::Function::iterator b = f->begin(); b != f->end(); ++b) {
         fBBOrder[f][b] = ++allBlockCount;
+        if (BBCoverage >= 4) {
+          // Print All atomic condition covered
+          std::string liveBBFileAICMP =
+              interpreterHandler->getOutputFilename("coveredAICMP.txt");
+          std::ofstream liveBBFileAICMPOut(liveBBFileAICMP.c_str(),
+                                           std::ofstream::app);
+
+          // block content
+          std::string tmpICMP;
+          raw_string_ostream tmpICMPOS(tmpICMP);
+          for (llvm::BasicBlock::iterator aicmp = b->begin(); aicmp != b->end();
+               aicmp++) {
+            if (llvm::isa<llvm::ICmpInst>(aicmp)) {
+              allICMPCount++;
+              liveBBFileAICMPOut << "Function: "
+                                 << b->getParent()->getName().str() << " ";
+              liveBBFileAICMPOut << "Block Order: " << allBlockCount;
+              aicmp->print(tmpICMPOS);
+              liveBBFileAICMPOut << tmpICMP << "\n";
+            }
+          }
+          liveBBFileAICMPOut.close();
+        }
       }
     }
   }
@@ -5686,6 +5734,25 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     visitedBBFileOut.close();
   }
 
+  if (BBCoverage >= 4) {
+    llvm::errs() << "************ICMP/Atomic Condition Coverage Report "
+                    "Starts****************"
+                 << "\n";
+    interpreterHandler->getInfoStream()
+        << "KLEE: done: Total number of Covered ICMP/Atomic Condition: "
+        << coveredICMPCount << "\n";
+    interpreterHandler->getInfoStream()
+        << "KLEE: done: Total number of All ICMP/Atomic Conditions "
+        << allICMPCount << "\n";
+    llvm::errs()
+        << "KLEE: done: Total number of Covered ICMP/Atomic Condition: "
+        << coveredICMPCount << "\n";
+    llvm::errs() << "KLEE: done: Total number of All ICMP/Atomic Condition: "
+                 << allICMPCount << "\n";
+    llvm::errs() << "************ICMP/Atomic Condition Coverage Report "
+                    "Ends****************"
+                 << "\n";
+  }
   // hack to clear memory objects
   delete memory;
   memory = new MemoryManager(NULL);

@@ -94,6 +94,8 @@ class Executor : public Interpreter {
 public:
   time_t startingBBPlottingTime;
   int allBlockCount;
+  int allICMPCount;
+  int coveredICMPCount;
   bool allBlockCollected;
   std::set<llvm::BasicBlock *> visitedBlocks;
   float blockCoverage;
