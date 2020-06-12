@@ -814,7 +814,7 @@ bool TxSubsumptionTableEntry::subsumed(
           (*it)->getValue()->getType()->getTypeID() == 0) {
         continue;
       }
-      // data in entry
+
       ref<Expr> addr = (*it)->getAddress()->getAddress();
       ref<Expr> offset = (*it)->getAddress()->getOffset();
       unsigned type = (*it)->getAddress()->getSize();
@@ -831,9 +831,9 @@ bool TxSubsumptionTableEntry::subsumed(
         break;
       } else {
         const ObjectState *initOs = initOp.second;
-        ref<Expr> initValue = initOs->read(offset, type);
+        ref<Expr> initValue = initOs->read(offset, type * 8);
         const ObjectState *currentOs = currentOp.second;
-        ref<Expr> currentValue = currentOs->read(offset, type);
+        ref<Expr> currentValue = currentOs->read(offset, type * 8);
 
         if (initValue != currentValue) {
           globalSat = false;
