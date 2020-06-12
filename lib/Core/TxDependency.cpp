@@ -1106,17 +1106,27 @@ void TxDependency::markGlobalVars(ref<TxStateValue> value,
     if (isa<llvm::GlobalVariable>(
             se->getAddress()->getAllocationInfo()->getContext()->getValue())) {
 
-      // keep at current node & parent nodes
-      markedGlobal.insert(getMarkedGlobal(se));
-      if (parent) {
-        parent->recursivelyMarkGlobalVars(se);
-      }
+      recursivelyMarkGlobalVars(se);
     }
   }
 }
 
 void TxDependency::recursivelyMarkGlobalVars(ref<TxStoreEntry> se) {
-  markedGlobal.insert(getMarkedGlobal(se));
+  if (!isEntryInParent(se)) {
+    bool isIn = false;
+    for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
+                                                ie = markedGlobal.end();
+         it != ie; ++it) {
+      if ((*it)->getAddress()->getAsVariable() ==
+          se->getAddress()->getAsVariable()) {
+        isIn = true;
+        break;
+      }
+    }
+    if (!isIn) {
+      markedGlobal.insert(se);
+    }
+  }
   if (parent) {
     parent->recursivelyMarkGlobalVars(se);
   }

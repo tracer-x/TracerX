@@ -807,30 +807,35 @@ bool TxSubsumptionTableEntry::subsumed(
   if (MarkGlobal) {
     // Global check
     bool globalSat = true;
-
     for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
                                                 ie = markedGlobal.end();
          it != ie; ++it) {
-
       if ((*it)->getValue()->getType()->isPointerTy() ||
           (*it)->getValue()->getType()->getTypeID() == 0) {
         continue;
       }
-      ref<Expr> entryVal = (*it)->getContent()->getExpression();
+
       ref<Expr> addr = (*it)->getAddress()->getAddress();
       ref<Expr> offset = (*it)->getAddress()->getOffset();
-      unsigned type = (*it)->getValue()->getType()->getIntegerBitWidth();
+      unsigned type = (*it)->getAddress()->getSize();
+      ObjectPair initOp;
+      bool initResolve = TxTree::initialStateCopy->addressSpace.resolveOne(
+          cast<klee::ConstantExpr>(addr), initOp);
 
-      ObjectPair op;
-      bool resolve =
-          state.addressSpace.resolveOne(cast<klee::ConstantExpr>(addr), op);
-      if (!resolve) {
+      ObjectPair currentOp;
+      bool currentResolve = state.addressSpace.resolveOne(
+          cast<klee::ConstantExpr>(addr), currentOp);
+
+      if (!initResolve || !currentResolve) {
         globalSat = false;
         break;
       } else {
-        const ObjectState *os = op.second;
-        ref<Expr> result = os->read(offset, type);
-        if (result != entryVal) {
+        const ObjectState *initOs = initOp.second;
+        ref<Expr> initValue = initOs->read(offset, type * 8);
+        const ObjectState *currentOs = currentOp.second;
+        ref<Expr> currentValue = currentOs->read(offset, type * 8);
+
+        if (initValue != currentValue) {
           globalSat = false;
           break;
         }
@@ -2210,6 +2215,8 @@ bool TxTree::symbolicExecutionError = false;
 
 uint64_t TxTree::subsumptionCheckCount = 0;
 
+ExecutionState *TxTree::initialStateCopy = 0;
+
 uint64_t TxTree::blockCount = 1;
 
 void TxTree::printTimeStat(std::stringstream &stream) {
@@ -2284,6 +2291,8 @@ TxTree::TxTree(
     currentTxTreeNode = TxTreeNode::createRoot(_targetData, _globalAddresses);
   }
   root = currentTxTreeNode;
+  initialStateCopy = new ExecutionState(*_root);
+  ;
 }
 
 bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
