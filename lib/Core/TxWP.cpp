@@ -420,8 +420,12 @@ ref<Expr> TxWeakestPreCondition::PushUp(
       }
     } else if (i->getOpcode() == llvm::Instruction::Call) {
       llvm::CallInst *callInst = dyn_cast<llvm::CallInst>(i);
-      std::string fname = callInst->getCalledFunction()->getName().data();
-      bool isignore = TxWPHelper::isSkipPushUp(fname);
+      bool isignore = 1;
+      if (!callInst && !callInst->getCalledFunction() &&
+          !callInst->getCalledFunction()->getName().empty()) {
+        std::string fname = callInst->getCalledFunction()->getName().data();
+        isignore = TxWPHelper::isSkipPushUp(fname);
+      }
       if (!isignore) {
         std::vector<ref<Expr> > passedVals;
         for (unsigned u = 0; u < callInst->getNumArgOperands(); ++u) {
@@ -1147,6 +1151,8 @@ TxWeakestPreCondition::getGlobalVariabletSize(llvm::GlobalValue *gv) {
     size = Expr::Int16;
   } else if (gv->getType()->getElementType()->isIntegerTy(32)) {
     size = Expr::Int32;
+  } else if (gv->getType()->getElementType()->isIntegerTy(64)) {
+    size = Expr::Int64;
   } else if (gv->getType()->getElementType()->isPointerTy()) {
     size = Expr::Int32;
   } else if (gv->getType()->getElementType()->isArrayTy()) {
@@ -1159,6 +1165,8 @@ TxWeakestPreCondition::getGlobalVariabletSize(llvm::GlobalValue *gv) {
     size = Expr::Int16;
   } else if (gv->getType()->isIntegerTy(32)) {
     size = Expr::Int32;
+  } else if (gv->getType()->isIntegerTy(64)) {
+    size = Expr::Int64;
   } else if (gv->getType()->isPointerTy()) {
     size = Expr::Int32;
   } else if (gv->getType()->isArrayTy()) {
@@ -1186,13 +1194,17 @@ TxWeakestPreCondition::getFunctionArgumentSize(llvm::Argument *arg) {
     size = Expr::Int16;
   } else if (arg->getType()->isIntegerTy(32)) {
     size = Expr::Int32;
+  } else if (arg->getType()->isIntegerTy(64)) {
+    size = Expr::Int64;
   } else if (arg->getType()->isPointerTy()) {
+    size = Expr::Int32;
+  } else if (arg->getType()->isArrayTy()) {
     size = Expr::Int32;
   } else {
     arg->dump();
     arg->getType()->dump();
     klee_error(
-        "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
+        "TxWeakestPreCondition::getFunctionArgumentSize getting size is not "
         "defined for this type yet");
   }
   return size;
@@ -1209,6 +1221,8 @@ unsigned int TxWeakestPreCondition::getGepSize(llvm::Type *ty) {
     size = Expr::Int16;
   } else if (ty->isIntegerTy(32)) {
     size = Expr::Int32;
+  } else if (ty->isIntegerTy(64)) {
+    size = Expr::Int64;
   } else if (ty->isPointerTy()) {
     size = getGepSize(ty->getPointerElementType());
   } else {

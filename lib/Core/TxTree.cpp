@@ -868,8 +868,14 @@ bool TxSubsumptionTableEntry::subsumed(
         state.txTreeNode->instantiateWPatSubsumption(
             wpInterpolant, state.txTreeNode->getDependency());
 
-    if (wpInstantiatedInterpolant.isNull())
+    if (wpInstantiatedInterpolant.isNull()) {
+      if (debugSubsumptionLevel >= 1) {
+        klee_message("#%lu=>#%lu: WP check filed, WP instantiation failed",
+                     state.txTreeNode->getNodeSequenceNumber(),
+                     nodeSequenceNumber);
+      }
       return false;
+    }
 
     ref<Expr> wpBoolean =
         ZExtExpr::create(wpInstantiatedInterpolant, Expr::Bool);

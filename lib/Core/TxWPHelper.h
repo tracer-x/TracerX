@@ -184,7 +184,8 @@ public:
 
   static bool isSkipPushUp(std::string fname) {
     if ((fname.substr(0, 5) == "klee_") || (fname.substr(0, 3) == "tx_") ||
-        (fname == "printf") || (fname.substr(0, 6) == "check_")) {
+        (fname == "printf") || (fname.substr(0, 6) == "check_") ||
+        (fname.substr(0, 6) == "memcpy")) {
       return true;
     }
     return false;
