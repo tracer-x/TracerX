@@ -2937,6 +2937,12 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     if (kids[1].isNull())
       return kids[1];
 
+    if (!isa<ConstantExpr>(kids[1])) {
+      ref<Expr> nilexp;
+      return nilexp;
+      // return SelExpr::create(kids[0], kids[1]);
+    }
+
     ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
 
     ref<TxAllocationContext> alc =
