@@ -1786,6 +1786,7 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
   std::string tabsNextNext = appendTab(tabsNext);
 
   stream << prefix << "------------ Subsumption Table Entry ------------\n";
+  stream << prefix << "------------@ Subsumption Table Entry ------------\n";
   stream << prefix << "Program point = " << programPoint << "\n";
   if (MarkGlobal) {
     stream << prefix << "global = [";
@@ -2182,6 +2183,8 @@ void TxSubsumptionTable::clear() {
            it = instance.begin(),
            ie = instance.end();
        it != ie; ++it) {
+	  llvm::errs() << "trying to print";
+	  it->second->print(llvm::errs());
     if (it->second) {
       ++TxTree::programPointNumber;
       delete it->second;

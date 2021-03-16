@@ -123,7 +123,7 @@ public:
              it = instance.begin(),
              ie = instance.end();
          it != ie; ++it) {
-      stream << it->first << ": ";
+      stream << it->first << ":";
       it->second->print(stream);
       stream << "\n";
     }
