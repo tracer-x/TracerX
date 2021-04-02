@@ -15,11 +15,11 @@
 
 #include "TxTree.h"
 
+#include "Executor.h"
+#include "Memory.h"
 #include "TimingSolver.h"
-
 #include "TxDependency.h"
 #include "TxShadowArray.h"
-#include "Memory.h"
 #include <fstream>
 #include <klee/CommandLine.h>
 #include <klee/Expr.h>
@@ -44,15 +44,14 @@ using namespace klee;
 Statistic TxSubsumptionTableEntry::concretelyAddressedStoreExpressionBuildTime(
     "concretelyAddressedStoreExpressionBuildTime", "concreteStoreTime");
 Statistic
-TxSubsumptionTableEntry::symbolicallyAddressedStoreExpressionBuildTime(
-    "symbolicallyAddressedStoreExpressionBuildTime", "symbolicStoreTime");
+    TxSubsumptionTableEntry::symbolicallyAddressedStoreExpressionBuildTime(
+        "symbolicallyAddressedStoreExpressionBuildTime", "symbolicStoreTime");
 Statistic TxSubsumptionTableEntry::solverAccessTime("solverAccessTime",
                                                     "solverAccessTime");
 
-int debugSubsumptionLevel_g=0;
-void setDebugSubsumptionLevelTxTree(int debugSubsumptionLevel)
-{
-    debugSubsumptionLevel_g=debugSubsumptionLevel;
+int debugSubsumptionLevel_g = 0;
+void setDebugSubsumptionLevelTxTree(int debugSubsumptionLevel) {
+  debugSubsumptionLevel_g = debugSubsumptionLevel;
 }
 
 TxSubsumptionTableEntry::TxSubsumptionTableEntry(
@@ -88,7 +87,7 @@ ref<Expr> TxSubsumptionTableEntry::makeConstraint(
     std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases,
     int debugSubsumptionLevel) const {
   ref<Expr> constraint;
-    setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
+  setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
 #ifdef ENABLE_Z3
   if (tabledValue->getExpression()->getWidth() !=
       stateValue->getExpression()->getWidth()) {
@@ -160,9 +159,8 @@ ref<Expr> TxSubsumptionTableEntry::makeConstraint(
   return constraint;
 }
 
-bool
-TxSubsumptionTableEntry::hasVariableInSet(std::set<const Array *> &existentials,
-                                          ref<Expr> expr) {
+bool TxSubsumptionTableEntry::hasVariableInSet(
+    std::set<const Array *> &existentials, ref<Expr> expr) {
   for (int i = 0, numKids = expr->getNumKids(); i < numKids; ++i) {
     if (llvm::isa<ReadExpr>(expr)) {
       ReadExpr *readExpr = llvm::dyn_cast<ReadExpr>(expr);
@@ -568,10 +566,9 @@ ref<Expr> TxSubsumptionTableEntry::simplifyEqualityExpr(
   assert(!"Invalid expression type.");
 }
 
-void
-TxSubsumptionTableEntry::getSubstitution(std::set<const Array *> &existentials,
-                                         ref<Expr> equalities,
-                                         std::map<ref<Expr>, ref<Expr> > &map) {
+void TxSubsumptionTableEntry::getSubstitution(
+    std::set<const Array *> &existentials, ref<Expr> equalities,
+    std::map<ref<Expr>, ref<Expr> > &map) {
   // It is assumed the rhs is an expression on the free variables.
   if (llvm::isa<EqExpr>(equalities)) {
     ref<Expr> lhs = equalities->getKid(0);
@@ -760,7 +757,7 @@ void TxSubsumptionTableEntry::interpolateValues(
     ExecutionState &state, std::set<ref<TxStateValue> > &coreValues,
     std::map<ref<TxStateValue>, std::set<uint64_t> > &corePointerValues,
     int debugSubsumptionLevel) {
-setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
+  setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
   std::string reason = "";
   if (debugSubsumptionLevel >= 1) {
     llvm::raw_string_ostream stream(reason);
@@ -809,7 +806,7 @@ bool TxSubsumptionTableEntry::subsumed(
     TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
-setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
+  setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
 #ifdef ENABLE_Z3
 
   if (MarkGlobal) {
@@ -1527,7 +1524,9 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
       if (debugSubsumptionLevel >= 2) {
         klee_message("Before simplification:\n%s",
                      TxPrettyExpressionBuilder::constructQuery(
-                         state.constraints, existsExpr,debugSubsumptionLevel).c_str()); // Added 'debugSubsumptionLevel' variable for PrettyPrint 
+                         state.constraints, existsExpr, debugSubsumptionLevel)
+                         .c_str()); // Added 'debugSubsumptionLevel' variable
+                                    // for PrettyPrint
       }
       expr = simplifyExistsExpr(existsExpr, exprHasNoFreeVariables);
     }
@@ -1603,10 +1602,16 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
             }
           }
 
-          if (debugSubsumptionLevel >= 2 and debugSubsumptionLevel != 3 ) { /*Added 'debugSubsumptionLevel != 3' constraint for Pretty Print*/
-            klee_message("Querying for subsumption check:\n%s",
-                         TxPrettyExpressionBuilder::constructQuery(
-                             state.constraints, expr,debugSubsumptionLevel).c_str()); /*Added 'debugSubsumptionLevel' variable in 'constructQuery' function for Pretty Print*/
+          if (debugSubsumptionLevel >= 2 and
+              debugSubsumptionLevel !=
+                  3) { /*Added 'debugSubsumptionLevel != 3' constraint for
+                          Pretty Print*/
+            klee_message(
+                "Querying for subsumption check:\n%s",
+                TxPrettyExpressionBuilder::constructQuery(
+                    state.constraints, expr, debugSubsumptionLevel)
+                    .c_str()); /*Added 'debugSubsumptionLevel' variable in
+                                  'constructQuery' function for Pretty Print*/
           }
 
           if (llvm::isa<ExistsExpr>(expr)) {
@@ -1639,10 +1644,15 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
         }
 
       } else {
-        if (debugSubsumptionLevel >= 2 and debugSubsumptionLevel != 3) { /*Added 'debugSubsumptionLevel != 3' constraint for prettyPrint*/
-          klee_message("Querying for subsumption check:\n%s",
-                       TxPrettyExpressionBuilder::constructQuery(
-                           state.constraints, expr, debugSubsumptionLevel).c_str());/*Added 'debugSubsumptionLevel' variable in 'constructQuery' function for Pretty Print*/
+        if (debugSubsumptionLevel >= 2 and
+            debugSubsumptionLevel != 3) { /*Added 'debugSubsumptionLevel != 3'
+                                             constraint for prettyPrint*/
+          klee_message(
+              "Querying for subsumption check:\n%s",
+              TxPrettyExpressionBuilder::constructQuery(state.constraints, expr,
+                                                        debugSubsumptionLevel)
+                  .c_str()); /*Added 'debugSubsumptionLevel' variable in
+                                'constructQuery' function for Pretty Print*/
         }
         // We call the solver in the standard way if the
         // formula is unquantified.
@@ -1783,16 +1793,18 @@ void TxSubsumptionTableEntry::setExistentials(
 }
 
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
-  print(stream, 0,debugSubsumptionLevel_g);
+  print(stream, 0, debugSubsumptionLevel_g);
 }
 
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
-                                    const unsigned paddingAmount, int debugSubsumptionLevel) const {
-  print(stream, makeTabs(paddingAmount),debugSubsumptionLevel);
+                                    const unsigned paddingAmount,
+                                    int debugSubsumptionLevel) const {
+  print(stream, makeTabs(paddingAmount), debugSubsumptionLevel);
 }
 
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
-                                    const std::string &prefix, int debugSubsumptionLevel) const {
+                                    const std::string &prefix,
+                                    int debugSubsumptionLevel) const {
   std::string tabsNext = appendTab(prefix);
   std::string tabsNextNext = appendTab(tabsNext);
 
@@ -1837,87 +1849,89 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     stream << prefix;
   }
   stream << "]";
-llvm::outs()<<"debugSubsumptionLevel"<<debugSubsumptionLevel<<"\n";
-  if(debugSubsumptionLevel>=4){ /*PrettyPrint*/
- stream << "\n" << prefix << "symbolically-addressed store = [";
-  if (!symbolicallyAddressedStore.empty()) {
-    stream << "\n";
-    for (TxStore::TopInterpolantStore::const_iterator
-             is1 = symbolicallyAddressedStore.begin(),
-             ie1 = symbolicallyAddressedStore.end(), it1 = is1;
-         it1 != ie1; ++it1) {
+  llvm::outs() << "debugSubsumptionLevel" << debugSubsumptionLevel << "\n";
+  if (debugSubsumptionLevel >= 4) { /*PrettyPrint*/
+    stream << "\n" << prefix << "symbolically-addressed store = [";
+    if (!symbolicallyAddressedStore.empty()) {
+      stream << "\n";
+      for (TxStore::TopInterpolantStore::const_iterator
+               is1 = symbolicallyAddressedStore.begin(),
+               ie1 = symbolicallyAddressedStore.end(), it1 = is1;
+           it1 != ie1; ++it1) {
+        for (TxStore::LowerInterpolantStore::const_iterator
+                 is2 = it1->second.begin(),
+                 ie2 = it1->second.end(), it2 = is2;
+             it2 != ie2; ++it2) {
+          if (it1 != is1 || it2 != is2)
+            stream << tabsNext
+                   << "------------------------------------------\n";
+          stream << tabsNext << "address:\n";
+          it2->first->print(stream, tabsNextNext);
+          stream << "\n";
+          stream << tabsNext << "content:\n";
+          it2->second->print(stream, tabsNextNext);
+          stream << "\n";
+        }
+      }
+      stream << prefix;
+    }
+    stream << "]";
+
+    stream << "\n" << prefix << "concretely-addressed historical store = [";
+    if (!concretelyAddressedHistoricalStore.empty()) {
+      stream << "\n";
       for (TxStore::LowerInterpolantStore::const_iterator
-               is2 = it1->second.begin(),
-               ie2 = it1->second.end(), it2 = is2;
-           it2 != ie2; ++it2) {
-        if (it1 != is1 || it2 != is2)
+               is1 = concretelyAddressedHistoricalStore.begin(),
+               ie1 = concretelyAddressedHistoricalStore.end(), it1 = is1;
+           it1 != ie1; ++it1) {
+        if (it1 != is1)
           stream << tabsNext << "------------------------------------------\n";
         stream << tabsNext << "address:\n";
-        it2->first->print(stream, tabsNextNext);
+
+        it1->first->print(stream, tabsNextNext);
         stream << "\n";
         stream << tabsNext << "content:\n";
-        it2->second->print(stream, tabsNextNext);
+        it1->second->print(stream, tabsNextNext);
         stream << "\n";
       }
+      stream << prefix;
     }
-    stream << prefix;
-  }
-  stream << "]";
+    stream << "]";
 
-  stream << "\n" << prefix << "concretely-addressed historical store = [";
-  if (!concretelyAddressedHistoricalStore.empty()) {
-    stream << "\n";
-    for (TxStore::LowerInterpolantStore::const_iterator
-             is1 = concretelyAddressedHistoricalStore.begin(),
-             ie1 = concretelyAddressedHistoricalStore.end(), it1 = is1;
-         it1 != ie1; ++it1) {
-      if (it1 != is1)
-        stream << tabsNext << "------------------------------------------\n";
-      stream << tabsNext << "address:\n";
-      
-      it1->first->print(stream, tabsNextNext);
+    stream << "\n" << prefix << "symbolically-addressed historical store = [";
+    if (!symbolicallyAddressedHistoricalStore.empty()) {
       stream << "\n";
-      stream << tabsNext << "content:\n";
-      it1->second->print(stream, tabsNextNext);
-      stream << "\n";
+      for (TxStore::LowerInterpolantStore::const_iterator
+               is1 = symbolicallyAddressedHistoricalStore.begin(),
+               ie1 = symbolicallyAddressedHistoricalStore.end(), it1 = is1;
+           it1 != ie1; ++it1) {
+        if (it1 != is1)
+          stream << tabsNext << "------------------------------------------\n";
+
+        stream << tabsNext << "address:\n";
+        it1->first->print(stream, tabsNextNext);
+        stream << "\n";
+        stream << tabsNext << "content:\n";
+        it1->second->print(stream, tabsNextNext);
+        stream << "\n";
+      }
+      stream << prefix;
     }
-    stream << prefix;
-  }
-  stream << "]";
+    stream << "]";
 
-  stream << "\n" << prefix << "symbolically-addressed historical store = [";
-  if (!symbolicallyAddressedHistoricalStore.empty()) {
-    stream << "\n";
-    for (TxStore::LowerInterpolantStore::const_iterator
-             is1 = symbolicallyAddressedHistoricalStore.begin(),
-             ie1 = symbolicallyAddressedHistoricalStore.end(), it1 = is1;
-         it1 != ie1; ++it1) {
-      if (it1 != is1)
-        stream << tabsNext << "------------------------------------------\n";
-
-      stream << tabsNext << "address:\n";
-      it1->first->print(stream, tabsNextNext);
-      stream << "\n";
-      stream << tabsNext << "content:\n";
-      it1->second->print(stream, tabsNextNext);
-      stream << "\n";
+    stream << "\n" << prefix << "existentials = [";
+    if (!existentials.empty()) {
+      for (std::set<const Array *>::const_iterator is = existentials.begin(),
+                                                   ie = existentials.end(),
+                                                   it = is;
+           it != ie; ++it) {
+        if (it != is)
+          stream << ", ";
+        stream << (*it)->name;
+      }
     }
-    stream << prefix;
-  }
-  stream << "]";
-
-  stream << "\n" << prefix << "existentials = [";
-  if (!existentials.empty()) {
-    for (std::set<const Array *>::const_iterator is = existentials.begin(),
-                                                 ie = existentials.end(),
-                                                 it = is;
-         it != ie; ++it) {
-      if (it != is)
-        stream << ", ";
-      stream << (*it)->name;
-    }
-  }
-  stream << "]";}  /*end Pretty Print*/
+    stream << "]";
+  } /*end Pretty Print*/
 }
 
 void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream) const {
@@ -1939,17 +1953,20 @@ void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
 
 void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
   stream << "KLEE: done:     Time for actual solver calls in subsumption check "
-            "(ms) = " << ((double)stats::subsumptionQueryTime.getValue()) / 1000
-         << "\n";
+            "(ms) = "
+         << ((double)stats::subsumptionQueryTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     Number of solver calls for subsumption check "
-            "(failed) = " << stats::subsumptionQueryCount.getValue() << " ("
+            "(failed) = "
+         << stats::subsumptionQueryCount.getValue() << " ("
          << stats::subsumptionQueryFailureCount.getValue() << ")\n";
   stream << "KLEE: done:     Concrete store expression build time (ms) = "
          << ((double)concretelyAddressedStoreExpressionBuildTime.getValue()) /
-                1000 << "\n";
+                1000
+         << "\n";
   stream << "KLEE: done:     Symbolic store expression build time (ms) = "
          << ((double)symbolicallyAddressedStoreExpressionBuildTime.getValue()) /
-                1000 << "\n";
+                1000
+         << "\n";
   stream << "KLEE: done:     Solver access time (ms) = "
          << ((double)solverAccessTime.getValue()) / 1000 << "\n";
 }
@@ -1958,16 +1975,18 @@ void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
 
 void TxSubsumptionTable::CallHistoryIndexedTable::Node::print(
     llvm::raw_ostream &stream) const {
-  print(stream, 0,debugSubsumptionLevel_g);
+  print(stream, 0, debugSubsumptionLevel_g);
 }
 
 void TxSubsumptionTable::CallHistoryIndexedTable::Node::print(
-    llvm::raw_ostream &stream, const unsigned paddingAmount, int debugSubsumptionLevel) const {
-  print(stream, makeTabs(paddingAmount),debugSubsumptionLevel);
+    llvm::raw_ostream &stream, const unsigned paddingAmount,
+    int debugSubsumptionLevel) const {
+  print(stream, makeTabs(paddingAmount), debugSubsumptionLevel);
 }
 
 void TxSubsumptionTable::CallHistoryIndexedTable::Node::print(
-    llvm::raw_ostream &stream, const std::string &prefix, int debugSubsumptionLevel) const {
+    llvm::raw_ostream &stream, const std::string &prefix,
+    int debugSubsumptionLevel) const {
   std::string tabsNext = appendTab(prefix);
 
   stream << "\n";
@@ -2059,13 +2078,14 @@ TxSubsumptionTable::CallHistoryIndexedTable::find(
 }
 
 void TxSubsumptionTable::CallHistoryIndexedTable::printNode(
-    llvm::raw_ostream &stream, Node *n, std::string edges, int debugSubsumptionLevel) const {
+    llvm::raw_ostream &stream, Node *n, std::string edges,
+    int debugSubsumptionLevel) const {
   for (std::map<llvm::Instruction *, Node *>::const_iterator
            it = n->next.begin(),
            ie = n->next.end();
        it != ie; ++it) {
     stream << "\n";
-    it->second->print(stream, edges + "    ",  debugSubsumptionLevel); //*******
+    it->second->print(stream, edges + "    ", debugSubsumptionLevel); //*******
     stream << "\n";
     printNode(stream, it->second, edges + "    ", debugSubsumptionLevel);
   }
@@ -2074,18 +2094,17 @@ void TxSubsumptionTable::CallHistoryIndexedTable::printNode(
 void TxSubsumptionTable::CallHistoryIndexedTable::print(
     llvm::raw_ostream &stream) const {
   root->print(stream);
-  printNode(stream, root, "",debugSubsumptionLevel_g);
+  printNode(stream, root, "", debugSubsumptionLevel_g);
 }
 
 /**/
 
 std::map<uintptr_t, TxSubsumptionTable::CallHistoryIndexedTable *>
-TxSubsumptionTable::instance;
+    TxSubsumptionTable::instance;
 
-void
-TxSubsumptionTable::insert(uintptr_t id,
-                           const std::vector<llvm::Instruction *> &callHistory,
-                           TxSubsumptionTableEntry *entry) {
+void TxSubsumptionTable::insert(
+    uintptr_t id, const std::vector<llvm::Instruction *> &callHistory,
+    TxSubsumptionTableEntry *entry) {
   CallHistoryIndexedTable *subTable = 0;
 
   TxTree::entryNumber++; // Count of entries in the table
@@ -2231,8 +2250,8 @@ uint64_t TxTree::blockCount = 1;
 void TxTree::printTimeStat(std::stringstream &stream) {
   stream << "KLEE: done:     setCurrentINode = "
          << ((double)setCurrentINodeTime.getValue()) / 1000 << "\n";
-  stream << "KLEE: done:     remove = " << ((double)removeTime.getValue()) /
-                                               1000 << "\n";
+  stream << "KLEE: done:     remove = "
+         << ((double)removeTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     subsumptionCheck = "
          << ((double)subsumptionCheckTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     markPathCondition = "
@@ -2257,7 +2276,8 @@ void TxTree::printTableStat(std::stringstream &stream) {
 
   stream << "KLEE: done:     Average solver calls per subsumption check = "
          << inTwoDecimalPoints((double)stats::subsumptionQueryCount /
-                               (double)subsumptionCheckCount) << "\n";
+                               (double)subsumptionCheckCount)
+         << "\n";
 }
 
 std::string TxTree::inTwoDecimalPoints(const double n) {
@@ -2314,8 +2334,9 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
   // first instruction executed of the sequence executed for a state
   // node, typically this the first instruction of a basic block.
   // Subsumption check only matches against this first instruction.
-  if (!state.txTreeNode || reinterpret_cast<uintptr_t>(state.pc->inst) !=
-                               state.txTreeNode->getProgramPoint())
+  if (!state.txTreeNode ||
+      reinterpret_cast<uintptr_t>(state.pc->inst) !=
+          state.txTreeNode->getProgramPoint())
     return false;
 
   int debugSubsumptionLevel =
@@ -2391,11 +2412,15 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       int debugSubsumptionLevel = node->dependency->debugSubsumptionLevel;
       setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
       if (debugSubsumptionLevel >= 2) {
-	if (debugSubsumptionLevel == 3){ // Printing block info for prettyPrint begin
-	llvm::outs()<<"\n------------------Printing Block Starts------------------\n";
-	llvm::outs()<<node->basicBlock->getName(); 
-	node->basicBlock->dump();
-	llvm::outs()<<"------------------Printing Block Ends------------------\n\n\n";} // Printing block info for prettyPrint ends
+        if (debugSubsumptionLevel ==
+            3) { // Printing block info for prettyPrint begin
+          llvm::outs() << "\n------------------Printing Block "
+                          "Starts------------------\n";
+          llvm::outs() << node->basicBlock->getName();
+          node->basicBlock->dump();
+          llvm::outs() << "------------------Printing Block "
+                          "Ends------------------\n\n\n";
+        } // Printing block info for prettyPrint ends
         klee_message("Storing entry for Node #%lu, Program Point %lu",
                      node->getNodeSequenceNumber(), node->getProgramPoint());
       } else if (debugSubsumptionLevel >= 1) {
@@ -2467,7 +2492,8 @@ void TxTree::markPathCondition(ExecutionState &state,
   if (binst) {
     ref<Expr> unknownExpression;
     std::string reason = "";
-    if (debugSubsumptionLevel >= 4 ) { /*Added 'debugSubsumptionLevel != 3' constraint for Pretty Print*/
+    if (debugSubsumptionLevel >=
+        4) { /*Added 'debugSubsumptionLevel != 3' constraint for Pretty Print*/
       llvm::raw_string_ostream stream(reason);
       stream << "branch infeasibility [";
       if (binst->getParent()->getParent()) {
@@ -2553,9 +2579,9 @@ void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
       stream << " (active)";
     }
     if (n->right != 0) {
-      printNode(stream, n->left, edges + "|   ",debugSubsumptionLevel);
+      printNode(stream, n->left, edges + "|   ", debugSubsumptionLevel);
     } else {
-      printNode(stream, n->left, edges + "    ",debugSubsumptionLevel);
+      printNode(stream, n->left, edges + "    ", debugSubsumptionLevel);
     }
   }
   if (n->right != 0) {
@@ -2564,7 +2590,7 @@ void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
     if (this->currentTxTreeNode == n->right) {
       stream << " (active)";
     }
-    printNode(stream, n->right, edges + "    ",debugSubsumptionLevel);
+    printNode(stream, n->right, edges + "    ", debugSubsumptionLevel);
   }
 }
 
@@ -2575,7 +2601,7 @@ void TxTree::print(llvm::raw_ostream &stream) const {
   if (this->root == this->currentTxTreeNode) {
     stream << " (active)";
   }
-  this->printNode(stream, this->root, "",debugSubsumptionLevel_g);
+  this->printNode(stream, this->root, "", debugSubsumptionLevel_g);
   stream << "\n------------------------- Subsumption Table "
             "-------------------------\n";
   TxSubsumptionTable::print(stream);
@@ -2601,8 +2627,8 @@ Statistic TxTreeNode::bindReturnValueTime("BindReturnValueTime",
 Statistic TxTreeNode::getStoredExpressionsTime("GetStoredExpressionsTime",
                                                "GetStoredExpressionsTime");
 Statistic
-TxTreeNode::getStoredCoreExpressionsTime("GetStoredCoreExpressionsTime",
-                                         "GetStoredCoreExpressionsTime");
+    TxTreeNode::getStoredCoreExpressionsTime("GetStoredCoreExpressionsTime",
+                                             "GetStoredCoreExpressionsTime");
 
 // The interpolation tree node sequence number
 uint64_t TxTreeNode::nextNodeSequenceNumber = 1;
@@ -2622,10 +2648,10 @@ void TxTreeNode::printTimeStat(std::stringstream &stream) {
            << ((double)getWPInterpolantTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     addConstraintTime = "
          << ((double)addConstraintTime.getValue()) / 1000 << "\n";
-  stream << "KLEE: done:     splitTime = " << ((double)splitTime.getValue()) /
-                                                  1000 << "\n";
-  stream << "KLEE: done:     execute = " << ((double)executeTime.getValue()) /
-                                                1000 << "\n";
+  stream << "KLEE: done:     splitTime = "
+         << ((double)splitTime.getValue()) / 1000 << "\n";
+  stream << "KLEE: done:     execute = "
+         << ((double)executeTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     bindCallArguments = "
          << ((double)bindCallArgumentsTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     bindReturnValue = "
@@ -2710,7 +2736,9 @@ void TxTreeNode::mark() {
   if (binst) {
     ref<Expr> unknownExpression;
     std::string reason = "";
-    if (debugSubsumptionLevel >= 1 && debugSubsumptionLevel != 3) { /*Added 'debugSubsumptionLevel != 3' constraint for Pretty Print*/
+    if (debugSubsumptionLevel >= 1 &&
+        debugSubsumptionLevel != 3) { /*Added 'debugSubsumptionLevel != 3'
+                                         constraint for Pretty Print*/
       llvm::raw_string_ostream stream(reason);
       stream << "branch infeasibility [";
       if (binst->getParent()->getParent()) {
@@ -2821,7 +2849,9 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
 
   switch (wpInterpolant->getKind()) {
   case Expr::InvalidKind:
-  case Expr::Constant: { return wpInterpolant; }
+  case Expr::Constant: {
+    return wpInterpolant;
+  }
 
   case Expr::WPVar: {
     // TODO: Not handling multiple copies of a var in store
@@ -2844,6 +2874,25 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
               entry->getContent()->getExpression(), wpInterpolant->getWidth());
           return result;
         }
+      }
+    } else {
+      // Checking the historical values
+      ref<TxStoreEntry> entry;
+      entry = dependency->getStore()
+                  ->getAddressofLatestCopyLLVMValueFromHistoricalStore(
+                      WPVar->address);
+
+      if (!entry.isNull()) {
+        if (wpInterpolant->getWidth() ==
+            entry->getContent()->getExpression()->getWidth()) {
+          return entry->getContent()->getExpression();
+        } else {
+          ref<Expr> result = ZExtExpr::create(
+              entry->getContent()->getExpression(), wpInterpolant->getWidth());
+          return result;
+        }
+      } else {
+        // Loading values from Global Variables
       }
     }
     // wpInterpolant->dump();
@@ -2936,13 +2985,18 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     ref<Expr> kids[2];
     kids[0] = wpInterpolant->getKid(0);
     kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
+    kids[0]->dump();
+    kids[1]->dump();
+
     if (kids[0].isNull())
       return kids[0];
     if (kids[1].isNull())
       return kids[1];
 
     ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
-
+    wpInterpolant->dump();
+    wpInterpolant->getKid(0)->dump();
+    WPVar->dump();
     ref<TxAllocationContext> alc =
         dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
 
@@ -2967,22 +3021,20 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
         } else {
           ref<Expr> result = ZExtExpr::create(
               entry->getContent()->getExpression(), wpInterpolant->getWidth());
+
           return result;
         }
       }
     } else {
     }
-
-    wpInterpolant->dump();
-    klee_error("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel "
-               "Expression failed!");
+    ref<Expr> dummy;
+    return dummy;
     break;
   }
   default: {
-    wpInterpolant->dump();
-    klee_error("TxWPHelper::instantiateWPatSubsumption: Expression not "
-               "supported yet!");
-    return wpInterpolant;
+
+    ref<Expr> dummy;
+    return dummy;
   }
   }
 }
@@ -3088,8 +3140,8 @@ uint64_t TxTreeNode::getInstructionsDepth() { return instructionsDepth; }
 
 void TxTreeNode::incInstructionsDepth() { ++instructionsDepth; }
 
-void
-TxTreeNode::unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore) {
+void TxTreeNode::unsatCoreInterpolation(
+    const std::vector<ref<Expr> > &unsatCore) {
   dependency->unsatCoreInterpolation(unsatCore);
 }
 
@@ -3101,11 +3153,11 @@ void TxTreeNode::dump() const {
 }
 
 void TxTreeNode::print(llvm::raw_ostream &stream) const {
-  this->print(stream, 0,debugSubsumptionLevel_g);
+  this->print(stream, 0, debugSubsumptionLevel_g);
 }
 
-void TxTreeNode::print(llvm::raw_ostream &stream,
-                       const unsigned paddingAmount, int debugSubsumptionLevel) const {
+void TxTreeNode::print(llvm::raw_ostream &stream, const unsigned paddingAmount,
+                       int debugSubsumptionLevel) const {
   std::string tabs = makeTabs(paddingAmount);
   std::string tabsNext = appendTab(tabs);
 

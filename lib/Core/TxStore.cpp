@@ -297,6 +297,7 @@ ref<TxAllocationContext>
 TxStore::getAddressofLatestCopyLLVMValue(llvm::Value *val) {
   ref<TxAllocationContext> address;
   bool foundValue = false;
+
   for (TopStateStore::const_iterator it = internalStore.begin(),
                                      ie = internalStore.end();
        it != ie; ++it) {
@@ -311,8 +312,27 @@ TxStore::getAddressofLatestCopyLLVMValue(llvm::Value *val) {
       }
     }
   }
-
   // Maybe NULL
+  return address;
+}
+
+ref<TxStoreEntry>
+TxStore::getAddressofLatestCopyLLVMValueFromHistoricalStore(llvm::Value *val) {
+  ref<TxStoreEntry> address;
+  bool foundValue = false;
+  for (LowerStateStore::const_iterator
+           it = symbolicallyAddressedHistoricalStore.begin(),
+           ie = symbolicallyAddressedHistoricalStore.end();
+       it != ie; ++it) {
+
+    ref<TxStoreEntry> temp = (*it).second;
+    if (temp->getValue() == val) {
+      if (!foundValue) {
+        address = temp;
+        foundValue = true;
+      }
+    }
+  }
   return address;
 }
 
@@ -390,16 +410,18 @@ inline void TxStore::symbolicToInterpolant(
 // An address is in the core if it stores a value that is in the core
 #ifdef ENABLE_Z3
     if (!NoExistential) {
-      ref<TxVariable> address = TxStateAddress::create(
-          entry->getAddress(), replacements)->getAsVariable();
+      ref<TxVariable> address =
+          TxStateAddress::create(entry->getAddress(), replacements)
+              ->getAsVariable();
       map[address] =
           entry->getInterpolantValue(leftOfEntry, substitution, replacements);
     } else {
       map[variable] = entry->getInterpolantValue(leftOfEntry);
     }
 #else
-    ref<TxVariable> address = TxStateAddress::create(
-        entry->getAddress(), replacements)->getAsVariable();
+    ref<TxVariable> address =
+        TxStateAddress::create(entry->getAddress(), replacements)
+            ->getAsVariable();
     map[address] =
         entry->getInterpolantValue(leftOfEntry, substitution, replacements);
 #endif
