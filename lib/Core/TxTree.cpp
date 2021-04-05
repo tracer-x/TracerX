@@ -2183,8 +2183,19 @@ void TxSubsumptionTable::clear() {
            it = instance.begin(),
            ie = instance.end();
        it != ie; ++it) {
-	  llvm::errs() << "trying to print";
+	  llvm::errs() << "Print interpolants";
 	  it->second->print(llvm::errs());
+	  //llvm::errs() << "Print wp-interpolants";
+
+	  //ExecutionState *state = it->first;
+	  //TxTreeNode *node = it->second;
+	  //TxSubsumptionTableEntry *entry =
+	            //new TxSubsumptionTableEntry(node, node->entryCallHistory);
+	  //TxSubsumptionTableEntry::printWP(llvm::errs());
+	  //instance.
+	  //TxSubsumptionTableEntry *entry =
+	            //new TxSubsumptionTableEntry(node, node->entryCallHistory);
+
     if (it->second) {
       ++TxTree::programPointNumber;
       delete it->second;
@@ -2399,16 +2410,18 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 
       TxTreeGraph::addTableEntryMapping(node, entry);
 
-      if (debugSubsumptionLevel >= 2) {
+      //if (debugSubsumptionLevel >= 2) {
         std::string msg;
         llvm::raw_string_ostream out(msg);
         entry->print(out);
-        if (WPInterpolant) {
-          entry->printWP(out);
-        }
+       // if (WPInterpolant) {
+        	llvm::errs() << "Print wp-interpolants";
+            entry->printWP(llvm::errs());
+          //entry->printWP(out);
+       // }
         out.flush();
         klee_message("%s", msg.c_str());
-      }
+     // }
     }
 
     if (p) {
