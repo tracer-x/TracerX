@@ -847,8 +847,8 @@ ref<Expr> TxWeakestPreCondition::getCmpCondition(llvm::CmpInst *cmp) {
   ref<Expr> result;
   ref<Expr> left = this->generateExprFromOperand(cmp->getOperand(0));
   ref<Expr> right = this->generateExprFromOperand(cmp->getOperand(1));
-  if (left.isNull() || right.isNull());
-    //return result;
+  if (left.isNull() || right.isNull())
+    return result;
 
   if (left->getWidth() > right->getWidth())
     right = ZExtExpr::create(right, left->getWidth());
