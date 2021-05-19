@@ -285,6 +285,7 @@ ref<Expr> TxWeakestPreCondition::PushUp(
            ie = reverseInstructionList.rend();
        it != ie; ++it) {
     llvm::Instruction *i = (*it).first->inst;
+    i->dump();
     int flag = (*it).second;
     if (flag == 1) {
       // 1- call getCondition on the cond argument of the branch instruction
@@ -491,7 +492,7 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
   if (llvm::isa<llvm::CmpInst>(value)) {
     llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(value);
     result = getCmpCondition(cmp);
-    if (result.isNull())
+    if (result.isNull());
       return result;
   } else if (llvm::isa<llvm::BinaryOperator>(value)) {
     llvm::Instruction *binOp = dyn_cast<llvm::Instruction>(value);
@@ -616,6 +617,7 @@ ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
   width = getFunctionArgumentSize(arg);
   index = ConstantExpr::create(0, width);
   result = WPVarExpr::create(arg, arg->getName(), index);
+  llvm::outs() << "------ check-1: "<<arg->getName()<<"\n";
   return result;
 }
 
@@ -980,7 +982,6 @@ ref<Expr> TxWeakestPreCondition::getPhiInst(llvm::PHINode *phi) {
 
 ref<Expr> TxWeakestPreCondition::getCallInst(llvm::CallInst *ci) {
   llvm::Function *function = ci->getCalledFunction();
-
   // TODO: This loop can further be optimized if we had access to the
   // iterator pointing to the call instruction. That way, we could
   // find the respective return instruction much faster. The iterator
@@ -1090,7 +1091,6 @@ TxWeakestPreCondition::getGlobalVariabletSize(llvm::GlobalValue *gv) {
 unsigned int
 TxWeakestPreCondition::getFunctionArgumentSize(llvm::Argument *arg) {
   unsigned int size;
-
   if (arg->getType()->isIntegerTy(1)) {
     size = Expr::Bool;
   } else if (arg->getType()->isIntegerTy(8)) {
