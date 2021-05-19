@@ -139,14 +139,24 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
   // vars(w)
   std::set<std::string> wpVars;
   if (!entry->getWPInterpolant().isNull())
-    wpVars = TxPartitionHelper::getExprVars(entry->getWPInterpolant());
-
-  // get vars(pi, miu)
-  // vars(pi)
+    wpVars  = TxPartitionHelper::getExprVars(entry->getWPInterpolant());
+   llvm::outs() <<"************** Printing wpVars ********************\n";
+    for (std::set<std::string>::iterator it1 = wpVars.begin(),
+                                       ie1 = wpVars.end();
+       it1 != ie1; ++it1) {
+   llvm::outs()<<*it1<<"\n";
+  }
+llvm::outs()<<"------------------------------------------\n";
   std::set<std::string> pimiuVars;
   if (!entry->getInterpolant().isNull())
     pimiuVars = TxPartitionHelper::getExprVars(entry->getInterpolant());
-
+   llvm::outs()<<"************** Printing pimiuVars ********************\n";
+    for (std::set<std::string>::iterator it1 = pimiuVars.begin(),
+                                       ie1 = pimiuVars.end();
+       it1 != ie1; ++it1) {
+   llvm::outs()<<*it1<<"\n";
+  }
+ llvm::outs()<<"------------------------------------------\n";
   // vars(miu)
   TxStore::TopInterpolantStore concretelyAddressedStore =
       entry->getConcretelyAddressedStore();
@@ -175,7 +185,14 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
       pimiuVars2.insert(*it1);
     }
   }
-
+  
+   llvm::outs()<<"************** Printing pimiuVars2 ********************\n";
+    for (std::set<std::string>::iterator it1 = pimiuVars2.begin(),
+                                       ie1 = pimiuVars2.end();
+       it1 != ie1; ++it1) {
+   llvm::outs()<<*it1<<"\n";
+  }
+ llvm::outs()<<"------------------------------------------\n"; 
   // get v1 = vars(pi,miu) - vars(w)
   std::set<std::string> v1 = TxPartitionHelper::diff(pimiuVars2, wpVars);
 
@@ -192,7 +209,13 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
       v1star.insert(tmp.begin(), tmp.end());
     }
   }
-
+   llvm::outs()<<"************** Printing v1star ********************\n";
+    for (std::set<std::string>::iterator it1 = v1star.begin(),
+                                       ie1 = v1star.end();
+       it1 != ie1; ++it1) {
+   llvm::outs()<<*it1<<"\n";
+  }
+  llvm::outs()<<"------------------------------------------\n";
   // closure on miu
   for (TxStore::TopInterpolantStore::iterator
            it1 = concretelyAddressedStore.begin(),
@@ -212,7 +235,13 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
 
   // v2
   std::set<std::string> v2 = TxPartitionHelper::diff(wpVars, v1star);
-
+  llvm::outs()<<"************** Printing v2 ********************\n";
+    for (std::set<std::string>::iterator it1 = v2.begin(),
+                                       ie1 = v2.end();
+       it1 != ie1; ++it1) {
+   llvm::outs()<<*it1<<"\n";
+  }  
+  llvm::outs()<<"------------------------------------------\n";
   // update pi by (wp,v2) and (pi,v1star)
   std::vector<ref<Expr> > wpComps =
       TxPartitionHelper::getExprsFromAndExpr(entry->getWPInterpolant());
