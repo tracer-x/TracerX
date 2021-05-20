@@ -325,9 +325,9 @@ ref<Expr> TxWeakestPreCondition::PushUp(
       }
       ref<Expr> cond = result;
 
-      //      llvm::outs() << "****** Flag = 1 ******\n";
-      //      cond->dump();
-      //      llvm::outs() << "****** End Flag = 1 ******\n";
+            llvm::outs() << "****** Flag = 1 ******\n";
+            cond->dump();
+            llvm::outs() << "****** End Flag = 1 ******\n";
 
       if (True() == WPExpr) {
         WPExpr = cond;
@@ -350,9 +350,9 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         return WPExpr;
       }
       ref<Expr> negCond = NotExpr::create(result);
-      //      llvm::outs() << "****** Flag = 2 ******\n";
-      //      negCond->dump();
-      //      llvm::outs() << "****** End Flag = 2 ******\n";
+            llvm::outs() << "****** Flag = 2 ******\n";
+            negCond->dump();
+            llvm::outs() << "****** End Flag = 2 ******\n";
 
       if (True() == WPExpr) {
         WPExpr = negCond;
@@ -376,12 +376,12 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         }
 
         WPExpr = TxWPHelper::substituteExpr(WPExpr, right, left);
-        //        llvm::outs() << "****** Flag = 0 *******\n";
-        //        WPExpr->dump();
-        //        llvm::outs() << "------\n";
+                llvm::outs() << "****** Flag = 0 *******\n";
+                WPExpr->dump();
+                llvm::outs() << "------\n";
         WPExpr = Z3Simplification::simplify(WPExpr);
-        //        WPExpr->dump();
-        //        llvm::outs() << "******* End Flag = 0 *******\n";
+                WPExpr->dump();
+                llvm::outs() << "******* End Flag = 0 *******\n";
       } else if (isa<llvm::GetElementPtrInst>(
                      i->getOperand(1))) { // Update Array
         llvm::GetElementPtrInst *parentGEP =
@@ -401,13 +401,12 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         if (val.isNull())
           return val;
         ref<Expr> update = UpdExpr::create(pair.second, pair.first, val);
-        //        llvm::outs() << "****** Flag = 0 for Update Array *******\n";
-        //        i->dump();
-        //        WPExpr->dump();
+                llvm::outs() << "****** Flag = 0 for Update Array *******\n";
+                i->dump();
+                WPExpr->dump();
         WPExpr = TxWPHelper::substituteExpr(WPExpr, pair.second, update);
-        //        WPExpr->dump();
-        //        llvm::outs() << "****** End Flag = 0 for Update Array
-        // *******\n";
+                WPExpr->dump();
+                llvm::outs() << "****** End Flag = 0 for Update Array *******\n";
       }
     }
   }
