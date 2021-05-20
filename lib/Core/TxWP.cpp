@@ -277,15 +277,25 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
 /**
  * Push up expression to top of the  basic block
  */
+ 
+std::vector<std::pair<KInstruction *, int> > WPInstructionSeq;
+ llvm::Instruction *CurrentWPInst;
 ref<Expr> TxWeakestPreCondition::PushUp(
     std::vector<std::pair<KInstruction *, int> > reverseInstructionList) {
-
+    WPInstructionSeq = reverseInstructionList;
   for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
            it = reverseInstructionList.rbegin(),
            ie = reverseInstructionList.rend();
        it != ie; ++it) {
     llvm::Instruction *i = (*it).first->inst;
-    i->dump();
+   CurrentWPInst= i;
+//   for (std::vector<std::pair<KInstruction *, int> >::iterator it1 = reverseInstructionList.begin(),
+//                                       ie1 = reverseInstructionList.end();
+//       it1 != ie1; ++it1) {
+//   llvm::outs()<<*it1<<"\n";
+//  }
+   //CurrentWPInst->dump();
+    //i->dump();
     int flag = (*it).second;
     if (flag == 1) {
       // 1- call getCondition on the cond argument of the branch instruction
@@ -608,7 +618,7 @@ ref<Expr> TxWeakestPreCondition::getGlobalValue(llvm::GlobalValue *gv) {
 
   return result;
 }
-
+//-----------------------------
 ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
   unsigned width;
   ref<Expr> index, result;
@@ -617,6 +627,9 @@ ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
   width = getFunctionArgumentSize(arg);
   index = ConstantExpr::create(0, width);
   result = WPVarExpr::create(arg, arg->getName(), index);
+  //-------------------------------
+  llvm::outs()<<"The current instruction is:";
+  CurrentWPInst->dump();
   llvm::outs() << "------ check-1: "<<arg->getName()<<"\n";
   return result;
 }
