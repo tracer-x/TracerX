@@ -1,0 +1,12 @@
+Error: free of global
+File: /home/sanghu/TracerX/tracerx/test/Runtime/POSIX/FreeArgv.c
+Line: 21
+assembly.ll line: 201
+Stack: 
+	#000000201 in main (argc=5, argv=45213568) at /home/sanghu/TracerX/tracerx/test/Runtime/POSIX/FreeArgv.c:21
+Info: 
+	address: 54495880
+	next: object at 54496608 of size 4
+		MO277[4] allocated at main():  %1 = alloca i32, align 4
+	prev: object at 54495880 of size 2
+		MO193[2] allocated at __get_sym_str():  %3 = tail call noalias i8* @malloc(i64 %2) #7, !dbg !2147

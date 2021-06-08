@@ -1,0 +1,12 @@
+Error: free of alloca
+File: /home/sanghu/TracerX/tracerx/test/regression/2007-10-11-free-of-alloca.c
+Line: 9
+assembly.ll line: 21
+Stack: 
+	#000000021 in main () at /home/sanghu/TracerX/tracerx/test/regression/2007-10-11-free-of-alloca.c:9
+Info: 
+	address: 51399008
+	next: object at 52833120 of size 22
+		MO7[22] allocated at global:.str
+	prev: object at 51399008 of size 16
+		MO17[16] allocated at main():  %buf = alloca [4 x i32], align 16

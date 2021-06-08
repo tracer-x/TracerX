@@ -1,0 +1,7 @@
+Error: overshift error
+File: /home/sanghu/TracerX/tracerx/test/regression/2014-07-04-unflushed-error-report.c
+Line: 23
+assembly.ll line: 29
+Stack: 
+	#000000074 in klee_overshift_check (bitWidth=32, shift) at /home/sanghu/TracerX/tracerx/runtime/Intrinsic/klee_overshift_check.c:27
+	#100000029 in main () at /home/sanghu/TracerX/tracerx/test/regression/2014-07-04-unflushed-error-report.c:23

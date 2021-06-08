@@ -1,0 +1,4 @@
+KLEE: ERROR: /home/sanghu/TracerX/tracerx/runtime/Intrinsic/memcpy.c:17: memory error: out of bound pointer
+KLEE: NOTE: now ignoring this error at this location
+KLEE: Memory cap NOT exceeded!
+

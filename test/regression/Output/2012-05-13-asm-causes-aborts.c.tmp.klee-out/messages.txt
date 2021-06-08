@@ -1,0 +1,4 @@
+KLEE: ERROR: (location information missing) inline assembly is unsupported
+KLEE: NOTE: now ignoring this error at this location
+KLEE: Memory cap NOT exceeded!
+

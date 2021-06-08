@@ -1,0 +1,8 @@
+KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/ubsan_unsigned_overflow.c:20: overflow on unsigned addition
+KLEE: NOTE: now ignoring this error at this location
+KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/ubsan_unsigned_overflow.c:23: overflow on unsigned subtraction
+KLEE: NOTE: now ignoring this error at this location
+KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/ubsan_unsigned_overflow.c:26: overflow on unsigned multiplication
+KLEE: NOTE: now ignoring this error at this location
+KLEE: Memory cap NOT exceeded!
+

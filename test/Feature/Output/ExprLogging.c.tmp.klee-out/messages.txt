@@ -1,0 +1,12 @@
+KLEE: Logging queries that reach solver in .pc format to /home/sanghu/TracerX/tracerx/test/Feature/Output/ExprLogging.c.tmp.klee-out/solver-queries.pc
+
+KLEE: Logging queries that reach solver in .smt2 format to /home/sanghu/TracerX/tracerx/test/Feature/Output/ExprLogging.c.tmp.klee-out/solver-queries.smt2
+
+KLEE: Logging all queries in .pc format to /home/sanghu/TracerX/tracerx/test/Feature/Output/ExprLogging.c.tmp.klee-out/all-queries.pc
+
+KLEE: Logging all queries in .smt2 format to /home/sanghu/TracerX/tracerx/test/Feature/Output/ExprLogging.c.tmp.klee-out/all-queries.smt2
+
+KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/ExprLogging.c:46: ASSERTION FAIL: 0
+KLEE: NOTE: now ignoring this error at this location
+KLEE: Memory cap NOT exceeded!
+

@@ -1,0 +1,12 @@
+Error: free of global
+File: /home/sanghu/TracerX/tracerx/test/Runtime/POSIX/FreeArgv.c
+Line: 17
+assembly.ll line: 194
+Stack: 
+	#000000194 in main (argc=5, argv=45213568) at /home/sanghu/TracerX/tracerx/test/Runtime/POSIX/FreeArgv.c:17
+Info: 
+	address: 50806912
+	next: object at 50809872 of size 65
+		MO43[65] allocated at global:__PRETTY_FUNCTION__.__fd_getdents
+	prev: object at 50806912 of size 73
+		MO1[73] allocated at main():  %argcPtr = alloca i32

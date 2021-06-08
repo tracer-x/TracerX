@@ -1,0 +1,3 @@
+KLEE: WARNING: undefined reference to function: fprintf
+KLEE: WARNING: undefined reference to variable: stderr
+KLEE: WARNING ONCE: calling external: fprintf(140483440928064, 58329040)

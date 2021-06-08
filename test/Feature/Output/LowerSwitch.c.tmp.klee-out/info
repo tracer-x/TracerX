@@ -1,0 +1,27 @@
+/home/sanghu/TracerX/tracerx/Release+Asserts/bin/klee -solver-backend=z3 --no-interpolation --output-dir=/home/sanghu/TracerX/tracerx/test/Feature/Output/LowerSwitch.c.tmp.klee-out --exit-on-error --allow-external-sym-calls --switch-type=simple /home/sanghu/TracerX/tracerx/test/Feature/Output/LowerSwitch.c.tmp.bc
+PID: 6357
+Started: 2020-06-05 14:18:39
+BEGIN searcher description
+<InterleavedSearcher> containing 2 searchers:
+RandomPathSearcher
+WeightedRandomSearcher::CoveringNew
+</InterleavedSearcher>
+END searcher description
+Finished: 2020-06-05 14:18:39
+Elapsed: 00:00:00
+KLEE: done: explored paths = 71
+KLEE: done: avg. constructs per query = 83
+KLEE: done: total queries = 141
+KLEE: done: valid queries = 0
+KLEE: done: invalid queries = 141
+KLEE: done: query cex = 141
+
+KLEE: done: total instructions = 448
+KLEE: done: completed paths = 71, among which
+KLEE: done:     early-terminating paths (instruction time limit, solver timeout, max-depth reached) = 0
+KLEE: done:     error paths = 0
+KLEE: done:     program exit paths = 71
+KLEE: done: generated tests = 71, among which
+KLEE: done:     early-terminating tests (instruction time limit, solver timeout, max-depth reached) = 0
+KLEE: done:     error tests = 0
+KLEE: done:     program exit tests = 71

@@ -1,0 +1,12 @@
+Error: memory error: out of bound pointer
+File: /home/sanghu/TracerX/tracerx/test/regression/2007-10-11-illegal-access-after-free-and-branch.c
+Line: 19
+assembly.ll line: 36
+Stack: 
+	#000000036 in main (argc=1, argv=64203776) at /home/sanghu/TracerX/tracerx/test/regression/2007-10-11-illegal-access-after-free-and-branch.c:19
+Info: 
+	address: 63834106
+	next: object at 63923904 of size 14
+		MO3[14] allocated at main():  %1 = tail call noalias i8* @malloc(i64 3) #8, !dbg !129
+	prev: object at 63834048 of size 5
+		MO25[5] allocated at global:.str28

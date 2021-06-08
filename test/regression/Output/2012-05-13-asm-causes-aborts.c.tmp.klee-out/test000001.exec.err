@@ -1,0 +1,3 @@
+Error: inline assembly is unsupported
+Stack: 
+	#000000023 in main (argc=1, argv=35875648)

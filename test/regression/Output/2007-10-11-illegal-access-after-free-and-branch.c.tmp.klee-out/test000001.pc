@@ -1,0 +1,6 @@
+array unnamed[3] : w32 -> w8 = symbolic
+(query [(Eq false
+             (Ult 4 (Read w8 0 unnamed)))
+         (Eq false
+             (Eq 0 (Read w8 1 unnamed)))]
+        false)

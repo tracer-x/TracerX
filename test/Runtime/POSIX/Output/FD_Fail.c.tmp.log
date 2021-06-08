@@ -1,0 +1,5 @@
+fread(): fail
+fread(): ok
+fclose(): ok
+fclose(): fail
+fclose(): fail

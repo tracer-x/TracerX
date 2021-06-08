@@ -1,0 +1,3 @@
+KLEE: WARNING: undefined reference to function: klee_posix_prefer_cex
+KLEE: WARNING ONCE: calling external: syscall(16, 0, 21505, 68361312)
+KLEE: WARNING ONCE: calling __user_main with extra arguments.

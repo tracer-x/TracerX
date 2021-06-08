@@ -1,0 +1,8 @@
+array range1[4] : w32 -> w8 = symbolic
+array range2[4] : w32 -> w8 = symbolic
+(query [(Eq 0
+             (ReadLSB w32 0 range1))
+         (Ult N0:(ReadLSB w32 0 range2)
+              2)
+         (Eq false (Eq 0 N0))]
+        false)

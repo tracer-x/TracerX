@@ -1,0 +1,15 @@
+Error: memory error: out of bound pointer
+File: /home/sanghu/TracerX/tracerx/test/Feature/OverlappedError.c
+Line: 16
+assembly.ll line: 47
+Stack: 
+	#000000047 in main () at /home/sanghu/TracerX/tracerx/test/Feature/OverlappedError.c:16
+Info: 
+	address: (Add w64 37267816
+          (SExt w64 (ReadLSB w32 0 range_1)))
+	example: 37267815
+	range: [37267815, 37267815]
+	next: object at 37267816 of size 8
+		MO27[8] allocated at main():  %13 = call noalias i8* @malloc(i64 8) #6, !dbg !135
+	prev: object at 37267560 of size 8
+		MO19[8] allocated at main():  %x1 = alloca i8*, align 8

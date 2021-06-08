@@ -1,0 +1,6 @@
+KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/srem.c:19: divide by zero
+KLEE: NOTE: now ignoring this error at this location
+KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/srem.c:32: ASSERTION FAIL: -1 % y == -1
+KLEE: NOTE: now ignoring this error at this location
+KLEE: Memory cap NOT exceeded!
+

@@ -1,0 +1,24 @@
+/home/sanghu/TracerX/tracerx/Release+Asserts/bin/klee -solver-backend=z3 --no-interpolation --output-dir=/home/sanghu/TracerX/tracerx/test/Runtime/POSIX/Output/FD_Fail2.c.tmp.klee-out --libc=uclibc --posix-runtime --search=dfs /home/sanghu/TracerX/tracerx/test/Runtime/POSIX/Output/FD_Fail2.c.tmp1.bc --sym-files 1 10 --max-fail 2
+PID: 7160
+Started: 2020-06-05 14:18:59
+BEGIN searcher description
+DFSSearcher
+END searcher description
+Finished: 2020-06-05 14:18:59
+Elapsed: 00:00:00
+KLEE: done: explored paths = 4
+KLEE: done: avg. constructs per query = 19
+KLEE: done: total queries = 7
+KLEE: done: valid queries = 1
+KLEE: done: invalid queries = 6
+KLEE: done: query cex = 7
+
+KLEE: done: total instructions = 20744
+KLEE: done: completed paths = 4, among which
+KLEE: done:     early-terminating paths (instruction time limit, solver timeout, max-depth reached) = 0
+KLEE: done:     error paths = 0
+KLEE: done:     program exit paths = 4
+KLEE: done: generated tests = 4, among which
+KLEE: done:     early-terminating tests (instruction time limit, solver timeout, max-depth reached) = 0
+KLEE: done:     error tests = 0
+KLEE: done:     program exit tests = 4

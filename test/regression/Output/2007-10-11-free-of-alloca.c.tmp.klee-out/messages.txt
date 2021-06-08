@@ -1,0 +1,4 @@
+KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/regression/2007-10-11-free-of-alloca.c:9: free of alloca
+KLEE: NOTE: now ignoring this error at this location
+KLEE: Memory cap NOT exceeded!
+

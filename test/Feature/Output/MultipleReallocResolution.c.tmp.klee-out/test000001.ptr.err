@@ -1,0 +1,12 @@
+Error: memory error: invalid pointer: free
+Stack: 
+	#000000126 in main ()
+Info: 
+	address: (ReadLSB w64 N0:(Extract w32 0 (Mul w64 8
+                                         (SExt w64 (ReadLSB w32 0 unnamed)))) const_arr1)
+	example: 3735928559
+	range: [3735928559, 3735928559]
+	next: object at 140661309248736 of size 1536
+		MO3[1536] (no allocation info)
+	prev: object at 59640208 of size 70
+		MO8[70] allocated at global:.str1

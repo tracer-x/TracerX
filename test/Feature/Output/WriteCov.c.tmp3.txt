@@ -1,0 +1,4 @@
+/home/sanghu/TracerX/tracerx/test/Feature/Output/WriteCov.c.tmp.klee-out/test000001.cov:0
+/home/sanghu/TracerX/tracerx/test/Feature/Output/WriteCov.c.tmp.klee-out/test000002.cov:1
+/home/sanghu/TracerX/tracerx/test/Feature/Output/WriteCov.c.tmp.klee-out/test000001.cov:1
+/home/sanghu/TracerX/tracerx/test/Feature/Output/WriteCov.c.tmp.klee-out/test000002.cov:0

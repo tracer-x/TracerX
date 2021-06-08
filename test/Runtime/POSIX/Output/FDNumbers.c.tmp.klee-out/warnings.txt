@@ -1,0 +1,12 @@
+KLEE: WARNING: undefined reference to function: __errno_location
+KLEE: WARNING: undefined reference to function: __fgetc_unlocked
+KLEE: WARNING: undefined reference to function: __fputc_unlocked
+KLEE: WARNING: undefined reference to function: endutent
+KLEE: WARNING: undefined reference to function: getutent
+KLEE: WARNING: undefined reference to function: klee_posix_prefer_cex
+KLEE: WARNING: undefined reference to function: realpath
+KLEE: WARNING: undefined reference to function: setutent
+KLEE: WARNING: undefined reference to function: strcmp
+KLEE: WARNING: undefined reference to function: utmpname
+KLEE: WARNING ONCE: calling external: syscall(4, 49093816, 51346608)
+KLEE: WARNING ONCE: calling external: __errno_location()

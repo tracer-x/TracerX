@@ -1,0 +1,27 @@
+array A-data-stat[144] : w32 -> w8 = symbolic
+array close_fail[4] : w32 -> w8 = symbolic
+array model_version[4] : w32 -> w8 = symbolic
+array read_fail[4] : w32 -> w8 = symbolic
+array write_fail[4] : w32 -> w8 = symbolic
+(query [(Eq false
+             (Eq 0
+                 (And w64 (ReadLSB w64 8 A-data-stat)
+                          2147483647)))
+         (Ult (ReadLSB w64 56 A-data-stat)
+              65536)
+         (Eq 1
+             (ReadLSB w32 0 model_version))
+         (Eq 0
+             (And w32 N0:(ReadLSB w32 24 A-data-stat)
+                      292))
+         (Eq false
+             (Eq 0 (And w32 N0 146)))
+         (Eq false
+             (Eq 1
+                 (ReadLSB w32 0 write_fail)))
+         (Eq false
+             (Eq 1
+                 (ReadLSB w32 0 read_fail)))
+         (Eq 1
+             (ReadLSB w32 0 close_fail))]
+        false)

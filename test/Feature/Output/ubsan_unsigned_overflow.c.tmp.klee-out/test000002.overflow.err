@@ -1,0 +1,6 @@
+Error: overflow on unsigned subtraction
+File: /home/sanghu/TracerX/tracerx/test/Feature/ubsan_unsigned_overflow.c
+Line: 23
+assembly.ll line: 72
+Stack: 
+	#000000072 in main () at /home/sanghu/TracerX/tracerx/test/Feature/ubsan_unsigned_overflow.c:23

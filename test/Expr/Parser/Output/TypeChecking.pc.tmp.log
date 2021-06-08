@@ -1,0 +1,10 @@
+/home/sanghu/TracerX/tracerx/test/Expr/Parser/TypeChecking.pc:7:9: error: type widths do not match in binary expression
+(query [(Eq (ReadLSB w32 0 arr1) true)] 
+         ~~
+/home/sanghu/TracerX/tracerx/test/Expr/Parser/TypeChecking.pc:14:25: error: invalid write index (doesn't match array domain).
+(query [(Eq (Read w8 0 [ (w17 0) = (w9 0) ] @ arr2) 0)] false)
+                         ^
+/home/sanghu/TracerX/tracerx/test/Expr/Parser/TypeChecking.pc:14:35: error: invalid write value (doesn't match array range).
+(query [(Eq (Read w8 0 [ (w17 0) = (w9 0) ] @ arr2) 0)] false)
+                                   ^
+/home/sanghu/TracerX/tracerx/test/Expr/Parser/TypeChecking.pc: parse failure: 3 errors.

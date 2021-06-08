@@ -1,0 +1,6 @@
+Error: overflow on unsigned addition
+File: /home/sanghu/TracerX/tracerx/test/Feature/ubsan_signed_overflow.c
+Line: 20
+assembly.ll line: 52
+Stack: 
+	#000000052 in main () at /home/sanghu/TracerX/tracerx/test/Feature/ubsan_signed_overflow.c:20

@@ -1,0 +1,5 @@
+KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/ExitOnErrorType.c:9: ASSERTION FAIL: klee_int("assert")
+KLEE: NOTE: now ignoring this error at this location
+KLEE: halting execution, dumping remaining states
+KLEE: Memory cap NOT exceeded!
+

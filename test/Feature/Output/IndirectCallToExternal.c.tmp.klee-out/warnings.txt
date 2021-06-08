@@ -1,0 +1,2 @@
+KLEE: WARNING: undefined reference to function: strcmp
+KLEE: WARNING ONCE: calling external: strcmp(61515592, 61515608)

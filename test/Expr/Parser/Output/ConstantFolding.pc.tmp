@@ -1,0 +1,87 @@
+array a[64] : w32 -> w8 = symbolic
+# Query 1
+(query [] false)
+# Query 2
+(query [] false [(Read w8 0 a)])
+# Query 3
+(query [] false [(Read w8 0 a)])
+# Query 4
+(query [] false [(Add w8 30 (Read w8 0 a))])
+# Query 5
+(query [] false [(Add w8 30 (Read w8 0 a))])
+# Query 6
+(query [] false [(Sub w8 30 (Read w8 0 a))])
+# Query 7
+(query [] false [(Add w8 246 (Read w8 0 a))])
+# Query 8
+(query [] false [(Add w8 (Read w8 0 a)
+                          (Add w8 (Read w8 1 a) (Read w8 2 a)))])
+# Query 9
+(query [] false [(Add w8 (Read w8 0 a)
+                          (Sub w8 (Read w8 2 a) (Read w8 1 a)))])
+# Query 10
+(query [] false [(Add w8 10
+                          (Add w8 (Read w8 0 a) (Read w8 1 a)))])
+# Query 11
+(query [] false [(Add w8 10
+                          (Add w8 (Read w8 0 a) (Read w8 1 a)))])
+# Query 12
+(query [] false [(Add w8 10
+                          (Sub w8 (Read w8 0 a) (Read w8 1 a)))])
+# Query 13
+(query [] false [(Add w8 246
+                          (Add w8 (Read w8 0 a) (Read w8 1 a)))])
+# Query 14
+(query [] false [(Sub w8 10 (Read w8 0 a))])
+# Query 15
+(query [] false [(Sub w8 10 (Read w8 0 a))])
+# Query 16
+(query [] false [(Add w8 10 (Read w8 0 a))])
+# Query 17
+(query [] false [(Sub w8 30 (Read w8 0 a))])
+# Query 18
+(query [] false [(Add w8 246 (Read w8 0 a))])
+# Query 19
+(query [] false [(Add w8 246 (Read w8 0 a))])
+# Query 20
+(query [] false [(Sub w8 246 (Read w8 0 a))])
+# Query 21
+(query [] false [(Add w8 226 (Read w8 0 a))])
+# Query 22
+(query [] false [(Add w8 (Read w8 0 a)
+                          (Sub w8 (Read w8 1 a) (Read w8 2 a)))])
+# Query 23
+(query [] false [(Sub w8 (Read w8 0 a)
+                          (Add w8 (Read w8 1 a) (Read w8 2 a)))])
+# Query 24
+(query [] false [(Add w8 246
+                          (Sub w8 (Read w8 0 a) (Read w8 1 a)))])
+# Query 25
+(query [] false [(Add w8 246
+                          (Sub w8 (Read w8 0 a) (Read w8 1 a)))])
+# Query 26
+(query [] false [(Add w8 246
+                          (Add w8 (Read w8 0 a) (Read w8 1 a)))])
+# Query 27
+(query [] false [(Add w8 10
+                          (Sub w8 (Read w8 0 a) (Read w8 1 a)))])
+# Query 28
+(query [] false [(w8 0)])
+# Query 29
+(query [] false [(Read w8 0 a)])
+# Query 30
+(query [] false [(w8 0)])
+# Query 31
+(query [] false [(Read w8 0 a)])
+# Query 32
+(query [] false [(Read w8 0 a)])
+# Query 33
+(query [] false [(w8 255)])
+# Query 34
+(query [] false [(Read w8 0 a)])
+# Query 35
+(query [] false [(Eq 0 (Read w8 0 a))])
+# Query 36
+(query [] false [(Eq 0 (Read w8 0 a))])
+# Query 37
+(query [] false [true])

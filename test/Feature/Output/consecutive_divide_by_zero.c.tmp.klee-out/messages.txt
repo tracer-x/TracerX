@@ -1,0 +1,6 @@
+KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/consecutive_divide_by_zero.c:25: divide by zero
+KLEE: NOTE: now ignoring this error at this location
+KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/consecutive_divide_by_zero.c:28: divide by zero
+KLEE: NOTE: now ignoring this error at this location
+KLEE: Memory cap NOT exceeded!
+

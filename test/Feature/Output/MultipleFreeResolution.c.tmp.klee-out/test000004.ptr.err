@@ -1,0 +1,12 @@
+Error: memory error: out of bound pointer
+File: /home/sanghu/TracerX/tracerx/test/Feature/MultipleFreeResolution.c
+Line: 40
+assembly.ll line: 123
+Stack: 
+	#000000123 in main () at /home/sanghu/TracerX/tracerx/test/Feature/MultipleFreeResolution.c:40
+Info: 
+	address: 33294856
+	next: object at 33294944 of size 4
+		MO28[4] allocated at make_int():  %2 = call noalias i8* @malloc(i64 4) #8, !dbg !136
+	prev: object at 33294776 of size 4
+		MO20[4] allocated at main():  %s = alloca i32, align 4

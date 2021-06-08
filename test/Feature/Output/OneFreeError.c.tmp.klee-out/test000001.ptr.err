@@ -1,0 +1,12 @@
+Error: memory error: out of bound pointer
+File: /home/sanghu/TracerX/tracerx/test/Feature/OneFreeError.c
+Line: 11
+assembly.ll line: 27
+Stack: 
+	#000000027 in main () at /home/sanghu/TracerX/tracerx/test/Feature/OneFreeError.c:11
+Info: 
+	address: 49211376
+	next: object at 49301120 of size 15
+		MO8[15] allocated at global:.str1
+	prev: object at 49211344 of size 8
+		MO17[8] allocated at main():  %x = alloca i32*, align 8

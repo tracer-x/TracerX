@@ -1,0 +1,14 @@
+Error: memory error: out of bound pointer
+File: /home/sanghu/TracerX/tracerx/runtime/Intrinsic/memcpy.c
+Line: 17
+assembly.ll line: 763
+Stack: 
+	#000000763 in memcpy (destaddr=61561760, srcaddr=64384664, len=12) at /home/sanghu/TracerX/tracerx/runtime/Intrinsic/memcpy.c:17
+	#100000146 in test1 (x=4294967295)
+	#200000606 in main ()
+Info: 
+	address: 64384672
+	next: object at 64385152 of size 24
+		MO373[24] allocated at test1():  %ap = alloca [1 x %struct.__va_list_tag], align 16
+	prev: object at 64384640 of size 32
+		MO370[32] allocated at main():  %39 = call i32 (i32, ...)* @test1(i32 -1, i32 52, double 2.000000e+00, i64 %36, i32 %38)

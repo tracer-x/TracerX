@@ -1,0 +1,36 @@
+array const_arr1[64] : w32 -> w8 = [1 0 0 0 2 0 0 0 4 0 0 0 8 0 0 0 16 0 0 0 32 0 0 0 64 0 0 0 128 0 0 0 0 1 0 0 0 2 0 0 0 4 0 0 0 8 0 0 0 16 0 0 0 32 0 0 0 64 0 0 0 128 0 0]
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+array idx.2[4] : w32 -> w8 = symbolic
+array idx.3[4] : w32 -> w8 = symbolic
+array unnamed[4] : w32 -> w8 = symbolic
+(query [(Ult N0:(ReadLSB w32 0 idx.0)
+              16)
+         (Ult N1:(ReadLSB w32 0 idx.1)
+              16)
+         (Ult N2:(ReadLSB w32 0 idx.2)
+              16)
+         (Ult N3:(ReadLSB w32 0 idx.3)
+              4)
+         (Eq 104
+             (Read w8 0 U0:[(Extract w32 0 (SExt w64 N3))=0,
+                            1=97] @ unnamed))
+         (Slt 2
+              N4:(Concat w32 (Read w8 3 U0)
+                             (Concat w24 (Read w8 2 U0)
+                                         (Concat w16 (Read w8 1 U0) (w8 104)))))
+         (Eq N4
+             (ReadLSB w32 48 U1:[(Add w32 3
+                                          N5:(Extract w32 0 (Mul w64 4 (SExt w64 N2))))=(Extract w8 24 N6:(SExt w32 (Read w8 3 unnamed))),
+                                 (Add w32 2 N5)=(Extract w8 16 N6),
+                                 (Add w32 1 N5)=(Extract w8 8 N6),
+                                 N5=(Extract w8 0 N6)] @
+                             U2:[(Add w32 3
+                                          N7:(Extract w32 0 (Mul w64 4 (SExt w64 N0))))=(Extract w8 24 N8:(SExt w32 (Read w8 0 unnamed))),
+                                 (Add w32 2 N7)=(Extract w8 16 N8),
+                                 (Add w32 1 N7)=(Extract w8 8 N8),
+                                 N7=(Extract w8 0 N8)] @ const_arr1))
+         (Eq false
+             (Eq 32
+                 (ReadLSB w32 N9:(Extract w32 0 (Mul w64 4 (SExt w64 N1))) U2)))]
+        false)

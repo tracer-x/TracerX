@@ -1,0 +1,10 @@
+Error: check_memory_access: memory error
+File: /home/sanghu/TracerX/tracerx/test/Feature/CheckMemoryAccess.c
+Line: 17
+assembly.ll line: 32
+Stack: 
+	#000000032 in main () at /home/sanghu/TracerX/tracerx/test/Feature/CheckMemoryAccess.c:17
+Info: 
+	address: 0
+	next: object at 55273336 of size 6
+		MO7[6] allocated at global:.str

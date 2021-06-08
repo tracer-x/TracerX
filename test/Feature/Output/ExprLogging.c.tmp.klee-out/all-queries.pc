@@ -1,0 +1,327 @@
+# Query 0 -- Type: Truth, Instructions: 27
+array idx.0[4] : w32 -> w8 = symbolic
+(query [] (Eq false
+               (Ult (ReadLSB w32 0 idx.0)
+                    16)))
+#   OK -- Elapsed: 3.189087e-03
+#   Is Valid: false
+
+# Query 1 -- Type: Value, Instructions: 35
+array idx.0[4] : w32 -> w8 = symbolic
+(query [(Ult N0:(ReadLSB w32 0 idx.0)
+              16)]
+        false [(Add w64 49857472
+                        (Mul w64 4 (SExt w64 N0)))])
+#   OK -- Elapsed: 2.642989e-03
+#   Result: 49857472
+
+# Query 2 -- Type: Truth, Instructions: 35
+array idx.0[4] : w32 -> w8 = symbolic
+(query [(Ult N0:(ReadLSB w32 0 idx.0)
+              16)]
+        (Ult (Mul w64 4 (SExt w64 N0))
+             61))
+#   OK -- Elapsed: 4.649043e-03
+#   Is Valid: true
+
+# Query 3 -- Type: Truth, Instructions: 50
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+(query [(Ult (ReadLSB w32 0 idx.0)
+              16)]
+        (Eq false
+            (Ult (ReadLSB w32 0 idx.1)
+                 16)))
+#   OK -- Elapsed: 1.883030e-03
+#   Is Valid: false
+
+# Query 4 -- Type: Value, Instructions: 58
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+(query [(Ult (ReadLSB w32 0 idx.0)
+              16)
+         (Ult N0:(ReadLSB w32 0 idx.1)
+              16)]
+        false [(Add w64 49857472
+                        (Mul w64 4 (SExt w64 N0)))])
+#   OK -- Elapsed: 2.204061e-03
+#   Result: 49857472
+
+# Query 5 -- Type: Truth, Instructions: 58
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+(query [(Ult (ReadLSB w32 0 idx.0)
+              16)
+         (Ult N0:(ReadLSB w32 0 idx.1)
+              16)]
+        (Ult (Mul w64 4 (SExt w64 N0))
+             61))
+#   OK -- Elapsed: 4.448056e-03
+#   Is Valid: true
+
+# Query 6 -- Type: Truth, Instructions: 77
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+array idx.2[4] : w32 -> w8 = symbolic
+(query [(Ult (ReadLSB w32 0 idx.0)
+              16)
+         (Ult (ReadLSB w32 0 idx.1)
+              16)]
+        (Eq false
+            (Ult (ReadLSB w32 0 idx.2)
+                 16)))
+#   OK -- Elapsed: 1.737952e-03
+#   Is Valid: false
+
+# Query 7 -- Type: Value, Instructions: 85
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+array idx.2[4] : w32 -> w8 = symbolic
+(query [(Ult (ReadLSB w32 0 idx.0)
+              16)
+         (Ult (ReadLSB w32 0 idx.1)
+              16)
+         (Ult N0:(ReadLSB w32 0 idx.2)
+              16)]
+        false [(Add w64 49857472
+                        (Mul w64 4 (SExt w64 N0)))])
+#   OK -- Elapsed: 2.243042e-03
+#   Result: 49857472
+
+# Query 8 -- Type: Truth, Instructions: 85
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+array idx.2[4] : w32 -> w8 = symbolic
+(query [(Ult (ReadLSB w32 0 idx.0)
+              16)
+         (Ult (ReadLSB w32 0 idx.1)
+              16)
+         (Ult N0:(ReadLSB w32 0 idx.2)
+              16)]
+        (Ult (Mul w64 4 (SExt w64 N0))
+             61))
+#   OK -- Elapsed: 4.326940e-03
+#   Is Valid: true
+
+# Query 9 -- Type: Truth, Instructions: 100
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+array idx.2[4] : w32 -> w8 = symbolic
+array idx.3[4] : w32 -> w8 = symbolic
+(query [(Ult (ReadLSB w32 0 idx.0)
+              16)
+         (Ult (ReadLSB w32 0 idx.1)
+              16)
+         (Ult (ReadLSB w32 0 idx.2)
+              16)]
+        (Eq false
+            (Ult (ReadLSB w32 0 idx.3)
+                 4)))
+#   OK -- Elapsed: 1.780033e-03
+#   Is Valid: false
+
+# Query 10 -- Type: Value, Instructions: 108
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+array idx.2[4] : w32 -> w8 = symbolic
+array idx.3[4] : w32 -> w8 = symbolic
+(query [(Ult (ReadLSB w32 0 idx.0)
+              16)
+         (Ult (ReadLSB w32 0 idx.1)
+              16)
+         (Ult (ReadLSB w32 0 idx.2)
+              16)
+         (Ult N0:(ReadLSB w32 0 idx.3)
+              4)]
+        false [(Add w64 48212288 (SExt w64 N0))])
+#   OK -- Elapsed: 2.270937e-03
+#   Result: 48212288
+
+# Query 11 -- Type: Truth, Instructions: 108
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+array idx.2[4] : w32 -> w8 = symbolic
+array idx.3[4] : w32 -> w8 = symbolic
+(query [(Ult (ReadLSB w32 0 idx.0)
+              16)
+         (Ult (ReadLSB w32 0 idx.1)
+              16)
+         (Ult (ReadLSB w32 0 idx.2)
+              16)
+         (Ult N0:(ReadLSB w32 0 idx.3)
+              4)]
+        (Ult (SExt w64 N0) 4))
+#   OK -- Elapsed: 2.914071e-03
+#   Is Valid: true
+
+# Query 12 -- Type: Truth, Instructions: 114
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+array idx.2[4] : w32 -> w8 = symbolic
+array idx.3[4] : w32 -> w8 = symbolic
+array unnamed[4] : w32 -> w8 = symbolic
+(query [(Ult (ReadLSB w32 0 idx.0)
+              16)
+         (Ult (ReadLSB w32 0 idx.1)
+              16)
+         (Ult (ReadLSB w32 0 idx.2)
+              16)
+         (Ult N0:(ReadLSB w32 0 idx.3)
+              4)]
+        (Eq false
+            (Eq 104
+                (Read w8 0 [(Extract w32 0 (SExt w64 N0))=0,
+                            1=97] @ unnamed))))
+#   OK -- Elapsed: 2.194047e-03
+#   Is Valid: false
+
+# Query 13 -- Type: Truth, Instructions: 122
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+array idx.2[4] : w32 -> w8 = symbolic
+array idx.3[4] : w32 -> w8 = symbolic
+array unnamed[4] : w32 -> w8 = symbolic
+(query [(Ult (ReadLSB w32 0 idx.0)
+              16)
+         (Ult (ReadLSB w32 0 idx.1)
+              16)
+         (Ult (ReadLSB w32 0 idx.2)
+              16)
+         (Ult N0:(ReadLSB w32 0 idx.3)
+              4)
+         (Eq 104
+             (Read w8 0 U0:[(Extract w32 0 (SExt w64 N0))=0,
+                            1=97] @ unnamed))]
+        (Eq false
+            (Slt 2
+                 (Concat w32 (Read w8 3 U0)
+                             (Concat w24 (Read w8 2 U0)
+                                         (Concat w16 (Read w8 1 U0) (w8 104)))))))
+#   OK -- Elapsed: 3.153920e-03
+#   Is Valid: false
+
+# Query 14 -- Type: Truth, Instructions: 127
+array const_arr1[64] : w32 -> w8 = [1 0 0 0 2 0 0 0 4 0 0 0 8 0 0 0 16 0 0 0 32 0 0 0 64 0 0 0 128 0 0 0 0 1 0 0 0 2 0 0 0 4 0 0 0 8 0 0 0 16 0 0 0 32 0 0 0 64 0 0 0 128 0 0]
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+array idx.2[4] : w32 -> w8 = symbolic
+array idx.3[4] : w32 -> w8 = symbolic
+array unnamed[4] : w32 -> w8 = symbolic
+(query [(Ult N0:(ReadLSB w32 0 idx.0)
+              16)
+         (Ult (ReadLSB w32 0 idx.1)
+              16)
+         (Ult N1:(ReadLSB w32 0 idx.2)
+              16)
+         (Ult N2:(ReadLSB w32 0 idx.3)
+              4)
+         (Eq 104
+             (Read w8 0 U0:[(Extract w32 0 (SExt w64 N2))=0,
+                            1=97] @ unnamed))
+         (Slt 2
+              N3:(Concat w32 (Read w8 3 U0)
+                             (Concat w24 (Read w8 2 U0)
+                                         (Concat w16 (Read w8 1 U0) (w8 104)))))]
+        (Eq false
+            (Eq N3
+                (ReadLSB w32 48 U1:[(Add w32 3
+                                             N4:(Extract w32 0 (Mul w64 4 (SExt w64 N1))))=(Extract w8 24 N5:(SExt w32 (Read w8 3 unnamed))),
+                                    (Add w32 2 N4)=(Extract w8 16 N5),
+                                    (Add w32 1 N4)=(Extract w8 8 N5),
+                                    N4=(Extract w8 0 N5),
+                                    (Add w32 3
+                                             N6:(Extract w32 0 (Mul w64 4 (SExt w64 N0))))=(Extract w8 24 N7:(SExt w32 (Read w8 0 unnamed))),
+                                    (Add w32 2 N6)=(Extract w8 16 N7),
+                                    (Add w32 1 N6)=(Extract w8 8 N7),
+                                    N6=(Extract w8 0 N7)] @ const_arr1))))
+#   OK -- Elapsed: 1.360810e-02
+#   Is Valid: false
+
+# Query 15 -- Type: Truth, Instructions: 131
+array const_arr1[64] : w32 -> w8 = [1 0 0 0 2 0 0 0 4 0 0 0 8 0 0 0 16 0 0 0 32 0 0 0 64 0 0 0 128 0 0 0 0 1 0 0 0 2 0 0 0 4 0 0 0 8 0 0 0 16 0 0 0 32 0 0 0 64 0 0 0 128 0 0]
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+array idx.2[4] : w32 -> w8 = symbolic
+array idx.3[4] : w32 -> w8 = symbolic
+array unnamed[4] : w32 -> w8 = symbolic
+(query [(Ult N0:(ReadLSB w32 0 idx.0)
+              16)
+         (Ult N1:(ReadLSB w32 0 idx.1)
+              16)
+         (Ult N2:(ReadLSB w32 0 idx.2)
+              16)
+         (Ult N3:(ReadLSB w32 0 idx.3)
+              4)
+         (Eq 104
+             (Read w8 0 U0:[(Extract w32 0 (SExt w64 N3))=0,
+                            1=97] @ unnamed))
+         (Slt 2
+              N4:(Concat w32 (Read w8 3 U0)
+                             (Concat w24 (Read w8 2 U0)
+                                         (Concat w16 (Read w8 1 U0) (w8 104)))))
+         (Eq N4
+             (ReadLSB w32 48 U1:[(Add w32 3
+                                          N5:(Extract w32 0 (Mul w64 4 (SExt w64 N2))))=(Extract w8 24 N6:(SExt w32 (Read w8 3 unnamed))),
+                                 (Add w32 2 N5)=(Extract w8 16 N6),
+                                 (Add w32 1 N5)=(Extract w8 8 N6),
+                                 N5=(Extract w8 0 N6)] @
+                             U2:[(Add w32 3
+                                          N7:(Extract w32 0 (Mul w64 4 (SExt w64 N0))))=(Extract w8 24 N8:(SExt w32 (Read w8 0 unnamed))),
+                                 (Add w32 2 N7)=(Extract w8 16 N8),
+                                 (Add w32 1 N7)=(Extract w8 8 N8),
+                                 N7=(Extract w8 0 N8)] @ const_arr1))]
+        (Eq 32
+            (ReadLSB w32 N9:(Extract w32 0 (Mul w64 4 (SExt w64 N1))) U2)))
+#   OK -- Elapsed: 1.759911e-01
+#   Is Valid: false
+
+# Query 16 -- Type: InitialValues, Instructions: 132
+array const_arr1[64] : w32 -> w8 = [1 0 0 0 2 0 0 0 4 0 0 0 8 0 0 0 16 0 0 0 32 0 0 0 64 0 0 0 128 0 0 0 0 1 0 0 0 2 0 0 0 4 0 0 0 8 0 0 0 16 0 0 0 32 0 0 0 64 0 0 0 128 0 0]
+array idx.0[4] : w32 -> w8 = symbolic
+array idx.1[4] : w32 -> w8 = symbolic
+array idx.2[4] : w32 -> w8 = symbolic
+array idx.3[4] : w32 -> w8 = symbolic
+array unnamed[4] : w32 -> w8 = symbolic
+(query [(Ult N0:(ReadLSB w32 0 idx.0)
+              16)
+         (Ult N1:(ReadLSB w32 0 idx.1)
+              16)
+         (Ult N2:(ReadLSB w32 0 idx.2)
+              16)
+         (Ult N3:(ReadLSB w32 0 idx.3)
+              4)
+         (Eq 104
+             (Read w8 0 U0:[(Extract w32 0 (SExt w64 N3))=0,
+                            1=97] @ unnamed))
+         (Slt 2
+              N4:(Concat w32 (Read w8 3 U0)
+                             (Concat w24 (Read w8 2 U0)
+                                         (Concat w16 (Read w8 1 U0) (w8 104)))))
+         (Eq N4
+             (ReadLSB w32 48 U1:[(Add w32 3
+                                          N5:(Extract w32 0 (Mul w64 4 (SExt w64 N2))))=(Extract w8 24 N6:(SExt w32 (Read w8 3 unnamed))),
+                                 (Add w32 2 N5)=(Extract w8 16 N6),
+                                 (Add w32 1 N5)=(Extract w8 8 N6),
+                                 N5=(Extract w8 0 N6)] @
+                             U2:[(Add w32 3
+                                          N7:(Extract w32 0 (Mul w64 4 (SExt w64 N0))))=(Extract w8 24 N8:(SExt w32 (Read w8 0 unnamed))),
+                                 (Add w32 2 N7)=(Extract w8 16 N8),
+                                 (Add w32 1 N7)=(Extract w8 8 N8),
+                                 N7=(Extract w8 0 N8)] @ const_arr1))
+         (Eq false
+             (Eq 32
+                 (ReadLSB w32 N9:(Extract w32 0 (Mul w64 4 (SExt w64 N1))) U2)))]
+        false []
+        [unnamed
+         idx.0
+         idx.1
+         idx.2
+         idx.3])
+#   OK -- Elapsed: 7.975698e-02
+#   Solvable: true
+#     unnamed = [104,0,0,0]
+#     idx.0 = [12,0,0,0]
+#     idx.1 = [15,0,0,0]
+#     idx.2 = [0,0,0,0]
+#     idx.3 = [1,0,0,0]
+

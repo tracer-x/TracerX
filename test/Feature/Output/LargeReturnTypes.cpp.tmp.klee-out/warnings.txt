@@ -1,0 +1,11 @@
+KLEE: WARNING: undefined reference to function: _ZNSi5seekgElSt12_Ios_Seekdir
+KLEE: WARNING: undefined reference to function: _ZNSi5tellgEv
+KLEE: WARNING: undefined reference to function: _ZNSt13basic_fstreamIcSt11char_traitsIcEE7is_openEv
+KLEE: WARNING: undefined reference to function: _ZNSt13basic_fstreamIcSt11char_traitsIcEEC1EPKcSt13_Ios_Openmode
+KLEE: WARNING: undefined reference to function: _ZNSt13basic_fstreamIcSt11char_traitsIcEED1Ev
+KLEE: WARNING: undefined reference to function: __errno_location
+KLEE: WARNING ONCE: calling external: _ZNSt13basic_fstreamIcSt11char_traitsIcEEC1EPKcSt13_Ios_Openmode(57127424, 56096336, 12)
+KLEE: WARNING ONCE: calling external: _ZNSt13basic_fstreamIcSt11char_traitsIcEE7is_openEv(57127424)
+KLEE: WARNING ONCE: calling external: _ZNSi5seekgElSt12_Ios_Seekdir(57127424, 0, 2)
+KLEE: WARNING ONCE: calling external: _ZNSi5tellgEv(57127424)
+KLEE: WARNING ONCE: calling external: _ZNSt13basic_fstreamIcSt11char_traitsIcEED1Ev(57127424)

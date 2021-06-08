@@ -1,0 +1,6 @@
+Error: ASSERTION FAIL: 5 != klee_get_obj_size(s)
+File: /home/sanghu/TracerX/tracerx/test/regression/2016-08-06-klee-get-obj-size.c
+Line: 11
+assembly.ll line: 32
+Stack: 
+	#000000032 in main () at /home/sanghu/TracerX/tracerx/test/regression/2016-08-06-klee-get-obj-size.c:11

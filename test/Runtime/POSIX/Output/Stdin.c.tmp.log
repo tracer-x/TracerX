@@ -1,0 +1,13 @@
+mode:file
+mode:dir
+mode:chr
+mode:blk
+mode:fifo
+mode:lnk
+unknown mode
+mode:sock
+read:sym:yes
+read:sym:yes
+read:sym:yes
+read:sym:yes
+read:sym:no

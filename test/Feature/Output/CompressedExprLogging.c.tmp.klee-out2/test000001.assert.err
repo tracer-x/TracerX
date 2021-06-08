@@ -1,0 +1,6 @@
+Error: ASSERTION FAIL: 0
+File: /home/sanghu/TracerX/tracerx/test/Feature/CompressedExprLogging.c
+Line: 39
+assembly.ll line: 80
+Stack: 
+	#000000080 in main () at /home/sanghu/TracerX/tracerx/test/Feature/CompressedExprLogging.c:39

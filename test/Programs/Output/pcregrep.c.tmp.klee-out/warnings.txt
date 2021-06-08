@@ -1,0 +1,3 @@
+KLEE: WARNING: undefined reference to function: __errno_location
+KLEE: WARNING: undefined reference to function: printf
+KLEE: WARNING ONCE: calling external: __ctype_b_loc()

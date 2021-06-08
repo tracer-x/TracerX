@@ -1,0 +1,3 @@
+/home/sanghu/TracerX/tracerx/Release+Asserts/bin/klee -solver-backend=z3 --output-dir=/home/sanghu/TracerX/tracerx/test/Feature/Output/SilentKleeAssume.c.tmp.klee-out --exit-on-error /home/sanghu/TracerX/tracerx/test/Feature/Output/SilentKleeAssume.c.tmp.bc
+PID: 6607
+Started: 2020-06-05 14:18:51

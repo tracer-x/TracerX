@@ -1,0 +1,6 @@
+KLEE: ERROR: (location information missing) ASSERTION FAIL: !klee_is_symbolic(a)
+KLEE: NOTE: now ignoring this error at this location
+KLEE: ERROR: (location information missing) ASSERTION FAIL: !klee_is_symbolic(a)
+KLEE: NOTE: now ignoring this error at this location
+KLEE: Memory cap NOT exceeded!
+

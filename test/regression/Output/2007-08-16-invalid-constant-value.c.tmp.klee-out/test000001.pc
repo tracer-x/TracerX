@@ -1,0 +1,5 @@
+array unnamed[1] : w32 -> w8 = symbolic
+(query [(Eq 43981
+             (Concat w16 (Add w8 205 (Read w8 0 unnamed))
+                         (w8 205)))]
+        false)
