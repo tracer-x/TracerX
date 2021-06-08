@@ -115,7 +115,15 @@
  /home/sanghu/TracerX/llvm/include/llvm/Support/Valgrind.h \
  /home/sanghu/TracerX/llvm/include/llvm/PassAnalysisSupport.h Context.h \
  TimingSolver.h TxShadowArray.h AddressSpace.h \
- /home/sanghu/TracerX/tracerx/include/klee/util/ExprPPrinter.h
+ /home/sanghu/TracerX/tracerx/include/klee/util/ExprPPrinter.h \
+ /home/sanghu/TracerX/llvm/include/llvm/IR/LLVMContext.h \
+ /home/sanghu/TracerX/llvm/include/llvm/IR/Module.h \
+ /home/sanghu/TracerX/llvm/include/llvm/IR/GlobalAlias.h \
+ /home/sanghu/TracerX/llvm/include/llvm/IR/GlobalVariable.h \
+ /home/sanghu/TracerX/llvm/include/llvm/IR/Metadata.h \
+ /home/sanghu/TracerX/llvm/include/llvm/IRReader/IRReader.h \
+ /home/sanghu/TracerX/llvm/include/llvm/Support/SourceMgr.h \
+ /home/sanghu/TracerX/llvm/include/llvm/Support/SMLoc.h
 
 TxWP.h:
 
@@ -372,3 +380,19 @@ TxShadowArray.h:
 AddressSpace.h:
 
 /home/sanghu/TracerX/tracerx/include/klee/util/ExprPPrinter.h:
+
+/home/sanghu/TracerX/llvm/include/llvm/IR/LLVMContext.h:
+
+/home/sanghu/TracerX/llvm/include/llvm/IR/Module.h:
+
+/home/sanghu/TracerX/llvm/include/llvm/IR/GlobalAlias.h:
+
+/home/sanghu/TracerX/llvm/include/llvm/IR/GlobalVariable.h:
+
+/home/sanghu/TracerX/llvm/include/llvm/IR/Metadata.h:
+
+/home/sanghu/TracerX/llvm/include/llvm/IRReader/IRReader.h:
+
+/home/sanghu/TracerX/llvm/include/llvm/Support/SourceMgr.h:
+
+/home/sanghu/TracerX/llvm/include/llvm/Support/SMLoc.h:
