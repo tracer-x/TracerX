@@ -123,7 +123,10 @@
  /home/sanghu/TracerX/llvm/include/llvm/IR/Metadata.h \
  /home/sanghu/TracerX/llvm/include/llvm/IRReader/IRReader.h \
  /home/sanghu/TracerX/llvm/include/llvm/Support/SourceMgr.h \
- /home/sanghu/TracerX/llvm/include/llvm/Support/SMLoc.h
+ /home/sanghu/TracerX/llvm/include/llvm/Support/SMLoc.h \
+ /home/sanghu/TracerX/llvm/include/llvm/IR/IntrinsicInst.h \
+ /home/sanghu/TracerX/llvm/include/llvm/IR/Intrinsics.h \
+ /home/sanghu/TracerX/llvm/include/llvm/IR/Intrinsics.gen
 
 TxWP.h:
 
@@ -396,3 +399,9 @@ AddressSpace.h:
 /home/sanghu/TracerX/llvm/include/llvm/Support/SourceMgr.h:
 
 /home/sanghu/TracerX/llvm/include/llvm/Support/SMLoc.h:
+
+/home/sanghu/TracerX/llvm/include/llvm/IR/IntrinsicInst.h:
+
+/home/sanghu/TracerX/llvm/include/llvm/IR/Intrinsics.h:
+
+/home/sanghu/TracerX/llvm/include/llvm/IR/Intrinsics.gen:

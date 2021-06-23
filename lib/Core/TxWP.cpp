@@ -43,6 +43,11 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "llvm/IR/IntrinsicInst.h"
+//#include "llvm/IR/DebugInfoMetadata.h"
+
+
+
 #include <cstdio>
 #include <iostream>
 #include <map>
@@ -300,29 +305,10 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 					reverseInstructionList.rend(); it != ie; ++it) {
 		llvm::Instruction *i = (*it).first->inst;
 		CurrentWPInst = i;
-//if (CurrentWPInst->getOpcodeName()=="call" && CurrentWPInst->getNumOperands()==2){
-//	llvm::outs()<<"CurrentWPInst->getOpcodeName() "<<CurrentWPInst->getOpcodeName()<<"\n";
-//
-//	llvm::outs()<<"CurrentWPInst->getName() "<<CurrentWPInst->getName()<<"\n";
-//	llvm::outs()<<"CurrentWPInst->getOpcode() "<<CurrentWPInst->getOpcode()<<"\n";
-//	llvm::outs()<<"CurrentWPInst->getOpcode() "<<CurrentWPInst->getNumOperands()<<"\n";
-//llvm::outs()<<"CurrentWPInst->getOperandUse(0)->getName() "<<CurrentWPInst->getOperandUse(0)->getName()<<"\n";
-//llvm::outs()<<"<CurrentWPInst->getOperandUse(1)->getName() "<<CurrentWPInst->getOperandUse(1)->getName()<<"\n";
-//llvm::outs()<<"CurrentWPInst->getOperandUse(1) "<<CurrentWPInst->getOperandUse(1)<<"\n";
-//llvm::outs()<<"CurrentWPInst->getValueID() "<<CurrentWPInst->getValueID()<<"\n";
-//
-//llvm::outs()<<"CurrentWPInst->getValueName() "<<CurrentWPInst->getValueName()<<"\n";
-//
-//
-//}
-//   for (std::vector<std::pair<KInstruction *, int> >::iterator it1 = reverseInstructionList.begin(),
-//                                       ie1 = reverseInstructionList.end();
-//       it1 != ie1; ++it1) {
-//   llvm::outs()<<*it1<<"\n";
-//  }
-		//CurrentWPInst->dump();
-		// i->dump();
+		//llvm::outs()<<"\n the current CurrentWPInst is:";
+		//i->dump();
 		int flag = (*it).second;
+		//llvm::outs()<<"\n the flag value is:"<<flag;
 		if (flag == 1) {
 			// 1- call getCondition on the cond argument of the branch instruction
 			// 2- create and expression from the condition and this->WPExpr
@@ -333,9 +319,9 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 			}
 			ref<Expr> cond = result;
 
-			//      llvm::outs() << "****** Flag = 1 ******\n";
-			//      cond->dump();
-			//      llvm::outs() << "****** End Flag = 1 ******\n";
+			      llvm::outs() << "****** Flag = 1 ******\n";
+			      cond->dump();
+			      llvm::outs() << "****** End Flag = 1 ******\n";
 
 			if (True() == WPExpr) {
 				WPExpr = cond;
@@ -353,14 +339,16 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 			// 2- generate not(condition): expr::not(condition)
 			// 3- create and expression from the condition and this->WPExpr
 			ref<Expr> result = getBrCondition(i);
+			llvm::outs()<<"\nThe result from the flag 2::::::::::::::::::::::::::::\n"<<result;
+			llvm::outs()<<"\n\n";
 			if (result.isNull()) {
 				WPExpr = result;
 				return WPExpr;
 			}
 			ref<Expr> negCond = NotExpr::create(result);
-			//      llvm::outs() << "****** Flag = 2 ******\n";
-			//      negCond->dump();
-			//      llvm::outs() << "****** End Flag = 2 ******\n";
+			      llvm::outs() << "****** Flag = 2 ******\n";
+			      negCond->dump();
+			      llvm::outs() << "****** End Flag = 2 ******\n";
 
 			if (True() == WPExpr) {
 				WPExpr = negCond;
@@ -374,11 +362,11 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 			}
 
 		} else if (i->getOpcode() == llvm::Instruction::Store) {
-			llvm::outs() << "****** Flag = -1 *******\n";
+			llvm::outs() << "\n****** Flag = 3 *******\n";
 			i->dump();
 			llvm::outs() << "------\n";
 			if (TxWPHelper::isTargetDependent(i->getOperand(1), WPExpr)) {
-				llvm::outs() << "****** Flag = 0 *******\n";
+				llvm::outs() << "****** Flag = 4 *******\n";
 				i->dump();
 				llvm::outs() << "------\n";
 				ref<Expr> left = this->generateExprFromOperand(
@@ -392,12 +380,12 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 				}
 
 				WPExpr = TxWPHelper::substituteExpr(WPExpr, right, left);
-				//        llvm::outs() << "****** Flag = 0 *******\n";
-				//        WPExpr->dump();
-				//        llvm::outs() << "------\n";
+				        llvm::outs() << "****** Flag = 5 *******\n";
+				        WPExpr->dump();
+				        llvm::outs() << "------\n";
 				WPExpr = Z3Simplification::simplify(WPExpr);
-				//        WPExpr->dump();
-				//        llvm::outs() << "******* End Flag = 0 *******\n";
+				        WPExpr->dump();
+				        llvm::outs() << "******* End Flag = 5 *******\n";
 			} else if (isa<llvm::GetElementPtrInst>(i->getOperand(1))) { // Update Array
 				llvm::GetElementPtrInst *parentGEP = dyn_cast<
 						llvm::GetElementPtrInst>(i->getOperand(1));
@@ -417,17 +405,17 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 					return val;
 				ref<Expr> update = UpdExpr::create(pair.second, pair.first,
 						val);
-				//        llvm::outs() << "****** Flag = 0 for Update Array *******\n";
-				//        i->dump();
-				//        WPExpr->dump();
+				        llvm::outs() << "****** Flag = 0 for Update Array *******\n";
+				        i->dump();
+				        WPExpr->dump();
 				WPExpr = TxWPHelper::substituteExpr(WPExpr, pair.second,
 						update);
-				//        WPExpr->dump();
-				//        llvm::outs() << "****** End Flag = 0 for Update Array
-				// *******\n";
+				        WPExpr->dump();
+			       llvm::outs() << "****** End Flag = 0 for Update Array*******\n";
 			}
 		}
 	}
+	//llvm::outs()<<"\n The expression returned by the PushUp function is<<<<<<<<<<<<<<<<<<<<<<<<"<<WPExpr<<"\n";
 	return WPExpr;
 }
 
@@ -689,6 +677,7 @@ ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
 		 {break;}
 	 }
 	if (CallInst *call = dyn_cast<CallInst>(RegInst)) {
+		llvm::outs()<<"If there any help----------------------------";
 		call->getArgOperand(whicharg)->dump();
 		finalExpr = this->generateExprFromOperand(call->getArgOperand(whicharg));
 	}
@@ -937,35 +926,60 @@ std::pair<ref<Expr>, ref<Expr> > TxWeakestPreCondition::getPointer(
 
 ref<Expr> TxWeakestPreCondition::getLoadGep(llvm::LoadInst *p) {
 	ref<Expr> result;
-	// klee_warning("PUSHUP4");
+	 klee_warning("PUSHUP4");
 	return result;
 }
 
 ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
 	unsigned width;
 	ref<Expr> index, result;
+//	llvm::outs()<<"Passed Instruction is:\n";
+//	p->dump();
+//	p->getOperand(0)->dump();
+//	llvm::AllocaInst *p1=dyn_cast<AllocaInst>(p->getOperand(0));
+//
+//	p1->dump();
+//	//p1->getAllocatedType()->dump();
+//	llvm::outs()<<"::::::::::::::::::::::::::: "<<p1->getName()<<"\n";
+//	llvm::outs()<<"::::::::::::::::::::::::::: "<<p1->getName()<<"\n";
+//	if(p1->getName().empty()){
+//	p1->setName("some");}
+//
+//	llvm::outs()<<"::::::::::::::::::::::::::: "<<p1->getName()<<"\n";
+
 	if (isa<llvm::AllocaInst>(p->getOperand(0))) {
 		llvm::AllocaInst *alc = dyn_cast<llvm::AllocaInst>(p->getOperand(0));
+		if(alc->getName().empty()){
+			alc->setName("TX_named_var");}
 		width = getAllocaInstSize(alc);
 		index = ConstantExpr::create(0, width);
 		result = WPVarExpr::create(p->getOperand(0),
 				p->getOperand(0)->getName(), index);
+
+
 	} else if (isa<llvm::GlobalValue>(p->getOperand(0))) {
 		llvm::GlobalValue *gv = dyn_cast<llvm::GlobalValue>(p->getOperand(0));
+		if(gv->getName().empty()){
+					gv->setName("TX_named_var");}
 		width = getGlobalVariabletSize(gv);
 		index = ConstantExpr::create(0, width);
 		result = WPVarExpr::create(p->getOperand(0),
 				p->getOperand(0)->getName(), index);
+
 	} else {
 		p->getOperand(0)->dump();
 		klee_warning("TxWeakestPreCondition::getLoad: Not implemented yet!");
 	}
+
 	return result;
+
 }
 
 ref<Expr> TxWeakestPreCondition::getAllocaInst(llvm::AllocaInst *alc) {
 	unsigned width;
 	ref<Expr> index, result;
+	if(alc->getName().empty()){
+				alc->setName("TX_named_var");}
 	width = getAllocaInstSize(alc);
 	index = ConstantExpr::create(0, width);
 	result = WPVarExpr::create(alc, alc->getName(), index);
@@ -1399,3 +1413,54 @@ unsigned int TxWeakestPreCondition::getGepSize(llvm::Type *ty) {
 	}
 	return size;
 }
+
+
+//		llvm::outs()<<"\n-----------------------GET NAME1----------------\n";
+//					//llvm::outs()<<alc->getName();
+//					llvm::outs()<<p->getOperand(0)->getName();
+//
+//					llvm::outs()<<"\n-----------------------GET NAME1-2----------------\n";
+//					std::string Str;
+//					raw_string_ostream OS(Str);
+//					p->getOperand(0)->print(OS);// printAsOperand(OS, false);
+//					llvm::outs()<<"\n-----------------------GET NAME2----------------\n";
+//					//llvm::outs()<<p->getOperand(0)->print(OS,false);
+
+//AllocaInst *alloca = dyn_cast<AllocaInst>(&*inst); errs()<<"Alloca instruction :"<<*alloca<<" Name is : "<<alloca->getName()<<"\n";
+//	llvm::outs()<<"\nlets see::"<<p->getOperand(0)->getName().str();;
+//	StringRef bbName(p->getOperand(0)->getName());
+//	                errs() << "BasicBlock: "  << bbName << "\n";
+//
+//	                llvm::outs()<<"If there any help22----------------------------";
+//	                		p->getOperand(0)->dump();
+//	                		generateExprFromOperand(p->getOperand(0))->dump();
+//	                		llvm::outs()<<"If there any help33----------------------------\n";
+//	                		llvm::outs()<<p->getOpcode();
+//	                		//finalExpr = this->generateExprFromOperand(call->getArgOperand(whicharg));
+//	                std::string Str;
+//	                    raw_string_ostream OS(Str);
+//
+//	                    p->getOperand(0)->print(OS, false);
+//	                     llvm::outs()<<"now is it :::::::\n"<<OS.str();
+//
+//	                     llvm::outs()<<generateExprFromOperand(p->getOperand(0));
+//	                     generateExprFromOperand(p->getOperand(0))->dump();
+//
+//		llvm::outs()<<"\n-----------------------GET NAME3----------------\n";
+//							//llvm::outs()<<alc->getName();
+//							llvm::outs()<<p->getOperand(0)->getName();
+//
+//							llvm::outs()<<"\n-----------------------GET NAME1-2----------------\n";
+//							std::string Str;
+//							raw_string_ostream OS(Str);
+//					p->getOperand(0)->print(OS,false);// printAsOperand(OS, false);
+//							llvm::outs()<<"\n-----------------------GET NAME4----------------\n";
+					//llvm::outs()<<p->getOperand(0)->print(OS,false);
+//	llvm::outs()<<"\n-----------------------GET NAME----------------\n";
+//	llvm::outs()<<alc->getName();
+//	llvm::outs()<<result;
+//
+//	if(result.isNull())
+//	{std::string Str;
+//    raw_string_ostream OS(Str);
+//}
