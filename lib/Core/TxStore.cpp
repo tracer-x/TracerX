@@ -297,10 +297,15 @@ ref<TxAllocationContext>
 TxStore::getAddressofLatestCopyLLVMValue(llvm::Value *val) {
   ref<TxAllocationContext> address;
   bool foundValue = false;
+  //llvm::outs()<<"getAddressofLatestCopyLLVMValue:::::::::::n";
+  //llvm::outs()<<val->Name;
+  //val->dump();
+
   for (TopStateStore::const_iterator it = internalStore.begin(),
                                      ie = internalStore.end();
        it != ie; ++it) {
     ref<TxAllocationContext> temp = (*it).first;
+    llvm::outs()<<"Address-01\n";
     if (temp->getValue() == val) {
       if (!foundValue) {
         address = temp;
@@ -311,7 +316,9 @@ TxStore::getAddressofLatestCopyLLVMValue(llvm::Value *val) {
       }
     }
   }
-
+  llvm::outs()<<"lets\n";
+//address->dump();
+llvm::outs()<<"lets\n";
   // Maybe NULL
   return address;
 }

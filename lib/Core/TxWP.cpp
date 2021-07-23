@@ -371,6 +371,8 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 				llvm::outs() << "------\n";
 				ref<Expr> left = this->generateExprFromOperand(
 						i->getOperand(0));
+
+				llvm::outs() << "----checkpoint--\n";
 				ref<Expr> right = this->generateExprFromOperand(
 						i->getOperand(1));
 
@@ -433,55 +435,75 @@ ref<Expr> TxWeakestPreCondition::getBrCondition(llvm::Instruction *ins) {
 ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
 		ref<Expr> offset) {
 	ref<Expr> ret;
+	llvm::outs()<<"Cp1\n";
 	//    klee_warning("TxWeakestPreCondition::generateExprFromOperand0");
 	//    val->dump();
 	//    klee_warning("TxWeakestPreCondition::generateExprFromOperand1");
 	if (isa<llvm::ConstantInt>(val)) {
+		llvm::outs()<<"Cp2\n";
 		llvm::ConstantInt *constInt = dyn_cast<llvm::ConstantInt>(val);
 		ret = getConstantInt(constInt);
 	} else if (isa<llvm::ConstantFP>(val)) {
+		llvm::outs()<<"Cp3\n";
 		llvm::ConstantFP *constFP = dyn_cast<llvm::ConstantFP>(val);
 		ret = getConstantFP(constFP);
 	} else if (isa<llvm::GlobalValue>(val)) {
+		llvm::outs()<<"Cp4\n";
 		llvm::GlobalValue *gv = dyn_cast<llvm::GlobalValue>(val);
 		ret = getGlobalValue(gv);
 	} else if (isa<llvm::ConstantExpr>(val)) {
+		llvm::outs()<<"Cp5\n";
 		llvm::ConstantExpr *constantExpr = dyn_cast<llvm::ConstantExpr>(val);
 		ret = getConstantExpr(constantExpr);
 	} else if (isa<llvm::LoadInst>(val)) {
+		llvm::outs()<<"Cp6\n";
 		llvm::LoadInst *inst = dyn_cast<llvm::LoadInst>(val);
 		if (isa<llvm::ConstantExpr>(inst->getOperand(0))) {
+			llvm::outs()<<"Cp6-1\n";
 			llvm::ConstantExpr *ce = dyn_cast<llvm::ConstantExpr>(
 					inst->getOperand(0));
 			ret = getConstantExpr(ce);
 			//      ret = getLoadGep(inst);
 		} else if (isa<llvm::GetElementPtrInst>(inst->getOperand(0))) {
+			llvm::outs()<<"Cp6-2\n";
 			llvm::GetElementPtrInst *parentGEP = dyn_cast<
 					llvm::GetElementPtrInst>(inst->getOperand(0));
+			llvm::outs()<<"Cp6-21\n";
+			inst->dump();
+			inst->getOperand(0)->dump();
+			parentGEP->dump();
 			std::pair<ref<Expr>, ref<Expr> > pair = getPointer(parentGEP);
-
+			llvm::outs()<<"Cp6-22\n";
 			if (!pair.first.isNull())
-				ret = SelExpr::create(pair.second, pair.first);
-			else
-				ret = pair.first;
+				{llvm::outs()<<"Cp6-221\n";
+				ret = SelExpr::create(pair.second, pair.first);}
+			else{
+				llvm::outs()<<"Cp6-222\n";
+				ret = pair.first;}
 		} else {
 			ret = getLoad(inst);
 		}
 	} else if (isa<llvm::BinaryOperator>(val)) {
+		llvm::outs()<<"Cp7\n";
 		llvm::BinaryOperator *bo = dyn_cast<llvm::BinaryOperator>(val);
 		ret = getBinaryInst(bo);
 	} else if (isa<llvm::CastInst>(val)) {
+		llvm::outs()<<"Cp8\n";
 		llvm::CastInst *ci = dyn_cast<llvm::CastInst>(val);
 		ret = getCastInst(ci);
 	} else if (isa<llvm::CallInst>(val)) {
+		llvm::outs()<<"Cp9\n";
 		llvm::CallInst *ci = dyn_cast<llvm::CallInst>(val);
 		ret = getCallInst(ci);
 	} else if (llvm::isa<llvm::CmpInst>(val)) {
+		llvm::outs()<<"Cp10\n";
 		llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(val);
 		ret = getCmpCondition(cmp);
 	} else if (llvm::isa<llvm::GlobalVariable>(val)) {
+		llvm::outs()<<"Cp11\n";
 		klee_error("not implemented yet!");
 	} else if (llvm::isa<llvm::Argument>(val)) {
+		llvm::outs()<<"Cp12\n";
 		llvm::Argument *arg = dyn_cast<llvm::Argument>(val);
 		llvm::outs()<<"the value passed\n";
 				val->dump();
@@ -489,15 +511,19 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
 		arg->dump();
 		ret = getFunctionArgument(arg);
 	} else if (llvm::isa<llvm::PHINode>(val)) {
+		llvm::outs()<<"Cp13\n";
 		llvm::PHINode *phi = dyn_cast<llvm::PHINode>(val);
 		ret = getPhiInst(phi);
 	} else if (llvm::isa<llvm::AllocaInst>(val)) {
+		llvm::outs()<<"Cp14\n";
 		llvm::AllocaInst *alc = dyn_cast<llvm::AllocaInst>(val);
 		ret = getAllocaInst(alc);
 	} else if (isa<llvm::GetElementPtrInst>(val)) {
+		llvm::outs()<<"Cp15\n";
 		llvm::GetElementPtrInst *gep = dyn_cast<llvm::GetElementPtrInst>(val);
 		ret = getGepInst(gep);
 	} else if (isa<llvm::Constant>(val)) {
+		llvm::outs()<<"Cp16\n";
 		if (isa<llvm::ConstantPointerNull>(val)) {
 			return Expr::createPointer(0);
 		} else {
@@ -510,6 +536,7 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
 							" case not implemented yet\n");
 		}
 	} else {
+		llvm::outs()<<"Cp17\n";
 		llvm::errs() << "Value:";
 		val->dump();
 		llvm::errs() << "\nType:";
@@ -685,201 +712,11 @@ ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
 }
 
 
-
-//ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
-//	unsigned width;
-//	ref<Expr> index, result, finalExpr;
-//	// klee_warning("PUSHUP2");
-//	//return result;
-//	width = getFunctionArgumentSize(arg);
-//	index = ConstantExpr::create(0, width);
-//	result = WPVarExpr::create(arg, arg->getName(), index);
-//	//llvm::outs()<<"----Here in function the getFunctionArgument is:"<<arg->getName()<<"\n";
-//
-//	int flg_gt = 0;
-//	llvm::Instruction *RegInst;
-//	for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
-//			it = WPInstructionSeq.rbegin(), ie = WPInstructionSeq.rend();
-//			it != ie; ++it) {
-//		llvm::Instruction *i = (*it).first->inst;
-//		if (i == CurrentWPInst) {
-//			flg_gt = 1;
-//		}
-//		if (flg_gt == 1 and i->getOpcodeName() == "call") {
-//			//llvm::outs()<<"Argument----------------------------------";
-//			//i->dump();
-//			RegInst = i;
-//			//llvm::outs()<<"RegInst----------------------------------";
-//			//RegInst->dump();
-//			break;
-//		}
-//	}
-//
-//	CallInst* call_inst = dyn_cast<CallInst>(RegInst);
-//	call_inst->getCalledFunction()->dump();
-//	 Value *val11 = call_inst->getArgOperand(0);
-//	 val11->dump();
-//
-//	 Function* fn = call_inst->getCalledFunction();
-//	 llvm::outs()<<fn->getName();
-//	 int whicharg=-1;
-//	 for(llvm::Function::arg_iterator arg1 = fn->arg_begin(); arg1 != fn->arg_end(); ++arg1) {
-//		 whicharg++;
-//		// if(ConstantInt* ci = dyn_cast<ConstantInt>(arg1))
-//		 //llvm::outs()<<*arg1<< "checking values2\n";
-//		 //llvm::outs()<<"----Here in function the getFunctionArgument we are getting is:"<<arg1->getName()<<"\n";
-//		 if (arg->getName().compare(arg1->getName())==0)
-//		 {
-//			 llvm::outs()<<"Yes equal";
-//			 break;
-//		 }
-//	 }
-//llvm::outs()<<"\nwhich arg value::::::::::::::::"<<whicharg;
-//	//call_inst->getCalledFunction()->dump();
-//	if (CallInst *call = dyn_cast<CallInst>(RegInst)) {
-//		llvm::outs()<<"call->getArgOperand(0)-------------\n";
-//		arg->dump();
-//		call->dump();
-//		//call->getCalledFunction()->dump();
-//		llvm::outs()<<"\nGet called function argument list:";
-//	//call->getCalledFunction()->OperandList->Val;
-//		llvm::outs()<<call->getNumArgOperands()<<" Number of operands\n";
-//		for (int pi=0;pi<call->getNumArgOperands();pi++){
-//			llvm::outs()<<"\nThe pi value is:"<<pi;
-//			call->getArgOperand(pi)->dump();
-//		}
-//
-//		call->getArgOperand(whicharg)->dump();
-//		finalExpr = this->generateExprFromOperand(call->getArgOperand(whicharg));
-//		//llvm::outs()<<"Final Expr----------------------------------\n";
-//		finalExpr->dump();
-//	}
-//	return finalExpr;
-//}
-
-
-//for(llvm::Function::arg_iterator arg1 = fn->arg_begin(); arg1 != fn->arg_end(); ++arg1) {
-//		 if(ConstantInt* ci = dyn_cast<ConstantInt>(arg1))
-//		 //    	    errs() << ci->getValue() << "\n";
-//		 //    	  errs() << *arg << "\n";
-//	   //if(auto* ci = dyn_cast<ConstantInt>(arg1))
-//			 llvm::outs()<<ci->getValue() << "checking values\n";
-//		 llvm::outs()<<*arg1 << "checking values2\n";
-//	     //errs() << ci->getValue() << "\n";
-//	   //errs() << *arg1 << "\n";
-//	 }
-//
-//	//call_inst->getCalledFunction()->dump();
-//	if (CallInst *call = dyn_cast<CallInst>(RegInst)) {
-//		llvm::outs()<<"call->getArgOperand(0)-------------\n";
-//		arg->dump();
-//		call->dump();
-//		//call->getCalledFunction()->dump();
-//		llvm::outs()<<"\nGet called function argument list:";
-//	//call->getCalledFunction()->OperandList->Val;
-//		llvm::outs()<<call->getNumArgOperands()<<" Number of operands\n";
-//		for (int pi=0;pi<call->getNumArgOperands();pi++){
-//			llvm::outs()<<"\nThe pi value is:"<<pi;
-//			call->getArgOperand(pi)->dump();
-//		}
-//
-//		call->getArgOperand(1)->dump();
-//		finalExpr = this->generateExprFromOperand(call->getArgOperand(1));
-//		llvm::outs()<<"Final Expr----------------------------------\n";
-//		finalExpr->dump();
-//	}
-//	return finalExpr;
-//-------------------------------
-//llvm::outs()<<"The current instruction is:"<<CurrentWPInst->getOpcodeName()<<"\n";
-
-// WPInstructionSeq = reverseInstructionList;
-//llvm::outs() << "------ Sanghu: "<< CurrentWPInst->getParent()->getParent()->getName() <<"\n";
-// llvm::outs()<<RegInst<<"cheking correct inst\n";
-// RegInst->dump();
-//Function* fn = call->getCalledFunction();
-//llvm::outs()<<call->getArgOperand(0)->getValueName()->getValue();
-//llvm::outs()<<"Arpi";
-//call->getArgOperand(0)->dump();
-
-//    	llvm::outs()<<finalExpr;
-//    	llvm::outs()<<call->getNumArgOperands()<<"nis\n";
-//    	//llvm::outs()<<call->getOperand(0)->HasValueHandle<<"arpi\n";
-//    	StringRef fn_name = fn->getName();
-//    	llvm::outs()<<fn_name<<" fun name\n";
-//    	llvm::outs()<<fn->arg_size()<<" fun size\n";
-//fn->arg
-//llvm::outs()<<fn->getArgumentList();
-//for(llvm::Function::arg_iterator arg1 = fn->arg_begin(); arg1 != fn->arg_end(); ++arg1) {
-
-//llvm::outs()<<arg1->getParent()->getEntryBlock()<<"\n";
-
-//llvm::outs()<<call->getCalledValue()->getName()<<"\n";
-
-//llvm::outs()<<arg1->getName()<<"\n";
-//ref<Expr> finalExpr = this->generateExprFromOperand(arg1);
-//llvm::outs()<<"final expr"<<finalExpr<<"\n";
-//finalExpr->dump();
-//    	  if(ConstantInt* ci = dyn_cast<ConstantInt>(arg1))
-//    	    errs() << ci->getValue() << "\n";
-//    	  errs() << *arg << "\n";
-//	}
-
-//                   Value *val11 = call->getArgOperand(0);
-//                   Value *valarrayIdx = call->getArgOperand(1);
-//                   val11->dump();
-//
-//                   Type *val11ty = val11->getType(); // this should be of float
-// Type *valarrayIdx = valarrayIdx->getType(); // this should be of i32 address(1)*
-
-//    	  while(i->getOpcodeName()!="Call"){
-//    	 	  llvm::outs()<<"The current instruction is:"<<CurrentWPInst->getOpcodeName()<<"\n";
-//    	 	  CurrentWPInst=CurrentWPInst->getPrevNode();
-//    	   }
-
-// i->getPrevNode()->dump();}
-//     CurrentWPInst= i;
-//  if (CurrentWPInst->getOpcodeName()=="call" && CurrentWPInst->getNumOperands()==2){
-//  	llvm::outs()<<"CurrentWPInst->getOpcodeName() "<<CurrentWPInst->getOpcodeName()<<"\n";
-//
-//  	llvm::outs()<<"CurrentWPInst->getName() "<<CurrentWPInst->getName()<<"\n";
-//  	llvm::outs()<<"CurrentWPInst->getOpcode() "<<CurrentWPInst->getOpcode()<<"\n";
-//  	llvm::outs()<<"CurrentWPInst->getOpcode() "<<CurrentWPInst->getNumOperands()<<"\n";
-//  llvm::outs()<<"CurrentWPInst->getOperandUse(0)->getName() "<<CurrentWPInst->getOperandUse(0)->getName()<<"\n";
-//  llvm::outs()<<"<CurrentWPInst->getOperandUse(1)->getName() "<<CurrentWPInst->getOperandUse(1)->getName()<<"\n";
-//  llvm::outs()<<"CurrentWPInst->getOperandUse(1) "<<CurrentWPInst->getOperandUse(1)<<"\n";
-//  llvm::outs()<<"CurrentWPInst->getValueID() "<<CurrentWPInst->getValueID()<<"\n";
-//
-//  llvm::outs()<<"CurrentWPInst->getValueName() "<<CurrentWPInst->getValueName()<<"\n";
-//
-//
-//  }
-//   for (std::vector<std::pair<KInstruction *, int> >::iterator it1 = reverseInstructionList.begin(),
-//                                       ie1 = reverseInstructionList.end();
-//       it1 != ie1; ++it1) {
-//   llvm::outs()<<*it1<<"\n";
-//  }
-//CurrentWPInst->dump();
-
-//  while(CurrentWPInst->getOpcodeName()!="Call"){
-//	  llvm::outs()<<"The current instruction is:"<<CurrentWPInst->getOpcodeName()<<"\n";
-//	  CurrentWPInst=CurrentWPInst->getPrevNode();
-//  }
-
-//llvm::outs()<<"---Sanghu2"<< CurrentWPInst->getNextNode()->dump()<<"\n";
-
-//llvm::outs() << "------ check-getNumOperands: "<<CurrentWPInst->getNumOperands()<<"\n";
-//llvm::outs() << "------ check-getNumOperands: "<<CurrentWPInst->getNextNode()->getOpcodeName()<<"\n";
-//llvm::outs() << "------ check-getNumOperands: "<<CurrentWPInst->getOpcodeName()<<"\n";
-//llvm::outs() << "------ check-getNumOperands: "<<CurrentWPInst->getName()<<"\n";
-//llvm::outs() << "------ check-1: "<<arg->getName()<<"\n";
-
-//llvm::outs() << "------ check-getPrevNode: "<<CurrentWPInst->getPrevNode()->getOpcodeName()<<"\n";
-
 std::pair<ref<Expr>, ref<Expr> > TxWeakestPreCondition::getPointer(
 		llvm::GetElementPtrInst *gep) {
 	std::pair<ref<Expr>, ref<Expr> > pair;
 	// klee_warning("PUSHUP3");
-	return pair;
+	//return pair;
 	if (isa<llvm::GetElementPtrInst>(gep->getOperand(0))) {
 		llvm::GetElementPtrInst *parentGEP = dyn_cast<llvm::GetElementPtrInst>(
 				gep->getOperand(0));
@@ -1413,6 +1250,198 @@ unsigned int TxWeakestPreCondition::getGepSize(llvm::Type *ty) {
 	}
 	return size;
 }
+
+
+
+
+//ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
+//	unsigned width;
+//	ref<Expr> index, result, finalExpr;
+//	// klee_warning("PUSHUP2");
+//	//return result;
+//	width = getFunctionArgumentSize(arg);
+//	index = ConstantExpr::create(0, width);
+//	result = WPVarExpr::create(arg, arg->getName(), index);
+//	//llvm::outs()<<"----Here in function the getFunctionArgument is:"<<arg->getName()<<"\n";
+//
+//	int flg_gt = 0;
+//	llvm::Instruction *RegInst;
+//	for (std::vector<std::pair<KInstruction *, int> >::const_reverse_iterator
+//			it = WPInstructionSeq.rbegin(), ie = WPInstructionSeq.rend();
+//			it != ie; ++it) {
+//		llvm::Instruction *i = (*it).first->inst;
+//		if (i == CurrentWPInst) {
+//			flg_gt = 1;
+//		}
+//		if (flg_gt == 1 and i->getOpcodeName() == "call") {
+//			//llvm::outs()<<"Argument----------------------------------";
+//			//i->dump();
+//			RegInst = i;
+//			//llvm::outs()<<"RegInst----------------------------------";
+//			//RegInst->dump();
+//			break;
+//		}
+//	}
+//
+//	CallInst* call_inst = dyn_cast<CallInst>(RegInst);
+//	call_inst->getCalledFunction()->dump();
+//	 Value *val11 = call_inst->getArgOperand(0);
+//	 val11->dump();
+//
+//	 Function* fn = call_inst->getCalledFunction();
+//	 llvm::outs()<<fn->getName();
+//	 int whicharg=-1;
+//	 for(llvm::Function::arg_iterator arg1 = fn->arg_begin(); arg1 != fn->arg_end(); ++arg1) {
+//		 whicharg++;
+//		// if(ConstantInt* ci = dyn_cast<ConstantInt>(arg1))
+//		 //llvm::outs()<<*arg1<< "checking values2\n";
+//		 //llvm::outs()<<"----Here in function the getFunctionArgument we are getting is:"<<arg1->getName()<<"\n";
+//		 if (arg->getName().compare(arg1->getName())==0)
+//		 {
+//			 llvm::outs()<<"Yes equal";
+//			 break;
+//		 }
+//	 }
+//llvm::outs()<<"\nwhich arg value::::::::::::::::"<<whicharg;
+//	//call_inst->getCalledFunction()->dump();
+//	if (CallInst *call = dyn_cast<CallInst>(RegInst)) {
+//		llvm::outs()<<"call->getArgOperand(0)-------------\n";
+//		arg->dump();
+//		call->dump();
+//		//call->getCalledFunction()->dump();
+//		llvm::outs()<<"\nGet called function argument list:";
+//	//call->getCalledFunction()->OperandList->Val;
+//		llvm::outs()<<call->getNumArgOperands()<<" Number of operands\n";
+//		for (int pi=0;pi<call->getNumArgOperands();pi++){
+//			llvm::outs()<<"\nThe pi value is:"<<pi;
+//			call->getArgOperand(pi)->dump();
+//		}
+//
+//		call->getArgOperand(whicharg)->dump();
+//		finalExpr = this->generateExprFromOperand(call->getArgOperand(whicharg));
+//		//llvm::outs()<<"Final Expr----------------------------------\n";
+//		finalExpr->dump();
+//	}
+//	return finalExpr;
+//}
+
+
+//for(llvm::Function::arg_iterator arg1 = fn->arg_begin(); arg1 != fn->arg_end(); ++arg1) {
+//		 if(ConstantInt* ci = dyn_cast<ConstantInt>(arg1))
+//		 //    	    errs() << ci->getValue() << "\n";
+//		 //    	  errs() << *arg << "\n";
+//	   //if(auto* ci = dyn_cast<ConstantInt>(arg1))
+//			 llvm::outs()<<ci->getValue() << "checking values\n";
+//		 llvm::outs()<<*arg1 << "checking values2\n";
+//	     //errs() << ci->getValue() << "\n";
+//	   //errs() << *arg1 << "\n";
+//	 }
+//
+//	//call_inst->getCalledFunction()->dump();
+//	if (CallInst *call = dyn_cast<CallInst>(RegInst)) {
+//		llvm::outs()<<"call->getArgOperand(0)-------------\n";
+//		arg->dump();
+//		call->dump();
+//		//call->getCalledFunction()->dump();
+//		llvm::outs()<<"\nGet called function argument list:";
+//	//call->getCalledFunction()->OperandList->Val;
+//		llvm::outs()<<call->getNumArgOperands()<<" Number of operands\n";
+//		for (int pi=0;pi<call->getNumArgOperands();pi++){
+//			llvm::outs()<<"\nThe pi value is:"<<pi;
+//			call->getArgOperand(pi)->dump();
+//		}
+//
+//		call->getArgOperand(1)->dump();
+//		finalExpr = this->generateExprFromOperand(call->getArgOperand(1));
+//		llvm::outs()<<"Final Expr----------------------------------\n";
+//		finalExpr->dump();
+//	}
+//	return finalExpr;
+//-------------------------------
+//llvm::outs()<<"The current instruction is:"<<CurrentWPInst->getOpcodeName()<<"\n";
+
+// WPInstructionSeq = reverseInstructionList;
+//llvm::outs() << "------ Sanghu: "<< CurrentWPInst->getParent()->getParent()->getName() <<"\n";
+// llvm::outs()<<RegInst<<"cheking correct inst\n";
+// RegInst->dump();
+//Function* fn = call->getCalledFunction();
+//llvm::outs()<<call->getArgOperand(0)->getValueName()->getValue();
+//llvm::outs()<<"Arpi";
+//call->getArgOperand(0)->dump();
+
+//    	llvm::outs()<<finalExpr;
+//    	llvm::outs()<<call->getNumArgOperands()<<"nis\n";
+//    	//llvm::outs()<<call->getOperand(0)->HasValueHandle<<"arpi\n";
+//    	StringRef fn_name = fn->getName();
+//    	llvm::outs()<<fn_name<<" fun name\n";
+//    	llvm::outs()<<fn->arg_size()<<" fun size\n";
+//fn->arg
+//llvm::outs()<<fn->getArgumentList();
+//for(llvm::Function::arg_iterator arg1 = fn->arg_begin(); arg1 != fn->arg_end(); ++arg1) {
+
+//llvm::outs()<<arg1->getParent()->getEntryBlock()<<"\n";
+
+//llvm::outs()<<call->getCalledValue()->getName()<<"\n";
+
+//llvm::outs()<<arg1->getName()<<"\n";
+//ref<Expr> finalExpr = this->generateExprFromOperand(arg1);
+//llvm::outs()<<"final expr"<<finalExpr<<"\n";
+//finalExpr->dump();
+//    	  if(ConstantInt* ci = dyn_cast<ConstantInt>(arg1))
+//    	    errs() << ci->getValue() << "\n";
+//    	  errs() << *arg << "\n";
+//	}
+
+//                   Value *val11 = call->getArgOperand(0);
+//                   Value *valarrayIdx = call->getArgOperand(1);
+//                   val11->dump();
+//
+//                   Type *val11ty = val11->getType(); // this should be of float
+// Type *valarrayIdx = valarrayIdx->getType(); // this should be of i32 address(1)*
+
+//    	  while(i->getOpcodeName()!="Call"){
+//    	 	  llvm::outs()<<"The current instruction is:"<<CurrentWPInst->getOpcodeName()<<"\n";
+//    	 	  CurrentWPInst=CurrentWPInst->getPrevNode();
+//    	   }
+
+// i->getPrevNode()->dump();}
+//     CurrentWPInst= i;
+//  if (CurrentWPInst->getOpcodeName()=="call" && CurrentWPInst->getNumOperands()==2){
+//  	llvm::outs()<<"CurrentWPInst->getOpcodeName() "<<CurrentWPInst->getOpcodeName()<<"\n";
+//
+//  	llvm::outs()<<"CurrentWPInst->getName() "<<CurrentWPInst->getName()<<"\n";
+//  	llvm::outs()<<"CurrentWPInst->getOpcode() "<<CurrentWPInst->getOpcode()<<"\n";
+//  	llvm::outs()<<"CurrentWPInst->getOpcode() "<<CurrentWPInst->getNumOperands()<<"\n";
+//  llvm::outs()<<"CurrentWPInst->getOperandUse(0)->getName() "<<CurrentWPInst->getOperandUse(0)->getName()<<"\n";
+//  llvm::outs()<<"<CurrentWPInst->getOperandUse(1)->getName() "<<CurrentWPInst->getOperandUse(1)->getName()<<"\n";
+//  llvm::outs()<<"CurrentWPInst->getOperandUse(1) "<<CurrentWPInst->getOperandUse(1)<<"\n";
+//  llvm::outs()<<"CurrentWPInst->getValueID() "<<CurrentWPInst->getValueID()<<"\n";
+//
+//  llvm::outs()<<"CurrentWPInst->getValueName() "<<CurrentWPInst->getValueName()<<"\n";
+//
+//
+//  }
+//   for (std::vector<std::pair<KInstruction *, int> >::iterator it1 = reverseInstructionList.begin(),
+//                                       ie1 = reverseInstructionList.end();
+//       it1 != ie1; ++it1) {
+//   llvm::outs()<<*it1<<"\n";
+//  }
+//CurrentWPInst->dump();
+
+//  while(CurrentWPInst->getOpcodeName()!="Call"){
+//	  llvm::outs()<<"The current instruction is:"<<CurrentWPInst->getOpcodeName()<<"\n";
+//	  CurrentWPInst=CurrentWPInst->getPrevNode();
+//  }
+
+//llvm::outs()<<"---Sanghu2"<< CurrentWPInst->getNextNode()->dump()<<"\n";
+
+//llvm::outs() << "------ check-getNumOperands: "<<CurrentWPInst->getNumOperands()<<"\n";
+//llvm::outs() << "------ check-getNumOperands: "<<CurrentWPInst->getNextNode()->getOpcodeName()<<"\n";
+//llvm::outs() << "------ check-getNumOperands: "<<CurrentWPInst->getOpcodeName()<<"\n";
+//llvm::outs() << "------ check-getNumOperands: "<<CurrentWPInst->getName()<<"\n";
+//llvm::outs() << "------ check-1: "<<arg->getName()<<"\n";
+
+//llvm::outs() << "------ check-getPrevNode: "<<CurrentWPInst->getPrevNode()->getOpcodeName()<<"\n";
 
 
 //		llvm::outs()<<"\n-----------------------GET NAME1----------------\n";

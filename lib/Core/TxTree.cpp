@@ -16,7 +16,7 @@
 #include "TxTree.h"
 
 #include "TimingSolver.h"
-
+#include "Executor.h"
 #include "TxDependency.h"
 #include "TxShadowArray.h"
 #include "Memory.h"
@@ -1807,6 +1807,7 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
                                                 ie = markedGlobal.end();
          it != ie; ++it) {
+    	llvm::outs()<<"Global vaiables:::::::::::---------------:::::\n\n\n";
       (*it)->print(stream);
     }
     stream << "]\n";
@@ -2932,15 +2933,48 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     ref<Expr> kids[2];
     kids[0] = wpInterpolant->getKid(0);
     kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
+    kids[0]->dump();
+    kids[1]->dump();
+
     if (kids[0].isNull())
       return kids[0];
     if (kids[1].isNull())
       return kids[1];
 
     ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
+    wpInterpolant->dump();
+    wpInterpolant->getKid(0)->dump();
+    WPVar->dump();
+    llvm::outs()<<"The Wpadress is \n"<<WPVar->address;
 
-    ref<TxAllocationContext> alc =
-        dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
+
+    //dependency->getStore()->dump();
+    WPVar->address->dump();
+    llvm::outs()<<"Checking the print-1\n";
+    ref<TxAllocationContext> alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
+    llvm::outs()<<"Checking the print-2\n";
+//alc->dump();
+    llvm::outs()<<"Checking the print-3\n";
+//
+//    for (const auto& p : globalAddresses ) {
+//            llvm::outs()<<p<<"\n";
+//        }
+//    Executor::const_iterator pos = globalAddresses.find("string");
+//    if (pos == map.end()) {
+//        //handle the error
+//    } else {
+//        std::string value = pos->second;
+//        ...
+//    }
+
+    		//dependency->getStore()->markGlobalVariables(WPVar->address);
+//       //
+// if(alc.isNull){
+//
+//
+// }
+    llvm::outs()<<"Checking the print\n";
+
 
     if (!alc.isNull()) {
       ref<TxStoreEntry> entry;
@@ -2955,23 +2989,33 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
              "instantiateWPatSubsumption, offset is "
              "not a constant value");
       entry = dependency->getStore()->find(alc, offset);
-
+  	llvm::outs()<<"Print-111\n";
+  	//entry->dump();
       if (!entry.isNull()) {
+    		llvm::outs()<<"Print-121\n";
+    		entry->dump();
         if (wpInterpolant->getWidth() ==
             entry->getContent()->getExpression()->getWidth()) {
+        	llvm::outs()<<"Print-11\n";
+        	entry->getContent()->getExpression()->dump();
           return entry->getContent()->getExpression();
         } else {
           ref<Expr> result = ZExtExpr::create(
               entry->getContent()->getExpression(), wpInterpolant->getWidth());
+
+      	llvm::outs()<<"Print-21\n";
+      	//result->dump();
           return result;
         }
       }
+      llvm::outs()<<"Are we reached here\n";
     } else {
+    	llvm::outs()<<"The entry part is null\n";
     }
-
-    wpInterpolant->dump();
-    klee_error("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel "
-               "Expression failed!");
+    llvm::outs()<<"Are we reached here-- before WP- Interpolants\n";
+   // wpInterpolant->dump();
+    //klee_error("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel "
+              // "Expression failed!");
     break;
   }
   default: {
