@@ -893,7 +893,7 @@ bool TxSubsumptionTableEntry::subsumed(
     }
   }
 
-  if (WPInterpolant) {
+  /*  if (WPInterpolant) {
     // In case a node is subsumed, the WP Expr is stored at the parent node.
     // This is crucial for generating WP Expr at the parent node.
     state.txTreeNode->setWPatSubsumption(wpInterpolant);
@@ -901,7 +901,7 @@ bool TxSubsumptionTableEntry::subsumed(
 
   return true;
 
-  // Ignoring deletion interpolant
+  // Ignoring deletion interpolant*/
 
   // PhiNode Check 1 (checking previous BB is the same at subsumption point)
   if (isa<llvm::PHINode>(state.pc->inst) &&

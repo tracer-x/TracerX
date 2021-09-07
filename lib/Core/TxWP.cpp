@@ -153,8 +153,8 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
 	if (entry->getWPInterpolant() == ConstantExpr::alloc(0, Expr::Bool))
 		entry->setWPInterpolant(ConstantExpr::alloc(1, Expr::Bool));
 
-	// vars(w)
-	/*std::set<std::string> wpVars;
+	 // vars(w)
+	 std::set<std::string> wpVars;
 	 if (!entry->getWPInterpolant().isNull())
 	 wpVars = TxPartitionHelper::getExprVars(entry->getWPInterpolant());
 
@@ -283,7 +283,7 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
 	 concretelyAddressedStore.erase((*it));
 	 }
 
-	 entry->setConcretelyAddressedStore(concretelyAddressedStore);*/
+	 entry->setConcretelyAddressedStore(concretelyAddressedStore);
 	return entry;
 }
 
