@@ -1223,7 +1223,7 @@ unsigned int TxWeakestPreCondition::getFunctionArgumentSize(
 		arg->dump();
 		arg->getType()->dump();
 		klee_error(
-				"TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
+				"TxWeakestPreCondition:: getting size is not "
 						"defined for this type yet");
 	}
 	return size;
@@ -1246,7 +1246,7 @@ unsigned int TxWeakestPreCondition::getGepSize(llvm::Type *ty) {
 		ty->dump();
 		klee_error(
 				"TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
-						"defined for this type yet");
+						"defined for this type yet--this");
 	}
 	return size;
 }
