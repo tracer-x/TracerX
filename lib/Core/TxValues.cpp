@@ -192,13 +192,13 @@ void TxVariable::print(llvm::raw_ostream &stream,
                        const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
-  stream << prefix << "function/value: ";
+  stream << prefix << "function/value name: ";
   if (outputFunctionName(allocInfo->getContext()->getValue(), stream))
     stream << "/";
   allocInfo->getContext()->getValue()->print(stream);
-  stream << "\n";
+  //stream << "\n";
 
-  stream << prefix << "stack:";
+ /* stream << prefix << "stack:";
   if (allocInfo->getContext()->getCallHistory().empty()) {
     stream << " (empty)\n";
   } else {
@@ -216,7 +216,7 @@ void TxVariable::print(llvm::raw_ostream &stream,
   if (!llvm::isa<ConstantExpr>(this->offset))
     stream << " (symbolic)";
   stream << ": ";
-  offset->print(stream);
+  offset->print(stream);*/ /*Commented for Pretty Print*/
 }
 
 /**/
@@ -633,11 +633,11 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
   std::string nextTabs = appendTab(prefix);
   bool offsetDisplayed = false;
 
-  stream << prefix << "function/value: ";
+  /*stream << prefix << "function/value: ";
   if (outputFunctionName(value, stream))
       stream << "/";
   value->print(stream);
-  stream << "\n";
+  stream << "\n";*/  /*Commented for Pretty Print*/
 
   if (!doNotUseBound && !allocationBounds.empty()) {
     stream << prefix << "BOUNDS:";
@@ -694,7 +694,7 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
     expr->print(stream);
   }
 
-  if (!coreReasons.empty()) {
+ /* if (!coreReasons.empty()) {
     stream << "\n";
     stream << prefix << "reason(s) for storage:\n";
     for (std::set<std::string>::const_iterator is = coreReasons.begin(),
@@ -704,7 +704,7 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
         stream << "\n";
       stream << nextTabs << *it;
     }
-  }
+  }*/ /*Commented for Pretty Print*/
 }
 
 /**/

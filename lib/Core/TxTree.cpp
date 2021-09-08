@@ -1598,9 +1598,10 @@ bool TxSubsumptionTableEntry::subsumed(
           }
 
           if (debugSubsumptionLevel >= 2) {
-            klee_message("Querying for subsumption check:\n%s",
+           /* klee_message("Querying for subsumption check:\n%s",
                          TxPrettyExpressionBuilder::constructQuery(
-                             state.constraints, expr).c_str());
+                             state.constraints, expr).c_str());*/ /*Commented for Pretty Print*/
+;
           }
 
           if (llvm::isa<ExistsExpr>(expr)) {
@@ -1634,9 +1635,10 @@ bool TxSubsumptionTableEntry::subsumed(
 
       } else {
         if (debugSubsumptionLevel >= 2) {
-          klee_message("Querying for subsumption check:\n%s",
+          /*klee_message("Querying for subsumption check:\n%s",
                        TxPrettyExpressionBuilder::constructQuery(
-                           state.constraints, expr).c_str());
+                           state.constraints, expr).c_str());*/ /*Commented for Pretty Print*/
+;
         }
         // We call the solver in the standard way if the
         // formula is unquantified.
@@ -1832,7 +1834,7 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
   }
   stream << "]";
 
-  stream << "\n" << prefix << "symbolically-addressed store = [";
+ /* stream << "\n" << prefix << "symbolically-addressed store = [";
   if (!symbolicallyAddressedStore.empty()) {
     stream << "\n";
     for (TxStore::TopInterpolantStore::const_iterator
@@ -1908,7 +1910,7 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
       stream << (*it)->name;
     }
   }
-  stream << "]";
+  stream << "]";*/  /*Commented for Pretty Print*/
 }
 
 void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream) const {

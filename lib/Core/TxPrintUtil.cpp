@@ -537,7 +537,7 @@ TxPrettyExpressionBuilder::constructQuery(ConstraintManager &constraints,
   std::string msg;
   std::string tabs = makeTabs(1);
   llvm::raw_string_ostream stream(msg);
-  stream << "antecedent:\n";
+  /*stream << "antecedent:\n";
   for (ConstraintManager::const_iterator it = constraints.begin(),
                                          ie = constraints.end();
        it != ie; ++it) {
@@ -545,7 +545,7 @@ TxPrettyExpressionBuilder::constructQuery(ConstraintManager &constraints,
   }
   stream << "consequent:\n";
   stream << tabs << construct(query) << "\n";
-  stream.flush();
+  stream.flush();*//*Commented for Pretty Print*/
   return msg;
 }
 
