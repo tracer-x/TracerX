@@ -1,4 +1,0 @@
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/regression/2007-10-11-illegal-access-after-free-and-branch.c:19: memory error: out of bound pointer
-KLEE: NOTE: now ignoring this error at this location
-KLEE: Memory cap NOT exceeded!
-

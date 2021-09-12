@@ -1,2 +1,0 @@
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/SilentKleeAssume.c:18: invalid klee_assume call (provably false)
-KLEE: NOTE: now ignoring this error at this location

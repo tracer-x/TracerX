@@ -1,6 +1,0 @@
-array x[4] : w32 -> w8 = symbolic
-array y[4] : w32 -> w8 = symbolic
-(query [(Ult 4294967295
-              (Add w64 (ZExt w64 (ReadLSB w32 0 x))
-                       (ZExt w64 (ReadLSB w32 0 y))))]
-        false)

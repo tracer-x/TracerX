@@ -1,3 +1,0 @@
-/home/sanghu/TracerX/tracerx/Release+Asserts/bin/klee -solver-backend=z3 --output-dir=/home/sanghu/TracerX/tracerx/test/Programs/Output/pcregrep.c.tmp.klee-out --libc=klee --exit-on-error /home/sanghu/TracerX/tracerx/test/Programs/Output/pcregrep.c.tmp1.bc 2 2
-PID: 6740
-Started: 2020-06-05 14:18:58

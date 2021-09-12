@@ -1,8 +1,0 @@
-array a[1] : w32 -> w8 = symbolic
-array t[4] : w32 -> w8 = symbolic
-(query [(Eq false
-             (Eq 0
-                 (ReadLSB w32 0 t)))
-         (Slt 97
-              (SExt w32 (Read w8 0 a)))]
-        false)

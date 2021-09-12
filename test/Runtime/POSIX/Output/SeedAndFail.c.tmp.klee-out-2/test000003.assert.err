@@ -1,8 +1,0 @@
-Error: ASSERTION FAIL: nbytes == sizeof("Hello")
-File: /home/sanghu/TracerX/tracerx/test/Runtime/POSIX/SeedAndFail.c
-Line: 22
-assembly.ll line: 288
-Stack: 
-	#000000288 in __user_main (argc=6, argv=64059872) at /home/sanghu/TracerX/tracerx/test/Runtime/POSIX/SeedAndFail.c:22
-	#100000672 in __uClibc_main (main=42401952, argc=6, argv=64059872, app_init=0, app_fini=0, rtld_fini=0, stack_end=0) at /home/sanghu/TracerX/klee-uclibc/libc/misc/internals/__uClibc_main.c:401
-	#200005716 in main (=6, =64059872)

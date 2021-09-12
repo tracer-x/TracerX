@@ -1,4 +1,0 @@
-KLEE: ERROR: (location information missing) wrong size given to klee_make_symbolic[_name]
-KLEE: NOTE: now ignoring this error at this location
-KLEE: Memory cap NOT exceeded!
-

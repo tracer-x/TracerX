@@ -1,6 +1,0 @@
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/OvershiftCheck.c:20: overshift error
-KLEE: NOTE: now ignoring this error at this location
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/OvershiftCheck.c:24: overshift error
-KLEE: NOTE: now ignoring this error at this location
-KLEE: Memory cap NOT exceeded!
-

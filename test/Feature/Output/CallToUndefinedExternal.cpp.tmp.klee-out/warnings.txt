@@ -1,2 +1,0 @@
-KLEE: WARNING: undefined reference to function: poof
-KLEE: WARNING ONCE: calling external: poof()

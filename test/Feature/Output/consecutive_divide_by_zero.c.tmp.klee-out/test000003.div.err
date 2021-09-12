@@ -1,7 +1,0 @@
-Error: divide by zero
-File: /home/sanghu/TracerX/tracerx/test/Feature/consecutive_divide_by_zero.c
-Line: 28
-assembly.ll line: 40
-Stack: 
-	#000000057 in klee_div_zero_check (z) at /home/sanghu/TracerX/tracerx/runtime/Intrinsic/klee_div_zero_check.c:14
-	#100000040 in main () at /home/sanghu/TracerX/tracerx/test/Feature/consecutive_divide_by_zero.c:28

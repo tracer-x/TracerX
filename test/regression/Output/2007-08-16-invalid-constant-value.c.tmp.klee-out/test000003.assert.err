@@ -1,3 +1,0 @@
-Error: ASSERTION FAIL: !klee_is_symbolic(a)
-Stack: 
-	#000000062 in main ()

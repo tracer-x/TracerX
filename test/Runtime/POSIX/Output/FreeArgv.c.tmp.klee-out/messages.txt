@@ -1,8 +1,0 @@
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Runtime/POSIX/FreeArgv.c:13: free of global
-KLEE: NOTE: now ignoring this error at this location
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Runtime/POSIX/FreeArgv.c:17: free of global
-KLEE: NOTE: now ignoring this error at this location
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Runtime/POSIX/FreeArgv.c:21: free of global
-KLEE: NOTE: now ignoring this error at this location
-KLEE: Memory cap NOT exceeded!
-

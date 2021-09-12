@@ -1,6 +1,0 @@
-Error: failed external call: poof
-File: /home/sanghu/TracerX/tracerx/test/Feature/CallToUndefinedExternal.cpp
-Line: 10
-assembly.ll line: 19
-Stack: 
-	#000000019 in main () at /home/sanghu/TracerX/tracerx/test/Feature/CallToUndefinedExternal.cpp:10

@@ -1,2 +1,0 @@
-KLEE: WARNING ONCE: __cxa_atexit: FIXME: __cxa_atexit being ignored
-KLEE: WARNING ONCE: skipping fork (max-forks reached)

@@ -1,1 +1,0 @@
-KLEE: WARNING ONCE: function "main" has inline asm

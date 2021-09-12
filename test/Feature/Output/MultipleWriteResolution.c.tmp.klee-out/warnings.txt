@@ -1,5 +1,0 @@
-KLEE: WARNING: undefined reference to function: fflush
-KLEE: WARNING: undefined reference to function: printf
-KLEE: WARNING: undefined reference to variable: stdout
-KLEE: WARNING ONCE: calling external: printf(61704552)
-KLEE: WARNING ONCE: calling external: fflush(140607678547488)

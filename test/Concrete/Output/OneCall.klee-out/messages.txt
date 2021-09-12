@@ -1,2 +1,0 @@
-KLEE: Memory cap NOT exceeded!
-

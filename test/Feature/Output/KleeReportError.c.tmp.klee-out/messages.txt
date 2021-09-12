@@ -1,4 +1,0 @@
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/KleeReportError.c:23: My error
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/KleeReportError.c:23: My error
-KLEE: Memory cap NOT exceeded!
-

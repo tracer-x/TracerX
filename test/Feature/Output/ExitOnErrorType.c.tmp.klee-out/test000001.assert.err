@@ -1,6 +1,0 @@
-Error: ASSERTION FAIL: klee_int("assert")
-File: /home/sanghu/TracerX/tracerx/test/Feature/ExitOnErrorType.c
-Line: 9
-assembly.ll line: 31
-Stack: 
-	#000000031 in main () at /home/sanghu/TracerX/tracerx/test/Feature/ExitOnErrorType.c:9

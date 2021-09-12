@@ -1,9 +1,0 @@
-EVALUATEINPUTAST
-EvaluateInputAST
-Query 0:	VALID (counterexample request ignored)
---
-total queries = 1
-total queries constructs = 30
-valid queries = 1
-invalid queries = 0
-query cex = 1

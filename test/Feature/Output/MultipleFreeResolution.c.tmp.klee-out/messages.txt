@@ -1,5 +1,0 @@
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/MultipleFreeResolution.c:40: memory error: out of bound pointer
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/MultipleFreeResolution.c:40: memory error: out of bound pointer
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Feature/MultipleFreeResolution.c:40: memory error: out of bound pointer
-KLEE: Memory cap NOT exceeded!
-

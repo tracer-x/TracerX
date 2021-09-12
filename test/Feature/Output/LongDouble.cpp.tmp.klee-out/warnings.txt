@@ -1,5 +1,0 @@
-KLEE: WARNING: undefined reference to function: __errno_location
-KLEE: WARNING: undefined reference to function: powl
-KLEE: WARNING: undefined reference to function: printf
-KLEE: WARNING ONCE: calling external: powl(906743940335669975449600, 302222231531620438900736)
-KLEE: WARNING ONCE: calling external: printf(64310272, (ReadLSB w32 0 x), 906743940335669975449600)

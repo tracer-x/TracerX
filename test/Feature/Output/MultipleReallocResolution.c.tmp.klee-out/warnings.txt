@@ -1,3 +1,0 @@
-KLEE: WARNING: using default handler for external function realloc
-KLEE: WARNING: using default handler for external function realloc
-KLEE: WARNING: using default handler for external function realloc

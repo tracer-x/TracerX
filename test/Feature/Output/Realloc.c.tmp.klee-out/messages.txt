@@ -1,2 +1,0 @@
-KLEE: ERROR: (location information missing) memory error: out of bound pointer
-KLEE: NOTE: now ignoring this error at this location

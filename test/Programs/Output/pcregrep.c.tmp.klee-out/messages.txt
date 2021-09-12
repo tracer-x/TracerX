@@ -1,2 +1,0 @@
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/runtime/klee-libc/strtol.c:63: memory error: out of bound pointer
-KLEE: NOTE: now ignoring this error at this location

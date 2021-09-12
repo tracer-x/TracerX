@@ -1,4 +1,0 @@
-Error: divide by zero
-Stack: 
-	#000000080 in klee_div_zero_check (z) at /home/sanghu/TracerX/tracerx/runtime/Intrinsic/klee_div_zero_check.c:14
-	#100000037 in main ()
