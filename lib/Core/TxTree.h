@@ -519,18 +519,6 @@ class TxTreeNode {
     return new TxTreeNode(0, targetData, globalAddresses);
   }
 
-  TxTreeNode *createLeftChild() {
-    left = new TxTreeNode(this, targetData, globalAddresses);
-    dependency->setLeftChild(left->dependency);
-    return left;
-  }
-
-  TxTreeNode *createRightChild() {
-    right = new TxTreeNode(this, targetData, globalAddresses);
-    dependency->setRightChild(right->dependency);
-    return right;
-  }
-
 public:
   bool isSubsumed;
 
@@ -615,6 +603,20 @@ public:
 
   /// \brief Returning the right node
   TxTreeNode *getRight() { return right; }
+  
+  template<TxTreeNode* TxTreeNode::* const childAttr>
+  TxTreeNode *createChild() {
+    TxTreeNode *const child = new TxTreeNode(this, targetData, globalAddresses);
+    this->*childAttr = child;
+    void (TxDependency::*depSetChildFn)(TxDependency*) = NULL;
+    if(childAttr == &TxTreeNode::left) {
+        depSetChildFn = &TxDependency::setLeftChild;
+    } else if(childAttr == &TxTreeNode::right) {
+        depSetChildFn = &TxDependency::setRightChild;
+    }
+    (dependency->*depSetChildFn)(child->dependency);
+    return child;
+  }
 
   /// \brief Store the solver and unsatcore temporarily, so they can be used for
   /// markings if speculation fails
@@ -968,6 +970,8 @@ public:
   void markPathConditionWithBrInst(llvm::BranchInst *binst,
                                    std::vector<ref<Expr> > &unsatCore);
 
+  TxTreeNode * splitSingle(TxTreeNode *parent, ExecutionState *newState);
+  
   /// \brief Creates fresh interpolation data holder for the two given KLEE
   /// execution states.
   /// This member function is to be invoked after KLEE splits its own state due
