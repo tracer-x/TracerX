@@ -1,4 +1,0 @@
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/Runtime/POSIX/SeedAndFail.c:20: ASSERTION FAIL: fd != -1
-KLEE: NOTE: now ignoring this error at this location
-KLEE: Memory cap NOT exceeded!
-

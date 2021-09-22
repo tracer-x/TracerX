@@ -1,2 +1,0 @@
-# Query 7
-(query [] false [(Not (Extract 1 (Read w8 0 a)))])

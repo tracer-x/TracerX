@@ -1,3 +1,0 @@
-/home/sanghu/TracerX/tracerx/Release+Asserts/bin/klee -solver-backend=z3 --output-dir=/home/sanghu/TracerX/tracerx/test/Feature/Output/const_array_opt1.c.tmp.klee-out --const-array-opt --max-time=10 --only-output-states-covering-new /home/sanghu/TracerX/tracerx/test/Feature/Output/const_array_opt1.c.tmp.bc
-PID: 6671
-Started: 2020-06-05 14:18:55

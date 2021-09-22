@@ -1,7 +1,0 @@
-Error: overshift error
-File: /home/sanghu/TracerX/tracerx/test/Feature/OvershiftCheck.c
-Line: 24
-assembly.ll line: 37
-Stack: 
-	#000000082 in klee_overshift_check (bitWidth=32, shift) at /home/sanghu/TracerX/tracerx/runtime/Intrinsic/klee_overshift_check.c:27
-	#100000037 in main () at /home/sanghu/TracerX/tracerx/test/Feature/OvershiftCheck.c:24

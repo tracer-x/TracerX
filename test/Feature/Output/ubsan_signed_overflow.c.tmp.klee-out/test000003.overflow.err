@@ -1,6 +1,0 @@
-Error: overflow on unsigned multiplication
-File: /home/sanghu/TracerX/tracerx/test/Feature/ubsan_signed_overflow.c
-Line: 26
-assembly.ll line: 100
-Stack: 
-	#000000100 in main () at /home/sanghu/TracerX/tracerx/test/Feature/ubsan_signed_overflow.c:26

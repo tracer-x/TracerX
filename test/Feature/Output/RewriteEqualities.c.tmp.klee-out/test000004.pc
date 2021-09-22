@@ -1,4 +1,0 @@
-array x[4] : w32 -> w8 = symbolic
-(query [(Sle 10
-              (ZExt w32 (Read w8 2 x)))]
-        false)

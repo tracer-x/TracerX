@@ -1,3 +1,0 @@
-KLEE: WARNING: undefined reference to function: _ZSt9terminatev
-KLEE: WARNING: undefined reference to function: __cxa_begin_catch
-KLEE: WARNING: undefined reference to function: __gxx_personality_v0

@@ -1,6 +1,0 @@
-Error: My error
-File: /home/sanghu/TracerX/tracerx/test/Feature/KleeReportError.c
-Line: 23
-assembly.ll line: 61
-Stack: 
-	#000000061 in main (argc=1, argv=58698752) at /home/sanghu/TracerX/tracerx/test/Feature/KleeReportError.c:23

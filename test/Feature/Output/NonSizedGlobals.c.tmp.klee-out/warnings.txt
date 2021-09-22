@@ -1,3 +1,0 @@
-KLEE: WARNING: undefined reference to variable: Y
-KLEE: WARNING: Type for Y is not sized
-KLEE: WARNING: Unable to find size for global variable: Y (use will result in out of bounds access)

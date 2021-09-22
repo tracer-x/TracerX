@@ -1,3 +1,0 @@
-Error: wrong size given to klee_make_symbolic[_name]
-Stack: 
-	#000000028 in main ()

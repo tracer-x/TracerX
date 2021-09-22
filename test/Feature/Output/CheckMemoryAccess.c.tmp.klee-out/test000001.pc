@@ -1,5 +1,0 @@
-array range1[4] : w32 -> w8 = symbolic
-(query [(Ult N0:(ReadLSB w32 0 range1)
-              2)
-         (Eq false (Eq 0 N0))]
-        false)

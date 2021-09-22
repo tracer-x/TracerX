@@ -1,9 +1,0 @@
-KLEE: WARNING: undefined reference to function: fcntl
-KLEE: WARNING: undefined reference to function: fstat
-KLEE: WARNING: undefined reference to function: ioctl
-KLEE: WARNING: undefined reference to function: open
-KLEE: WARNING: undefined reference to function: write
-KLEE: WARNING ONCE: calling external: ioctl(0, 21505, 40582512)
-KLEE: WARNING ONCE: calling __user_main with extra arguments.
-KLEE: WARNING: using default handler for external function realloc
-KLEE: WARNING ONCE: calling boo with extra arguments.

@@ -1,6 +1,0 @@
-Error: ASSERTION FAIL: -1 % y == -1
-File: /home/sanghu/TracerX/tracerx/test/Feature/srem.c
-Line: 32
-assembly.ll line: 161
-Stack: 
-	#000000161 in main (argc=1, argv=60099872) at /home/sanghu/TracerX/tracerx/test/Feature/srem.c:32

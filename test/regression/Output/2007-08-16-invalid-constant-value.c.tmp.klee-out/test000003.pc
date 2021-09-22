@@ -1,8 +1,0 @@
-array unnamed[1] : w32 -> w8 = symbolic
-(query [(Eq false
-             (Eq 43981
-                 (Concat w16 (Add w8 205 N0:(Read w8 0 unnamed))
-                             (w8 205))))
-         (Eq 43981
-             (Concat w16 (Sub w8 11 N0) (w8 205)))]
-        false)

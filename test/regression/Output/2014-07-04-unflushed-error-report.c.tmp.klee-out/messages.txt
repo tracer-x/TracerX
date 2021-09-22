@@ -1,4 +1,0 @@
-KLEE: ERROR: /home/sanghu/TracerX/tracerx/test/regression/2014-07-04-unflushed-error-report.c:23: overshift error
-KLEE: NOTE: now ignoring this error at this location
-KLEE: Memory cap NOT exceeded!
-
