@@ -2384,6 +2384,11 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       int debugSubsumptionLevel = node->dependency->debugSubsumptionLevel;
 
       if (debugSubsumptionLevel >= 2) {
+	llvm::outs()<<"\n------------------Printing Block Starts------------------\n";
+	llvm::outs()<<node->basicBlock->getName(); // Arpi Change
+    	node->basicBlock->dump();
+	llvm::outs()<<"------------------Printing Block Ends------------------\n\n\n";
+        //node->getParent()->basicBlock->dump();
         klee_message("Storing entry for Node #%lu, Program Point %lu",
                      node->getNodeSequenceNumber(), node->getProgramPoint());
       } else if (debugSubsumptionLevel >= 1) {
