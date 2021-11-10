@@ -73,14 +73,14 @@ class TxSubsumptionTable {
 
       void print(llvm::raw_ostream &stream) const;
 
-      void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
+      void print(llvm::raw_ostream &stream, const unsigned paddingAmount, int debugSubsumptionLevel) const;
 
-      void print(llvm::raw_ostream &stream, const std::string &prefix) const;
+      void print(llvm::raw_ostream &stream, const std::string &prefix, int debugSubsumptionLevel) const;
     };
 
     Node *root;
 
-    void printNode(llvm::raw_ostream &stream, Node *n, std::string edges) const;
+    void printNode(llvm::raw_ostream &stream, Node *n, std::string edges, int debugSubsumptionLevel) const;
 
   public:
     CallHistoryIndexedTable() { root = new Node(0); }
@@ -380,9 +380,9 @@ public:
 
   void print(llvm::raw_ostream &stream) const;
 
-  void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
+  void print(llvm::raw_ostream &stream, const unsigned paddingAmount, int debugSubsumptionLevel) const;
 
-  void print(llvm::raw_ostream &stream, const std::string &prefix) const;
+  void print(llvm::raw_ostream &stream, const std::string &prefix, int debugSubsumptionLevel) const;
 
   void printWP(llvm::raw_ostream &stream) const;
 
@@ -507,7 +507,7 @@ class TxTreeNode {
   void execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args,
                bool symbolicExecutionError);
 
-  void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
+  void print(llvm::raw_ostream &stream, const unsigned paddingAmount, int debugSubsumptionLevel) const;
 
   TxTreeNode(TxTreeNode *_parent, llvm::DataLayout *_targetData,
              std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
@@ -877,7 +877,7 @@ class TxTree {
   std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
 
   void printNode(llvm::raw_ostream &stream, TxTreeNode *n,
-                 std::string edges) const;
+                 std::string edges, int debugSubsumptionLevel) const;
 
   /// \brief Displays member functions running time statistics
   static void printTimeStat(std::stringstream &stream);

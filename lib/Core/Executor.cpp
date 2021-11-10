@@ -2857,16 +2857,12 @@ static inline const llvm::fltSemantics *fpWidthToSemantics(unsigned width) {
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
   // if this is starting a new BB then
-  // check for non-linear & new BB in speculation mode
-  
+  // check for non-linear & new BB in speculation mode  
   if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
       txTree->isSpeculationNode() &&
       (i == &state.txTreeNode->getBasicBlock()->front())) {
     // check non-linear
     uintptr_t pp = state.txTreeNode->getProgramPoint();
-//i->dump();
-//klee_message("Arpi:Storing entry for Node #%lu, Program Point %lu",
-                     // state.txTreeNode->getNodeSequenceNumber(), state.txTreeNode->getProgramPoint());
     bool isPPVisited = (state.txTreeNode->visitedProgramPoints->find(pp) !=
                         state.txTreeNode->visitedProgramPoints->end());
     if (isPPVisited) {

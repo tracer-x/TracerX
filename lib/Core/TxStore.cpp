@@ -824,7 +824,7 @@ bool TxStore::markPointerFlow(ref<TxStateValue> target,
 }
 
 /// \brief Print the content of the object to the LLVM error stream
-void TxStore::print(llvm::raw_ostream &stream) const { this->print(stream, 0); }
+void TxStore::print(llvm::raw_ostream &stream) const { this->print(stream); }
 
 void TxStore::print(llvm::raw_ostream &stream,
                     const unsigned paddingAmount) const {

@@ -533,11 +533,12 @@ std::string TxPrettyExpressionBuilder::construct(ref<Expr> e) {
 
 std::string
 TxPrettyExpressionBuilder::constructQuery(ConstraintManager &constraints,
-                                          ref<Expr> query) {
+                                          ref<Expr> query, int debugSubsumptionLevel) {  // Added 'debugSubsumptionLevel' variable for PrettyPrint
   std::string msg;
   std::string tabs = makeTabs(1);
   llvm::raw_string_ostream stream(msg);
-  /*stream << "antecedent:\n";
+  if (debugSubsumptionLevel>3){ /*Added 'debugSubsumptionLevel' varaible here for Pretty Print*/
+  stream << "antecedent:\n";
   for (ConstraintManager::const_iterator it = constraints.begin(),
                                          ie = constraints.end();
        it != ie; ++it) {
@@ -545,7 +546,7 @@ TxPrettyExpressionBuilder::constructQuery(ConstraintManager &constraints,
   }
   stream << "consequent:\n";
   stream << tabs << construct(query) << "\n";
-  stream.flush();*//*Commented for Pretty Print*/
+  stream.flush();} 
   return msg;
 }
 
