@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TxStore.h"
+#include "TxTree.h"
 
 #include "klee/Internal/Module/TxValues.h"
 #include "klee/Internal/Support/ErrorHandling.h"
@@ -39,19 +40,24 @@ namespace klee {
 bool concreteBound(uint64_t bound) { return bound < symbolicBoundId; }
 
 /**/
-
+int debugSubsumptionLevel_g=0;
+void setDebugSubsumptionLevelTxValue(int debugSubsumptionLevel)
+{
+    debugSubsumptionLevel_g=debugSubsumptionLevel;
+}
 void TxStoreEntry::print(llvm::raw_ostream &stream,
                          const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
   std::string tabsNextNext = appendTab(tabsNext);
-
- /* stream << prefix << "creation depth: " << depth << "\n";*/ /*For prettyPrint*/
+  if (debugSubsumptionLevel_g>=4){
+  stream << prefix << "creation depth: " << depth << "\n";} /*For prettyPrint*/
   stream << prefix << "address:\n";
   address->print(stream, tabsNext);
   stream << "\n";
   stream << prefix << "content:\n";
   if (leftCore && rightCore) {
-   /* stream << tabsNext << "a left and right interpolant value:\n";*/  /*For prettyPrint*/
+  if (debugSubsumptionLevel_g>=4){
+    stream << tabsNext << "a left and right interpolant value:\n"; } /*For prettyPrint*/
     for (std::set<std::string>::iterator it = leftCoreReasons.begin(),
                                          ie = leftCoreReasons.end();
          it != ie; ++it) {
@@ -63,24 +69,28 @@ void TxStoreEntry::print(llvm::raw_ostream &stream,
       stream << tabsNextNext << *it << "\n";
     }
   } else if (leftCore) {
-     /* stream << tabsNext << "a left and right interpolant value:\n";*/  /*For prettyPrint*/
+  if (debugSubsumptionLevel_g>=4){
+     stream << tabsNext << "a left and right interpolant value:\n"; } /*For prettyPrint*/
     for (std::set<std::string>::iterator it = leftCoreReasons.begin(),
                                          ie = leftCoreReasons.end();
          it != ie; ++it) {
       stream << tabsNextNext << *it << "\n";
     }
   } else if (rightCore) {
-   /* stream << tabsNext << "a right interpolant value:\n";*/  /*For prettyPrint*/
+  if (debugSubsumptionLevel_g>=4){
+    stream << tabsNext << "a right interpolant value:\n";}  /*For prettyPrint*/
     for (std::set<std::string>::iterator it = rightCoreReasons.begin(),
                                          ie = rightCoreReasons.end();
          it != ie; ++it) {
       stream << tabsNextNext << *it << "\n";
     }
   } else {
-    /*stream << tabsNext << "a non-interpolant value:\n";*/  /*For prettyPrint*/
+   if (debugSubsumptionLevel_g>=4){
+    stream << tabsNext << "a non-interpolant value:\n";}  /*For prettyPrint*/
   }
   content->printMinimal(stream, tabsNext);
-  /*if (!leftPointerInfo.isNull()) {
+  if (debugSubsumptionLevel_g>=4){
+  if (!leftPointerInfo.isNull()) {
     stream << "\n";
     stream << tabsNext << "left pointer info:\n";
     leftPointerInfo->print(stream, tabsNextNext);
@@ -89,7 +99,7 @@ void TxStoreEntry::print(llvm::raw_ostream &stream,
     stream << "\n";
     stream << tabsNext << "right pointer info:\n";
     rightPointerInfo->print(stream, tabsNextNext);
-  }*/  /*For prettyPrint*/
+  } } /*For prettyPrint*/
 }
 
 /**/
@@ -196,9 +206,9 @@ void TxVariable::print(llvm::raw_ostream &stream,
   if (outputFunctionName(allocInfo->getContext()->getValue(), stream))
     stream << "/";
   allocInfo->getContext()->getValue()->print(stream);
-  //stream << "\n";
-
- /* stream << prefix << "stack:";
+  if (debugSubsumptionLevel_g>=4){
+  stream << "\n";
+  stream << prefix << "stack:";
   if (allocInfo->getContext()->getCallHistory().empty()) {
     stream << " (empty)\n";
   } else {
@@ -216,7 +226,7 @@ void TxVariable::print(llvm::raw_ostream &stream,
   if (!llvm::isa<ConstantExpr>(this->offset))
     stream << " (symbolic)";
   stream << ": ";
-  offset->print(stream);*/ /*Commented for Pretty Print*/
+  offset->print(stream);} /*Commented for Pretty Print*/
 }
 
 /**/
@@ -632,12 +642,12 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
                                const std::string &prefix) const {
   std::string nextTabs = appendTab(prefix);
   bool offsetDisplayed = false;
-
-  /*stream << prefix << "function/value: ";
+  if (debugSubsumptionLevel_g>=4){
+  stream << prefix << "function/value: ";
   if (outputFunctionName(value, stream))
       stream << "/";
   value->print(stream);
-  stream << "\n";*/  /*Commented for Pretty Print*/
+  stream << "\n"; } /*For Pretty Print*/
 
   if (!doNotUseBound && !allocationBounds.empty()) {
     stream << prefix << "BOUNDS:";
@@ -694,7 +704,8 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
     expr->print(stream);
   }
 
- /* if (!coreReasons.empty()) {
+  if (debugSubsumptionLevel_g>=4){
+   if (!coreReasons.empty()) {
     stream << "\n";
     stream << prefix << "reason(s) for storage:\n";
     for (std::set<std::string>::const_iterator is = coreReasons.begin(),
@@ -704,7 +715,8 @@ void TxInterpolantValue::print(llvm::raw_ostream &stream,
         stream << "\n";
       stream << nextTabs << *it;
     }
-  }*/ /*Commented for Pretty Print*/
+   }
+  } /*Commented for Pretty Print*/
 }
 
 /**/
@@ -795,7 +807,8 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
   std::string tabsNext = appendTab(prefix);
 
   variable->print(stream, prefix);
-  /*stream << "\n";
+  if (debugSubsumptionLevel_g>=4){
+  stream << "\n";
   stream << prefix << "address";
   if (!llvm::isa<ConstantExpr>(address))
     stream << " (symbolic)";
@@ -817,7 +830,7 @@ void TxStateAddress::print(llvm::raw_ostream &stream,
   else
     stream << concreteOffsetBound;
   stream << "\n";
-  stream << prefix << "size: " << size;*/ /*For prettyPrint*/
+  stream << prefix << "size: " << size;} /*For prettyPrint*/
 }
 
 /**/
@@ -922,20 +935,21 @@ void TxStateValue::print(llvm::raw_ostream &stream,
 void TxStateValue::printMinimal(llvm::raw_ostream &stream,
                                 const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
-
-  /*stream << prefix << "function/value: ";
-  if (outputFunctionName(value, stream))
-    stream << "/";
-  value->print(stream);
-  stream << "\n";*/
+  if (debugSubsumptionLevel_g>=4){
+   stream << prefix << "function/value: ";
+   if (outputFunctionName(value, stream))
+     stream << "/";
+   value->print(stream);
+   stream << "\n";}  /*For prettyPrint*/
   stream << prefix << "expression: ";
   if (!valueExpr.isNull())
     valueExpr->print(stream);
   else
     stream << "NULL";
   stream << "\n";
-  /*stream << prefix
-         << "pointer to location object: " << reinterpret_cast<uintptr_t>(this);*/ /*For prettyPrint*/
+  if (debugSubsumptionLevel_g>=4){
+   stream << prefix
+         << "pointer to location object: " << reinterpret_cast<uintptr_t>(this); }/*For prettyPrint*/
 }
 
 /**/

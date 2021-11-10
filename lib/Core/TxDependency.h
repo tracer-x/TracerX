@@ -17,6 +17,7 @@
 #ifndef KLEE_DEPENDENCY_H
 #define KLEE_DEPENDENCY_H
 
+
 #include "TxPathCondition.h"
 #include "TxStore.h"
 
@@ -586,7 +587,7 @@ public:
   /// \param stream The stream to print the data to.
   /// \param paddingAmount The number of whitespaces to be printed before each
   /// line.
-  void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
+  void print(llvm::raw_ostream &stream, const unsigned paddingAmount, int debugSubsumptionLevel) const;
 };
 }
 
