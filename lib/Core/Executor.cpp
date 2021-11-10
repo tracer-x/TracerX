@@ -2857,7 +2857,7 @@ static inline const llvm::fltSemantics *fpWidthToSemantics(unsigned width) {
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
   // if this is starting a new BB then
-  // check for non-linear & new BB in speculation mode
+  // check for non-linear & new BB in speculation mode  
   if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
       txTree->isSpeculationNode() &&
       (i == &state.txTreeNode->getBasicBlock()->front())) {

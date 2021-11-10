@@ -47,6 +47,7 @@ class TxStoreEntry;
 class TxStore;
 
 const uint64_t symbolicBoundId = ULONG_MAX;
+void setDebugSubsumptionLevelTxValue(int debugSubsumptionLevel);
 
 class TxAllocationContext {
 
@@ -626,7 +627,8 @@ public:
   ///
   /// \param stream The stream to print the data to.
   /// \param prefix Padding spaces to print before the actual data.
-  void print(llvm::raw_ostream &stream, const std::string &prefix) const;
+  void print(llvm::raw_ostream &stream, const std::string &prefix, int debug) const;
+void print(llvm::raw_ostream &stream, const std::string &prefix) const;
 };
 
 /// \brief A class that represents LLVM value that can be destructively

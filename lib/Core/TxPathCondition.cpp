@@ -197,11 +197,11 @@ ref<Expr> TxPathCondition::packInterpolant(
 }
 
 void TxPathCondition::print(llvm::raw_ostream &stream) const {
-  print(stream, 0);
+  print(stream, 0, 0);
 }
 
 void TxPathCondition::print(llvm::raw_ostream &stream,
-                            const unsigned paddingAmount) const {
+                            const unsigned paddingAmount, int debugSubsumptionLevel) const {
   std::string tabs = makeTabs(paddingAmount);
   std::string tabsNext = appendTab(tabs);
 

@@ -14,6 +14,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+
 #include "TxDependency.h"
 
 #include "Context.h"
@@ -44,7 +45,6 @@
 using namespace klee;
 
 namespace klee {
-
 bool TxDependency::isMainArgument(const llvm::Value *loc) {
   const llvm::Argument *vArg = llvm::dyn_cast<llvm::Argument>(loc);
 
@@ -305,10 +305,13 @@ TxDependency::TxDependency(
     std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *_globalAddresses)
     : parent(parent), left(0), right(0), targetData(_targetData),
       globalAddresses(_globalAddresses) {
+
+
   if (parent) {
     pathCondition = TxPathCondition::create(parent->pathCondition);
     store = TxStore::create(parent->store);
     debugSubsumptionLevel = parent->debugSubsumptionLevel;
+    setDebugSubsumptionLevelTxValue(debugSubsumptionLevel);
     debugStateLevel = parent->debugStateLevel;
   } else {
     pathCondition = TxPathCondition::create(0);
@@ -316,9 +319,11 @@ TxDependency::TxDependency(
 #ifdef ENABLE_Z3
     debugSubsumptionLevel = DebugSubsumption;
     debugStateLevel = DebugState;
+    setDebugSubsumptionLevelTxValue(debugSubsumptionLevel);
 #else
     debugSubsumptionLevel = 0;
     debugStateLevel = 0;
+    setDebugSubsumptionLevelTxValue(debugSubsumptionLevel);
 #endif
   }
 }
@@ -1576,21 +1581,21 @@ ref<TxStateValue> TxDependency::evalConstantExpr(
 
 /// \brief Print the content of the object to the LLVM error stream
 void TxDependency::print(llvm::raw_ostream &stream) const {
-  this->print(stream, 0);
+  this->print(stream);
 }
 
 void TxDependency::print(llvm::raw_ostream &stream,
-                         const unsigned paddingAmount) const {
+                         const unsigned paddingAmount, int debugSubsumptionLevel) const {
   std::string tabs = makeTabs(paddingAmount);
 
-  pathCondition->print(stream, paddingAmount);
+  pathCondition->print(stream, paddingAmount, debugSubsumptionLevel);
   stream << "\n";
 
   store->print(stream, paddingAmount);
 
   if (parent) {
     stream << tabs << "\n--------- Parent Dependencies ----------\n";
-    parent->print(stream, paddingAmount);
+    parent->print(stream, paddingAmount, debugSubsumptionLevel);
   }
 }
 }
