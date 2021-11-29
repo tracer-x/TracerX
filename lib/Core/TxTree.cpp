@@ -3011,19 +3011,25 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
       llvm::outs()<<"Are we reached here\n";
     } else {
     	llvm::outs()<<"The entry part is null\n";
-    	llvm::outs()<<alc;
+    	//llvm::outs()<<alc;//for make
     }
     llvm::outs()<<"Are we reached here-- before WP- Interpolants\n";
-   // wpInterpolant->dump();
+     ref<Expr> dummy;
+     return dummy;
+    //wpInterpolant->dump();
     //klee_error("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel "
               // "Expression failed!");
+    //return wpInterpolant;
     break;
   }
   default: {
-    wpInterpolant->dump();
-    klee_error("TxWPHelper::instantiateWPatSubsumption: Expression not "
-               "supported yet!");
-    return wpInterpolant;
+	
+     ref<Expr> dummy;
+     return dummy;
+     //wpInterpolant->dump();
+     //klee_error("TxWPHelper::instantiateWPatSubsumption: Expression not "
+     //          "supported yet!");
+     //return wpInterpolant;
   }
   }
 }
