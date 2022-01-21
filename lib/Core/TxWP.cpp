@@ -657,8 +657,10 @@ ref<Expr> TxWeakestPreCondition::getConstantExpr(llvm::ConstantExpr *ce) {
 		break;
 	}
 	default: {
-		klee_warning(
-				"TxWeakestPreCondition::getConstantExpr: ConstantExpr is not support");
+		//klee_warning(
+				//"TxWeakestPreCondition::getConstantExpr: ConstantExpr is not support");
+		ref<Expr> dummy;
+     		return dummy;
 		ce->dump();
 	}
 	}
