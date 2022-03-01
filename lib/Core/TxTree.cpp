@@ -2857,7 +2857,6 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
              return result;
            }
          }
-
     }
     // wpInterpolant->dump();
     // dependency->getStore()->dump();

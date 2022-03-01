@@ -316,10 +316,50 @@ TxStore::getAddressofLatestCopyLLVMValue(llvm::Value *val) {
       }
     }
   }
-  llvm::outs()<<"lets\n";
-//address->dump();
-llvm::outs()<<"lets\n";
+//  llvm::outs()<<"lets\n";
+////address->dump();
+//llvm::outs()<<"lets\n";
   // Maybe NULL
+//---- 18/02/2022----
+//if(address==NULL){
+//	 for (LowerStateStore::const_iterator
+//	           it = concretelyAddressedHistoricalStore.begin(),
+//	           ie = concretelyAddressedHistoricalStore.end();
+//	       it != ie; ++it) {
+////
+//		 ref<TxAllocationContext> temp = (*it).second;
+////		     //llvm::outs()<<"Address-01\n";
+//		     if (temp->getValue() == val) {
+////		       if (!foundValue) {
+//		         address = temp;
+////		         foundValue = true;
+////		       }
+//	     }
+//	  }
+////
+//}
+
+//if(address==NULL){
+//	 for (LowerStateStore::const_iterator
+//	           it = symbolicallyAddressedHistoricalStore.begin(),
+//	           ie = symbolicallyAddressedHistoricalStore.end();
+//	       it != ie; ++it) {
+//
+//		 ref<TxAllocationContext> temp = (*it).first;
+//		     //llvm::outs()<<"Address-01\n";
+//		     if (temp->getValue() == val) {
+//		       if (!foundValue) {
+//		         address = temp;
+//		         foundValue = true;
+//		       } else if (temp->getCallHistory().size() >
+//		                  address->getCallHistory().size()) {
+//		         address = temp;
+//		       }
+//		     }
+//	  }
+//
+//}
+//------------------------
   return address;
 }
 
