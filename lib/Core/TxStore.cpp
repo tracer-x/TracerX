@@ -323,6 +323,26 @@ llvm::outs()<<"lets\n";
   return address;
 }
 
+ref<TxStoreEntry> TxStore::getAddressofLatestCopyLLVMValueFromHistoricalStore(llvm::Value *val){
+ref<TxStoreEntry> address;
+ bool foundValue = false;
+for (LowerStateStore::const_iterator
+          it = symbolicallyAddressedHistoricalStore.begin(),
+          ie = symbolicallyAddressedHistoricalStore.end();
+      it != ie; ++it) {
+
+ref<TxStoreEntry> temp = (*it).second;
+    //llvm::outs()<<"Address-01\n";
+    if (temp->getValue() == val) {
+      if (!foundValue) {
+        address = temp;
+        foundValue = true;
+      }
+    }
+}
+return address;
+}
+
 inline void TxStore::concreteToInterpolant(
     ref<TxVariable> variable, ref<TxStoreEntry> entry,
     const std::map<ref<Expr>, ref<Expr> > &substitution,
