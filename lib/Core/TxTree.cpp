@@ -2842,6 +2842,22 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
           return result;
         }
       }
+    } else {
+    	//Checking the historical values
+    	  ref<TxStoreEntry> entry;
+    	      entry = dependency->getStore()->getAddressofLatestCopyLLVMValueFromHistoricalStore(WPVar->address);
+
+    	      if (!entry.isNull()) {
+    	        if (wpInterpolant->getWidth() ==
+    	            entry->getContent()->getExpression()->getWidth()) {
+    	          return entry->getContent()->getExpression();
+    	        } else {
+    	          ref<Expr> result = ZExtExpr::create(
+    	              entry->getContent()->getExpression(), wpInterpolant->getWidth());
+    	          return result;
+    	        }
+    	      }
+
     }
     // wpInterpolant->dump();
     // dependency->getStore()->dump();
