@@ -1807,7 +1807,7 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
                                                 ie = markedGlobal.end();
          it != ie; ++it) {
-    	llvm::outs()<<"Global vaiables:::::::::::---------------:::::\n\n\n";
+    	//llvm::outs()<<"Global vaiables:::::::::::---------------:::::\n\n\n";
       (*it)->print(stream);
     }
     stream << "]\n";
@@ -2857,6 +2857,12 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
              return result;
            }
          }
+         else{ // Date: 20/04/2022
+        	 // Loading values from Global Variables
+
+        llvm::outs()<<globalAddresses;
+
+         }
     }
     // wpInterpolant->dump();
     // dependency->getStore()->dump();
@@ -2964,22 +2970,48 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
 
 
     //dependency->getStore()->dump();
-    WPVar->address->dump();
-    llvm::outs()<<"Checking the print-1\n";
+//    WPVar->address->dump();
+//    llvm::outs()<<"Checking the print-1\n";
     ref<TxAllocationContext> alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
-    llvm::outs()<<"Checking the print-2\n";
-//alc->dump();
-    llvm::outs()<<"Checking the print-3\n";
+//    llvm::outs()<<"Checking the print-2\n";
+////alc->dump();
+//    llvm::outs()<<"Checking the print-3\n";
+
+//    for(map<string, pair<string,string> >::const_iterator it = myMap.begin();
+//        it != myMap.end(); ++it)
+//    {
+//        std::cout << it->first << " " << it->second.first << " " << it->second.second << "\n";
+//    }
 //
+//    std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
+
+    // Change to check the global variables -- 18 may 2022
+//    for(std::map<const llvm::GlobalValue *, ref<ConstantExpr> >::const_iterator it = globalAddresses->begin();
+//        it != globalAddresses->end(); ++it)
+//    {
+//
+//    	llvm::outs()<<"**************************************************************\n";
+//    	it->first->dump();
+//    	llvm::outs()<<"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+//    	it->second->dump();
+//    	Executor::const_iterator pos = globalAddresses.find("string");
+//    	//ref<TxAllocationContext> alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(it->first);
+//    	 //llvm::outs()<<it<<"\n";
+//    }
+
 //    for (const auto& p : globalAddresses ) {
 //            llvm::outs()<<p<<"\n";
+//        }
+
+//    for (auto const &pair: globalAddresses) {
+//    	llvm::outs() << "{" << pair.first << ": " << pair.second << "}\n";
 //        }
 //    Executor::const_iterator pos = globalAddresses.find("string");
 //    if (pos == map.end()) {
 //        //handle the error
 //    } else {
 //        std::string value = pos->second;
-//        ...
+//
 //    }
 
     		//dependency->getStore()->markGlobalVariables(WPVar->address);
@@ -2988,7 +3020,7 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
 //
 //
 // }
-    llvm::outs()<<"Checking the print\n";
+//    llvm::outs()<<"Checking the print\n";
 
 
     if (!alc.isNull()) {
@@ -3004,31 +3036,31 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
              "instantiateWPatSubsumption, offset is "
              "not a constant value");
       entry = dependency->getStore()->find(alc, offset);
-  	llvm::outs()<<"Print-111\n";
+  //	llvm::outs()<<"Print-111\n";
   	//entry->dump();
       if (!entry.isNull()) {
-    		llvm::outs()<<"Print-121\n";
+    	//	llvm::outs()<<"Print-121\n";
     		entry->dump();
         if (wpInterpolant->getWidth() ==
             entry->getContent()->getExpression()->getWidth()) {
-        	llvm::outs()<<"Print-11\n";
+        //	llvm::outs()<<"Print-11\n";
         	entry->getContent()->getExpression()->dump();
           return entry->getContent()->getExpression();
         } else {
           ref<Expr> result = ZExtExpr::create(
               entry->getContent()->getExpression(), wpInterpolant->getWidth());
 
-      	llvm::outs()<<"Print-21\n";
+      	//llvm::outs()<<"Print-21\n";
       	//result->dump();
           return result;
         }
       }
-      llvm::outs()<<"Are we reached here\n";
+     // llvm::outs()<<"Are we reached here\n";
     } else {
-    	llvm::outs()<<"The entry part is null\n";
+    //	llvm::outs()<<"The entry part is null\n";
     	//llvm::outs()<<alc;//for make
     }
-    llvm::outs()<<"Are we reached here-- before WP- Interpolants\n";
+  //  llvm::outs()<<"Are we reached here-- before WP- Interpolants\n";
      ref<Expr> dummy;
      return dummy;
     //wpInterpolant->dump();
