@@ -383,10 +383,10 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 
 				WPExpr = TxWPHelper::substituteExpr(WPExpr, right, left);
 				       /* llvm::outs() << "****** Flag = 5 *******\n";*/
-				        WPExpr->dump();
+				       //WPExpr->dump();
 				        /*llvm::outs() << "------\n";*/
 				WPExpr = Z3Simplification::simplify(WPExpr);
-				        WPExpr->dump();
+				        //WPExpr->dump();
 				        //llvm::outs() << "******* End Flag = 5 *******\n";
 			} else if (isa<llvm::GetElementPtrInst>(i->getOperand(1))) { // Update Array
 				llvm::GetElementPtrInst *parentGEP = dyn_cast<
@@ -409,10 +409,10 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 						val);
 //				        llvm::outs() << "****** Flag = 0 for Update Array *******\n";
 //				        i->dump();
-				        WPExpr->dump();
+				        //WPExpr->dump();
 				WPExpr = TxWPHelper::substituteExpr(WPExpr, pair.second,
 						update);
-				        WPExpr->dump();
+				        //WPExpr->dump();
 			      // llvm::outs() << "****** End Flag = 0 for Update Array*******\n";
 			}
 		}
