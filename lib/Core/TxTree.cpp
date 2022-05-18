@@ -2857,6 +2857,12 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
              return result;
            }
          }
+         else{ // Date: 20/04/2022
+        	 // Loading values from Global Variables
+
+        llvm::outs()<<globalAddresses;
+
+         }
     }
     // wpInterpolant->dump();
     // dependency->getStore()->dump();
@@ -2964,22 +2970,57 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
 
 
     //dependency->getStore()->dump();
+<<<<<<< HEAD
    // WPVar->address->dump();
    // llvm::outs()<<"Checking the print-1\n";
     ref<TxAllocationContext> alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
     //llvm::outs()<<"Checking the print-2\n";
 //alc->dump();
     //llvm::outs()<<"Checking the print-3\n";
+=======
+//    WPVar->address->dump();
+//    llvm::outs()<<"Checking the print-1\n";
+    ref<TxAllocationContext> alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
+//    llvm::outs()<<"Checking the print-2\n";
+////alc->dump();
+//    llvm::outs()<<"Checking the print-3\n";
+
+//    for(map<string, pair<string,string> >::const_iterator it = myMap.begin();
+//        it != myMap.end(); ++it)
+//    {
+//        std::cout << it->first << " " << it->second.first << " " << it->second.second << "\n";
+//    }
 //
+//    std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
+
+    // Change to check the global variables -- 18 may 2022
+//    for(std::map<const llvm::GlobalValue *, ref<ConstantExpr> >::const_iterator it = globalAddresses->begin();
+//        it != globalAddresses->end(); ++it)
+//    {
+>>>>>>> be20653631ae527dbb2b9d717eb71ef69f64cae6
+//
+//    	llvm::outs()<<"**************************************************************\n";
+//    	it->first->dump();
+//    	llvm::outs()<<"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+//    	it->second->dump();
+//    	Executor::const_iterator pos = globalAddresses.find("string");
+//    	//ref<TxAllocationContext> alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(it->first);
+//    	 //llvm::outs()<<it<<"\n";
+//    }
+
 //    for (const auto& p : globalAddresses ) {
 //            llvm::outs()<<p<<"\n";
+//        }
+
+//    for (auto const &pair: globalAddresses) {
+//    	llvm::outs() << "{" << pair.first << ": " << pair.second << "}\n";
 //        }
 //    Executor::const_iterator pos = globalAddresses.find("string");
 //    if (pos == map.end()) {
 //        //handle the error
 //    } else {
 //        std::string value = pos->second;
-//        ...
+//
 //    }
 
     		//dependency->getStore()->markGlobalVariables(WPVar->address);
@@ -2988,7 +3029,11 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
 //
 //
 // }
+<<<<<<< HEAD
     //llvm::outs()<<"Checking the print\n";
+=======
+//    llvm::outs()<<"Checking the print\n";
+>>>>>>> be20653631ae527dbb2b9d717eb71ef69f64cae6
 
 
     if (!alc.isNull()) {
@@ -3004,14 +3049,14 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
              "instantiateWPatSubsumption, offset is "
              "not a constant value");
       entry = dependency->getStore()->find(alc, offset);
-  	llvm::outs()<<"Print-111\n";
+  //	llvm::outs()<<"Print-111\n";
   	//entry->dump();
       if (!entry.isNull()) {
-    		llvm::outs()<<"Print-121\n";
+    	//	llvm::outs()<<"Print-121\n";
     		entry->dump();
         if (wpInterpolant->getWidth() ==
             entry->getContent()->getExpression()->getWidth()) {
-        	llvm::outs()<<"Print-11\n";
+        //	llvm::outs()<<"Print-11\n";
         	entry->getContent()->getExpression()->dump();
           return entry->getContent()->getExpression();
         } else {
@@ -3023,12 +3068,21 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
           return result;
         }
       }
+<<<<<<< HEAD
       //llvm::outs()<<"Are we reached here\n";
     } else {
     	//llvm::outs()<<"The entry part is null\n";
     	//llvm::outs()<<alc;//for make
     }
     //llvm::outs()<<"Are we reached here-- before WP- Interpolants\n";
+=======
+     // llvm::outs()<<"Are we reached here\n";
+    } else {
+    //	llvm::outs()<<"The entry part is null\n";
+    	//llvm::outs()<<alc;//for make
+    }
+  //  llvm::outs()<<"Are we reached here-- before WP- Interpolants\n";
+>>>>>>> be20653631ae527dbb2b9d717eb71ef69f64cae6
      ref<Expr> dummy;
      return dummy;
     //wpInterpolant->dump();
