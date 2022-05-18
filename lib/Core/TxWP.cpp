@@ -339,8 +339,8 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 			// 2- generate not(condition): expr::not(condition)
 			// 3- create and expression from the condition and this->WPExpr
 			ref<Expr> result = getBrCondition(i);
-			llvm::outs()<<"\nThe result from the flag 2::::::::::::::::::::::::::::\n"<<result;
-			llvm::outs()<<"\n\n";
+			//llvm::outs()<<"\nThe result from the flag 2::::::::::::::::::::::::::::\n"<<result;
+			//llvm::outs()<<"\n\n";
 			if (result.isNull()) {
 				WPExpr = result;
 				return WPExpr;
@@ -362,17 +362,17 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 			}
 
 		} else if (i->getOpcode() == llvm::Instruction::Store) {
-			llvm::outs() << "\n****** Flag = 3 *******\n";
+			/*llvm::outs() << "\n****** Flag = 3 *******\n";
 			i->dump();
-			llvm::outs() << "------\n";
+			llvm::outs() << "------\n";*/
 			if (TxWPHelper::isTargetDependent(i->getOperand(1), WPExpr)) {
-				llvm::outs() << "****** Flag = 4 *******\n";
+				/*llvm::outs() << "****** Flag = 4 *******\n";
 				i->dump();
-				llvm::outs() << "------\n";
+				llvm::outs() << "------\n";*/
 				ref<Expr> left = this->generateExprFromOperand(
 						i->getOperand(0));
 
-				llvm::outs() << "----checkpoint--\n";
+				//llvm::outs() << "----checkpoint--\n";
 				ref<Expr> right = this->generateExprFromOperand(
 						i->getOperand(1));
 
@@ -382,12 +382,12 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 				}
 
 				WPExpr = TxWPHelper::substituteExpr(WPExpr, right, left);
-				        llvm::outs() << "****** Flag = 5 *******\n";
+				       /* llvm::outs() << "****** Flag = 5 *******\n";*/
 				        WPExpr->dump();
-				        llvm::outs() << "------\n";
+				        /*llvm::outs() << "------\n";*/
 				WPExpr = Z3Simplification::simplify(WPExpr);
 				        WPExpr->dump();
-				        llvm::outs() << "******* End Flag = 5 *******\n";
+				        //llvm::outs() << "******* End Flag = 5 *******\n";
 			} else if (isa<llvm::GetElementPtrInst>(i->getOperand(1))) { // Update Array
 				llvm::GetElementPtrInst *parentGEP = dyn_cast<
 						llvm::GetElementPtrInst>(i->getOperand(1));
@@ -435,95 +435,95 @@ ref<Expr> TxWeakestPreCondition::getBrCondition(llvm::Instruction *ins) {
 ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
 		ref<Expr> offset) {
 	ref<Expr> ret;
-	llvm::outs()<<"Cp1\n";
+	//llvm::outs()<<"Cp1\n";
 	//    klee_warning("TxWeakestPreCondition::generateExprFromOperand0");
 	//    val->dump();
 	//    klee_warning("TxWeakestPreCondition::generateExprFromOperand1");
 	if (isa<llvm::ConstantInt>(val)) {
-		llvm::outs()<<"Cp2\n";
+		//llvm::outs()<<"Cp2\n";
 		llvm::ConstantInt *constInt = dyn_cast<llvm::ConstantInt>(val);
 		ret = getConstantInt(constInt);
 	} else if (isa<llvm::ConstantFP>(val)) {
-		llvm::outs()<<"Cp3\n";
+		//llvm::outs()<<"Cp3\n";
 		llvm::ConstantFP *constFP = dyn_cast<llvm::ConstantFP>(val);
 		ret = getConstantFP(constFP);
 	} else if (isa<llvm::GlobalValue>(val)) {
-		llvm::outs()<<"Cp4\n";
+		//llvm::outs()<<"Cp4\n";
 		llvm::GlobalValue *gv = dyn_cast<llvm::GlobalValue>(val);
 		ret = getGlobalValue(gv);
 	} else if (isa<llvm::ConstantExpr>(val)) {
-		llvm::outs()<<"Cp5\n";
+		//llvm::outs()<<"Cp5\n";
 		llvm::ConstantExpr *constantExpr = dyn_cast<llvm::ConstantExpr>(val);
 		ret = getConstantExpr(constantExpr);
 	} else if (isa<llvm::LoadInst>(val)) {
-		llvm::outs()<<"Cp6\n";
+		//llvm::outs()<<"Cp6\n";
 		llvm::LoadInst *inst = dyn_cast<llvm::LoadInst>(val);
 		if (isa<llvm::ConstantExpr>(inst->getOperand(0))) {
-			llvm::outs()<<"Cp6-1\n";
+			//llvm::outs()<<"Cp6-1\n";
 			llvm::ConstantExpr *ce = dyn_cast<llvm::ConstantExpr>(
 					inst->getOperand(0));
 			ret = getConstantExpr(ce);
 			//      ret = getLoadGep(inst);
 		} else if (isa<llvm::GetElementPtrInst>(inst->getOperand(0))) {
-			llvm::outs()<<"Cp6-2\n";
+			//llvm::outs()<<"Cp6-2\n";
 			llvm::GetElementPtrInst *parentGEP = dyn_cast<
 					llvm::GetElementPtrInst>(inst->getOperand(0));
-			llvm::outs()<<"Cp6-21\n";
+			//llvm::outs()<<"Cp6-21\n";
 			inst->dump();
 			inst->getOperand(0)->dump();
 			parentGEP->dump();
 			std::pair<ref<Expr>, ref<Expr> > pair = getPointer(parentGEP);
-			llvm::outs()<<"Cp6-22\n";
+			//llvm::outs()<<"Cp6-22\n";
 			if (!pair.first.isNull())
-				{llvm::outs()<<"Cp6-221\n";
+				{//llvm::outs()<<"Cp6-221\n";
 				ret = SelExpr::create(pair.second, pair.first);}
 			else{
-				llvm::outs()<<"Cp6-222\n";
+				//llvm::outs()<<"Cp6-222\n";
 				ret = pair.first;}
 		} else {
 			ret = getLoad(inst);
 		}
 	} else if (isa<llvm::BinaryOperator>(val)) {
-		llvm::outs()<<"Cp7\n";
+		//llvm::outs()<<"Cp7\n";
 		llvm::BinaryOperator *bo = dyn_cast<llvm::BinaryOperator>(val);
 		ret = getBinaryInst(bo);
 	} else if (isa<llvm::CastInst>(val)) {
-		llvm::outs()<<"Cp8\n";
+		//llvm::outs()<<"Cp8\n";
 		llvm::CastInst *ci = dyn_cast<llvm::CastInst>(val);
 		ret = getCastInst(ci);
 	} else if (isa<llvm::CallInst>(val)) {
-		llvm::outs()<<"Cp9\n";
+		//llvm::outs()<<"Cp9\n";
 		llvm::CallInst *ci = dyn_cast<llvm::CallInst>(val);
 		ret = getCallInst(ci);
 	} else if (llvm::isa<llvm::CmpInst>(val)) {
-		llvm::outs()<<"Cp10\n";
+		//llvm::outs()<<"Cp10\n";
 		llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(val);
 		ret = getCmpCondition(cmp);
 	} else if (llvm::isa<llvm::GlobalVariable>(val)) {
-		llvm::outs()<<"Cp11\n";
+		//llvm::outs()<<"Cp11\n";
 		klee_error("not implemented yet!");
 	} else if (llvm::isa<llvm::Argument>(val)) {
-		llvm::outs()<<"Cp12\n";
+		//llvm::outs()<<"Cp12\n";
 		llvm::Argument *arg = dyn_cast<llvm::Argument>(val);
-		llvm::outs()<<"the value passed\n";
-				val->dump();
-		llvm::outs()<<"the argument passed\n";
+		//llvm::outs()<<"the value passed\n";
+				//val->dump();
+		//llvm::outs()<<"the argument passed\n";
 		arg->dump();
 		ret = getFunctionArgument(arg);
 	} else if (llvm::isa<llvm::PHINode>(val)) {
-		llvm::outs()<<"Cp13\n";
+		//llvm::outs()<<"Cp13\n";
 		llvm::PHINode *phi = dyn_cast<llvm::PHINode>(val);
 		ret = getPhiInst(phi);
 	} else if (llvm::isa<llvm::AllocaInst>(val)) {
-		llvm::outs()<<"Cp14\n";
+		//llvm::outs()<<"Cp14\n";
 		llvm::AllocaInst *alc = dyn_cast<llvm::AllocaInst>(val);
 		ret = getAllocaInst(alc);
 	} else if (isa<llvm::GetElementPtrInst>(val)) {
-		llvm::outs()<<"Cp15\n";
+		//llvm::outs()<<"Cp15\n";
 		llvm::GetElementPtrInst *gep = dyn_cast<llvm::GetElementPtrInst>(val);
 		ret = getGepInst(gep);
 	} else if (isa<llvm::Constant>(val)) {
-		llvm::outs()<<"Cp16\n";
+		//llvm::outs()<<"Cp16\n";
 		if (isa<llvm::ConstantPointerNull>(val)) {
 			return Expr::createPointer(0);
 		} else {
@@ -536,7 +536,7 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
 							" case not implemented yet\n");
 		}
 	} else {
-		llvm::outs()<<"Cp17\n";
+		//llvm::outs()<<"Cp17\n";
 		llvm::errs() << "Value:";
 		val->dump();
 		llvm::errs() << "\nType:";
@@ -706,7 +706,7 @@ ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
 		 {break;}
 	 }
 	if (CallInst *call = dyn_cast<CallInst>(RegInst)) {
-		llvm::outs()<<"If there any help----------------------------";
+		//llvm::outs()<<"If there any help----------------------------";
 		call->getArgOperand(whicharg)->dump();
 		finalExpr = this->generateExprFromOperand(call->getArgOperand(whicharg));
 	}
