@@ -2812,26 +2812,23 @@ llvm::Instruction *TxTreeNode::getPreviousInstruction(llvm::PHINode *phi) {
 // =========================================================================
 ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
                                                  TxDependency *dependency) {
-
   if (wpInterpolant.isNull())
     return wpInterpolant;
 
   switch (wpInterpolant->getKind()) {
   case Expr::InvalidKind:
-  case Expr::Constant: { return wpInterpolant; }
+  case Expr::Constant: {
+	  return wpInterpolant; }
 
   case Expr::WPVar: {
     // TODO: Not handling multiple copies of a var in store
     // TxTreeNode::instantiateWPatSubsumption
     ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant);
-
     ref<TxAllocationContext> alc =
         dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
-
     if (!alc.isNull()) {
       ref<TxStoreEntry> entry;
       entry = dependency->getStore()->find(alc);
-
       if (!entry.isNull()) {
         if (wpInterpolant->getWidth() ==
             entry->getContent()->getExpression()->getWidth()) {
@@ -2859,13 +2856,12 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
          }
          else{ // Date: 20/04/2022
         	 // Loading values from Global Variables
-
+        	 ref<Expr> dummy;
+        	 return dummy;
         //llvm::outs()<<globalAddresses;
 
          }
     }
-    // wpInterpolant->dump();
-    // dependency->getStore()->dump();
     klee_warning(
         "TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
     ref<Expr> dummy;
@@ -2919,7 +2915,6 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
       return kids[0];
     if (kids[1].isNull())
       return kids[1];
-
     return wpInterpolant->rebuild(kids);
   }
 
@@ -2950,30 +2945,18 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     return wpInterpolant->rebuild(kids);
   }
   case Expr::Sel: {
-
     ref<Expr> kids[2];
     kids[0] = wpInterpolant->getKid(0);
     kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
-    kids[0]->dump();
-    kids[1]->dump();
-
     if (kids[0].isNull())
       return kids[0];
     if (kids[1].isNull())
       return kids[1];
 
     ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
-    wpInterpolant->dump();
-    wpInterpolant->getKid(0)->dump();
-    WPVar->dump();
-    //llvm::outs()<<"The Wpadress is \n"<<WPVar->address;
-
-
-    //dependency->getStore()->dump();
-//    WPVar->address->dump();
-//    llvm::outs()<<"Checking the print-1\n";
-    ref<TxAllocationContext> alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
-//    llvm::outs()<<"Checking the print-2\n";
+    ref<TxAllocationContext> alc;
+    if (!WPVar.isNull()){
+     alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);}
 ////alc->dump();
 //    llvm::outs()<<"Checking the print-3\n";
 
@@ -3020,7 +3003,6 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
 //
 //
 // }
-    //llvm::outs()<<"Checking the print\n";
     if (!alc.isNull()) {
       ref<TxStoreEntry> entry;
       ref<Expr> offset = MulExpr::create(
@@ -3038,11 +3020,11 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   	//entry->dump();
       if (!entry.isNull()) {
     	//	llvm::outs()<<"Print-121\n";
-    		entry->dump();
+    		//entry->dump();
         if (wpInterpolant->getWidth() ==
             entry->getContent()->getExpression()->getWidth()) {
         //	llvm::outs()<<"Print-11\n";
-        	entry->getContent()->getExpression()->dump();
+        	//entry->getContent()->getExpression()->dump();
           return entry->getContent()->getExpression();
         } else {
           ref<Expr> result = ZExtExpr::create(
@@ -3069,11 +3051,11 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   }
   default: {
 	
-     ref<Expr> dummy;
-     return dummy;
+     //ref<Expr> dummy;
+     //return dummy;
      //wpInterpolant->dump();
-     //klee_error("TxWPHelper::instantiateWPatSubsumption: Expression not "
-     //          "supported yet!");
+     klee_error("TxWPHelper::instantiateWPatSubsumption: Expression not "
+               "supported yet!");
      //return wpInterpolant;
   }
   }
