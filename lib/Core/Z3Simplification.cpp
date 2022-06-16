@@ -441,8 +441,6 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
         // Added a check condition for "ite" (if-then-else) statement;
     	if (symbol == "if"){
     	      ref<Expr> f = z3Expr2TxExpr(e.arg(0), emap);
-    	      ref<Expr> s = z3Expr2TxExpr(e.arg(1), emap);
-    	      ref<Expr> t = z3Expr2TxExpr(e.arg(2), emap);
     	      if(!simplify(f).isNull()){
     	    	  ref<Expr> s = z3Expr2TxExpr(e.arg(1), emap);
     	    	  return s;
