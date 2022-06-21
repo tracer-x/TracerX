@@ -579,9 +579,11 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
     if (result.isNull())
       return result;
   } else {
-    value->dump();
-    klee_error("TxWeakestPreCondition::getCondition: value is not "
-               "implemented yet!");
+
+    return result;
+    // value->dump();
+    // klee_error("TxWeakestPreCondition::getCondition: value is not "
+    // 		"implemented yet!");
   }
   return result;
 }
