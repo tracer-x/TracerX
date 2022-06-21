@@ -63,7 +63,9 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   interpolant = node->getInterpolant(existentials, substitution);
   prevProgramPoint = node->getPrevProgramPoint();
   phiValues = node->getPhiValue();
-
+  klee_message("********** Start of Program Point: %lu Block Instructions **********",node->getProgramPoint());
+  node->getBasicBlock()->dump();
+  klee_message("*********************** End of Instructions ******************************************\n");
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
