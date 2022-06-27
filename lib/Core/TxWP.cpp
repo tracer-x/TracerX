@@ -578,12 +578,18 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
     result = getPhiInst(phi);
     if (result.isNull())
       return result;
-  } else {
-
+  } else if (llvm::isa<llvm::TruncInst>(value)) {
+    llvm::TruncInst *trunc_Inst = dyn_cast<llvm::TruncInst>(value);
+    ref<Expr> arg1 = this->generateExprFromOperand(trunc_Inst->getOperand(0));
+    Expr::Width width = Expr::InvalidWidth;
+    width = Expr::Bool;
+    result = ExtractExpr::create(arg1, 0, width);
     return result;
-    // value->dump();
-    // klee_error("TxWeakestPreCondition::getCondition: value is not "
-    // 		"implemented yet!");
+  } else {
+    // return result;
+    value->dump();
+    klee_error("TxWeakestPreCondition::getCondition: value is not "
+               "implemented yet!");
   }
   return result;
 }
