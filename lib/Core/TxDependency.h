@@ -337,6 +337,10 @@ public:
 
   std::set<ref<TxStoreEntry> > &getMarkedGlobal() { return markedGlobal; }
 
+  void setMarkedGlobal(std::set<ref<TxStoreEntry> >& newMarkedGlobal) {
+	  markedGlobal = newMarkedGlobal;
+	}
+
   bool isEntryInParent(ref<TxStoreEntry> se) {
     if (!parent)
       return false;
