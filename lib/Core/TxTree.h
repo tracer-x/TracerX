@@ -367,6 +367,8 @@ public:
 
   void setExistentials(std::set<const Array *> _existentials);
 
+  void setmarkedGlobal(std::set<ref<TxStoreEntry> > _markedGlobal);
+  
   void dump() const {
     this->print(llvm::errs());
     llvm::errs() << "\n";

@@ -334,7 +334,8 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
 									ie = markedGlobaldels.end();it != ie; ++it) {
 		markedGlobal.erase((*it));
 	}
-	node->getDependency()->setMarkedGlobal(markedGlobal);
+	entry->setmarkedGlobal(markedGlobal);
+	
 	return entry;
 }
 
