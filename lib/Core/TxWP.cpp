@@ -336,7 +336,8 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
        it != ie; ++it) {
     markedGlobal.erase((*it));
   }
-  node->getDependency()->setMarkedGlobal(markedGlobal);
+  entry->setmarkedGlobal(markedGlobal);
+
   return entry;
 }
 
@@ -1259,6 +1260,8 @@ TxWeakestPreCondition::getFunctionArgumentSize(llvm::Argument *arg) {
     size = Expr::Int16;
   } else if (arg->getType()->isIntegerTy(32)) {
     size = Expr::Int32;
+  } else if (arg->getType()->isIntegerTy(64)) {
+    size = Expr::Int64;
   } else if (arg->getType()->isPointerTy()) {
     size = Expr::Int32;
   } else {

@@ -1794,6 +1794,10 @@ void TxSubsumptionTableEntry::setExistentials(
   existentials = _existentials;
 }
 
+void TxSubsumptionTableEntry::setmarkedGlobal(std::set<ref<TxStoreEntry> > _markedGlobal){
+	markedGlobal=_markedGlobal;
+}
+
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
   print(stream, 0, debugSubsumptionLevel_g);
 }
