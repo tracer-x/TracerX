@@ -1310,6 +1310,8 @@ unsigned int TxWeakestPreCondition::getGepSize(llvm::Type *ty) {
 		size = Expr::Int16;
 	} else if (ty->isIntegerTy(32)) {
 		size = Expr::Int32;
+	} else if (ty->isIntegerTy(64)) {
+		size = Expr::Int64;
 	} else if (ty->isPointerTy()) {
 		size = getGepSize(ty->getPointerElementType());
 	} else {
