@@ -1243,6 +1243,8 @@ unsigned int TxWeakestPreCondition::getGlobalVariabletSize(
 		size = Expr::Int16;
 	} else if (gv->getType()->getElementType()->isIntegerTy(32)) {
 		size = Expr::Int32;
+	} else if (gv->getType()->getElementType()->isIntegerTy(64)) {
+		size = Expr::Int64;
 	} else if (gv->getType()->getElementType()->isPointerTy()) {
 		size = Expr::Int32;
 	} else if (gv->getType()->getElementType()->isArrayTy()) {
@@ -1255,6 +1257,8 @@ unsigned int TxWeakestPreCondition::getGlobalVariabletSize(
 		size = Expr::Int16;
 	} else if (gv->getType()->isIntegerTy(32)) {
 		size = Expr::Int32;
+	} else if (gv->getType()->isIntegerTy(64)) {
+		size = Expr::Int64;
 	} else if (gv->getType()->isPointerTy()) {
 		size = Expr::Int32;
 	} else if (gv->getType()->isArrayTy()) {
