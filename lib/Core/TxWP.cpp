@@ -593,8 +593,7 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
   if (llvm::isa<llvm::CmpInst>(value)) {
     llvm::CmpInst *cmp = dyn_cast<llvm::CmpInst>(value);
     result = getCmpCondition(cmp);
-    if (result.isNull())
-		return result;
+    return result;
   } else if (llvm::isa<llvm::BinaryOperator>(value)) {
     llvm::Instruction *binOp = dyn_cast<llvm::Instruction>(value);
     ref<Expr> left = this->generateExprFromOperand(binOp->getOperand(0));
