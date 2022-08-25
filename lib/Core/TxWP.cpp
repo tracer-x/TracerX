@@ -959,6 +959,10 @@ ref<Expr> TxWeakestPreCondition::getCastInst(llvm::CastInst *ci) {
     width = Expr::Int64;
   else if (ci->getDestTy()->isDoubleTy())
     width = Expr::Fl80;
+  else if (ci->getDestTy()->isArrayTy())
+    width = Expr::Int32;
+  else if (ci->getDestTy()->isPointerTy())
+    width = Expr::Int32;
   else {
     ci->getDestTy()->dump();
     klee_warning("TxWeakestPreCondition::getCastInst size not supported yet!");
