@@ -754,7 +754,7 @@ ref<Expr> TxWeakestPreCondition::getFunctionArgument(llvm::Argument *arg) {
 		if (i == CurrentWPInst) {
 			flg_gt = 1;
 		}
-		if (flg_gt == 1 and i->getOpcodeName() == "call") {
+		if (flg_gt == 1 and strcmp(i->getOpcodeName(),"call")==0) {
 			RegInst = i;
 			break;
 		}
