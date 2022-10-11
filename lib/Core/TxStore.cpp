@@ -297,7 +297,6 @@ ref<TxAllocationContext>
 TxStore::getAddressofLatestCopyLLVMValue(llvm::Value *val) {
   ref<TxAllocationContext> address;
   bool foundValue = false;
-
   for (TopStateStore::const_iterator it = internalStore.begin(),
                                      ie = internalStore.end();
        it != ie; ++it) {
@@ -312,7 +311,6 @@ TxStore::getAddressofLatestCopyLLVMValue(llvm::Value *val) {
       }
     }
   }
-  // Maybe NULL
   return address;
 }
 
@@ -324,10 +322,19 @@ TxStore::getAddressofLatestCopyLLVMValueFromHistoricalStore(llvm::Value *val) {
            it = symbolicallyAddressedHistoricalStore.begin(),
            ie = symbolicallyAddressedHistoricalStore.end();
        it != ie; ++it) {
-
     ref<TxStoreEntry> temp = (*it).second;
     if (temp->getValue() == val) {
-      if (!foundValue) {
+      address = temp;
+      foundValue = true;
+    }
+  }
+  if (!foundValue) {
+    for (LowerStateStore::const_iterator
+             it = concretelyAddressedHistoricalStore.begin(),
+             ie = concretelyAddressedHistoricalStore.end();
+         it != ie; ++it) {
+      ref<TxStoreEntry> temp = (*it).second;
+      if (temp->getValue() == val) {
         address = temp;
         foundValue = true;
       }
