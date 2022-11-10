@@ -63,9 +63,11 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   interpolant = node->getInterpolant(existentials, substitution);
   prevProgramPoint = node->getPrevProgramPoint();
   phiValues = node->getPhiValue();
-  //klee_message("********** Start of Program Point: %lu Block Instructions **********",node->getProgramPoint());
-  //node->getBasicBlock()->dump();
-  //klee_message("*********************** End of Instructions ******************************************\n");
+  // klee_message("********** Start of Program Point: %lu Block Instructions
+  // **********",node->getProgramPoint());
+  // node->getBasicBlock()->dump();
+  // klee_message("*********************** End of Instructions
+  // ******************************************\n");
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
@@ -873,7 +875,7 @@ bool TxSubsumptionTableEntry::subsumed(
     // second check is performed.
     ref<Expr> wpInstantiatedInterpolant =
         state.txTreeNode->instantiateWPatSubsumption(
-            wpInterpolant, state.txTreeNode->getDependency());
+            wpInterpolant, state, state.txTreeNode->getDependency());
     if (wpInstantiatedInterpolant.isNull())
       return false;
     ref<Expr> wpBoolean =
@@ -1791,8 +1793,9 @@ void TxSubsumptionTableEntry::setExistentials(
   existentials = _existentials;
 }
 
-void TxSubsumptionTableEntry::setmarkedGlobal(std::set<ref<TxStoreEntry> > _markedGlobal){
-	markedGlobal=_markedGlobal;
+void TxSubsumptionTableEntry::setmarkedGlobal(
+    std::set<ref<TxStoreEntry> > _markedGlobal) {
+  markedGlobal = _markedGlobal;
 }
 
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
@@ -2845,6 +2848,7 @@ llvm::Instruction *TxTreeNode::getPreviousInstruction(llvm::PHINode *phi) {
 // Instantiating WP Expression at Subsumption Point
 // =========================================================================
 ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
+                                                 ExecutionState &state,
                                                  TxDependency *dependency) {
   if (wpInterpolant.isNull())
     return wpInterpolant;
@@ -2858,10 +2862,11 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   case Expr::WPVar: {
     // TODO: Not handling multiple copies of a var in store
     // TxTreeNode::instantiateWPatSubsumption
-    ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant);
+    ref<WPVarExpr> WPVar1 = dyn_cast<WPVarExpr>(wpInterpolant);
 
     ref<TxAllocationContext> alc =
-        dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
+        dependency->getStore()->getAddressofLatestCopyLLVMValue(
+            WPVar1->address);
 
     if (!alc.isNull()) {
       ref<TxStoreEntry> entry;
@@ -2882,7 +2887,7 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
       ref<TxStoreEntry> entry;
       entry = dependency->getStore()
                   ->getAddressofLatestCopyLLVMValueFromHistoricalStore(
-                      WPVar->address);
+                      WPVar1->address);
 
       if (!entry.isNull()) {
         if (wpInterpolant->getWidth() ==
@@ -2893,10 +2898,33 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
               entry->getContent()->getExpression(), wpInterpolant->getWidth());
           return result;
         }
-      } else {
-        // Loading values from Global Variables
+      } else { // Date: 20/04/2022
+               //  // Loading values from Global Variables
         ref<Expr> dummy;
+        //        llvm::outs()<<"\nChecking the Global list for the WPVar:
+        //        ["<<wpInterpolant<<"]\n";
+        //        llvm::outs()<<"cheking WP var address\n";
+        //        llvm::outs()<<WPVar1->address<<"\n";
+        //        wpInterpolant.get()->dump();
+        //        llvm::outs()<<wpInterpolant.get();
+        MemoryMap::iterator begin = state.addressSpace.objects.begin();
+        MemoryMap::iterator end = state.addressSpace.objects.end();
+        while (end != begin) {
+          --end;
+          const MemoryObject *mo = end->first;
+          ObjectState *oj = end->second;
+          if (!mo->isFixed) {
+            if (mo->allocSite == WPVar1->address) {
+              ref<Expr> address =
+                  ConstantExpr::create(mo->address, Expr::Int64);
+              ref<Expr> offset = mo->getOffsetExpr(address);
+              ref<Expr> result = oj->read(offset, mo->size * 8);
+              return result;
+            }
+          }
+        }
         return dummy;
+        // llvm::outs()<<globalAddresses;
       }
     }
     // wpInterpolant->dump();
@@ -2915,7 +2943,8 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   case Expr::ZExt:
   case Expr::SExt: {
     ref<Expr> kids[1];
-    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
+    kids[0] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(0), state, dependency);
     if (kids[0].isNull())
       return kids[0];
     else
@@ -2948,8 +2977,10 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   case Expr::LShr:
   case Expr::AShr: {
     ref<Expr> kids[2];
-    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
-    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
+    kids[0] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(0), state, dependency);
+    kids[1] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
     if (kids[0].isNull()) {
       return kids[0];
     }
@@ -2969,9 +3000,12 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
 
   case Expr::Select: {
     ref<Expr> kids[3];
-    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
-    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
-    kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), dependency);
+    kids[0] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(0), state, dependency);
+    kids[1] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
+    kids[2] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(2), state, dependency);
     if (kids[0].isNull())
       return kids[0];
     if (kids[1].isNull())
@@ -2982,9 +3016,12 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   }
   case Expr::Upd: {
     ref<Expr> kids[3];
-    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
-    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
-    kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), dependency);
+    kids[0] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(0), state, dependency);
+    kids[1] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
+    kids[2] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(2), state, dependency);
     if (kids[0].isNull())
       return kids[0];
     if (kids[1].isNull())
@@ -2996,7 +3033,8 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   case Expr::Sel: {
     ref<Expr> kids[2];
     kids[0] = wpInterpolant->getKid(0);
-    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
+    kids[1] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
     if (kids[0].isNull())
       return kids[0];
     if (kids[1].isNull())
