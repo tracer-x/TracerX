@@ -518,9 +518,6 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
     } else if (isa<llvm::GetElementPtrInst>(inst->getOperand(0))) {
       llvm::GetElementPtrInst *parentGEP =
           dyn_cast<llvm::GetElementPtrInst>(inst->getOperand(0));
-      inst->dump();
-      inst->getOperand(0)->dump();
-      parentGEP->dump();
 
       std::pair<ref<Expr>, ref<Expr> > pair = getPointer(parentGEP);
       if (!pair.first.isNull()) { // llvm::outs()<<"Cp6-221\n";
@@ -702,7 +699,7 @@ ref<Expr> TxWeakestPreCondition::getConstantExpr(llvm::ConstantExpr *ce) {
     //"TxWeakestPreCondition::getConstantExpr: ConstantExpr is not support");
     ref<Expr> dummy;
     return dummy;
-    ce->dump();
+    // ce->dump();
   }
   }
 
