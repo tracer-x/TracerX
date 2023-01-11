@@ -165,7 +165,6 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
   // vars(pi)
   std::set<std::string> globalpimiuVars;
   if (!entry->getInterpolant().isNull()) {
-    entry->getInterpolant()->dump();
     globalpimiuVars = TxPartitionHelper::getExprVars(entry->getInterpolant());
   }
 
@@ -235,7 +234,7 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
            ie1 = concretelyAddressedStore.end();
        it1 != ie1; ++it1) {
     std::set<std::string> tmp;
-    if (strcmp(it1->first->getValue()->getName().data(), "") == 0) {
+    if (strcmp(it1->first->getValue()->getName().data(), "") != 0) {
       tmp.insert(it1->first->getValue()->getName().data());
       std::set<std::string> right = TxPartitionHelper::getExprVars(
           it1->second.begin()->second->getExpression());
