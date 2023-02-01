@@ -153,146 +153,147 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
 	if (entry->getWPInterpolant() == ConstantExpr::alloc(0, Expr::Bool))
 		entry->setWPInterpolant(ConstantExpr::alloc(1, Expr::Bool));
 
-	 // vars(w)
-	 std::set<std::string> wpVars;
-	 if (!entry->getWPInterpolant().isNull())
-	 wpVars = TxPartitionHelper::getExprVars(entry->getWPInterpolant());
+	//  // vars(w)
+	//  std::set<std::string> wpVars;
+	//  if (!entry->getWPInterpolant().isNull())
+	//  wpVars = TxPartitionHelper::getExprVars(entry->getWPInterpolant());
 
 
-	 // get vars(pi, miu, globals)
-	 // vars(pi)
-	 std::set<std::string> globalpimiuVars;
-	 if (!entry->getInterpolant().isNull()){
-		 entry->getInterpolant()->dump();
-		 globalpimiuVars = TxPartitionHelper::getExprVars(entry->getInterpolant());
+	//  // get vars(pi, miu, globals)
+	//  // vars(pi)
+	//  std::set<std::string> globalpimiuVars;
+	//  if (!entry->getInterpolant().isNull()){
+	// 	 entry->getInterpolant()->dump();
+	// 	 globalpimiuVars = TxPartitionHelper::getExprVars(entry->getInterpolant());
 
-	 }
+	//  }
 
 	 // vars(miu)
 	 TxStore::TopInterpolantStore concretelyAddressedStore =
 	 entry->getConcretelyAddressedStore();
-	 for (TxStore::TopInterpolantStore::iterator
-	 it1 = concretelyAddressedStore.begin(),
-	 ie1 = concretelyAddressedStore.end();
-	 it1 != ie1; ++it1) {
-	 if (strcmp(it1->first->getValue()->getName().data(), "") != 0) {
-		 globalpimiuVars.insert(it1->first->getValue()->getName().data());
-	 std::set<std::string> right = TxPartitionHelper::getExprVars(
-	 it1->second.begin()->second->getExpression());
-	 globalpimiuVars.insert(right.begin(), right.end());
-	 }
-	 }
+	//  for (TxStore::TopInterpolantStore::iterator
+	//  it1 = concretelyAddressedStore.begin(),
+	//  ie1 = concretelyAddressedStore.end();
+	//  it1 != ie1; ++it1) {
+	//  if (strcmp(it1->first->getValue()->getName().data(), "") != 0) {
+	// 	 globalpimiuVars.insert(it1->first->getValue()->getName().data());
+	//  std::set<std::string> right = TxPartitionHelper::getExprVars(
+	//  it1->second.begin()->second->getExpression());
+	//  globalpimiuVars.insert(right.begin(), right.end());
+	//  }
+	//  }
 
 
 	// vars(globals)
 	std::set<ref<TxStoreEntry> > markedGlobal;
-	markedGlobal = node->getDependency()->getMarkedGlobal();
-	for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
-	                               ie = markedGlobal.end(); it != ie; ++it) {
-	 llvm::Value *val1=it->get()->getAddress()->getContext()->getValue();
-	 llvm::GlobalValue *gv1 = dyn_cast<llvm::GlobalValue>(val1);
-	 ref<Expr> result = getGlobalValue(gv1);
-	 std::set<std::string> result1 = TxPartitionHelper::getExprVars(result);
-	 globalpimiuVars.insert(result1.begin(), result1.end());
-	}
+	// markedGlobal = node->getDependency()->getMarkedGlobal();
+	// for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
+	//                                ie = markedGlobal.end(); it != ie; ++it) {
+	//  llvm::Value *val1=it->get()->getAddress()->getContext()->getValue();
+	//  llvm::GlobalValue *gv1 = dyn_cast<llvm::GlobalValue>(val1);
+	//  ref<Expr> result = getGlobalValue(gv1);
+	//  std::set<std::string> result1 = TxPartitionHelper::getExprVars(result);
+	//  globalpimiuVars.insert(result1.begin(), result1.end());
+	// }
 
 
-	// add normal names of __shadow__ variables
-	std::set<std::string> globalpimiuVars2;
-	for (std::set<std::string>::iterator it1 = globalpimiuVars.begin(),
-	ie1 = globalpimiuVars.end();
-	it1 != ie1; ++it1) {
-	// keep both normal & __shadow__
-		globalpimiuVars2.insert((*it1));
-		std::string toErase = "__shadow__";
-		size_t pos = (*it1).find(toErase);
-	if (pos == std::string::npos) {
-		globalpimiuVars2.insert(*it1);
-	}
-	}
+	// // add normal names of __shadow__ variables
+	// std::set<std::string> globalpimiuVars2;
+	// for (std::set<std::string>::iterator it1 = globalpimiuVars.begin(),
+	// ie1 = globalpimiuVars.end();
+	// it1 != ie1; ++it1) {
+	// // keep both normal & __shadow__
+	// 	globalpimiuVars2.insert((*it1));
+	// 	std::string toErase = "__shadow__";
+	// 	size_t pos = (*it1).find(toErase);
+	// if (pos == std::string::npos) {
+	// 	globalpimiuVars2.insert(*it1);
+	// }
+	// }
 
-	// get v1 = vars(global,pi,miu) - vars(w)
-	std::set<std::string> v1 = TxPartitionHelper::diff(globalpimiuVars2, wpVars);
+	// // get v1 = vars(global,pi,miu) - vars(w)
+	// std::set<std::string> v1 = TxPartitionHelper::diff(globalpimiuVars2, wpVars);
 
-	// closure(global,pi,miu,v1)
-	std::set<std::string> v1star = v1;
+	// // closure(global,pi,miu,v1)
+	// std::set<std::string> v1star = v1;
 
 
-	// closure on pi
-	std::vector<ref<Expr> > piComps =
-	TxPartitionHelper::getExprsFromAndExpr(entry->getInterpolant());
-	for (std::vector<ref<Expr> >::iterator it = piComps.begin(),
-	ie = piComps.end();
-	it != ie; ++it) {
-	std::set<std::string> tmp = TxPartitionHelper::getExprVars(*it);
-	if (TxPartitionHelper::isShared(tmp, v1star)) {
-	v1star.insert(tmp.begin(), tmp.end());
-	}
-	}
+	// // closure on pi
+	// std::vector<ref<Expr> > piComps =
+	// TxPartitionHelper::getExprsFromAndExpr(entry->getInterpolant());
+	// for (std::vector<ref<Expr> >::iterator it = piComps.begin(),
+	// ie = piComps.end();
+	// it != ie; ++it) {
+	// std::set<std::string> tmp = TxPartitionHelper::getExprVars(*it);
+	// if (TxPartitionHelper::isShared(tmp, v1star)) {
+	// v1star.insert(tmp.begin(), tmp.end());
+	// }
+	// }
 
-	// closure on miu
-	for (TxStore::TopInterpolantStore::iterator
-	it1 = concretelyAddressedStore.begin(),
-	ie1 = concretelyAddressedStore.end();
-	it1 != ie1; ++it1) {
-	std::set<std::string> tmp;
-	if (strcmp(it1->first->getValue()->getName().data(), "") != 0) {
-	tmp.insert(it1->first->getValue()->getName().data());
-	std::set<std::string> right = TxPartitionHelper::getExprVars(
-	it1->second.begin()->second->getExpression());
-	tmp.insert(right.begin(), right.end());
-	if (TxPartitionHelper::isShared(tmp, v1star)) {
-	v1star.insert(tmp.begin(), tmp.end());
-	}
-	}
-	}
+	// // closure on miu
+	// for (TxStore::TopInterpolantStore::iterator
+	// it1 = concretelyAddressedStore.begin(),
+	// ie1 = concretelyAddressedStore.end();
+	// it1 != ie1; ++it1) {
+	// std::set<std::string> tmp;
+	// if (strcmp(it1->first->getValue()->getName().data(), "") != 0) {
+	// tmp.insert(it1->first->getValue()->getName().data());
+	// std::set<std::string> right = TxPartitionHelper::getExprVars(
+	// it1->second.begin()->second->getExpression());
+	// tmp.insert(right.begin(), right.end());
+	// if (TxPartitionHelper::isShared(tmp, v1star)) {
+	// v1star.insert(tmp.begin(), tmp.end());
+	// }
+	// }
+	// }
 
-	// closure on global
-	for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
-									ie = markedGlobal.end(); it != ie; ++it) {
-	llvm::Value *val1=it->get()->getAddress()->getContext()->getValue();
-	llvm::GlobalValue *gv1 = dyn_cast<llvm::GlobalValue>(val1);
-	std::set<std::string> tmp;
-	ref<Expr> result = getGlobalValue(gv1);
-	std::set<std::string> result1 = TxPartitionHelper::getExprVars(result);
-	tmp.insert(result1.begin(), result1.end());
-	if (TxPartitionHelper::isShared(tmp, v1star)) {
-			v1star.insert(tmp.begin(), tmp.end());
-			}
-	}
+	// // closure on global
+	// for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
+	// 								ie = markedGlobal.end(); it != ie; ++it) {
+	// llvm::Value *val1=it->get()->getAddress()->getContext()->getValue();
+	// llvm::GlobalValue *gv1 = dyn_cast<llvm::GlobalValue>(val1);
+	// std::set<std::string> tmp;
+	// ref<Expr> result = getGlobalValue(gv1);
+	// std::set<std::string> result1 = TxPartitionHelper::getExprVars(result);
+	// tmp.insert(result1.begin(), result1.end());
+	// if (TxPartitionHelper::isShared(tmp, v1star)) {
+	// 		v1star.insert(tmp.begin(), tmp.end());
+	// 		}
+	// }
 
-	// v2
-	std::set<std::string> v2 = TxPartitionHelper::diff(wpVars, v1star);
+	// // v2
+	// std::set<std::string> v2 = TxPartitionHelper::diff(wpVars, v1star);
 
-	// update pi by (wp,v2) and (pi,v1star)
-	std::vector<ref<Expr> > wpComps =
-	TxPartitionHelper::getExprsFromAndExpr(entry->getWPInterpolant());
+	// // update pi by (wp,v2) and (pi,v1star)
+	// std::vector<ref<Expr> > wpComps =
+	// TxPartitionHelper::getExprsFromAndExpr(entry->getWPInterpolant());
 
-	std::vector<ref<Expr> > newWPComps;
-	for (std::vector<ref<Expr> >::iterator it = wpComps.begin(),
-	ie = wpComps.end();
-	it != ie; ++it) {
-	std::set<std::string> tmp = TxPartitionHelper::getExprVars(*it);
-	if (TxPartitionHelper::isSubset(tmp, v2)) {
-	newWPComps.push_back(*it);
-	}
-	}
+	// std::vector<ref<Expr> > newWPComps;
+	// for (std::vector<ref<Expr> >::iterator it = wpComps.begin(),
+	// ie = wpComps.end();
+	// it != ie; ++it) {
+	// std::set<std::string> tmp = TxPartitionHelper::getExprVars(*it);
+	// if (TxPartitionHelper::isSubset(tmp, v2)) {
+	// newWPComps.push_back(*it);
+	// }
+	// }
 
-	std::vector<ref<Expr> > newpiComps;
-	for (std::vector<ref<Expr> >::iterator it = piComps.begin(),
-	ie = piComps.end();
-	it != ie; ++it) {
-	std::set<std::string> tmp = TxPartitionHelper::getExprVars(*it);
-	if (TxPartitionHelper::isShared(tmp, v1star)) {
-	newpiComps.push_back(*it);
-	}
-	}
+	// std::vector<ref<Expr> > newpiComps;
+	// for (std::vector<ref<Expr> >::iterator it = piComps.begin(),
+	// ie = piComps.end();
+	// it != ie; ++it) {
+	// std::set<std::string> tmp = TxPartitionHelper::getExprVars(*it);
+	// if (TxPartitionHelper::isShared(tmp, v1star)) {
+	// newpiComps.push_back(*it);
+	// }
+	// }
 
-	if (!entry->getWPInterpolant().isNull())
-	entry->setWPInterpolant(TxPartitionHelper::createAnd(newWPComps));
+	// if (!entry->getWPInterpolant().isNull())
+	// entry->setWPInterpolant(TxPartitionHelper::createAnd(newWPComps));
 
-	if (!entry->getInterpolant().isNull())
-	entry->setInterpolant(TxPartitionHelper::createAnd(newpiComps));
+	// if (!entry->getInterpolant().isNull())
+	// entry->setInterpolant(TxPartitionHelper::createAnd(newpiComps));
+  entry->setInterpolant(ConstantExpr::alloc(1, Expr::Bool));
 
 	// update miu by (miu, v1star)
 	std::set<ref<TxAllocationContext> > dels;
@@ -300,16 +301,16 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
 	it1 = concretelyAddressedStore.begin(),
 	ie1 = concretelyAddressedStore.end();
 	it1 != ie1; ++it1) {
-	std::set<std::string> tmp;
-	if (strcmp(it1->first->getValue()->getName().data(), "") != 0) {
-	tmp.insert(it1->first->getValue()->getName().data());
-	std::set<std::string> right = TxPartitionHelper::getExprVars(
-	it1->second.begin()->second->getExpression());
-	tmp.insert(right.begin(), right.end());
-	if (!TxPartitionHelper::isShared(tmp, v1star)) {
+	// std::set<std::string> tmp;
+	// if (strcmp(it1->first->getValue()->getName().data(), "") != 0) {
+	// tmp.insert(it1->first->getValue()->getName().data());
+	// std::set<std::string> right = TxPartitionHelper::getExprVars(
+	// it1->second.begin()->second->getExpression());
+	// tmp.insert(right.begin(), right.end());
+	// if (!TxPartitionHelper::isShared(tmp, v1star)) {
 	dels.insert(it1->first);
-	}
-	}
+	// }
+	// }
 	}
 	for (std::set<ref<TxAllocationContext> >::iterator it = dels.begin(),
 	ie = dels.end();
@@ -322,13 +323,13 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
 	std::set<ref<TxStoreEntry> > markedGlobaldels;
 	for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
 								ie = markedGlobal.end(); it != ie; ++it) {
-		llvm::Value *val1=it->get()->getAddress()->getContext()->getValue();
-		llvm::GlobalValue *gv1 = dyn_cast<llvm::GlobalValue>(val1);
-		ref<Expr> result = getGlobalValue(gv1);
-		std::set<std::string> tmp = TxPartitionHelper::getExprVars(result);
-		if (!TxPartitionHelper::isShared(tmp, v1star)) {
+		// llvm::Value *val1=it->get()->getAddress()->getContext()->getValue();
+		// llvm::GlobalValue *gv1 = dyn_cast<llvm::GlobalValue>(val1);
+		// ref<Expr> result = getGlobalValue(gv1);
+		// std::set<std::string> tmp = TxPartitionHelper::getExprVars(result);
+		// if (!TxPartitionHelper::isShared(tmp, v1star)) {
 			markedGlobaldels.insert((*it));
-		}
+		// }
 	}
 	for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobaldels.begin(),
 									ie = markedGlobaldels.end();it != ie; ++it) {
