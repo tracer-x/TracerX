@@ -214,6 +214,13 @@ MarkGlobal("mark-global",
            llvm::cl::desc("Decide whether global variables are marked or not"),
            llvm::cl::init(true));
 
+llvm::cl::opt<bool>
+NoAbduction("no-abduction",
+              llvm::cl::desc("Perform weakest-precondition computation without partitioning"),
+              llvm::cl::init(false));
+
+
+
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT

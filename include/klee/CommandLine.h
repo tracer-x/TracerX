@@ -121,6 +121,9 @@ extern llvm::cl::opt<bool> WPInterpolant;
 
 extern llvm::cl::opt<bool> MarkGlobal;
 
+extern llvm::cl::opt<bool> NoAbduction;
+
+
 #endif
 
 #ifdef ENABLE_METASMT
