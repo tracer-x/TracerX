@@ -806,6 +806,7 @@ bool TxSubsumptionTableEntry::subsumed(
     int debugSubsumptionLevel) {
 #ifdef ENABLE_Z3
 
+if(!NoAbduction){
   if (MarkGlobal) {
     // Global check
     bool globalSat = true;
@@ -859,7 +860,7 @@ bool TxSubsumptionTableEntry::subsumed(
       }
     }
   }
-
+}
   // WP interpolant check
   if (WPInterpolant && !wpInterpolant.isNull()) {
     // Checking if weakest pre-condition holds. In case WPInterpolant
@@ -892,16 +893,17 @@ bool TxSubsumptionTableEntry::subsumed(
     }
   }
 
-  /*  if (WPInterpolant) {
+if(NoAbduction){
+   if (WPInterpolant) {
     // In case a node is subsumed, the WP Expr is stored at the parent node.
     // This is crucial for generating WP Expr at the parent node.
     state.txTreeNode->setWPatSubsumption(wpInterpolant);
   }
 
   return true;
-
+}
   // Ignoring deletion interpolant*/
-
+if(!NoAbduction){
   // PhiNode Check 1 (checking previous BB is the same at subsumption point)
   if (isa<llvm::PHINode>(state.pc->inst) &&
       prevProgramPoint != reinterpret_cast<uintptr_t>(state.prevPC->inst)) {
@@ -1716,6 +1718,7 @@ bool TxSubsumptionTableEntry::subsumed(
     }
     return true;
   }
+}
 #endif /* ENABLE_Z3 */
   return false;
 }
