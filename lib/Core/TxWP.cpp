@@ -163,7 +163,7 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
 	 // vars(pi)
 	 std::set<std::string> globalpimiuVars;
 	 if (!entry->getInterpolant().isNull()){
-		 entry->getInterpolant()->dump();
+		 //entry->getInterpolant()->dump();
 		 globalpimiuVars = TxPartitionHelper::getExprVars(entry->getInterpolant());
 
 	 }

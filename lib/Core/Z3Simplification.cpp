@@ -368,7 +368,7 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
            if(!val0.compare(l)||!val0.compare(r)){
         	   ref<Expr> val1 = ConstantExpr::create(1, Expr::Int32);
         	   ref<Expr> val2 = SDivExpr::create(val0, val1);
-        	   val2->dump();
+        	   //val2->dump();
         	   return val2;
                 }
            else{
