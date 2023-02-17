@@ -80,61 +80,64 @@ TxWeakestPreCondition::~TxWeakestPreCondition() {
 
 ref<Expr> TxWeakestPreCondition::intersectWPExpr(ref<Expr> branchCondition,
 		ref<Expr> expr1, ref<Expr> expr2) {
-	// v
-	std::set<std::string> bvars = TxPartitionHelper::getExprVars(
-			branchCondition);
+	// // v
+	// std::set<std::string> bvars = TxPartitionHelper::getExprVars(
+	// 		branchCondition);
 
-	// Closure(W1,v)
-	std::set<std::string> closure1 = bvars;
-	std::vector<ref<Expr> > expr1Comps = TxPartitionHelper::getExprsFromAndExpr(
-			expr1);
-	for (std::vector<ref<Expr> >::iterator it = expr1Comps.begin(), ie =
-			expr1Comps.end(); it != ie; ++it) {
-		std::set<std::string> tmpVars = TxPartitionHelper::getExprVars(*it);
-		if (TxPartitionHelper::isShared(closure1, tmpVars)) {
-			closure1.insert(tmpVars.begin(), tmpVars.end());
-		}
-	}
+	// // Closure(W1,v)
+	// std::set<std::string> closure1 = bvars;
+	// std::vector<ref<Expr> > expr1Comps = TxPartitionHelper::getExprsFromAndExpr(
+	// 		expr1);
+	// for (std::vector<ref<Expr> >::iterator it = expr1Comps.begin(), ie =
+	// 		expr1Comps.end(); it != ie; ++it) {
+	// 	std::set<std::string> tmpVars = TxPartitionHelper::getExprVars(*it);
+	// 	if (TxPartitionHelper::isShared(closure1, tmpVars)) {
+	// 		closure1.insert(tmpVars.begin(), tmpVars.end());
+	// 	}
+	// }
 
-	// Closure(W2,v)
-	std::set<std::string> closure2 = bvars;
-	std::vector<ref<Expr> > expr2Comps = TxPartitionHelper::getExprsFromAndExpr(
-			expr2);
-	for (std::vector<ref<Expr> >::iterator it = expr2Comps.begin(), ie =
-			expr2Comps.end(); it != ie; ++it) {
-		std::set<std::string> tmpVars = TxPartitionHelper::getExprVars(*it);
-		if (TxPartitionHelper::isShared(closure2, tmpVars)) {
-			closure2.insert(tmpVars.begin(), tmpVars.end());
-		}
-	}
+	// // Closure(W2,v)
+	// std::set<std::string> closure2 = bvars;
+	// std::vector<ref<Expr> > expr2Comps = TxPartitionHelper::getExprsFromAndExpr(
+	// 		expr2);
+	// for (std::vector<ref<Expr> >::iterator it = expr2Comps.begin(), ie =
+	// 		expr2Comps.end(); it != ie; ++it) {
+	// 	std::set<std::string> tmpVars = TxPartitionHelper::getExprVars(*it);
+	// 	if (TxPartitionHelper::isShared(closure2, tmpVars)) {
+	// 		closure2.insert(tmpVars.begin(), tmpVars.end());
+	// 	}
+	// }
 
-	std::set<std::string> closure = closure1;
-	closure.insert(closure2.begin(), closure2.end());
+	// std::set<std::string> closure = closure1;
+	// closure.insert(closure2.begin(), closure2.end());
 
-	// v1, v2
-	std::set<std::string> wp1vars = TxPartitionHelper::getExprVars(expr1);
-	std::set<std::string> v1 = TxPartitionHelper::diff(wp1vars, closure);
-	std::set<std::string> wp2vars = TxPartitionHelper::getExprVars(expr2);
-	std::set<std::string> v2 = TxPartitionHelper::diff(wp2vars, closure);
+	// // v1, v2
+	// std::set<std::string> wp1vars = TxPartitionHelper::getExprVars(expr1);
+	// std::set<std::string> v1 = TxPartitionHelper::diff(wp1vars, closure);
+	// std::set<std::string> wp2vars = TxPartitionHelper::getExprVars(expr2);
+	// std::set<std::string> v2 = TxPartitionHelper::diff(wp2vars, closure);
 
-	std::vector<ref<Expr> > expr0Comps;
-	// proj(W1, v1)
-	for (std::vector<ref<Expr> >::iterator it = expr1Comps.begin(), ie =
-			expr1Comps.end(); it != ie; ++it) {
-		std::set<std::string> tmpVars = TxPartitionHelper::getExprVars(*it);
-		if (TxPartitionHelper::isShared(v1, tmpVars)) {
-			expr0Comps.push_back(*it);
-		}
-	}
+	std::vector<ref<Expr> > expr0Comps;			
+	expr0Comps.push_back(expr1);
+	expr0Comps.push_back(expr2);
+
+	// // proj(W1, v1)
+	// for (std::vector<ref<Expr> >::iterator it = expr1Comps.begin(), ie =
+	// 		expr1Comps.end(); it != ie; ++it) {
+	// 	 std::set<std::string> tmpVars = TxPartitionHelper::getExprVars(*it);
+	// 	 if (TxPartitionHelper::isShared(v1, tmpVars)) {
+	// 		expr0Comps.push_back(*it);
+	// 	 }
+	// }
 
 	// proj(W2, v2)
-	for (std::vector<ref<Expr> >::iterator it = expr2Comps.begin(), ie =
-			expr2Comps.end(); it != ie; ++it) {
-		std::set<std::string> tmpVars = TxPartitionHelper::getExprVars(*it);
-		if (TxPartitionHelper::isShared(v2, tmpVars)) {
-			expr0Comps.push_back(*it);
-		}
-	}
+	// for (std::vector<ref<Expr> >::iterator it = expr2Comps.begin(), ie =
+	// 		expr2Comps.end(); it != ie; ++it) {
+	// 	std::set<std::string> tmpVars = TxPartitionHelper::getExprVars(*it);
+	// 	if (TxPartitionHelper::isShared(v2, tmpVars)) {
+	// 		expr0Comps.push_back(*it);
+	// 	}
+	// }
 
 	ref<Expr> expr0 = TxPartitionHelper::createAnd(expr0Comps);
 	return expr0;
