@@ -2753,13 +2753,44 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
   } else if (assertionFail) {
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
-    expr = wp->True();
+    expr = wp->False();
   } else if (childWPInterpolant[0].isNull() || childWPInterpolant[1].isNull()) {
     expr = childWPInterpolant[0].isNull() ? childWPInterpolant[0]
                                           : childWPInterpolant[1];
-  } else if (childWPInterpolant[0] == wp->False() ||
+  } else if (childWPInterpolant[0] == wp->False() &&
              childWPInterpolant[1] == wp->False()) {
     expr = wp->False();
+  } else if (childWPInterpolant[0] == wp->False() ||
+             childWPInterpolant[1] == wp->False()) {
+    llvm::Instruction *i = reverseInstructionList.back().first->inst;
+    if (i->getOpcode() == llvm::Instruction::Br) {
+      llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(i);
+      if (br->isConditional()) {
+        branchCondition = wp->getBrCondition(i);
+      }
+    }
+    if (!branchCondition.isNull()) {
+       if (childWPInterpolant[0] == wp->False()){
+          std::vector<ref<Expr> > exprVec;
+          exprVec.push_back(NotExpr::create(branchCondition));
+          exprVec.push_back(childWPInterpolant[1]);
+          expr = TxPartitionHelper::createAnd(exprVec);
+       } else {
+          std::vector<ref<Expr> > exprVec;
+          exprVec.push_back(branchCondition);
+          exprVec.push_back(childWPInterpolant[0]);
+          expr = TxPartitionHelper::createAnd(exprVec);
+       }
+      if (!expr.isNull()) {
+        wp->setWPExpr(expr);
+        // Generate weakest precondition from pathCondition and/or BB
+        // instructions
+        expr = wp->PushUp(reverseInstructionList);
+        expr = Z3Simplification::simplify(expr);
+      } else
+        expr = wp->False(); // push up false to be safe
+    } else
+      expr = wp->False(); // push up false to be safe
   } else if (childWPInterpolant[0] == wp->True() &&
              childWPInterpolant[1] == wp->True()) {
     wp->resetWPExpr();

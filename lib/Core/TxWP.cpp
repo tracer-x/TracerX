@@ -153,8 +153,9 @@ ref<Expr> TxWeakestPreCondition::intersectWPExpr(ref<Expr> branchCondition,
 TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
 		TxSubsumptionTableEntry *entry) {
 
-	if (entry->getWPInterpolant() == ConstantExpr::alloc(0, Expr::Bool))
-		entry->setWPInterpolant(ConstantExpr::alloc(1, Expr::Bool));
+	// Don't change false to true
+	// if (entry->getWPInterpolant() == ConstantExpr::alloc(0, Expr::Bool))
+	// 	entry->setWPInterpolant(ConstantExpr::alloc(1, Expr::Bool));
 
 	//  // vars(w)
 	//  std::set<std::string> wpVars;
@@ -438,12 +439,12 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 				}
 
 				WPExpr = TxWPHelper::substituteExpr(WPExpr, right, left);
-				       /* llvm::outs() << "****** Flag = 5 *******\n";*/
-				       //WPExpr->dump();
-				        /*llvm::outs() << "------\n";*/
+				    //    llvm::outs() << "****** Flag = 5 *******\n";
+				    //    WPExpr->dump();
+				    //    llvm::outs() << "------\n";
 				WPExpr = Z3Simplification::simplify(WPExpr);
-				        //WPExpr->dump();
-				        //llvm::outs() << "******* End Flag = 5 *******\n";
+				    //    WPExpr->dump();
+				    //    llvm::outs() << "******* End Flag = 5 *******\n";
 			} else if (isa<llvm::GetElementPtrInst>(i->getOperand(1))) { // Update Array
 				llvm::GetElementPtrInst *parentGEP = dyn_cast<
 						llvm::GetElementPtrInst>(i->getOperand(1));
@@ -463,13 +464,13 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 					return val;
 				ref<Expr> update = UpdExpr::create(pair.second, pair.first,
 						val);
-//				        llvm::outs() << "****** Flag = 0 for Update Array *******\n";
-//				        i->dump();
-				        //WPExpr->dump();
+				        // llvm::outs() << "****** Flag = 0 for Update Array *******\n";
+				        // i->dump();
+				        // WPExpr->dump();
 				WPExpr = TxWPHelper::substituteExpr(WPExpr, pair.second,
 						update);
-				        //WPExpr->dump();
-			      // llvm::outs() << "****** End Flag = 0 for Update Array*******\n";
+						// WPExpr->dump();
+						// llvm::outs() << "****** End Flag = 0 for Update Array*******\n";
 			}
 		}
 	}
