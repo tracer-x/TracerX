@@ -154,8 +154,11 @@ TxSubsumptionTableEntry *TxWeakestPreCondition::updateSubsumptionTableEntry(
 		TxSubsumptionTableEntry *entry) {
 
 	// Don't change false to true
-	// if (entry->getWPInterpolant() == ConstantExpr::alloc(0, Expr::Bool))
-	// 	entry->setWPInterpolant(ConstantExpr::alloc(1, Expr::Bool));
+	if (entry->getWPInterpolant() == ConstantExpr::alloc(0, Expr::Bool)){
+		ref<Expr> dummy;
+		entry->setWPInterpolant(dummy);
+		return entry;
+	}
 
 	//  // vars(w)
 	//  std::set<std::string> wpVars;

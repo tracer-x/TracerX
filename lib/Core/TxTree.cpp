@@ -846,12 +846,6 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
     }
   }
 
-    if (WPInterpolant) {
-    // In case a node is subsumed, the WP Expr is stored at the parent node.
-    // This is crucial for generating WP Expr at the parent node.
-    state.txTreeNode->setWPatSubsumption(wpInterpolant);
-  }
-
   if (MarkGlobal) {
     // Global check
     bool globalSat = true;
