@@ -2314,7 +2314,21 @@ ref<klee::ConstantExpr> Executor::evalConstant(const Constant *c) {
       }
       ref<Expr> res = ConcatExpr::createN(kids.size(), kids.data());
       return cast<ConstantExpr>(res);
-    } else {
+    } else if (const ConstantVector *cv = dyn_cast<ConstantVector>(c)) {
+        llvm::SmallVector<ref<Expr>, 8> kids;
+        const size_t numOperands = cv->getNumOperands();
+        kids.reserve(numOperands);
+        for (unsigned i = numOperands; i != 0; --i) {
+          kids.push_back(evalConstant(cv->getOperand(i)));
+        }
+        assert(Context::get().isLittleEndian() &&
+               "FIXME:Broken for big endian");
+        ref<Expr> res = ConcatExpr::createN(numOperands, kids.data());
+        assert(isa<ConstantExpr>(res) &&
+               "result of constant vector built is not a constant");
+        return cast<ConstantExpr>(res);
+     }
+    else {
       // Constant{Vector}
       llvm::report_fatal_error("invalid argument to evalConstant()");
     }
