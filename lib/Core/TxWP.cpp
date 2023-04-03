@@ -689,8 +689,7 @@ ref<Expr> TxWeakestPreCondition::getConstantInt(llvm::ConstantInt *CI) {
 
 ref<Expr> TxWeakestPreCondition::getConstantFP(llvm::ConstantFP *CI) {
   ref<Expr> result;
-  klee_warning("Silently skipping WP (reason: Constant Floating Point): "
-               "TxWeakestPreCondition::getConstantFP");
+  result = ConstantExpr::alloc(CI->getValueAPF().bitcastToAPInt());
   return result;
 }
 
