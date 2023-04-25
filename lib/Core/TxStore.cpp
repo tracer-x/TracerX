@@ -301,6 +301,7 @@ TxStore::getAddressofLatestCopyLLVMValue(llvm::Value *val) {
                                      ie = internalStore.end();
        it != ie; ++it) {
     ref<TxAllocationContext> temp = (*it).first;
+    //llvm::outs()<<"Address-01\n";
     if (temp->getValue() == val) {
       if (!foundValue) {
         address = temp;
@@ -311,9 +312,37 @@ TxStore::getAddressofLatestCopyLLVMValue(llvm::Value *val) {
       }
     }
   }
-
-  // Maybe NULL
   return address;
+}
+
+ref<TxStoreEntry> TxStore::getAddressofLatestCopyLLVMValueFromHistoricalStore(llvm::Value *val){
+ref<TxStoreEntry> address;
+ bool foundValue = false;
+for (LowerStateStore::const_iterator
+          it = symbolicallyAddressedHistoricalStore.begin(),
+          ie = symbolicallyAddressedHistoricalStore.end();
+      it != ie; ++it) {
+ref<TxStoreEntry> temp = (*it).second;
+    if (temp->getValue() == val) {     
+        address = temp;
+        foundValue = true;
+    }
+}
+if(!foundValue)
+{
+for (LowerStateStore::const_iterator
+          it = concretelyAddressedHistoricalStore.begin(),
+          ie = concretelyAddressedHistoricalStore.end();
+      it != ie; ++it) {
+ref<TxStoreEntry> temp = (*it).second;
+    if (temp->getValue() == val) {     
+        address = temp;
+        foundValue = true;
+    }
+}
+
+}
+return address;
 }
 
 inline void TxStore::concreteToInterpolant(

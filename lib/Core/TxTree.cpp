@@ -16,7 +16,7 @@
 #include "TxTree.h"
 
 #include "TimingSolver.h"
-
+#include "Executor.h"
 #include "TxDependency.h"
 #include "TxShadowArray.h"
 #include "Memory.h"
@@ -64,7 +64,9 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   interpolant = node->getInterpolant(existentials, substitution);
   prevProgramPoint = node->getPrevProgramPoint();
   phiValues = node->getPhiValue();
-
+  //klee_message("********** Start of Program Point: %lu Block Instructions **********",node->getProgramPoint());
+  //node->getBasicBlock()->dump();
+  //klee_message("*********************** End of Instructions ******************************************\n");
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
@@ -812,6 +814,38 @@ bool TxSubsumptionTableEntry::subsumed(
 setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
 #ifdef ENABLE_Z3
 
+  // WP interpolant check
+  if (WPInterpolant && !wpInterpolant.isNull()) {
+    // Checking if weakest pre-condition holds. In case WPInterpolant
+    // flag is set, this serves as the first check when subsuming a node.
+    // If it fails then false is returned. If it succeeds then the
+    // second check is performed.
+    ref<Expr> wpInstantiatedInterpolant =
+        state.txTreeNode->instantiateWPatSubsumption(
+            wpInterpolant, state, state.txTreeNode->getDependency());
+    if (wpInstantiatedInterpolant.isNull())
+      return false;
+    ref<Expr> wpBoolean =
+        ZExtExpr::create(wpInstantiatedInterpolant, Expr::Bool);
+    Solver::Validity result;
+    std::vector<ref<Expr> > unsatCore;
+    bool success = solver->evaluate(state, wpBoolean, result, unsatCore);
+
+    if (!success || result != Solver::True) {
+      if (debugSubsumptionLevel >= 1) {
+        klee_message("#%lu=>#%lu: Check failure at WP Expr check ",
+                     state.txTreeNode->getNodeSequenceNumber(),
+                     nodeSequenceNumber);
+      }
+      return false;
+    }
+    if (debugSubsumptionLevel >= 1) {
+      klee_message("#%lu=>#%lu: Weakest precondition check success",
+                   state.txTreeNode->getNodeSequenceNumber(),
+                   nodeSequenceNumber);
+    }
+  }
+
   if (MarkGlobal) {
     // Global check
     bool globalSat = true;
@@ -866,41 +900,7 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
     }
   }
 
-  // WP interpolant check
-  if (WPInterpolant && !wpInterpolant.isNull()) {
-    // Checking if weakest pre-condition holds. In case WPInterpolant
-    // flag is set, this serves as the first check when subsuming a node.
-    // If it fails then false is returned. If it succeeds then the
-    // second check is performed.
-    ref<Expr> wpInstantiatedInterpolant =
-        state.txTreeNode->instantiateWPatSubsumption(
-            wpInterpolant, state.txTreeNode->getDependency());
-
-    if (wpInstantiatedInterpolant.isNull())
-      return false;
-
-    ref<Expr> wpBoolean =
-        ZExtExpr::create(wpInstantiatedInterpolant, Expr::Bool);
-
-    Solver::Validity result;
-    std::vector<ref<Expr> > unsatCore;
-    bool success = solver->evaluate(state, wpBoolean, result, unsatCore);
-
-    if (!success || result != Solver::True) {
-      if (debugSubsumptionLevel >= 1) {
-        klee_message("#%lu=>#%lu: Check failure at WP Expr check ",
-                     state.txTreeNode->getNodeSequenceNumber(),
-                     nodeSequenceNumber);
-      }
-      return false;
-    }
-    if (debugSubsumptionLevel >= 1) {
-      klee_message("#%lu=>#%lu: Weakest precondition check success",
-                   state.txTreeNode->getNodeSequenceNumber(),
-                   nodeSequenceNumber);
-    }
-  }
-
+  // Ignoring deletion interpolant
   // PhiNode Check 1 (checking previous BB is the same at subsumption point)
   if (isa<llvm::PHINode>(state.pc->inst) &&
       prevProgramPoint != reinterpret_cast<uintptr_t>(state.prevPC->inst)) {
@@ -1782,6 +1782,10 @@ void TxSubsumptionTableEntry::setExistentials(
   existentials = _existentials;
 }
 
+void TxSubsumptionTableEntry::setmarkedGlobal(std::set<ref<TxStoreEntry> > _markedGlobal){
+	markedGlobal=_markedGlobal;
+}
+
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
   print(stream, 0,debugSubsumptionLevel_g);
 }
@@ -1803,11 +1807,12 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
                                                 ie = markedGlobal.end();
          it != ie; ++it) {
+    	//llvm::outs()<<"Global vaiables:::::::::::---------------:::::\n\n\n";
       (*it)->print(stream);
     }
     stream << "]\n";
   }
-  stream << prefix << "interpolant = ";
+  stream << prefix << "pi = ";
   if (!interpolant.isNull())
     interpolant->print(stream);
   else
@@ -2742,13 +2747,44 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
   } else if (assertionFail) {
     wp->resetWPExpr();
     // Generate weakest precondition from pathCondition and/or BB instructions
-    expr = wp->True();
+    expr = wp->False();
   } else if (childWPInterpolant[0].isNull() || childWPInterpolant[1].isNull()) {
     expr = childWPInterpolant[0].isNull() ? childWPInterpolant[0]
                                           : childWPInterpolant[1];
-  } else if (childWPInterpolant[0] == wp->False() ||
+  } else if (childWPInterpolant[0] == wp->False() &&
              childWPInterpolant[1] == wp->False()) {
     expr = wp->False();
+  } else if (childWPInterpolant[0] == wp->False() ||
+             childWPInterpolant[1] == wp->False()) {
+    llvm::Instruction *i = reverseInstructionList.back().first->inst;
+    if (i->getOpcode() == llvm::Instruction::Br) {
+      llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(i);
+      if (br->isConditional()) {
+        branchCondition = wp->getBrCondition(i);
+      }
+    }
+    if (!branchCondition.isNull()) {
+       if (childWPInterpolant[0] == wp->False()){
+          std::vector<ref<Expr> > exprVec;
+          exprVec.push_back(NotExpr::create(branchCondition));
+          exprVec.push_back(childWPInterpolant[1]);
+          expr = TxPartitionHelper::createAnd(exprVec);
+       } else {
+          std::vector<ref<Expr> > exprVec;
+          exprVec.push_back(branchCondition);
+          exprVec.push_back(childWPInterpolant[0]);
+          expr = TxPartitionHelper::createAnd(exprVec);
+       }
+      if (!expr.isNull()) {
+        wp->setWPExpr(expr);
+        // Generate weakest precondition from pathCondition and/or BB
+        // instructions
+        expr = wp->PushUp(reverseInstructionList);
+        expr = Z3Simplification::simplify(expr);
+      } else
+        expr = wp->False(); // push up false to be safe
+    } else
+      expr = wp->False(); // push up false to be safe
   } else if (childWPInterpolant[0] == wp->True() &&
              childWPInterpolant[1] == wp->True()) {
     wp->resetWPExpr();
@@ -2813,23 +2849,23 @@ llvm::Instruction *TxTreeNode::getPreviousInstruction(llvm::PHINode *phi) {
 // =========================================================================
 // Instantiating WP Expression at Subsumption Point
 // =========================================================================
-ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
+ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant, ExecutionState &state,
                                                  TxDependency *dependency) {
-
   if (wpInterpolant.isNull())
     return wpInterpolant;
 
   switch (wpInterpolant->getKind()) {
   case Expr::InvalidKind:
-  case Expr::Constant: { return wpInterpolant; }
+  case Expr::Constant: {
+	  return wpInterpolant; }
 
   case Expr::WPVar: {
     // TODO: Not handling multiple copies of a var in store
     // TxTreeNode::instantiateWPatSubsumption
-    ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant);
+    ref<WPVarExpr> WPVar1 = dyn_cast<WPVarExpr>(wpInterpolant);
 
     ref<TxAllocationContext> alc =
-        dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
+        dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar1->address);
 
     if (!alc.isNull()) {
       ref<TxStoreEntry> entry;
@@ -2845,6 +2881,48 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
           return result;
         }
       }
+    }  else {
+    //Checking the historical values
+     ref<TxStoreEntry> entry;
+         entry = dependency->getStore()->getAddressofLatestCopyLLVMValueFromHistoricalStore(WPVar1->address);
+
+         if (!entry.isNull()) {
+           if (wpInterpolant->getWidth() ==
+               entry->getContent()->getExpression()->getWidth()) {
+             return entry->getContent()->getExpression();
+           } else {
+             ref<Expr> result = ZExtExpr::create(
+                 entry->getContent()->getExpression(), wpInterpolant->getWidth());
+             return result;
+           }
+         }
+         else{ // Date: 20/04/2022
+        	//  // Loading values from Global Variables
+                  	  ref<Expr> dummy;
+          //        llvm::outs()<<"\nChecking the Global list for the WPVar: ["<<wpInterpolant<<"]\n";
+          //        llvm::outs()<<"cheking WP var address\n";
+          //        llvm::outs()<<WPVar1->address<<"\n";
+          //        wpInterpolant.get()->dump();
+          //        llvm::outs()<<wpInterpolant.get();
+                 MemoryMap::iterator begin = state.addressSpace.objects.begin();
+                 MemoryMap::iterator end = state.addressSpace.objects.end();
+                 while (end!=begin) {
+                	 --end;
+                 const MemoryObject *mo = end->first;
+                 ObjectState *oj= end->second;
+                 if(!mo->isFixed){
+                	 	 if(mo->allocSite==WPVar1->address){
+                        	 ref<Expr> address=ConstantExpr::create(mo->address, Expr::Int64);
+                        	 ref<Expr> offset = mo->getOffsetExpr(address);
+                	 		     ref<Expr> result = oj->read(offset, mo->size*8);
+                	 		     return result;
+                	 	 }
+                 }
+                 }
+              return dummy;
+        //llvm::outs()<<globalAddresses;
+
+         }
     }
     // wpInterpolant->dump();
     // dependency->getStore()->dump();
@@ -2862,7 +2940,7 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   case Expr::ZExt:
   case Expr::SExt: {
     ref<Expr> kids[1];
-    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
+    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0),state,dependency);
     if (kids[0].isNull())
       return kids[0];
     else
@@ -2895,21 +2973,26 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   case Expr::LShr:
   case Expr::AShr: {
     ref<Expr> kids[2];
-    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
-    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
-    if (kids[0].isNull())
-      return kids[0];
-    if (kids[1].isNull())
-      return kids[1];
+    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), state, dependency);
+    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
+    if (kids[0].isNull()){
+    	return kids[0];}
+    if (kids[1].isNull()){
+      return kids[1];}
+    ref<Expr> CONST_REF1 = ConstantExpr::create(0, Expr::Int32);
+    if (wpInterpolant->getKid(1)==CONST_REF1 && wpInterpolant->getKid(1)->getKind()== Expr::Constant && wpInterpolant->getKind()== Expr::SDiv){
 
+    	ref<Expr> dummy;
+    	     return dummy;
+    }
     return wpInterpolant->rebuild(kids);
   }
 
   case Expr::Select: {
     ref<Expr> kids[3];
-    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
-    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
-    kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), dependency);
+    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), state, dependency);
+    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
+    kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), state, dependency);
     if (kids[0].isNull())
       return kids[0];
     if (kids[1].isNull())
@@ -2920,9 +3003,9 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   }
   case Expr::Upd: {
     ref<Expr> kids[3];
-    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
-    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
-    kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), dependency);
+    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), state, dependency);
+    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
+    kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), state, dependency);
     if (kids[0].isNull())
       return kids[0];
     if (kids[1].isNull())
@@ -2932,20 +3015,71 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     return wpInterpolant->rebuild(kids);
   }
   case Expr::Sel: {
-
     ref<Expr> kids[2];
     kids[0] = wpInterpolant->getKid(0);
-    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
+    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
     if (kids[0].isNull())
       return kids[0];
     if (kids[1].isNull())
       return kids[1];
 
     ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
+    ref<TxAllocationContext> alc;
+    //ref<TxAllocationContext> alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
+    if (!WPVar.isNull()){
+     alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);}
+//    else{
+//
+//    	alc=nullptr;
+//    }
+//    llvm::outs()<<"Checking the print-2\n";
+////alc->dump();
+//    llvm::outs()<<"Checking the print-3\n";
 
-    ref<TxAllocationContext> alc =
-        dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
+//    for(map<string, pair<string,string> >::const_iterator it = myMap.begin();
+//        it != myMap.end(); ++it)
+//    {
+//        std::cout << it->first << " " << it->second.first << " " << it->second.second << "\n";
+//    }
+//
+//    std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
 
+    // Change to check the global variables -- 18 may 2022
+//    for(std::map<const llvm::GlobalValue *, ref<ConstantExpr> >::const_iterator it = globalAddresses->begin();
+//        it != globalAddresses->end(); ++it)
+//    {
+//
+//    	llvm::outs()<<"**************************************************************\n";
+//    	it->first->dump();
+//    	llvm::outs()<<"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+//    	it->second->dump();
+//    	Executor::const_iterator pos = globalAddresses.find("string");
+//    	//ref<TxAllocationContext> alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(it->first);
+//    	 //llvm::outs()<<it<<"\n";
+//    }
+
+//    for (const auto& p : globalAddresses ) {
+//            llvm::outs()<<p<<"\n";
+//        }
+
+//    for (auto const &pair: globalAddresses) {
+//    	llvm::outs() << "{" << pair.first << ": " << pair.second << "}\n";
+//        }
+//    Executor::const_iterator pos = globalAddresses.find("string");
+//    if (pos == map.end()) {
+//        //handle the error
+//    } else {
+//        std::string value = pos->second;
+//
+//    }
+
+    		//dependency->getStore()->markGlobalVariables(WPVar->address);
+//       //
+// if(alc.isNull){
+//
+//
+// }
+ //   llvm::outs()<<"Checking the print\n";
     if (!alc.isNull()) {
       ref<TxStoreEntry> entry;
       ref<Expr> offset = MulExpr::create(
@@ -2959,30 +3093,47 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
              "instantiateWPatSubsumption, offset is "
              "not a constant value");
       entry = dependency->getStore()->find(alc, offset);
-
+  //	llvm::outs()<<"Print-111\n";
+  	//entry->dump();
       if (!entry.isNull()) {
+    	//	llvm::outs()<<"Print-121\n";
+    		//entry->dump();
         if (wpInterpolant->getWidth() ==
             entry->getContent()->getExpression()->getWidth()) {
+        //	llvm::outs()<<"Print-11\n";
+        	//entry->getContent()->getExpression()->dump();
           return entry->getContent()->getExpression();
         } else {
           ref<Expr> result = ZExtExpr::create(
               entry->getContent()->getExpression(), wpInterpolant->getWidth());
+
+      	//llvm::outs()<<"Print-21\n";
+      	//result->dump();
           return result;
         }
       }
+      //llvm::outs()<<"Are we reached here\n";
     } else {
+    	//llvm::outs()<<"The entry part is null\n";
+    	//llvm::outs()<<alc;//for make
     }
-
-    wpInterpolant->dump();
-    klee_error("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel "
-               "Expression failed!");
+    //llvm::outs()<<"Are we reached here-- before WP- Interpolants\n";
+     ref<Expr> dummy;
+     return dummy;
+    //wpInterpolant->dump();
+    //klee_error("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel "
+              // "Expression failed!");
+    //return wpInterpolant;
     break;
   }
   default: {
-    wpInterpolant->dump();
-    klee_error("TxWPHelper::instantiateWPatSubsumption: Expression not "
+	
+     //ref<Expr> dummy;
+     //return dummy;
+     //wpInterpolant->dump();
+     klee_error("TxWPHelper::instantiateWPatSubsumption: Expression not "
                "supported yet!");
-    return wpInterpolant;
+     //return wpInterpolant;
   }
   }
 }

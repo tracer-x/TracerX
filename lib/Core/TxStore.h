@@ -272,6 +272,8 @@ public:
       LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const;
 
   ref<TxAllocationContext> getAddressofLatestCopyLLVMValue(llvm::Value *val);
+  
+  ref<TxStoreEntry> getAddressofLatestCopyLLVMValueFromHistoricalStore(llvm::Value *val);
 
   /// \brief Newly relate a location with its stored value, when the value is
   /// loaded from the location

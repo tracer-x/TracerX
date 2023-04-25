@@ -367,6 +367,8 @@ public:
 
   void setExistentials(std::set<const Array *> _existentials);
 
+  void setmarkedGlobal(std::set<ref<TxStoreEntry> > _markedGlobal);
+  
   void dump() const {
     this->print(llvm::errs());
     llvm::errs() << "\n";
@@ -649,7 +651,7 @@ public:
 
   // \brief Instantiates the variables in WPExpr by their latest value for the
   // implication test.
-  ref<Expr> instantiateWPatSubsumption(ref<Expr> wpInterpolant,
+  ref<Expr> instantiateWPatSubsumption(ref<Expr> wpInterpolant, ExecutionState &state,
                                        TxDependency *dependency);
 
   /// \brief Copy WP to the parent node at subsumption point
