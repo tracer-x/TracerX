@@ -51,20 +51,16 @@ Statistic TxSubsumptionTableEntry::solverAccessTime("solverAccessTime",
 
 TxSubsumptionTableEntry::TxSubsumptionTableEntry(
     TxTreeNode *node, const std::vector<llvm::Instruction *> &callHistory)
-    : programPoint(node->getProgramPoint()),
-      nodeSequenceNumber(node->getNodeSequenceNumber()),
-      CfileLineNumber(node->getCfileLineNumber()),
-      CfileName(node->getCfileName()), CFuntionName(node->getCFunctionName()) {
+    : programPoint(node->getProgramPoint()),      
+      nodeSequenceNumber(node->getNodeSequenceNumber()),CfileLineNumber(node->getCfileLineNumber()),CfileName(node->getCfileName()),CFuntionName(node->getCFunctionName()) {
   std::map<ref<Expr>, ref<Expr> > substitution;
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
   prevProgramPoint = node->getPrevProgramPoint();
   phiValues = node->getPhiValue();
-  // klee_message("********** Start of Program Point: %lu Block Instructions
-  // **********",node->getProgramPoint());
+  // klee_message("********** Start of Program Point: %lu Block Instructions **********",node->getProgramPoint());
   // node->getBasicBlock()->dump();
-  // klee_message("*********************** End of Instructions
-  // ******************************************\n");
+  // klee_message("*********************** End of Instructions ******************************************\n");
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
@@ -1825,9 +1821,8 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
   std::string tabsNextNext = appendTab(tabsNext);
 
   stream << prefix << "------------ Subsumption Table Entry ------------\n";
-  stream << prefix << "Program point = " << programPoint << "\n";
-  stream << prefix << "C-File Name:Function Name:Line number = " << CfileName
-         << ":" << CFuntionName << ":" << CfileLineNumber << "\n";
+  stream << prefix << "Program point = " << programPoint << "\n"; 
+  stream << prefix << "C-File Name:Function Name:Line number = " << CfileName << ":"<<CFuntionName<<":" <<CfileLineNumber <<"\n";
   if (MarkGlobal) {
     stream << prefix << "global = [";
     for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),

@@ -317,11 +317,12 @@ public:
 
   const uint64_t nodeSequenceNumber;
 
-  unsigned CfileLineNumber;
+   unsigned CfileLineNumber;
 
-  llvm::StringRef CfileName;
+   llvm::StringRef CfileName;
 
-  std::string CFuntionName;
+   std::string CFuntionName;
+
 
   TxSubsumptionTableEntry(TxTreeNode *node,
                           const std::vector<llvm::Instruction *> &callHistory);
@@ -470,11 +471,11 @@ class TxTreeNode {
 
   llvm::BasicBlock *basicBlock;
 
-  unsigned CfileLineNumber;
+   unsigned CfileLineNumber;
 
-  llvm::StringRef CfileName;
-
-  std::string CFuntionName;
+   llvm::StringRef CfileName;
+  
+   std::string CFuntionName;
 
   // Used to ensure at subsumption the value of the phiNodes in the subsumed
   // tree remain the same
@@ -510,14 +511,13 @@ class TxTreeNode {
     if (!programPoint) {
       programPoint = reinterpret_cast<uintptr_t>(instr);
       prevProgramPoint = reinterpret_cast<uintptr_t>(prevInstr);
-      std::string CFuntionName1(
-          instr->getParent()->getParent()->getName().str());
-      CFuntionName = CFuntionName1;
+      std::string CFuntionName1(instr->getParent()->getParent()->getName().str());
+      CFuntionName=CFuntionName1;
       llvm::MDNode *n = instr->getMetadata("dbg");
-      // Display the line, char position of this instruction
-      llvm::DILocation loc(n);
-      CfileLineNumber = loc.getLineNumber();
-      CfileName = loc.getFilename();
+           // Display the line, char position of this instruction
+           llvm::DILocation loc(n);
+           CfileLineNumber = loc.getLineNumber();
+           CfileName = loc.getFilename();
 
       basicBlock = instr->getParent();
     }
@@ -596,7 +596,7 @@ public:
   uintptr_t getProgramPoint() { return programPoint; }
   unsigned getCfileLineNumber() { return CfileLineNumber; }
   llvm::StringRef getCfileName() { return CfileName; }
-  std::string getCFunctionName() { return CFuntionName; }
+  std::string getCFunctionName() {return CFuntionName;}
   llvm::BasicBlock *getBasicBlock() { return basicBlock; }
 
   uintptr_t getPrevProgramPoint() { return prevProgramPoint; }
