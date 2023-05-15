@@ -33,6 +33,14 @@
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/Support/raw_ostream.h"
 
+
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
+#include <llvm/IR/DebugInfo.h>
+#elif LLVM_VERSION_CODE >= LLVM_VERSION(3, 2)
+#include <llvm/DebugInfo.h>
+#else
+#include <llvm/Analysis/DebugInfo.h>
+#endif
 namespace klee {
 
 class TxWeakestPreCondition;
@@ -310,6 +318,13 @@ public:
 
   const uint64_t nodeSequenceNumber;
 
+   unsigned CfileLineNumber;
+
+   llvm::StringRef CfileName;
+
+   std::string CFuntionName;
+
+
   TxSubsumptionTableEntry(TxTreeNode *node,
                           const std::vector<llvm::Instruction *> &callHistory);
 
@@ -454,7 +469,14 @@ class TxTreeNode {
   TxTreeNode *parent, *left, *right;
 
   uintptr_t programPoint;
+
   llvm::BasicBlock *basicBlock;
+
+   unsigned CfileLineNumber;
+
+   llvm::StringRef CfileName;
+  
+   std::string CFuntionName;
 
   // Used to ensure at subsumption the value of the phiNodes in the subsumed
   // tree remain the same
@@ -490,6 +512,14 @@ class TxTreeNode {
     if (!programPoint) {
       programPoint = reinterpret_cast<uintptr_t>(instr);
       prevProgramPoint = reinterpret_cast<uintptr_t>(prevInstr);
+      std::string CFuntionName1(instr->getParent()->getParent()->getName().str());
+      CFuntionName=CFuntionName1;
+      llvm::MDNode *n = instr->getMetadata("dbg");
+           // Display the line, char position of this instruction
+           llvm::DILocation loc(n);
+           CfileLineNumber = loc.getLineNumber();
+           CfileName = loc.getFilename();
+
       basicBlock = instr->getParent();
     }
 
@@ -565,6 +595,9 @@ public:
   std::vector<llvm::Instruction *> callHistory;
 
   uintptr_t getProgramPoint() { return programPoint; }
+  unsigned getCfileLineNumber() { return CfileLineNumber; }
+  llvm::StringRef getCfileName() { return CfileName; }
+  std::string getCFunctionName() {return CFuntionName;}
   llvm::BasicBlock *getBasicBlock() { return basicBlock; }
 
   uintptr_t getPrevProgramPoint() { return prevProgramPoint; }
