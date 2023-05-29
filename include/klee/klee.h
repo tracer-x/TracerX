@@ -181,6 +181,13 @@ extern "C" {
   /* Check if a vector of integers is stored previously. */
   void tracerx_memo_check();
 
+  /* Increments the persistent variable count. */
+   void tracerx_incr_count();
+
+   /* Prints the persistent variable count. */
+   void tracerx_print_count();
+
+
 #ifdef __cplusplus
 }
 #endif

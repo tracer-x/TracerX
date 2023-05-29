@@ -141,6 +141,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_debug_state_off", handleDebugStateOff, false),
     add("tracerx_memo_check", handleMemoCheck, true),
     add("tracerx_memo", handleMemo, false),
+	  add("tracerx_incr_count", handleIncrCount, false),
+    add("tracerx_print_count", handlePrintCount, false),
 #undef addDNR
 #undef add
 };
@@ -733,6 +735,17 @@ void SpecialFunctionHandler::handleMemo(ExecutionState &state,
   }
 
   po.insert(obj);
+}
+
+void SpecialFunctionHandler::handleIncrCount(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments) {
+  po1.inc();
+}
+void SpecialFunctionHandler::handlePrintCount(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments) {
+  po1.print();
 }
 
 void SpecialFunctionHandler::handleGetValue(
