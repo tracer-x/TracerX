@@ -85,7 +85,21 @@ namespace klee {
     };
 
     persistentObject po;
+ 
+    class persistentVarCount {
+        private:
+          int count;
 
+        public:
+          void inc(){
+          count++;
+          //std::cout<<"****************\n The count value here is:"<<count<<"\n****************\n\n";
+          }
+          void print(){            
+          std::cout<<"****************\n The count value is:"<<count<<"\n****************\n\n";}
+        };
+
+    persistentVarCount po1;
   public:
     SpecialFunctionHandler(Executor &_executor);
 
@@ -125,6 +139,8 @@ namespace klee {
     HANDLER(handleDebugSubsumptionOff);
     HANDLER(handleMemoCheck);
     HANDLER(handleMemo);
+    HANDLER(handleIncrCount);
+    HANDLER(handlePrintCount);
     HANDLER(handleDefineFixedObject);
     HANDLER(handleDelete);    
     HANDLER(handleDeleteArray);
