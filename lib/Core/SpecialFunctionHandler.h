@@ -96,10 +96,34 @@ namespace klee {
           //std::cout<<"****************\n The count value here is:"<<count<<"\n****************\n\n";
           }
           void print(){            
-          std::cout<<"****************\n The count value is:"<<count<<"\n****************\n\n";}
+          std::cout<<"****************\n The count value is:"<<count<<"\n****************\n\n";
+          }
         };
 
     persistentVarCount po1;
+
+    class persistentVar {
+        private:
+         std::map<int, int> objects;
+
+        public:
+          void inc(int p){
+            if(objects.find(p) != objects.end()){
+            int oldCount=objects[p];
+            int newcount=oldCount+1;
+            objects[p]=newcount;
+            }
+            else{
+              objects[p]=1;
+            }
+          }
+
+          void print(int p){
+            std::cout<<"****************\n The count value of point-"<<p<<" is:"<<objects[p]<<"\n****************\n\n";
+          }
+        };
+
+    persistentVar po2;
   public:
     SpecialFunctionHandler(Executor &_executor);
 
@@ -141,6 +165,8 @@ namespace klee {
     HANDLER(handleMemo);
     HANDLER(handleIncrCount);
     HANDLER(handlePrintCount);
+    HANDLER(handleIncrVar);
+    HANDLER(handlePrintVar);
     HANDLER(handleDefineFixedObject);
     HANDLER(handleDelete);    
     HANDLER(handleDeleteArray);

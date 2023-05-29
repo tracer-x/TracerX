@@ -187,6 +187,13 @@ extern "C" {
    /* Prints the persistent variable count. */
    void tracerx_print_count();
 
+   /* Increments the persistent variable var. */
+   void tracerx_incr_var();
+
+   /* Prints the persistent variable var. */
+   void tracerx_print_var();
+
+
 
 #ifdef __cplusplus
 }

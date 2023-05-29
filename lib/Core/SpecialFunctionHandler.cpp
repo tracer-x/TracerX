@@ -143,6 +143,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_memo", handleMemo, false),
 	  add("tracerx_incr_count", handleIncrCount, false),
     add("tracerx_print_count", handlePrintCount, false),
+	  add("tracerx_incr_var", handleIncrVar, false),
+    add("tracerx_print_var", handlePrintVar, false),
 #undef addDNR
 #undef add
 };
@@ -746,6 +748,25 @@ void SpecialFunctionHandler::handlePrintCount(ExecutionState &state,
                                         KInstruction *target,
                                         std::vector<ref<Expr> > &arguments) {
   po1.print();
+}
+
+void SpecialFunctionHandler::handleIncrVar(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments) {
+	ref<Expr> level = executor.toUnique(state, arguments[0]);
+	  if (ConstantExpr *cLevel = llvm::dyn_cast<ConstantExpr>(level)) {
+	    po2.inc(cLevel->getZExtValue());
+	    return;
+	  }
+}
+void SpecialFunctionHandler::handlePrintVar(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments) {
+	ref<Expr> level = executor.toUnique(state, arguments[0]);
+		  if (ConstantExpr *cLevel = llvm::dyn_cast<ConstantExpr>(level)) {
+		    po2.print(cLevel->getZExtValue());
+		    return;
+		  }
 }
 
 void SpecialFunctionHandler::handleGetValue(
