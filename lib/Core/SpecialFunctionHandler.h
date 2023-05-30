@@ -85,6 +85,21 @@ namespace klee {
     };
 
     persistentObject po;
+    class extPersistentObject {
+        private:
+          std::vector<std::pair<std::vector<int>,uintptr_t> > objects;
+          //std::vector<std::pair<int,int> > objects1;
+          int count;
+
+        public:
+          void insert(std::pair<std::vector<int>,uintptr_t> items) { objects.push_back(items); }
+          bool contains(std::pair<std::vector<int>,uintptr_t> items) {
+            return std::find(objects.begin(), objects.end(), items) !=
+                   objects.end();
+          }
+        };
+
+    extPersistentObject epo;
  
     class persistentVarCount {
         private:
@@ -163,6 +178,8 @@ namespace klee {
     HANDLER(handleDebugSubsumptionOff);
     HANDLER(handleMemoCheck);
     HANDLER(handleMemo);
+    HANDLER(handleExtMemoCheck);
+    HANDLER(handleExtMemo);
     HANDLER(handleIncrCount);
     HANDLER(handlePrintCount);
     HANDLER(handleIncrVar);

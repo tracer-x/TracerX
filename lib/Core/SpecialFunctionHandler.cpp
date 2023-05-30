@@ -141,6 +141,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_debug_state_off", handleDebugStateOff, false),
     add("tracerx_memo_check", handleMemoCheck, true),
     add("tracerx_memo", handleMemo, false),
+    add("tracerx_ext_memo_check", handleExtMemoCheck, true),
+    add("tracerx_ext_memo", handleExtMemo, false),
 	  add("tracerx_incr_count", handleIncrCount, false),
     add("tracerx_print_count", handlePrintCount, false),
 	  add("tracerx_incr_var", handleIncrVar, false),
@@ -737,6 +739,46 @@ void SpecialFunctionHandler::handleMemo(ExecutionState &state,
   }
 
   po.insert(obj);
+}
+
+void SpecialFunctionHandler::handleExtMemoCheck(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr> > &arguments) {
+  assert(arguments[0]->getKind() == 0 &&
+         "invalid length variable, the first argument should be constant");
+  ref<ConstantExpr> length = dyn_cast<ConstantExpr>(arguments[0]);
+  std::vector<int> obj;
+  for (int i = 1; i <= length->getAPValue().getSExtValue(); i++) {
+    assert(arguments[i]->getKind() == 0 &&
+           "invalid item, the items should be constant");
+    ref<ConstantExpr> item = dyn_cast<ConstantExpr>(arguments[i]);
+    obj.push_back(item->getAPValue().getSExtValue());
+  }
+  uintptr_t programPoint = state.txTreeNode->getProgramPoint();
+  std::pair<std::vector<int>,int> p;
+    p.first=obj;
+    p.second=programPoint;
+  if (epo.contains(p))
+    executor.terminateStateOnExit(state);
+}
+void SpecialFunctionHandler::handleExtMemo(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments) {
+  assert(arguments[0]->getKind() == 0 &&
+         "invalid length variable, the first argument should be constant");
+  ref<ConstantExpr> length = dyn_cast<ConstantExpr>(arguments[0]);
+  std::vector<int> obj;
+  for (int i = 1; i <= length->getAPValue().getSExtValue(); i++) {
+    assert(arguments[i]->getKind() == 0 &&
+           "invalid item, the items should be constant");
+    ref<ConstantExpr> item = dyn_cast<ConstantExpr>(arguments[i]);
+    obj.push_back(item->getAPValue().getSExtValue());
+  }
+  uintptr_t programPoint = state.txTreeNode->getProgramPoint();
+  std::pair<std::vector<int>,int> p;
+  p.first=obj;
+  p.second=programPoint;
+  epo.insert(p);
 }
 
 void SpecialFunctionHandler::handleIncrCount(ExecutionState &state,
