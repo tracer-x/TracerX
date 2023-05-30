@@ -924,14 +924,15 @@ static const char *modelledExternals[] = {
   "tracerx_debug_state",
   "tracerx_debug_state_off",
   "tracerx_memo",
-  "tracerx_memo_check", 
+  "tracerx_memo_check",
+  "tracerx_ext_memo",
+  "tracerx_ext_memo_check", 
   "tracerx_incr_count",
   "tracerx_print_count", 
   "tracerx_incr_var",
   "tracerx_print_var",
-  "tracerx_ext_memo",
-  "tracerx_ext_memo_check",
-
+  "tracerx_incr_det_var",
+  "tracerx_print_det_var",
 };
 // Symbols we aren't going to warn about
 static const char *dontCareExternals[] = {

@@ -139,6 +139,40 @@ namespace klee {
         };
 
     persistentVar po2;
+    
+    class persistentVarDetail {
+      private:
+      std::map< ref<Expr>, std::pair<int,std::vector<std::pair<int,uintptr_t> > > > objects;
+
+      public:
+      void inc(ref<Expr> p, std::pair<int,uintptr_t> info ){
+      if(objects.find(p) != objects.end()){
+      int oldCount=objects[p].first;
+      int newcount=oldCount+1;
+      objects[p].first=newcount;
+      objects[p].second.push_back(info);
+      }
+      else{
+        objects[p].first=1;
+        objects[p].second.push_back(info);
+      }
+      }
+
+      void print(ref<Expr> p){
+        llvm::outs()<<"************************\n";
+        llvm::outs()<<"The count value of program tag point - ";
+        p->dump();
+        llvm::outs()<<"is: "<<objects[p].first<<"\n";
+        llvm::outs()<<"Program points updated its value are:\n";
+        for ( std::vector < std::pair<int,uintptr_t> >::const_iterator it = objects[p].second.begin() ; it != objects[p].second.end(); it++){
+                llvm::outs()<<"Node: "<<it->first <<", Program Point: "<<it->second<<"\n";
+            }
+
+        llvm::outs()<<"************************\n";
+      }
+	 };
+
+ persistentVarDetail PV_det;
   public:
     SpecialFunctionHandler(Executor &_executor);
 
@@ -184,6 +218,8 @@ namespace klee {
     HANDLER(handlePrintCount);
     HANDLER(handleIncrVar);
     HANDLER(handlePrintVar);
+    HANDLER(handleIncrDetVar);
+    HANDLER(handlePrintDetVar);
     HANDLER(handleDefineFixedObject);
     HANDLER(handleDelete);    
     HANDLER(handleDeleteArray);
