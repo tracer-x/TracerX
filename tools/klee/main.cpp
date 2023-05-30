@@ -929,6 +929,8 @@ static const char *modelledExternals[] = {
   "tracerx_print_count", 
   "tracerx_incr_var",
   "tracerx_print_var",
+  "tracerx_ext_memo",
+  "tracerx_ext_memo_check",
 
 };
 // Symbols we aren't going to warn about

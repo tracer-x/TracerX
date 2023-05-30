@@ -181,6 +181,12 @@ extern "C" {
   /* Check if a vector of integers is stored previously. */
   void tracerx_memo_check();
 
+  /* Store a vector of integers along with program point info persistently. */
+  void tracerx_ext_memo();
+
+  /* Check if a vector of integers along with the specific program point is stored previously. */
+  void tracerx_ext_memo_check();
+
   /* Increments the persistent variable count. */
    void tracerx_incr_count();
 
