@@ -198,6 +198,13 @@ extern "C" {
 
    /* Prints the persistent variable var. */
    void tracerx_print_var();
+   
+   /* Increments the persistent variable named var along with its detail information. */
+   void tracerx_incr_det_var();
+
+   /* Prints the persistent variable named var along with its detail information. */
+   void tracerx_print_det_var();
+
 
 
 

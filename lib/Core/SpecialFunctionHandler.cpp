@@ -147,6 +147,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_print_count", handlePrintCount, false),
 	  add("tracerx_incr_var", handleIncrVar, false),
     add("tracerx_print_var", handlePrintVar, false),
+	  add("tracerx_incr_det_var", handleIncrDetVar, false),
+	  add("tracerx_print_det_var", handlePrintDetVar, false),
 #undef addDNR
 #undef add
 };
@@ -811,6 +813,25 @@ void SpecialFunctionHandler::handlePrintVar(ExecutionState &state,
 		  }
 }
 
+void SpecialFunctionHandler::handleIncrDetVar(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments) {
+	ref<Expr> prgmtag = executor.toUnique(state, arguments[0]);
+	uintptr_t programPoint = state.txTreeNode->getProgramPoint();
+	int nodeNumber = state.txTreeNode->getNodeSequenceNumber();
+	std::pair<int,uintptr_t> info;
+	info.first=nodeNumber;
+	info.second=programPoint;
+	PV_det.inc(prgmtag,info);
+	    return;
+}
+void SpecialFunctionHandler::handlePrintDetVar(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments) {
+	ref<Expr> prgmtag = executor.toUnique(state, arguments[0]);
+		PV_det.print(prgmtag);
+		return;
+}
 void SpecialFunctionHandler::handleGetValue(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr> > &arguments) {
