@@ -149,6 +149,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_print_var", handlePrintVar, false),
 	  add("tracerx_incr_det_var", handleIncrDetVar, false),
 	  add("tracerx_print_det_var", handlePrintDetVar, false),
+	  add("tracerx_mark_interpolant_point", handleMarkInterpolantPoint, false),
 #undef addDNR
 #undef add
 };
@@ -832,6 +833,14 @@ void SpecialFunctionHandler::handlePrintDetVar(ExecutionState &state,
 		PV_det.print(prgmtag);
 		return;
 }
+
+
+void SpecialFunctionHandler::handleMarkInterpolantPoint(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments){
+state.txTreeNode->setPrintInterpolant();
+}
+
 void SpecialFunctionHandler::handleGetValue(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr> > &arguments) {

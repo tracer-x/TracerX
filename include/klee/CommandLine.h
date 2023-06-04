@@ -123,6 +123,9 @@ extern llvm::cl::opt<bool> MarkGlobal;
 
 extern llvm::cl::opt<bool> NoAbduction;
 
+extern llvm::cl::opt<bool> MarkInterpolant;
+
+
 
 #endif
 

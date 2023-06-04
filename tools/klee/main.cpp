@@ -933,6 +933,7 @@ static const char *modelledExternals[] = {
   "tracerx_print_var",
   "tracerx_incr_det_var",
   "tracerx_print_det_var",
+  "tracerx_mark_interpolant_point",
 };
 // Symbols we aren't going to warn about
 static const char *dontCareExternals[] = {

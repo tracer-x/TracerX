@@ -2426,9 +2426,23 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       if (debugSubsumptionLevel >= 2) {
         std::string msg;
         llvm::raw_string_ostream out(msg);
-        entry->print(out);
-        if (WPInterpolant) {
-          entry->printWP(out);
+        // This condition helps to print the interpolants for the specific point of interest
+        if (MarkInterpolant == true && node->printInterpolant == true)
+        {
+        	entry->print(out);
+            if (WPInterpolant) {
+              entry->printWP(out);
+            }
+        }
+        else  if (MarkInterpolant == true && node->printInterpolant == false){
+        	; // Do not print the interpolants for this node
+        }
+        else{
+          // This case prints the interpolants for all the program points
+        	entry->print(out);
+            if (WPInterpolant) {
+              entry->printWP(out);
+            }
         }
         out.flush();
         klee_message("%s", msg.c_str());

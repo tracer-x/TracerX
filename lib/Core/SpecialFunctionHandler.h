@@ -220,6 +220,7 @@ namespace klee {
     HANDLER(handlePrintVar);
     HANDLER(handleIncrDetVar);
     HANDLER(handlePrintDetVar);
+    HANDLER(handleMarkInterpolantPoint);
     HANDLER(handleDefineFixedObject);
     HANDLER(handleDelete);    
     HANDLER(handleDeleteArray);

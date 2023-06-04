@@ -205,7 +205,8 @@ extern "C" {
    /* Prints the persistent variable named var along with its detail information. */
    void tracerx_print_det_var();
 
-
+   /* Print interpolant only for this specific point*/
+   void tracerx_mark_interpolant_point();
 
 
 #ifdef __cplusplus

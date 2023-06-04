@@ -478,6 +478,8 @@ class TxTreeNode {
   
    std::string CFuntionName;
 
+   bool printInterpolant = false;  // print the subsumption table only when this flag is on;
+
   // Used to ensure at subsumption the value of the phiNodes in the subsumed
   // tree remain the same
   uintptr_t prevProgramPoint;
@@ -565,6 +567,16 @@ class TxTreeNode {
 
 public:
   bool isSubsumed;
+
+  //  \brief This function sets the value of printInterpolant bool var which 
+  // to determine whether the TXSubsumption table will get printed for not when the 
+  // MarkInterpolant flag is set
+  // We can enable and then mark specific points for printing the interpolants using this flag.
+
+  void setPrintInterpolant(){
+ 	  printInterpolant = true;
+   }
+
 
   // \brief The unsat core from a infeasible path is temporarily stored here
   // and in case speculation is failed it's used to do marking related to
