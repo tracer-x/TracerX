@@ -220,6 +220,11 @@ NoAbduction("no-abduction",
               llvm::cl::init(false));
 
 llvm::cl::opt<bool>
+MarkInterpolant("mark-Interpolant",
+              llvm::cl::desc("Print interpolants for the specified points"),
+              llvm::cl::init(false));
+
+llvm::cl::opt<bool>
     MarkWPVar("mark-WPVar",
               llvm::cl::desc("mark WPVars during WPInstantiation  "
                              "(experimental, related #398, default=on)"),
