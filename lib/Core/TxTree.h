@@ -577,6 +577,10 @@ public:
  	  printInterpolant = true;
    }
 
+   bool getPrintInterpolant(){
+   	   return(printInterpolant);
+    }
+
 
   // \brief The unsat core from a infeasible path is temporarily stored here
   // and in case speculation is failed it's used to do marking related to

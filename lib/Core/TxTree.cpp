@@ -847,16 +847,30 @@ if(!NoAbduction){
 
     if (!globalSat) {
       if (debugSubsumptionLevel >= 1) {
-        klee_message("#%lu=>#%lu: Global check fail",
-                     state.txTreeNode->getNodeSequenceNumber(),
-                     nodeSequenceNumber);
+       // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+			   ;
+		   }
+		   else
+		   {
+			   klee_message("#%lu=>#%lu: Global check fail",
+                  state.txTreeNode->getNodeSequenceNumber(),
+                  nodeSequenceNumber);
+		   }
       }
       return false;
     } else {
       if (debugSubsumptionLevel >= 1) {
-        klee_message("#%lu=>#%lu: Global check success",
-                     state.txTreeNode->getNodeSequenceNumber(),
-                     nodeSequenceNumber);
+        // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+			   ;
+		   }
+		   else
+		   {
+          klee_message("#%lu=>#%lu: Global check success",
+              state.txTreeNode->getNodeSequenceNumber(),
+              nodeSequenceNumber);
+		   }
       }
     }
   }
@@ -880,16 +894,32 @@ if(!NoAbduction){
 
     if (!success || result != Solver::True) {
       if (debugSubsumptionLevel >= 1) {
+        // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+			   ;
+		   }
+		   else
+		   {
         klee_message("#%lu=>#%lu: Check failure at WP Expr check ",
                      state.txTreeNode->getNodeSequenceNumber(),
                      nodeSequenceNumber);
+		   }
+
       }
       return false;
     }
     if (debugSubsumptionLevel >= 1) {
-      klee_message("#%lu=>#%lu: Weakest precondition check success",
+      // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+			   ;
+		   }
+		   else
+		   {
+			    klee_message("#%lu=>#%lu: Weakest precondition check success",
                    state.txTreeNode->getNodeSequenceNumber(),
                    nodeSequenceNumber);
+		   }
+     
     }
   }
 
@@ -1003,9 +1033,17 @@ if(!NoAbduction){
   // Quick check for subsumption in case the interpolant is empty
   if (empty()) {
     if (debugSubsumptionLevel >= 1) {
-      klee_message("#%lu=>#%lu: Check success due to empty table entry",
+      // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+			   ;
+		   }
+		   else
+		   {
+          klee_message("#%lu=>#%lu: Check success due to empty table entry",
                    state.txTreeNode->getNodeSequenceNumber(),
                    nodeSequenceNumber);
+		   } 
+      
     }
 
     if (WPInterpolant) {
@@ -1043,15 +1081,22 @@ if(!NoAbduction){
       TxStore::TopStateStore::iterator mIt = __internalStore.find(it1->first);
       if (mIt == __internalStore.end()) {
         if (debugSubsumptionLevel >= 1) {
-          std::string msg;
-          std::string padding(makeTabs(1));
-          llvm::raw_string_ostream stream(msg);
-          it1->first->print(stream, padding);
-          stream.flush();
-          klee_message("#%lu=>#%lu: Check failure as allocated memory region "
-                       "in the table does not exist in the state:\n%s",
-                       state.txTreeNode->getNodeSequenceNumber(),
-                       nodeSequenceNumber, msg.c_str());
+          // TracerX MarkInterpolant Point Command Line feature check
+          if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+            ;
+          }
+          else
+          {       
+              std::string msg;
+              std::string padding(makeTabs(1));
+              llvm::raw_string_ostream stream(msg);
+              it1->first->print(stream, padding);
+              stream.flush();
+              klee_message("#%lu=>#%lu: Check failure as allocated memory region "
+                          "in the table does not exist in the state:\n%s",
+                          state.txTreeNode->getNodeSequenceNumber(),
+                          nodeSequenceNumber, msg.c_str());
+          }
         }
         return false;
       }
@@ -1070,6 +1115,12 @@ if(!NoAbduction){
           // Fail the subsumption, since the address was not found in the state,
           // and we could not translate the addresses
           if (debugSubsumptionLevel >= 1) {
+            // TracerX MarkInterpolant Point Command Line feature check
+          if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+            ;
+          }
+          else
+          {       
             std::string msg;
             std::string padding(makeTabs(1));
             llvm::raw_string_ostream stream(msg);
@@ -1079,6 +1130,8 @@ if(!NoAbduction){
                          "table does not exist in the state:\n%s",
                          state.txTreeNode->getNodeSequenceNumber(),
                          nodeSequenceNumber, msg.c_str());
+          }
+           
           }
           return false;
         } else {
@@ -1097,11 +1150,19 @@ if(!NoAbduction){
             // We conservatively fail the subsumption in case the sizes do not
             // match.
             if (debugSubsumptionLevel >= 1) {
-              std::string msg;
-              klee_message("#%lu=>#%lu: Check failure as sizes of stored "
+               // TracerX MarkInterpolant Point Command Line feature check
+              if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                ;
+              }
+              else
+              {
+                  std::string msg;
+                  klee_message("#%lu=>#%lu: Check failure as sizes of stored "
                            "values do not match%s",
                            state.txTreeNode->getNodeSequenceNumber(),
                            nodeSequenceNumber, msg.c_str());
+              }
+              
             }
             return false;
           } else if (TxDependency::boundInterpolation() &&
@@ -1114,11 +1175,18 @@ if(!NoAbduction){
               if (!boundsCheck.isNull()) {
                 if (boundsCheck->isFalse()) {
                   if (debugSubsumptionLevel >= 1) {
-                    std::string msg;
-                    klee_message("#%lu=>#%lu: Check failure due to failure in "
-                                 "memory bounds check%s",
-                                 state.txTreeNode->getNodeSequenceNumber(),
-                                 nodeSequenceNumber, msg.c_str());
+                     // TracerX MarkInterpolant Point Command Line feature check
+                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                      ;
+                    }
+                    else
+                    {
+                          std::string msg;
+                          klee_message("#%lu=>#%lu: Check failure due to failure in "
+                                      "memory bounds check%s",
+                                      state.txTreeNode->getNodeSequenceNumber(),
+                                      nodeSequenceNumber, msg.c_str());
+                    }                  
                   }
                   return false;
                 }
@@ -1136,11 +1204,18 @@ if(!NoAbduction){
 
               if (offsetsCheck->isFalse()) {
                 if (debugSubsumptionLevel >= 1) {
-                  std::string msg;
-                  klee_message("#%lu=>#%lu: Check failure due to failure in "
+                   // TracerX MarkInterpolant Point Command Line feature check
+                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                      ;
+                    }
+                    else
+                    {
+                          std::string msg;
+                          klee_message("#%lu=>#%lu: Check failure due to failure in "
                                "offset equality check%s",
                                state.txTreeNode->getNodeSequenceNumber(),
                                nodeSequenceNumber, msg.c_str());
+                    }  
                 }
                 return false;
               }
@@ -1156,61 +1231,108 @@ if(!NoAbduction){
             if (res->isFalse()) {
               if (debugSubsumptionLevel >= 1) {
                 if (debugSubsumptionLevel >= 2) {
-                  std::string msg;
-                  llvm::raw_string_ostream stream(msg);
-                  tabledValue->getExpression()->print(stream);
-                  stream << " (interpolant) vs. ";
-                  stateValue->getExpression()->print(stream);
-                  stream << " (state)";
-                  stream.flush();
-                  klee_message(
-                      "#%lu=>#%lu: Check failure due to unequal content: %s",
-                      state.txTreeNode->getNodeSequenceNumber(),
-                      nodeSequenceNumber, msg.c_str());
+                    // TracerX MarkInterpolant Point Command Line feature check
+                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                      ;
+                    }
+                    else
+                    {
+                      std::string msg;
+                      llvm::raw_string_ostream stream(msg);
+                      tabledValue->getExpression()->print(stream);
+                      stream << " (interpolant) vs. ";
+                      stateValue->getExpression()->print(stream);
+                      stream << " (state)";
+                      stream.flush();
+                      klee_message(
+                          "#%lu=>#%lu: Check failure due to unequal content: %s",
+                          state.txTreeNode->getNodeSequenceNumber(),
+                          nodeSequenceNumber, msg.c_str());
+                    }  
+                  
                 } else {
-                  klee_message(
+                  // TracerX MarkInterpolant Point Command Line feature check
+                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                      ;
+                    }
+                    else
+                    {
+                      klee_message(
                       "#%lu=>#%lu: Check failure due to unequal content",
                       state.txTreeNode->getNodeSequenceNumber(),
                       nodeSequenceNumber);
+                    } 
                 }
 
                 if (debugSubsumptionLevel >= 3) {
-                  std::string msg;
-                  llvm::raw_string_ostream stream1(msg);
+                  // TracerX MarkInterpolant Point Command Line feature check
+                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                      ;
+                    }
+                    else
+                    {
+                      std::string msg;
+                      llvm::raw_string_ostream stream1(msg);
 
-                  it2->first->print(stream1, makeTabs(1));
-                  stream1.flush();
+                      it2->first->print(stream1, makeTabs(1));
+                      stream1.flush();
 
-                  klee_message("with value stored in address:\n%s",
-                               msg.c_str());
+                      klee_message("with value stored in address:\n%s",
+                                  msg.c_str());
+                    } 
+                  
                 }
               }
               return false;
             } else if (res->isTrue()) {
               if (debugSubsumptionLevel >= 1) {
                 if (debugSubsumptionLevel >= 2) {
-                  std::string msg;
-                  llvm::raw_string_ostream stream(msg);
-                  tabledValue->getExpression()->print(stream);
-                  stream.flush();
-                  klee_message("#%lu=>#%lu: Equal contents: %s",
-                               state.txTreeNode->getNodeSequenceNumber(),
-                               nodeSequenceNumber, msg.c_str());
+                  // TracerX MarkInterpolant Point Command Line feature check
+                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                      ;
+                    }
+                    else
+                    {
+                      std::string msg;
+                      llvm::raw_string_ostream stream(msg);
+                      tabledValue->getExpression()->print(stream);
+                      stream.flush();
+                      klee_message("#%lu=>#%lu: Equal contents: %s",
+                                  state.txTreeNode->getNodeSequenceNumber(),
+                                  nodeSequenceNumber, msg.c_str());
+                    } 
+                  
                 } else {
-                  klee_message("#%lu=>#%lu: Equal contents",
+                  // TracerX MarkInterpolant Point Command Line feature check
+                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                      ;
+                    }
+                    else
+                    {
+                      klee_message("#%lu=>#%lu: Equal contents",
                                state.txTreeNode->getNodeSequenceNumber(),
                                nodeSequenceNumber);
+                    } 
+                  
                 }
 
                 if (debugSubsumptionLevel >= 3) {
-                  std::string msg3;
-                  llvm::raw_string_ostream stream1(msg3);
+                  // TracerX MarkInterpolant Point Command Line feature check
+                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                      ;
+                    }
+                    else
+                    {
+                      std::string msg3;
+                      llvm::raw_string_ostream stream1(msg3);
 
-                  it2->first->print(stream1, makeTabs(1));
-                  stream1.flush();
+                      it2->first->print(stream1, makeTabs(1));
+                      stream1.flush();
 
-                  klee_message("with value stored in address:\n%s",
-                               msg3.c_str());
+                      klee_message("with value stored in address:\n%s",
+                                  msg3.c_str());
+                    } 
+                  
                 }
               }
             }
@@ -1510,9 +1632,17 @@ if(!NoAbduction){
         if (!corePointerValues.empty()) {
           msg += " (with successful memory bound checks)";
         }
-        klee_message("#%lu=>#%lu: Check success as interpolant is empty%s",
+         // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+			   ;
+		   }
+		   else
+		   {
+          klee_message("#%lu=>#%lu: Check success as interpolant is empty%s",
                      state.txTreeNode->getNodeSequenceNumber(),
                      nodeSequenceNumber, msg.c_str());
+		   }
+        
       }
 
       interpolateValues(state, coreValues, corePointerValues,
@@ -1530,9 +1660,17 @@ if(!NoAbduction){
     if (!existentials.empty()) {
       ref<Expr> existsExpr = ExistsExpr::create(existentials, expr);
       if (debugSubsumptionLevel >= 2) {
-        klee_message("Before simplification:\n%s",
+         // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+			   ;
+		   }
+		   else
+		   {
+          klee_message("Before simplification:\n%s",
                      TxPrettyExpressionBuilder::constructQuery(
                          state.constraints, existsExpr).c_str());
+		   }
+        
       }
       expr = simplifyExistsExpr(existsExpr, exprHasNoFreeVariables);
     }
@@ -1545,9 +1683,17 @@ if(!NoAbduction){
     // without calling the solver
     if (expr->isFalse()) {
       if (debugSubsumptionLevel >= 1) {
-        klee_message("#%lu=>#%lu: Check failure as consequent is unsatisfiable",
+         // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+			   ;
+		   }
+		   else
+		   {
+          klee_message("#%lu=>#%lu: Check failure as consequent is unsatisfiable",
                      state.txTreeNode->getNodeSequenceNumber(),
                      nodeSequenceNumber);
+		   }
+        
       }
       return false;
     }
@@ -1556,9 +1702,17 @@ if(!NoAbduction){
 
     if (!detectConflictPrimitives(state, expr)) {
       if (debugSubsumptionLevel >= 1) {
-        klee_message(
+         // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+			   ;
+		   }
+		   else
+		   {
+          klee_message(
             "#%lu=>#%lu: Check failure as contradictory equalities detected",
             state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
+		   }
+        
       }
       return false;
     }
@@ -1585,10 +1739,18 @@ if(!NoAbduction){
             if (!corePointerValues.empty()) {
               msg += " (with successful memory bound checks)";
             }
-            klee_message("#%lu=>#%lu: Check success as query expression "
-                         "contains only bound variables%s",
-                         state.txTreeNode->getNodeSequenceNumber(),
-                         nodeSequenceNumber, msg.c_str());
+             // TracerX MarkInterpolant Point Command Line feature check
+            if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+              ;
+            }
+            else
+            {
+                klee_message("#%lu=>#%lu: Check success as query expression "
+                              "contains only bound variables%s",
+                              state.txTreeNode->getNodeSequenceNumber(),
+                              nodeSequenceNumber, msg.c_str());
+            }
+            
           }
           if (WPInterpolant) {
             // In case a node is subsumed, the WP Expr is stored at the parent
@@ -1609,9 +1771,16 @@ if(!NoAbduction){
           }
 
           if (debugSubsumptionLevel >= 2) {
-            klee_message("Querying for subsumption check:\n%s",
-                         TxPrettyExpressionBuilder::constructQuery(
-                             state.constraints, expr).c_str());
+            // TracerX MarkInterpolant Point Command Line feature check
+            if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+              ;
+            }
+            else
+            {
+                klee_message("Querying for subsumption check:\n%s",
+                              TxPrettyExpressionBuilder::constructQuery(
+                                  state.constraints, expr).c_str());
+            }            
           }
 
           if (llvm::isa<ExistsExpr>(expr)) {
@@ -1634,10 +1803,18 @@ if(!NoAbduction){
 
           if (!success || result != Solver::True) {
             if (debugSubsumptionLevel >= 1) {
-              klee_message("#%lu=>#%lu: Check failure as solved did not decide "
+               // TracerX MarkInterpolant Point Command Line feature check
+                if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                  ;
+                }
+                else
+                {
+                   klee_message("#%lu=>#%lu: Check failure as solved did not decide "
                            "validity of existentially-quantified query",
                            state.txTreeNode->getNodeSequenceNumber(),
                            nodeSequenceNumber);
+                }
+              
             }
             return false;
           }
@@ -1645,9 +1822,17 @@ if(!NoAbduction){
 
       } else {
         if (debugSubsumptionLevel >= 2) {
-          klee_message("Querying for subsumption check:\n%s",
+           // TracerX MarkInterpolant Point Command Line feature check
+            if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+              ;
+            }
+            else
+            {
+                klee_message("Querying for subsumption check:\n%s",
                        TxPrettyExpressionBuilder::constructQuery(
                            state.constraints, expr).c_str());
+            }
+          
         }
         // We call the solver in the standard way if the
         // formula is unquantified.
@@ -1672,10 +1857,18 @@ if(!NoAbduction){
           if (!corePointerValues.empty()) {
             msg += " (with successful memory bound checks)";
           }
-          klee_message(
-              "#%lu=>#%lu: Check success as query expression is true%s",
-              state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber,
-              msg.c_str());
+              // TracerX MarkInterpolant Point Command Line feature check
+          if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+            ;
+          }
+          else
+          {
+              klee_message(
+                  "#%lu=>#%lu: Check success as query expression is true%s",
+                  state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber,
+                  msg.c_str());
+          }
+          
         }
 
         interpolateValues(state, coreValues, corePointerValues,
@@ -1702,9 +1895,18 @@ if(!NoAbduction){
       if (!corePointerValues.empty()) {
         msg += " (with successful memory bound checks)";
       }
-      klee_message("#%lu=>#%lu: Check success as solver decided validity%s",
+
+       // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+			   ;
+		   }
+		   else
+		   {
+          klee_message("#%lu=>#%lu: Check success as solver decided validity%s",
                    state.txTreeNode->getNodeSequenceNumber(),
                    nodeSequenceNumber, msg.c_str());
+		   }
+      
     }
 
     // We create path condition marking structure and mark core constraints
@@ -2121,9 +2323,17 @@ bool TxSubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
       instance.find(state.txTreeNode->getProgramPoint());
   if (it == instance.end()) {
     if (debugSubsumptionLevel >= 1) {
-      klee_message(
+       // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+			   ;
+		   }
+		   else
+		   {
+          klee_message(
           "#%lu: Check failure due to control point not found in table",
           state.txTreeNode->getNodeSequenceNumber());
+		   }
+      
     }
     return false;
   }
@@ -2134,8 +2344,16 @@ bool TxSubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
       subTable->find(txTreeNode->entryCallHistory, found);
   if (!found) {
     if (debugSubsumptionLevel >= 1) {
-      klee_message("#%lu: Check failure due to entry not found",
+       // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+			   ;
+		   }
+		   else
+		   {
+          klee_message("#%lu: Check failure due to entry not found",
                    state.txTreeNode->getNodeSequenceNumber());
+		   }
+      
     }
     return false;
   }
@@ -2331,12 +2549,28 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
       currentTxTreeNode->dependency->debugSubsumptionLevel;
 
   if (debugSubsumptionLevel >= 2) {
-    klee_message("Subsumption check for Node #%lu, Program Point %lu",
+     // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+			   ;
+		   }
+		   else
+		   {
+          klee_message("Subsumption check for Node #%lu, Program Point %lu",
                  state.txTreeNode->getNodeSequenceNumber(),
                  state.txTreeNode->getProgramPoint());
+		   }
+    
   } else if (debugSubsumptionLevel >= 1) {
-    klee_message("Subsumption check for Node #%lu",
+     // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+			   ;
+		   }
+		   else
+		   {
+          klee_message("Subsumption check for Node #%lu",
                  state.txTreeNode->getNodeSequenceNumber());
+		   }
+    
   }
 
   ++subsumptionCheckCount; // For profiling
@@ -2400,11 +2634,25 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       int debugSubsumptionLevel = node->dependency->debugSubsumptionLevel;
 
       if (debugSubsumptionLevel >= 2) {
-        klee_message("Storing entry for Node #%lu, Program Point %lu",
-                     node->getNodeSequenceNumber(), node->getProgramPoint());
+         // TracerX MarkInterpolant Point Command Line feature check
+    	   if (MarkInterpolant == true && node->printInterpolant == true){
+           klee_message("Storing entry for Node #%lu, Program Point %lu",
+                     node->getNodeSequenceNumber(), node->getProgramPoint());}
+    	   else  if (MarkInterpolant == true && node->printInterpolant == false){;}
+    	   else {
+    		   klee_message("Storing entry for Node #%lu, Program Point %lu",
+    		                        node->getNodeSequenceNumber(), node->getProgramPoint());
+    	   }
       } else if (debugSubsumptionLevel >= 1) {
-        klee_message("Storing entry for Node #%lu",
-                     node->getNodeSequenceNumber());
+        // TracerX MarkInterpolant Point Command Line feature check
+		   if (MarkInterpolant == true && node->printInterpolant == false){
+			   ;
+		   }
+		   else
+		   {
+			   klee_message("Storing entry for Node #%lu", node->getNodeSequenceNumber());
+		   }
+        
       }
 
       // generate marking and wp interpolant
@@ -2433,6 +2681,8 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
             if (WPInterpolant) {
               entry->printWP(out);
             }
+            out.flush();
+            klee_message("%s", msg.c_str());
         }
         else  if (MarkInterpolant == true && node->printInterpolant == false){
         	; // Do not print the interpolants for this node
@@ -2443,9 +2693,10 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
             if (WPInterpolant) {
               entry->printWP(out);
             }
+            out.flush();
+            klee_message("%s", msg.c_str());
         }
-        out.flush();
-        klee_message("%s", msg.c_str());
+        
       }
     }
 
