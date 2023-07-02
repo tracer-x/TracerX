@@ -1842,9 +1842,16 @@ if(!NoAbduction){
 
         if (!success || result != Solver::True) {
           if (debugSubsumptionLevel >= 1) {
+               // TracerX MarkInterpolant Point Command Line feature check
+          if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+            ;
+          }
+          else
+          { 
             klee_message(
                 "#%lu=>#%lu: Check failure as solved did not decide validity",
                 state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
+          }
           }
           return false;
         }
