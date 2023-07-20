@@ -84,7 +84,7 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
     case Expr::Int16:
     case Expr::Int32:
     case Expr::Int64: {
-      z3e = c.int_val(val);
+      z3e = c.int_val(int(val));
       return true;
     }
     default: {
