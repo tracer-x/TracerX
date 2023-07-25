@@ -2028,13 +2028,14 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     }
     stream << "]\n";
   }
-  stream << prefix << "pi = ";
+  if (interpolant.empty() && prettyPrint == true);
+  else{ stream << prefix << "pi = ";
   if (!interpolant.isNull())
     interpolant->print(stream);
   else
-    stream << "(empty)";
+    stream << "(empty)";}
 
-  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  if (concretelyAddressedStore.empty() && prettyPrint == true);
   else{stream << "\n" << prefix << "concretely-addressed store = [";}
   if (!concretelyAddressedStore.empty()) {
     stream << "\n";
@@ -2058,7 +2059,7 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     }
     stream << prefix;
   }
-  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  if (concretelyAddressedStore.empty() && prettyPrint == true);
   else{stream << "]";}
 
   if (symbolicallyAddressedStore.empty() && prettyPrint == true);
@@ -2088,7 +2089,7 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
   if (symbolicallyAddressedStore.empty() && prettyPrint == true);
   else{ stream << "]";}
 
-  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  if (concretelyAddressedHistoricalStore.empty() && prettyPrint == true);
   else{stream << "\n" << prefix << "concretely-addressed historical store = [";}
   if (!concretelyAddressedHistoricalStore.empty()) {
     stream << "\n";
@@ -2107,10 +2108,10 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     }
     stream << prefix;
   }
-  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  if (concretelyAddressedHistoricalStore.empty() && prettyPrint == true);
   else{stream << "]";}
 
-  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  if (symbolicallyAddressedHistoricalStore.empty() && prettyPrint == true);
   else{stream << "\n" << prefix << "symbolically-addressed historical store = [";}
   if (!symbolicallyAddressedHistoricalStore.empty()) {
     stream << "\n";
@@ -2129,10 +2130,10 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     }
     stream << prefix;
   }
-  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  if (symbolicallyAddressedHistoricalStore.empty() && prettyPrint == true);
   else{stream << "]";}
 
-  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  if (existentials.empty() && prettyPrint == true);
   else{stream << "\n" << prefix << "existentials = [";}
   if (!existentials.empty()) {
     for (std::set<const Array *>::const_iterator is = existentials.begin(),
@@ -2144,7 +2145,7 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
       stream << (*it)->name;
     }
   }
-  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  if (existentials.empty() && prettyPrint == true);
   else{stream << "]";}
 }
 
