@@ -910,7 +910,7 @@ if(!NoAbduction){
     }
     if (debugSubsumptionLevel >= 1) {
       // TracerX MarkInterpolant Point Command Line feature check
-		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+		   if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
 			   ;
 		   }
 		   else
@@ -1034,7 +1034,7 @@ if(!NoAbduction){
   if (empty()) {
     if (debugSubsumptionLevel >= 1) {
       // TracerX MarkInterpolant Point Command Line feature check
-		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+		   if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
 			   ;
 		   }
 		   else
@@ -1082,7 +1082,7 @@ if(!NoAbduction){
       if (mIt == __internalStore.end()) {
         if (debugSubsumptionLevel >= 1) {
           // TracerX MarkInterpolant Point Command Line feature check
-          if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+          if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
             ;
           }
           else
@@ -1116,7 +1116,7 @@ if(!NoAbduction){
           // and we could not translate the addresses
           if (debugSubsumptionLevel >= 1) {
             // TracerX MarkInterpolant Point Command Line feature check
-          if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+          if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
             ;
           }
           else
@@ -1151,7 +1151,7 @@ if(!NoAbduction){
             // match.
             if (debugSubsumptionLevel >= 1) {
                // TracerX MarkInterpolant Point Command Line feature check
-              if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+              if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
                 ;
               }
               else
@@ -1176,7 +1176,7 @@ if(!NoAbduction){
                 if (boundsCheck->isFalse()) {
                   if (debugSubsumptionLevel >= 1) {
                      // TracerX MarkInterpolant Point Command Line feature check
-                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                    if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
                       ;
                     }
                     else
@@ -1205,7 +1205,7 @@ if(!NoAbduction){
               if (offsetsCheck->isFalse()) {
                 if (debugSubsumptionLevel >= 1) {
                    // TracerX MarkInterpolant Point Command Line feature check
-                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                    if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
                       ;
                     }
                     else
@@ -1232,7 +1232,7 @@ if(!NoAbduction){
               if (debugSubsumptionLevel >= 1) {
                 if (debugSubsumptionLevel >= 2) {
                     // TracerX MarkInterpolant Point Command Line feature check
-                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                    if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
                       ;
                     }
                     else
@@ -1252,7 +1252,7 @@ if(!NoAbduction){
                   
                 } else {
                   // TracerX MarkInterpolant Point Command Line feature check
-                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                    if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
                       ;
                     }
                     else
@@ -1266,7 +1266,7 @@ if(!NoAbduction){
 
                 if (debugSubsumptionLevel >= 3) {
                   // TracerX MarkInterpolant Point Command Line feature check
-                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                    if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
                       ;
                     }
                     else
@@ -1288,7 +1288,7 @@ if(!NoAbduction){
               if (debugSubsumptionLevel >= 1) {
                 if (debugSubsumptionLevel >= 2) {
                   // TracerX MarkInterpolant Point Command Line feature check
-                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                    if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
                       ;
                     }
                     else
@@ -1304,7 +1304,7 @@ if(!NoAbduction){
                   
                 } else {
                   // TracerX MarkInterpolant Point Command Line feature check
-                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                    if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
                       ;
                     }
                     else
@@ -1318,7 +1318,7 @@ if(!NoAbduction){
 
                 if (debugSubsumptionLevel >= 3) {
                   // TracerX MarkInterpolant Point Command Line feature check
-                    if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                    if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
                       ;
                     }
                     else
@@ -1633,7 +1633,7 @@ if(!NoAbduction){
           msg += " (with successful memory bound checks)";
         }
          // TracerX MarkInterpolant Point Command Line feature check
-		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+		   if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
 			   ;
 		   }
 		   else
@@ -1661,7 +1661,7 @@ if(!NoAbduction){
       ref<Expr> existsExpr = ExistsExpr::create(existentials, expr);
       if (debugSubsumptionLevel >= 2) {
          // TracerX MarkInterpolant Point Command Line feature check
-		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+		   if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
 			   ;
 		   }
 		   else
@@ -1684,7 +1684,7 @@ if(!NoAbduction){
     if (expr->isFalse()) {
       if (debugSubsumptionLevel >= 1) {
          // TracerX MarkInterpolant Point Command Line feature check
-		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+		   if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
 			   ;
 		   }
 		   else
@@ -1703,7 +1703,7 @@ if(!NoAbduction){
     if (!detectConflictPrimitives(state, expr)) {
       if (debugSubsumptionLevel >= 1) {
          // TracerX MarkInterpolant Point Command Line feature check
-		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+		   if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
 			   ;
 		   }
 		   else
@@ -1740,7 +1740,7 @@ if(!NoAbduction){
               msg += " (with successful memory bound checks)";
             }
              // TracerX MarkInterpolant Point Command Line feature check
-            if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+            if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
               ;
             }
             else
@@ -1772,7 +1772,7 @@ if(!NoAbduction){
 
           if (debugSubsumptionLevel >= 2) {
             // TracerX MarkInterpolant Point Command Line feature check
-            if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+            if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
               ;
             }
             else
@@ -1804,7 +1804,7 @@ if(!NoAbduction){
           if (!success || result != Solver::True) {
             if (debugSubsumptionLevel >= 1) {
                // TracerX MarkInterpolant Point Command Line feature check
-                if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+                if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
                   ;
                 }
                 else
@@ -1823,7 +1823,7 @@ if(!NoAbduction){
       } else {
         if (debugSubsumptionLevel >= 2) {
            // TracerX MarkInterpolant Point Command Line feature check
-            if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+            if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
               ;
             }
             else
@@ -1843,7 +1843,7 @@ if(!NoAbduction){
         if (!success || result != Solver::True) {
           if (debugSubsumptionLevel >= 1) {
                // TracerX MarkInterpolant Point Command Line feature check
-          if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+          if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
             ;
           }
           else
@@ -1865,7 +1865,7 @@ if(!NoAbduction){
             msg += " (with successful memory bound checks)";
           }
               // TracerX MarkInterpolant Point Command Line feature check
-          if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+          if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
             ;
           }
           else
@@ -1904,7 +1904,7 @@ if(!NoAbduction){
       }
 
        // TracerX MarkInterpolant Point Command Line feature check
-		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+		   if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
 			   ;
 		   }
 		   else
@@ -2341,7 +2341,7 @@ bool TxSubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
   if (it == instance.end()) {
     if (debugSubsumptionLevel >= 1) {
        // TracerX MarkInterpolant Point Command Line feature check
-		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+		   if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
 			   ;
 		   }
 		   else
@@ -2362,7 +2362,7 @@ bool TxSubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
   if (!found) {
     if (debugSubsumptionLevel >= 1) {
        // TracerX MarkInterpolant Point Command Line feature check
-		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+		   if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
 			   ;
 		   }
 		   else
@@ -2567,7 +2567,7 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
 
   if (debugSubsumptionLevel >= 2) {
      // TracerX MarkInterpolant Point Command Line feature check
-		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+		   if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
 			   ;
 		   }
 		   else
@@ -2579,7 +2579,7 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
     
   } else if (debugSubsumptionLevel >= 1) {
      // TracerX MarkInterpolant Point Command Line feature check
-		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+		   if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
 			   ;
 		   }
 		   else
