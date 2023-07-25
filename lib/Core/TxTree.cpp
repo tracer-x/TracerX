@@ -848,7 +848,7 @@ if(!NoAbduction){
     if (!globalSat) {
       if (debugSubsumptionLevel >= 1) {
        // TracerX MarkInterpolant Point Command Line feature check
-		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+		   if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
 			   ;
 		   }
 		   else
@@ -862,7 +862,7 @@ if(!NoAbduction){
     } else {
       if (debugSubsumptionLevel >= 1) {
         // TracerX MarkInterpolant Point Command Line feature check
-		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+		   if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false) || prettyPrint ==true){
 			   ;
 		   }
 		   else
@@ -895,7 +895,7 @@ if(!NoAbduction){
     if (!success || result != Solver::True) {
       if (debugSubsumptionLevel >= 1) {
         // TracerX MarkInterpolant Point Command Line feature check
-		   if (MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false){
+		   if ((MarkInterpolant == true && state.txTreeNode->getPrintInterpolant() == false)|| prettyPrint ==true){
 			   ;
 		   }
 		   else
@@ -2034,7 +2034,8 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
   else
     stream << "(empty)";
 
-  stream << "\n" << prefix << "concretely-addressed store = [";
+  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  else{stream << "\n" << prefix << "concretely-addressed store = [";}
   if (!concretelyAddressedStore.empty()) {
     stream << "\n";
     for (TxStore::TopInterpolantStore::const_iterator
@@ -2057,9 +2058,11 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     }
     stream << prefix;
   }
-  stream << "]";
+  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  else{stream << "]";}
 
-  stream << "\n" << prefix << "symbolically-addressed store = [";
+  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  else{stream << "\n" << prefix << "symbolically-addressed store = [";}
   if (!symbolicallyAddressedStore.empty()) {
     stream << "\n";
     for (TxStore::TopInterpolantStore::const_iterator
@@ -2082,9 +2085,11 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     }
     stream << prefix;
   }
-  stream << "]";
+  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  else{ stream << "]";}
 
-  stream << "\n" << prefix << "concretely-addressed historical store = [";
+  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  else{stream << "\n" << prefix << "concretely-addressed historical store = [";}
   if (!concretelyAddressedHistoricalStore.empty()) {
     stream << "\n";
     for (TxStore::LowerInterpolantStore::const_iterator
@@ -2102,9 +2107,11 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     }
     stream << prefix;
   }
-  stream << "]";
+  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  else{stream << "]";}
 
-  stream << "\n" << prefix << "symbolically-addressed historical store = [";
+  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  else{stream << "\n" << prefix << "symbolically-addressed historical store = [";}
   if (!symbolicallyAddressedHistoricalStore.empty()) {
     stream << "\n";
     for (TxStore::LowerInterpolantStore::const_iterator
@@ -2122,9 +2129,11 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     }
     stream << prefix;
   }
-  stream << "]";
+  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  else{stream << "]";}
 
-  stream << "\n" << prefix << "existentials = [";
+  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  else{stream << "\n" << prefix << "existentials = [";}
   if (!existentials.empty()) {
     for (std::set<const Array *>::const_iterator is = existentials.begin(),
                                                  ie = existentials.end(),
@@ -2135,7 +2144,8 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
       stream << (*it)->name;
     }
   }
-  stream << "]";
+  if (symbolicallyAddressedStore.empty() && prettyPrint == true);
+  else{stream << "]";}
 }
 
 void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream) const {

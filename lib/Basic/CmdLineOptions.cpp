@@ -224,6 +224,11 @@ MarkInterpolant("mark-Interpolant",
               llvm::cl::desc("Print interpolants for the specified points"),
               llvm::cl::init(false));
 
+llvm::cl::opt<bool>
+prettyPrint("prettyPrint",
+              llvm::cl::desc("Improves readability of debug-subsumption information"),
+              llvm::cl::init(false));
+
 
 #endif // ENABLE_Z3
 

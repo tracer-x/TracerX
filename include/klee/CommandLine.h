@@ -125,6 +125,8 @@ extern llvm::cl::opt<bool> NoAbduction;
 
 extern llvm::cl::opt<bool> MarkInterpolant;
 
+extern llvm::cl::opt<bool> prettyPrint;
+
 
 
 #endif
