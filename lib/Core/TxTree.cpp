@@ -2028,7 +2028,7 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     }
     stream << "]\n";
   }
-  if (interpolant.empty() && prettyPrint == true);
+  if (interpolant.isNull() && prettyPrint == true);
   else{ stream << prefix << "pi = ";
   if (!interpolant.isNull())
     interpolant->print(stream);
