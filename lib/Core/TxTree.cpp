@@ -2887,6 +2887,7 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant, Execut
                 	 	 }
                  }
                  }
+        klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
               return dummy;
         //llvm::outs()<<globalAddresses;
 
@@ -2951,6 +2952,7 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant, Execut
     if (wpInterpolant->getKid(1)==CONST_REF1 && wpInterpolant->getKid(1)->getKind()== Expr::Constant && wpInterpolant->getKind()== Expr::SDiv){
 
     	ref<Expr> dummy;
+      klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
     	     return dummy;
     }
     return wpInterpolant->rebuild(kids);
@@ -3087,10 +3089,10 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant, Execut
     }
     //llvm::outs()<<"Are we reached here-- before WP- Interpolants\n";
      ref<Expr> dummy;
+      klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel Expression failed!");
      return dummy;
     //wpInterpolant->dump();
-    //klee_error("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel "
-              // "Expression failed!");
+   
     //return wpInterpolant;
     break;
   }

@@ -296,7 +296,7 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
 
   default: {
     // Sanity check
-    //    klee_warning("Cannot convert to z3 with type: %d", txe->getKind());
+       klee_warning("Cannot convert to z3 with type: %d", txe->getKind());
     return false;
   }
   }
