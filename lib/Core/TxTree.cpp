@@ -2870,50 +2870,49 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
           return result;
         }
       }
-    } else {
-      // Checking the historical values
-      ref<TxStoreEntry> entry;
-      entry = dependency->getStore()
-                  ->getAddressofLatestCopyLLVMValueFromHistoricalStore(
-                      WPVar1->address);
+    }  else {
+    //Checking the historical values
+     ref<TxStoreEntry> entry;
+         entry = dependency->getStore()->getAddressofLatestCopyLLVMValueFromHistoricalStore(WPVar1->address);
 
-      if (!entry.isNull()) {
-        if (wpInterpolant->getWidth() ==
-            entry->getContent()->getExpression()->getWidth()) {
-          return entry->getContent()->getExpression();
-        } else {
-          ref<Expr> result = ZExtExpr::create(
-              entry->getContent()->getExpression(), wpInterpolant->getWidth());
-          return result;
-        }
-      } else { // Date: 20/04/2022
-               //  // Loading values from Global Variables
-        ref<Expr> dummy;
-        //        llvm::outs()<<"\nChecking the Global list for the WPVar:
-        //        ["<<wpInterpolant<<"]\n";
-        //        llvm::outs()<<"cheking WP var address\n";
-        //        llvm::outs()<<WPVar1->address<<"\n";
-        //        wpInterpolant.get()->dump();
-        //        llvm::outs()<<wpInterpolant.get();
-        MemoryMap::iterator begin = state.addressSpace.objects.begin();
-        MemoryMap::iterator end = state.addressSpace.objects.end();
-        while (end != begin) {
-          --end;
-          const MemoryObject *mo = end->first;
-          ObjectState *oj = end->second;
-          if (!mo->isFixed) {
-            if (mo->allocSite == WPVar1->address) {
-              ref<Expr> address =
-                  ConstantExpr::create(mo->address, Expr::Int64);
-              ref<Expr> offset = mo->getOffsetExpr(address);
-              ref<Expr> result = oj->read(offset, mo->size * 8);
-              return result;
-            }
-          }
-        }
-        return dummy;
-        // llvm::outs()<<globalAddresses;
-      }
+         if (!entry.isNull()) {
+           if (wpInterpolant->getWidth() ==
+               entry->getContent()->getExpression()->getWidth()) {
+             return entry->getContent()->getExpression();
+           } else {
+             ref<Expr> result = ZExtExpr::create(
+                 entry->getContent()->getExpression(), wpInterpolant->getWidth());
+             return result;
+           }
+         }
+         else{ // Date: 20/04/2022
+        	//  // Loading values from Global Variables
+                  	  ref<Expr> dummy;
+          //        llvm::outs()<<"\nChecking the Global list for the WPVar: ["<<wpInterpolant<<"]\n";
+          //        llvm::outs()<<"cheking WP var address\n";
+          //        llvm::outs()<<WPVar1->address<<"\n";
+          //        wpInterpolant.get()->dump();
+          //        llvm::outs()<<wpInterpolant.get();
+                 MemoryMap::iterator begin = state.addressSpace.objects.begin();
+                 MemoryMap::iterator end = state.addressSpace.objects.end();
+                 while (end!=begin) {
+                	 --end;
+                 const MemoryObject *mo = end->first;
+                 ObjectState *oj= end->second;
+                 if(!mo->isFixed){
+                	 	 if(mo->allocSite==WPVar1->address){
+                        	 ref<Expr> address=ConstantExpr::create(mo->address, Expr::Int64);
+                        	 ref<Expr> offset = mo->getOffsetExpr(address);
+                	 		     ref<Expr> result = oj->read(offset, mo->size*8);
+                	 		     return result;
+                	 	 }
+                 }
+                 }
+        klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
+              return dummy;
+        //llvm::outs()<<globalAddresses;
+
+         }
     }
     // wpInterpolant->dump();
     // dependency->getStore()->dump();
@@ -2980,8 +2979,9 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
         wpInterpolant->getKid(1)->getKind() == Expr::Constant &&
         wpInterpolant->getKind() == Expr::SDiv) {
 
-      ref<Expr> dummy;
-      return dummy;
+    	ref<Expr> dummy;
+      klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
+    	     return dummy;
     }
     return wpInterpolant->rebuild(kids);
   }
@@ -3120,13 +3120,13 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
       }
     } else {
     }
-    ref<Expr> dummy;
-    return dummy;
-    // wpInterpolant->dump();
-    // klee_error("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel
-    // "
-    // "Expression failed!");
-    // return wpInterpolant;
+    //llvm::outs()<<"Are we reached here-- before WP- Interpolants\n";
+     ref<Expr> dummy;
+      klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel Expression failed!");
+     return dummy;
+    //wpInterpolant->dump();
+   
+    //return wpInterpolant;
     break;
   }
   default: {
