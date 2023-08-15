@@ -6,7 +6,9 @@
  */
 
 #include "Z3Simplification.h"
-
+#include <sstream>
+#include <string>
+#include <iostream>
 using namespace klee;
 
 void Z3Simplification::test() {
@@ -42,6 +44,7 @@ ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
 bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
                                      ref<Expr> txe,
                                      std::map<std::string, ref<Expr> > &emap) {
+
   if (isaVar(txe)) {
     std::string name = extractVarName(txe);
     unsigned int size = txe->getWidth();
@@ -99,6 +102,11 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
     z3::expr t = c.bool_val(false);
     bool r = txExpr2z3Expr(t, c, txe->getKid(0), emap);
     if (r) {
+      if (!t.is_bool()) {
+        klee_warning("Z3Simplification: doesn't support NOT "
+                     "operation on non-boolean operands");
+        return false;
+      }
       z3e = not(t);
       return true;
     }
@@ -287,17 +295,29 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
       z3::expr t2 = c.bool_val(false);
       bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
       if (r2) {
+        if (!t1.is_bool() || !t2.is_bool()) {
+          klee_warning("Z3Simplification: doesn't support XOR "
+                       "operation on non-boolean operands");
+          return false;
+        }
         z3e = not(not(t2) && not(t1));
         return true;
       }
     }
     return false;
   }
-
-  default: {
-    // Sanity check
-    //    klee_warning("Cannot convert to z3 with type: %d", txe->getKind());
+  
+  case Expr::Sel: {
     return false;
+         }
+         case Expr::SExt: {
+           return false;
+         }
+
+         default: {
+           // Sanity check
+           klee_warning("Cannot convert to z3 with type: %d", txe->getKind());
+           return false;
   }
   }
 }
@@ -360,7 +380,6 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
       r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
       return MulExpr::create(l, r);
     } else if (symbol == "div") {
-      // Written by Arpi: 15/06/2022;
       // Added a check condition to avoid the divide by zero error;
       ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
       ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
@@ -435,7 +454,6 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
       }
       return f;
     } else {
-      // Written by Arpi: 15/06/2022;
       // Added a check condition for "ite" (if-then-else) statement;
       if (symbol == "if") {
         ref<Expr> f = z3Expr2TxExpr(e.arg(0), emap);
