@@ -3083,19 +3083,36 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant, Execut
         }
       }
       //llvm::outs()<<"Are we reached here\n";
-    } else {
-    	//llvm::outs()<<"The entry part is null\n";
-    	//llvm::outs()<<alc;//for make
-    }
-    //llvm::outs()<<"Are we reached here-- before WP- Interpolants\n";
-     ref<Expr> dummy;
-      klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel Expression failed!");
-     return dummy;
-    //wpInterpolant->dump();
-   
-    //return wpInterpolant;
-    break;
-  }
+    } 
+	ref<WPVarExpr> WPVar1 = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
+        ref<Expr> offset = MulExpr::create(kids[1],UDivExpr::create(
+                       ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
+                       ConstantExpr::create(8, kids[1]->getWidth())));
+
+         assert(isa<ConstantExpr>(offset) &&
+                      "TxTreeNode::"
+                      "instantiateWPatSubsumption, offset is "
+                      "not a constant value");
+        MemoryMap::iterator begin = state.addressSpace.objects.begin();
+        MemoryMap::iterator end = state.addressSpace.objects.end();
+        while (end!=begin) {
+        	--end;
+        		const MemoryObject *mo = end->first;
+        		ObjectState *oj= end->second;
+        		if(!mo->isFixed){
+        		unsigned type = mo->size/mo->allocSite->getType()->getArrayElementType()->getArrayNumElements();
+        		if(mo->allocSite==WPVar1->address){
+        			ref<Expr> result = oj->read(offset, type*8);
+					if(!result.isNull())
+						return result;
+        		}
+			}
+		}
+      ref<Expr> dummy;
+	  klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel Expression failed!");
+	  return dummy;
+	 break;
+   }
   default: {
 	
      //ref<Expr> dummy;
