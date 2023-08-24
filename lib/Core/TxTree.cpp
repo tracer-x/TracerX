@@ -15,11 +15,11 @@
 
 #include "TxTree.h"
 
+#include "Executor.h"
+#include "Memory.h"
 #include "TimingSolver.h"
-
 #include "TxDependency.h"
 #include "TxShadowArray.h"
-#include "Memory.h"
 #include <fstream>
 #include <klee/CommandLine.h>
 #include <klee/Expr.h>
@@ -44,27 +44,23 @@ using namespace klee;
 Statistic TxSubsumptionTableEntry::concretelyAddressedStoreExpressionBuildTime(
     "concretelyAddressedStoreExpressionBuildTime", "concreteStoreTime");
 Statistic
-TxSubsumptionTableEntry::symbolicallyAddressedStoreExpressionBuildTime(
-    "symbolicallyAddressedStoreExpressionBuildTime", "symbolicStoreTime");
+    TxSubsumptionTableEntry::symbolicallyAddressedStoreExpressionBuildTime(
+        "symbolicallyAddressedStoreExpressionBuildTime", "symbolicStoreTime");
 Statistic TxSubsumptionTableEntry::solverAccessTime("solverAccessTime",
                                                     "solverAccessTime");
 
-int debugSubsumptionLevel_g=0;
-void setDebugSubsumptionLevelTxTree(int debugSubsumptionLevel)
-{
-    debugSubsumptionLevel_g=debugSubsumptionLevel;
-}
-
 TxSubsumptionTableEntry::TxSubsumptionTableEntry(
     TxTreeNode *node, const std::vector<llvm::Instruction *> &callHistory)
-    : programPoint(node->getProgramPoint()),
-      nodeSequenceNumber(node->getNodeSequenceNumber()) {
+    : programPoint(node->getProgramPoint()),      
+      nodeSequenceNumber(node->getNodeSequenceNumber()),CfileLineNumber(node->getCfileLineNumber()),CfileName(node->getCfileName()),CFuntionName(node->getCFunctionName()) {
   std::map<ref<Expr>, ref<Expr> > substitution;
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
   prevProgramPoint = node->getPrevProgramPoint();
   phiValues = node->getPhiValue();
-
+  // klee_message("********** Start of Program Point: %lu Block Instructions **********",node->getProgramPoint());
+  // node->getBasicBlock()->dump();
+  // klee_message("*********************** End of Instructions ******************************************\n");
   node->getStoredCoreExpressions(
       callHistory, substitution, existentials, concretelyAddressedStore,
       symbolicallyAddressedStore, concretelyAddressedHistoricalStore,
@@ -88,7 +84,7 @@ ref<Expr> TxSubsumptionTableEntry::makeConstraint(
     std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases,
     int debugSubsumptionLevel) const {
   ref<Expr> constraint;
-    setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
+
 #ifdef ENABLE_Z3
   if (tabledValue->getExpression()->getWidth() !=
       stateValue->getExpression()->getWidth()) {
@@ -160,9 +156,8 @@ ref<Expr> TxSubsumptionTableEntry::makeConstraint(
   return constraint;
 }
 
-bool
-TxSubsumptionTableEntry::hasVariableInSet(std::set<const Array *> &existentials,
-                                          ref<Expr> expr) {
+bool TxSubsumptionTableEntry::hasVariableInSet(
+    std::set<const Array *> &existentials, ref<Expr> expr) {
   for (int i = 0, numKids = expr->getNumKids(); i < numKids; ++i) {
     if (llvm::isa<ReadExpr>(expr)) {
       ReadExpr *readExpr = llvm::dyn_cast<ReadExpr>(expr);
@@ -568,10 +563,9 @@ ref<Expr> TxSubsumptionTableEntry::simplifyEqualityExpr(
   assert(!"Invalid expression type.");
 }
 
-void
-TxSubsumptionTableEntry::getSubstitution(std::set<const Array *> &existentials,
-                                         ref<Expr> equalities,
-                                         std::map<ref<Expr>, ref<Expr> > &map) {
+void TxSubsumptionTableEntry::getSubstitution(
+    std::set<const Array *> &existentials, ref<Expr> equalities,
+    std::map<ref<Expr>, ref<Expr> > &map) {
   // It is assumed the rhs is an expression on the free variables.
   if (llvm::isa<EqExpr>(equalities)) {
     ref<Expr> lhs = equalities->getKid(0);
@@ -760,7 +754,6 @@ void TxSubsumptionTableEntry::interpolateValues(
     ExecutionState &state, std::set<ref<TxStateValue> > &coreValues,
     std::map<ref<TxStateValue>, std::set<uint64_t> > &corePointerValues,
     int debugSubsumptionLevel) {
-setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
   std::string reason = "";
   if (debugSubsumptionLevel >= 1) {
     llvm::raw_string_ostream stream(reason);
@@ -809,63 +802,63 @@ bool TxSubsumptionTableEntry::subsumed(
     TxStore::LowerStateStore &__concretelyAddressedHistoricalStore,
     TxStore::LowerStateStore &__symbolicallyAddressedHistoricalStore,
     int debugSubsumptionLevel) {
-setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
 #ifdef ENABLE_Z3
 
-  if (MarkGlobal) {
-    // Global check
-    bool globalSat = true;
-    for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
-                                                ie = markedGlobal.end();
-         it != ie; ++it) {
-      if ((*it)->getValue()->getType()->isPointerTy() ||
-          (*it)->getValue()->getType()->getTypeID() == 0) {
-        continue;
-      }
+  if (!NoAbduction) {
+    if (MarkGlobal) {
+      // Global check
+      bool globalSat = true;
+      for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
+                                                  ie = markedGlobal.end();
+           it != ie; ++it) {
+        if ((*it)->getValue()->getType()->isPointerTy() ||
+            (*it)->getValue()->getType()->getTypeID() == 0) {
+          continue;
+        }
 
-      ref<Expr> addr = (*it)->getAddress()->getAddress();
-      ref<Expr> offset = (*it)->getAddress()->getOffset();
-      unsigned type = (*it)->getAddress()->getSize();
-      ObjectPair initOp;
-      bool initResolve = TxTree::initialStateCopy->addressSpace.resolveOne(
-          cast<klee::ConstantExpr>(addr), initOp);
+        ref<Expr> addr = (*it)->getAddress()->getAddress();
+        ref<Expr> offset = (*it)->getAddress()->getOffset();
+        unsigned type = (*it)->getAddress()->getSize();
+        ObjectPair initOp;
+        bool initResolve = TxTree::initialStateCopy->addressSpace.resolveOne(
+            cast<klee::ConstantExpr>(addr), initOp);
 
-      ObjectPair currentOp;
-      bool currentResolve = state.addressSpace.resolveOne(
-          cast<klee::ConstantExpr>(addr), currentOp);
+        ObjectPair currentOp;
+        bool currentResolve = state.addressSpace.resolveOne(
+            cast<klee::ConstantExpr>(addr), currentOp);
 
-      if (!initResolve || !currentResolve) {
-        globalSat = false;
-        break;
-      } else {
-        const ObjectState *initOs = initOp.second;
-        ref<Expr> initValue = initOs->read(offset, type * 8);
-        const ObjectState *currentOs = currentOp.second;
-        ref<Expr> currentValue = currentOs->read(offset, type * 8);
-
-        if (initValue != currentValue) {
+        if (!initResolve || !currentResolve) {
           globalSat = false;
           break;
+        } else {
+          const ObjectState *initOs = initOp.second;
+          ref<Expr> initValue = initOs->read(offset, type * 8);
+          const ObjectState *currentOs = currentOp.second;
+          ref<Expr> currentValue = currentOs->read(offset, type * 8);
+
+          if (initValue != currentValue) {
+            globalSat = false;
+            break;
+          }
+        }
+      }
+
+      if (!globalSat) {
+        if (debugSubsumptionLevel >= 1) {
+          klee_message("#%lu=>#%lu: Global check fail",
+                       state.txTreeNode->getNodeSequenceNumber(),
+                       nodeSequenceNumber);
+        }
+        return false;
+      } else {
+        if (debugSubsumptionLevel >= 1) {
+          klee_message("#%lu=>#%lu: Global check success",
+                       state.txTreeNode->getNodeSequenceNumber(),
+                       nodeSequenceNumber);
         }
       }
     }
-
-    if (!globalSat) {
-      if (debugSubsumptionLevel >= 1) {
-        klee_message("#%lu=>#%lu: Global check fail",
-                     state.txTreeNode->getNodeSequenceNumber(),
-                     nodeSequenceNumber);
-      }
-      return false;
-    } else {
-      if (debugSubsumptionLevel >= 1) {
-        klee_message("#%lu=>#%lu: Global check success",
-                     state.txTreeNode->getNodeSequenceNumber(),
-                     nodeSequenceNumber);
-      }
-    }
   }
-
   // WP interpolant check
   if (WPInterpolant && !wpInterpolant.isNull()) {
     // Checking if weakest pre-condition holds. In case WPInterpolant
@@ -874,14 +867,11 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
     // second check is performed.
     ref<Expr> wpInstantiatedInterpolant =
         state.txTreeNode->instantiateWPatSubsumption(
-            wpInterpolant, state.txTreeNode->getDependency());
-
+            wpInterpolant, state, state.txTreeNode->getDependency());
     if (wpInstantiatedInterpolant.isNull())
       return false;
-
     ref<Expr> wpBoolean =
         ZExtExpr::create(wpInstantiatedInterpolant, Expr::Bool);
-
     Solver::Validity result;
     std::vector<ref<Expr> > unsatCore;
     bool success = solver->evaluate(state, wpBoolean, result, unsatCore);
@@ -901,65 +891,91 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
     }
   }
 
-  // PhiNode Check 1 (checking previous BB is the same at subsumption point)
-  if (isa<llvm::PHINode>(state.pc->inst) &&
-      prevProgramPoint != reinterpret_cast<uintptr_t>(state.prevPC->inst)) {
-    if (debugSubsumptionLevel >= 1) {
-      std::string msg;
-      std::string padding(makeTabs(1));
-      llvm::raw_string_ostream stream(msg);
-      stream.flush();
-      klee_message("#%lu=>#%lu: Check failure due to different predessor for "
-                   "the PHInode.",
-                   state.txTreeNode->getNodeSequenceNumber(),
-                   nodeSequenceNumber);
+  if (NoAbduction) {
+    if (WPInterpolant) {
+      // In case a node is subsumed, the WP Expr is stored at the parent node.
+      // This is crucial for generating WP Expr at the parent node.
+      state.txTreeNode->setWPatSubsumption(wpInterpolant);
     }
-    return false;
-  }
 
-  // PhiNode Check 2 (checking the value of phi instructions at subsumption
-  // point)
-  for (std::map<llvm::Value *, std::vector<ref<Expr> > >::const_iterator it =
-           phiValues.begin();
-       it != phiValues.end(); ++it) {
-    if (isa<llvm::PHINode>((*it).first)) {
-      llvm::Instruction *phi = dyn_cast<llvm::Instruction>((*it).first);
-      std::vector<ref<Expr> > values = (*it).second;
-      if (values.empty())
-        continue;
+    return true;
+  }
+  // Ignoring deletion interpolant*/
+  if (!NoAbduction) {
+    // PhiNode Check 1 (checking previous BB is the same at subsumption point)
+    if (isa<llvm::PHINode>(state.pc->inst) &&
+        prevProgramPoint != reinterpret_cast<uintptr_t>(state.prevPC->inst)) {
+      if (debugSubsumptionLevel >= 1) {
+        std::string msg;
+        std::string padding(makeTabs(1));
+        llvm::raw_string_ostream stream(msg);
+        stream.flush();
+        klee_message("#%lu=>#%lu: Check failure due to different predessor for "
+                     "the PHInode.",
+                     state.txTreeNode->getNodeSequenceNumber(),
+                     nodeSequenceNumber);
+      }
+      return false;
+    }
+
+    // PhiNode Check 2 (checking the value of phi instructions at subsumption
+    // point)
+    for (std::map<llvm::Value *, std::vector<ref<Expr> > >::const_iterator it =
+             phiValues.begin();
+         it != phiValues.end(); ++it) {
+      if (isa<llvm::PHINode>((*it).first)) {
+        llvm::Instruction *phi = dyn_cast<llvm::Instruction>((*it).first);
+        std::vector<ref<Expr> > values = (*it).second;
+        if (values.empty())
+          continue;
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 0)
-      llvm::Value *inputArg = phi->getOperand(state.incomingBBIndex);
+        llvm::Value *inputArg = phi->getOperand(state.incomingBBIndex);
 #else
-      llvm::Value *inputArg = phi->getOperand(state.incomingBBIndex * 2);
+        llvm::Value *inputArg = phi->getOperand(state.incomingBBIndex * 2);
 #endif
 
-      if (state.txTreeNode->getParent() &&
-          state.txTreeNode->getParent()->getDependency()) {
-        std::map<llvm::Value *, std::vector<ref<TxStateValue> > > valuesMap =
-            state.txTreeNode->getParent()->getDependency()->getvaluesMap();
-        std::vector<ref<TxStateValue> > txStateVal =
-            valuesMap[dyn_cast<llvm::Value>(inputArg)];
-        if (txStateVal.empty()) {
-          if (debugSubsumptionLevel >= 1) {
-            std::string msg;
-            std::string padding(makeTabs(1));
-            llvm::raw_string_ostream stream(msg);
-            stream.flush();
-            klee_message(
-                "#%lu=>#%lu: Check failure as in PHInode: txStateVal is "
-                "empty. Failing conservatively. ",
-                state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
+        if (state.txTreeNode->getParent() &&
+            state.txTreeNode->getParent()->getDependency()) {
+          std::map<llvm::Value *, std::vector<ref<TxStateValue> > > valuesMap =
+              state.txTreeNode->getParent()->getDependency()->getvaluesMap();
+          std::vector<ref<TxStateValue> > txStateVal =
+              valuesMap[dyn_cast<llvm::Value>(inputArg)];
+          if (txStateVal.empty()) {
+            if (debugSubsumptionLevel >= 1) {
+              std::string msg;
+              std::string padding(makeTabs(1));
+              llvm::raw_string_ostream stream(msg);
+              stream.flush();
+              klee_message(
+                  "#%lu=>#%lu: Check failure as in PHInode: txStateVal is "
+                  "empty. Failing conservatively. ",
+                  state.txTreeNode->getNodeSequenceNumber(),
+                  nodeSequenceNumber);
+            }
+            return false;
           }
-          return false;
-        }
-        if (txStateVal.back()->getExpression().compare(values.back()) != 0) {
+          if (txStateVal.back()->getExpression().compare(values.back()) != 0) {
+            if (debugSubsumptionLevel >= 1) {
+              std::string msg;
+              std::string padding(makeTabs(1));
+              llvm::raw_string_ostream stream(msg);
+              stream.flush();
+              klee_message(
+                  "#%lu=>#%lu: Check failure as in PHInode: phi values "
+                  "don't match ",
+                  state.txTreeNode->getNodeSequenceNumber(),
+                  nodeSequenceNumber);
+            }
+            return false;
+          }
+        } else {
           if (debugSubsumptionLevel >= 1) {
             std::string msg;
             std::string padding(makeTabs(1));
             llvm::raw_string_ostream stream(msg);
             stream.flush();
-            klee_message("#%lu=>#%lu: Check failure as in PHInode: phi values "
-                         "don't match ",
+            klee_message("#%lu=>#%lu: Check failure as in PHInode: parent node "
+                         "doen't exist. Failing conservatively. ",
                          state.txTreeNode->getNodeSequenceNumber(),
                          nodeSequenceNumber);
           }
@@ -971,307 +987,318 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
           std::string padding(makeTabs(1));
           llvm::raw_string_ostream stream(msg);
           stream.flush();
-          klee_message("#%lu=>#%lu: Check failure as in PHInode: parent node "
-                       "doen't exist. Failing conservatively. ",
-                       state.txTreeNode->getNodeSequenceNumber(),
-                       nodeSequenceNumber);
+          klee_message(
+              "#%lu=>#%lu: Check failure as this part of PHInode check is not "
+              "implemented yet. Failing conservatively. ",
+              state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
         }
         return false;
       }
-    } else {
+    }
+
+    // Tell the solver implementation that we are checking for subsumption for
+    // collecting statistics of solver calls.
+    SubsumptionCheckMarker subsumptionCheckMarker;
+
+    // Quick check for subsumption in case the interpolant is empty
+    if (empty()) {
       if (debugSubsumptionLevel >= 1) {
-        std::string msg;
-        std::string padding(makeTabs(1));
-        llvm::raw_string_ostream stream(msg);
-        stream.flush();
-        klee_message(
-            "#%lu=>#%lu: Check failure as this part of PHInode check is not "
-            "implemented yet. Failing conservatively. ",
-            state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
-      }
-      return false;
-    }
-  }
-
-  // Tell the solver implementation that we are checking for subsumption for
-  // collecting statistics of solver calls.
-  SubsumptionCheckMarker subsumptionCheckMarker;
-
-  // Quick check for subsumption in case the interpolant is empty
-  if (empty()) {
-    if (debugSubsumptionLevel >= 1) {
-      klee_message("#%lu=>#%lu: Check success due to empty table entry",
-                   state.txTreeNode->getNodeSequenceNumber(),
-                   nodeSequenceNumber);
-    }
-
-    if (WPInterpolant) {
-      // In case a node is subsumed, the WP Expr is stored at the parent node.
-      // This is crucial for generating WP Expr at the parent node.
-      state.txTreeNode->setWPatSubsumption(wpInterpolant);
-    }
-    return true;
-  }
-
-  ref<Expr> stateEqualityConstraints;
-
-  // Translation of allocation in the current state into an allocation in the
-  // tabled interpolant. This translation is used to equate absolute address
-  // values for allocations of matching sizes.
-  std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > unifiedBases;
-
-  // Non-pointer / exact pointer values to be marked as in the interpolant
-  std::set<ref<TxStateValue> > coreValues;
-
-  // Pointer values in the core for memory bounds interpolation.
-  std::map<ref<TxStateValue>, std::set<uint64_t> > corePointerValues;
-
-  {
-    TimerStatIncrementer t(concretelyAddressedStoreExpressionBuildTime);
-
-    // Build constraints from concrete-address interpolant store
-    for (TxStore::TopInterpolantStore::const_iterator
-             it1 = concretelyAddressedStore.begin(),
-             ie1 = concretelyAddressedStore.end();
-         it1 != ie1; ++it1) {
-      assert(!it1->second.empty() && "empty table entry with real index");
-
-      const TxStore::LowerInterpolantStore &tabledConcreteMap = it1->second;
-      TxStore::TopStateStore::iterator mIt = __internalStore.find(it1->first);
-      if (mIt == __internalStore.end()) {
-        if (debugSubsumptionLevel >= 1) {
-          std::string msg;
-          std::string padding(makeTabs(1));
-          llvm::raw_string_ostream stream(msg);
-          it1->first->print(stream, padding);
-          stream.flush();
-          klee_message("#%lu=>#%lu: Check failure as allocated memory region "
-                       "in the table does not exist in the state:\n%s",
-                       state.txTreeNode->getNodeSequenceNumber(),
-                       nodeSequenceNumber, msg.c_str());
-        }
-        return false;
+        klee_message("#%lu=>#%lu: Check success due to empty table entry",
+                     state.txTreeNode->getNodeSequenceNumber(),
+                     nodeSequenceNumber);
       }
 
-      TxStore::MiddleStateStore &m = mIt->second;
+      if (WPInterpolant) {
+        // In case a node is subsumed, the WP Expr is stored at the parent node.
+        // This is crucial for generating WP Expr at the parent node.
+        state.txTreeNode->setWPatSubsumption(wpInterpolant);
+      }
+      return true;
+    }
 
-      for (TxStore::LowerInterpolantStore::const_iterator
-               it2 = tabledConcreteMap.begin(),
-               ie2 = tabledConcreteMap.end();
-           it2 != ie2; ++it2) {
-        ref<TxInterpolantValue> stateValue;
+    ref<Expr> stateEqualityConstraints;
 
-        ref<TxStoreEntry> e = m.findConcrete(it2->first, unifiedBases);
+    // Translation of allocation in the current state into an allocation in the
+    // tabled interpolant. This translation is used to equate absolute address
+    // values for allocations of matching sizes.
+    std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > unifiedBases;
 
-        if (e.isNull()) {
-          // Fail the subsumption, since the address was not found in the state,
-          // and we could not translate the addresses
+    // Non-pointer / exact pointer values to be marked as in the interpolant
+    std::set<ref<TxStateValue> > coreValues;
+
+    // Pointer values in the core for memory bounds interpolation.
+    std::map<ref<TxStateValue>, std::set<uint64_t> > corePointerValues;
+
+    {
+      TimerStatIncrementer t(concretelyAddressedStoreExpressionBuildTime);
+
+      // Build constraints from concrete-address interpolant store
+      for (TxStore::TopInterpolantStore::const_iterator
+               it1 = concretelyAddressedStore.begin(),
+               ie1 = concretelyAddressedStore.end();
+           it1 != ie1; ++it1) {
+        assert(!it1->second.empty() && "empty table entry with real index");
+
+        const TxStore::LowerInterpolantStore &tabledConcreteMap = it1->second;
+        TxStore::TopStateStore::iterator mIt = __internalStore.find(it1->first);
+        if (mIt == __internalStore.end()) {
           if (debugSubsumptionLevel >= 1) {
             std::string msg;
             std::string padding(makeTabs(1));
             llvm::raw_string_ostream stream(msg);
-            it2->first->print(stream, padding);
+            it1->first->print(stream, padding);
             stream.flush();
-            klee_message("#%lu=>#%lu: Check failure as memory region in the "
-                         "table does not exist in the state:\n%s",
+            klee_message("#%lu=>#%lu: Check failure as allocated memory region "
+                         "in the table does not exist in the state:\n%s",
                          state.txTreeNode->getNodeSequenceNumber(),
                          nodeSequenceNumber, msg.c_str());
           }
           return false;
-        } else {
-          bool leftUse =
-              state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
-          stateValue = e->getInterpolantStyleValue(leftUse);
         }
 
-        const ref<TxInterpolantValue> tabledValue = it2->second;
-        ref<Expr> res;
+        TxStore::MiddleStateStore &m = mIt->second;
 
-        if (!stateValue.isNull()) {
-          // There is the corresponding concrete allocation
-          if (tabledValue->getExpression()->getWidth() !=
-              stateValue->getExpression()->getWidth()) {
-            // We conservatively fail the subsumption in case the sizes do not
-            // match.
+        for (TxStore::LowerInterpolantStore::const_iterator
+                 it2 = tabledConcreteMap.begin(),
+                 ie2 = tabledConcreteMap.end();
+             it2 != ie2; ++it2) {
+          ref<TxInterpolantValue> stateValue;
+
+          ref<TxStoreEntry> e = m.findConcrete(it2->first, unifiedBases);
+
+          if (e.isNull()) {
+            // Fail the subsumption, since the address was not found in the
+            // state,
+            // and we could not translate the addresses
             if (debugSubsumptionLevel >= 1) {
               std::string msg;
-              klee_message("#%lu=>#%lu: Check failure as sizes of stored "
-                           "values do not match%s",
+              std::string padding(makeTabs(1));
+              llvm::raw_string_ostream stream(msg);
+              it2->first->print(stream, padding);
+              stream.flush();
+              klee_message("#%lu=>#%lu: Check failure as memory region in the "
+                           "table does not exist in the state:\n%s",
                            state.txTreeNode->getNodeSequenceNumber(),
                            nodeSequenceNumber, msg.c_str());
             }
             return false;
-          } else if (TxDependency::boundInterpolation() &&
-                     tabledValue->isPointer() && stateValue->isPointer()) {
-            ref<Expr> boundsCheck;
-            if (!ExactAddressInterpolant && tabledValue->useBound()) {
-              std::set<uint64_t> bounds;
-              boundsCheck = tabledValue->getBoundsCheck(
-                  stateValue, bounds, unifiedBases, debugSubsumptionLevel);
-              if (!boundsCheck.isNull()) {
-                if (boundsCheck->isFalse()) {
+          } else {
+            bool leftUse =
+                state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+            stateValue = e->getInterpolantStyleValue(leftUse);
+          }
+
+          const ref<TxInterpolantValue> tabledValue = it2->second;
+          ref<Expr> res;
+
+          if (!stateValue.isNull()) {
+            // There is the corresponding concrete allocation
+            if (tabledValue->getExpression()->getWidth() !=
+                stateValue->getExpression()->getWidth()) {
+              // We conservatively fail the subsumption in case the sizes do not
+              // match.
+              if (debugSubsumptionLevel >= 1) {
+                std::string msg;
+                klee_message("#%lu=>#%lu: Check failure as sizes of stored "
+                             "values do not match%s",
+                             state.txTreeNode->getNodeSequenceNumber(),
+                             nodeSequenceNumber, msg.c_str());
+              }
+              return false;
+            } else if (TxDependency::boundInterpolation() &&
+                       tabledValue->isPointer() && stateValue->isPointer()) {
+              ref<Expr> boundsCheck;
+              if (!ExactAddressInterpolant && tabledValue->useBound()) {
+                std::set<uint64_t> bounds;
+                boundsCheck = tabledValue->getBoundsCheck(
+                    stateValue, bounds, unifiedBases, debugSubsumptionLevel);
+                if (!boundsCheck.isNull()) {
+                  if (boundsCheck->isFalse()) {
+                    if (debugSubsumptionLevel >= 1) {
+                      std::string msg;
+                      klee_message(
+                          "#%lu=>#%lu: Check failure due to failure in "
+                          "memory bounds check%s",
+                          state.txTreeNode->getNodeSequenceNumber(),
+                          nodeSequenceNumber, msg.c_str());
+                    }
+                    return false;
+                  }
+                  if (!boundsCheck->isTrue())
+                    res = boundsCheck;
+
+                  // We record the LLVM value of the pointer
+                  corePointerValues[stateValue->getOriginalValue()] = bounds;
+                }
+              }
+
+              if (boundsCheck.isNull()) {
+                ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
+                    stateValue, unifiedBases, debugSubsumptionLevel);
+
+                if (offsetsCheck->isFalse()) {
                   if (debugSubsumptionLevel >= 1) {
                     std::string msg;
                     klee_message("#%lu=>#%lu: Check failure due to failure in "
-                                 "memory bounds check%s",
+                                 "offset equality check%s",
                                  state.txTreeNode->getNodeSequenceNumber(),
                                  nodeSequenceNumber, msg.c_str());
                   }
                   return false;
                 }
-                if (!boundsCheck->isTrue())
-                  res = boundsCheck;
+                if (!offsetsCheck->isTrue())
+                  res = offsetsCheck;
 
-                // We record the LLVM value of the pointer
-                corePointerValues[stateValue->getOriginalValue()] = bounds;
+                // We record the value of the pointer for interpolation marking
+                coreValues.insert(stateValue->getOriginalValue());
               }
-            }
-
-            if (boundsCheck.isNull()) {
-              ref<Expr> offsetsCheck = tabledValue->getOffsetsCheck(
-                  stateValue, unifiedBases, debugSubsumptionLevel);
-
-              if (offsetsCheck->isFalse()) {
+            } else {
+              res = EqExpr::create(tabledValue->getExpression(),
+                                   stateValue->getExpression());
+              if (res->isFalse()) {
                 if (debugSubsumptionLevel >= 1) {
-                  std::string msg;
-                  klee_message("#%lu=>#%lu: Check failure due to failure in "
-                               "offset equality check%s",
-                               state.txTreeNode->getNodeSequenceNumber(),
-                               nodeSequenceNumber, msg.c_str());
+                  if (debugSubsumptionLevel >= 2) {
+                    std::string msg;
+                    llvm::raw_string_ostream stream(msg);
+                    tabledValue->getExpression()->print(stream);
+                    stream << " (interpolant) vs. ";
+                    stateValue->getExpression()->print(stream);
+                    stream << " (state)";
+                    stream.flush();
+                    klee_message(
+                        "#%lu=>#%lu: Check failure due to unequal content: %s",
+                        state.txTreeNode->getNodeSequenceNumber(),
+                        nodeSequenceNumber, msg.c_str());
+                  } else {
+                    klee_message(
+                        "#%lu=>#%lu: Check failure due to unequal content",
+                        state.txTreeNode->getNodeSequenceNumber(),
+                        nodeSequenceNumber);
+                  }
+
+                  if (debugSubsumptionLevel >= 3) {
+                    std::string msg;
+                    llvm::raw_string_ostream stream1(msg);
+                    it2->first->print(stream1, makeTabs(1));
+                    stream1.flush();
+
+                    klee_message("with value stored in address:\n%s",
+                                 msg.c_str());
+                  }
                 }
                 return false;
-              }
-              if (!offsetsCheck->isTrue())
-                res = offsetsCheck;
+              } else if (res->isTrue()) {
+                if (debugSubsumptionLevel >= 1) {
+                  if (debugSubsumptionLevel >= 2) {
+                    std::string msg;
+                    llvm::raw_string_ostream stream(msg);
+                    tabledValue->getExpression()->print(stream);
+                    stream.flush();
+                    klee_message("#%lu=>#%lu: Equal contents: %s",
+                                 state.txTreeNode->getNodeSequenceNumber(),
+                                 nodeSequenceNumber, msg.c_str());
+                  } else {
+                    klee_message("#%lu=>#%lu: Equal contents",
+                                 state.txTreeNode->getNodeSequenceNumber(),
+                                 nodeSequenceNumber);
+                  }
 
-              // We record the value of the pointer for interpolation marking
+                  if (debugSubsumptionLevel >= 3) {
+                    std::string msg3;
+                    llvm::raw_string_ostream stream1(msg3);
+                    it2->first->print(stream1, makeTabs(1));
+                    stream1.flush();
+
+                    klee_message("with value stored in address:\n%s",
+                                 msg3.c_str());
+                  }
+                }
+              }
               coreValues.insert(stateValue->getOriginalValue());
             }
-          } else {
-            res = EqExpr::create(tabledValue->getExpression(),
-                                 stateValue->getExpression());
-            if (res->isFalse()) {
-              if (debugSubsumptionLevel >= 1) {
-                if (debugSubsumptionLevel >= 2) {
-                  std::string msg;
-                  llvm::raw_string_ostream stream(msg);
-                  tabledValue->getExpression()->print(stream);
-                  stream << " (interpolant) vs. ";
-                  stateValue->getExpression()->print(stream);
-                  stream << " (state)";
-                  stream.flush();
-                  klee_message(
-                      "#%lu=>#%lu: Check failure due to unequal content: %s",
-                      state.txTreeNode->getNodeSequenceNumber(),
-                      nodeSequenceNumber, msg.c_str());
-                } else {
-                  klee_message(
-                      "#%lu=>#%lu: Check failure due to unequal content",
-                      state.txTreeNode->getNodeSequenceNumber(),
-                      nodeSequenceNumber);
-                }
+          }
 
-                if (debugSubsumptionLevel >= 3) {
-                  std::string msg;
-                  llvm::raw_string_ostream stream1(msg);
-                  it2->first->print(stream1, makeTabs(1));
-                  stream1.flush();
+          e = m.findSymbolic(it2->first);
+          if (!e.isNull()) {
+            const ref<Expr> tabledConcreteOffset = it2->first->getOffset();
+            ref<Expr> conjunction;
+            bool leftUse =
+                state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
 
-                  klee_message("with value stored in address:\n%s",
-                               msg.c_str());
-                }
-              }
-              return false;
-            } else if (res->isTrue()) {
-              if (debugSubsumptionLevel >= 1) {
-                if (debugSubsumptionLevel >= 2) {
-                  std::string msg;
-                  llvm::raw_string_ostream stream(msg);
-                  tabledValue->getExpression()->print(stream);
-                  stream.flush();
-                  klee_message("#%lu=>#%lu: Equal contents: %s",
-                               state.txTreeNode->getNodeSequenceNumber(),
-                               nodeSequenceNumber, msg.c_str());
-                } else {
-                  klee_message("#%lu=>#%lu: Equal contents",
-                               state.txTreeNode->getNodeSequenceNumber(),
-                               nodeSequenceNumber);
-                }
+            // We make sure the context part of the addresses (the allocation
+            // site and the call history) are equivalent.
+            if (it2->first->getContext() == e->getAddress()->getContext()) {
 
-                if (debugSubsumptionLevel >= 3) {
-                  std::string msg3;
-                  llvm::raw_string_ostream stream1(msg3);
-                  it2->first->print(stream1, makeTabs(1));
-                  stream1.flush();
+              ref<TxInterpolantValue> interpolantValue =
+                  e->getInterpolantStyleValue(leftUse);
+              ref<Expr> constraint = makeConstraint(
+                  state, it2->second, interpolantValue, it2->first->getOffset(),
+                  e->getAddress()->getOffset(), coreValues, corePointerValues,
+                  unifiedBases, debugSubsumptionLevel);
 
-                  klee_message("with value stored in address:\n%s",
-                               msg3.c_str());
-                }
+              if (constraint.isNull())
+                return false;
+
+              if (!conjunction.isNull()) {
+                conjunction = AndExpr::create(constraint, conjunction);
+              } else {
+                conjunction = constraint;
               }
             }
-            coreValues.insert(stateValue->getOriginalValue());
-          }
-        }
 
-        e = m.findSymbolic(it2->first);
-        if (!e.isNull()) {
-          const ref<Expr> tabledConcreteOffset = it2->first->getOffset();
-          ref<Expr> conjunction;
-          bool leftUse =
-              state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
-
-          // We make sure the context part of the addresses (the allocation
-          // site and the call history) are equivalent.
-          if (it2->first->getContext() == e->getAddress()->getContext()) {
-
-            ref<TxInterpolantValue> interpolantValue =
-                e->getInterpolantStyleValue(leftUse);
-            ref<Expr> constraint = makeConstraint(
-                state, it2->second, interpolantValue, it2->first->getOffset(),
-                e->getAddress()->getOffset(), coreValues, corePointerValues,
-                unifiedBases, debugSubsumptionLevel);
-
-            if (constraint.isNull())
-              return false;
-
+            // If there were corresponding concrete as well as symbolic
+            // allocations in the current state, conjunct them
             if (!conjunction.isNull()) {
-              conjunction = AndExpr::create(constraint, conjunction);
-            } else {
-              conjunction = constraint;
+              res = (!res.isNull() ? AndExpr::create(res, conjunction)
+                                   : conjunction);
             }
           }
 
-          // If there were corresponding concrete as well as symbolic
-          // allocations in the current state, conjunct them
-          if (!conjunction.isNull()) {
-            res = (!res.isNull() ? AndExpr::create(res, conjunction)
-                                 : conjunction);
+          if (!res.isNull()) {
+            stateEqualityConstraints =
+                (stateEqualityConstraints.isNull()
+                     ? res
+                     : AndExpr::create(res, stateEqualityConstraints));
           }
-        }
-
-        if (!res.isNull()) {
-          stateEqualityConstraints =
-              (stateEqualityConstraints.isNull()
-                   ? res
-                   : AndExpr::create(res, stateEqualityConstraints));
         }
       }
-    }
 
-    //------------------------------------------------------------------------
-    // Historical concretely-addressed store
-    //------------------------------------------------------------------------
-    for (TxStore::LowerInterpolantStore::const_iterator
-             it1 = concretelyAddressedHistoricalStore.begin(),
-             ie1 = concretelyAddressedHistoricalStore.end();
-         it1 != ie1; ++it1) {
-      TxStore::LowerStateStore::const_iterator mIt =
-          __concretelyAddressedHistoricalStore.find(it1->first);
-      ref<Expr> constraint;
+      //------------------------------------------------------------------------
+      // Historical concretely-addressed store
+      //------------------------------------------------------------------------
+      for (TxStore::LowerInterpolantStore::const_iterator
+               it1 = concretelyAddressedHistoricalStore.begin(),
+               ie1 = concretelyAddressedHistoricalStore.end();
+           it1 != ie1; ++it1) {
+        TxStore::LowerStateStore::const_iterator mIt =
+            __concretelyAddressedHistoricalStore.find(it1->first);
+        ref<Expr> constraint;
 
-      if (mIt == __concretelyAddressedHistoricalStore.end()) {
-        mIt = __symbolicallyAddressedHistoricalStore.find(it1->first);
-        if (mIt != __symbolicallyAddressedHistoricalStore.end()) {
+        if (mIt == __concretelyAddressedHistoricalStore.end()) {
+          mIt = __symbolicallyAddressedHistoricalStore.find(it1->first);
+          if (mIt != __symbolicallyAddressedHistoricalStore.end()) {
+            ref<TxStoreEntry> e = mIt->second;
+            bool leftUse =
+                state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+            ref<TxInterpolantValue> interpolantValue =
+                e->getInterpolantStyleValue(leftUse);
+            constraint = makeConstraint(
+                state, it1->second, interpolantValue, it1->first->getOffset(),
+                e->getAddress()->getOffset(), coreValues, corePointerValues,
+                unifiedBases, debugSubsumptionLevel);
+            if (constraint.isNull())
+              return false;
+            if (stateEqualityConstraints.isNull()) {
+              stateEqualityConstraints = constraint;
+            } else {
+              stateEqualityConstraints =
+                  AndExpr::create(constraint, stateEqualityConstraints);
+            }
+          } else {
+            // Match not found
+            return false;
+          }
+        } else {
           ref<TxStoreEntry> e = mIt->second;
           bool leftUse =
               state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
@@ -1289,22 +1316,8 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
             stateEqualityConstraints =
                 AndExpr::create(constraint, stateEqualityConstraints);
           }
-        } else {
-          // Match not found
-          return false;
         }
-      } else {
-        ref<TxStoreEntry> e = mIt->second;
-        bool leftUse =
-            state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
-        ref<TxInterpolantValue> interpolantValue =
-            e->getInterpolantStyleValue(leftUse);
-        constraint = makeConstraint(
-            state, it1->second, interpolantValue, it1->first->getOffset(),
-            e->getAddress()->getOffset(), coreValues, corePointerValues,
-            unifiedBases, debugSubsumptionLevel);
-        if (constraint.isNull())
-          return false;
+
         if (stateEqualityConstraints.isNull()) {
           stateEqualityConstraints = constraint;
         } else {
@@ -1312,70 +1325,91 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
               AndExpr::create(constraint, stateEqualityConstraints);
         }
       }
-
-      if (stateEqualityConstraints.isNull()) {
-        stateEqualityConstraints = constraint;
-      } else {
-        stateEqualityConstraints =
-            AndExpr::create(constraint, stateEqualityConstraints);
-      }
     }
-  }
 
-  {
-    TimerStatIncrementer t(symbolicallyAddressedStoreExpressionBuildTime);
-    // Build constraints from symbolic-address interpolant store
-    for (TxStore::TopInterpolantStore::const_iterator
-             it1 = symbolicallyAddressedStore.begin(),
-             ie1 = symbolicallyAddressedStore.end();
-         it1 != ie1; ++it1) {
-      assert(!it1->second.empty() && "empty table entry with real index");
+    {
+      TimerStatIncrementer t(symbolicallyAddressedStoreExpressionBuildTime);
+      // Build constraints from symbolic-address interpolant store
+      for (TxStore::TopInterpolantStore::const_iterator
+               it1 = symbolicallyAddressedStore.begin(),
+               ie1 = symbolicallyAddressedStore.end();
+           it1 != ie1; ++it1) {
+        assert(!it1->second.empty() && "empty table entry with real index");
 
-      const TxStore::LowerInterpolantStore &tabledSymbolicMap = it1->second;
-      TxStore::TopStateStore::iterator mIt = __internalStore.find(it1->first);
-      if (mIt == __internalStore.end()) {
-        if (debugSubsumptionLevel >= 1) {
-          std::string msg;
-          std::string padding(makeTabs(1));
-          llvm::raw_string_ostream stream(msg);
-          it1->first->print(stream, padding);
-          stream.flush();
-          klee_message("#%lu=>#%lu: Check failure as allocated memory region "
-                       "in the table does not exist in the state:\n%s",
-                       state.txTreeNode->getNodeSequenceNumber(),
-                       nodeSequenceNumber, msg.c_str());
+        const TxStore::LowerInterpolantStore &tabledSymbolicMap = it1->second;
+        TxStore::TopStateStore::iterator mIt = __internalStore.find(it1->first);
+        if (mIt == __internalStore.end()) {
+          if (debugSubsumptionLevel >= 1) {
+            std::string msg;
+            std::string padding(makeTabs(1));
+            llvm::raw_string_ostream stream(msg);
+            it1->first->print(stream, padding);
+            stream.flush();
+            klee_message("#%lu=>#%lu: Check failure as allocated memory region "
+                         "in the table does not exist in the state:\n%s",
+                         state.txTreeNode->getNodeSequenceNumber(),
+                         nodeSequenceNumber, msg.c_str());
+          }
+          return false;
         }
-        return false;
-      }
 
-      TxStore::MiddleStateStore &m = mIt->second;
+        TxStore::MiddleStateStore &m = mIt->second;
 
-      ref<Expr> conjunction;
+        ref<Expr> conjunction;
 
-      for (TxStore::LowerInterpolantStore::const_iterator
-               it2 = tabledSymbolicMap.begin(),
-               ie2 = tabledSymbolicMap.end();
-           it2 != ie2; ++it2) {
+        for (TxStore::LowerInterpolantStore::const_iterator
+                 it2 = tabledSymbolicMap.begin(),
+                 ie2 = tabledSymbolicMap.end();
+             it2 != ie2; ++it2) {
 
-        ref<TxStoreEntry> e = m.findConcrete(it2->first, unifiedBases);
-        if (!e.isNull()) {
-          bool leftUse =
-              state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+          ref<TxStoreEntry> e = m.findConcrete(it2->first, unifiedBases);
+          if (!e.isNull()) {
+            bool leftUse =
+                state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
 
-          // We make sure the context part of the addresses (the allocation site
-          // and the call history) are equivalent.
-          if (it2->first->getContext() == e->getAddress()->getContext()) {
-            ref<TxInterpolantValue> interpolantValue =
-                e->getInterpolantStyleValue(leftUse);
-            ref<Expr> constraint = makeConstraint(
-                state, it2->second, interpolantValue, it2->first->getOffset(),
-                e->getAddress()->getOffset(), coreValues, corePointerValues,
-                unifiedBases, debugSubsumptionLevel);
+            // We make sure the context part of the addresses (the allocation
+            // site
+            // and the call history) are equivalent.
+            if (it2->first->getContext() == e->getAddress()->getContext()) {
+              ref<TxInterpolantValue> interpolantValue =
+                  e->getInterpolantStyleValue(leftUse);
+              ref<Expr> constraint = makeConstraint(
+                  state, it2->second, interpolantValue, it2->first->getOffset(),
+                  e->getAddress()->getOffset(), coreValues, corePointerValues,
+                  unifiedBases, debugSubsumptionLevel);
 
-            if (constraint.isNull())
-              return false;
+              if (constraint.isNull())
+                return false;
 
-            if (!constraint.isNull()) {
+              if (!constraint.isNull()) {
+                if (!conjunction.isNull()) {
+                  conjunction = AndExpr::create(constraint, conjunction);
+                } else {
+                  conjunction = constraint;
+                }
+              }
+            }
+          }
+
+          e = m.findSymbolic(it2->first);
+          if (!e.isNull()) {
+            bool leftUse =
+                state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+
+            // We make sure the context part of the addresses (the allocation
+            // site
+            // and the call history) are equivalent.
+            if (it2->first->getContext() == e->getAddress()->getContext()) {
+              ref<TxInterpolantValue> interpolantValue =
+                  e->getInterpolantStyleValue(leftUse);
+              ref<Expr> constraint = makeConstraint(
+                  state, it2->second, interpolantValue, it2->first->getOffset(),
+                  e->getAddress()->getOffset(), coreValues, corePointerValues,
+                  unifiedBases, debugSubsumptionLevel);
+
+              if (constraint.isNull())
+                return false;
+
               if (!conjunction.isNull()) {
                 conjunction = AndExpr::create(constraint, conjunction);
               } else {
@@ -1385,56 +1419,51 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
           }
         }
 
-        e = m.findSymbolic(it2->first);
-        if (!e.isNull()) {
-          bool leftUse =
-              state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
-
-          // We make sure the context part of the addresses (the allocation site
-          // and the call history) are equivalent.
-          if (it2->first->getContext() == e->getAddress()->getContext()) {
-            ref<TxInterpolantValue> interpolantValue =
-                e->getInterpolantStyleValue(leftUse);
-            ref<Expr> constraint = makeConstraint(
-                state, it2->second, interpolantValue, it2->first->getOffset(),
-                e->getAddress()->getOffset(), coreValues, corePointerValues,
-                unifiedBases, debugSubsumptionLevel);
-
-            if (constraint.isNull())
-              return false;
-
-            if (!conjunction.isNull()) {
-              conjunction = AndExpr::create(constraint, conjunction);
-            } else {
-              conjunction = constraint;
-            }
-          }
+        if (!conjunction.isNull()) {
+          stateEqualityConstraints =
+              (stateEqualityConstraints.isNull()
+                   ? conjunction
+                   : AndExpr::create(conjunction, stateEqualityConstraints));
         }
       }
 
-      if (!conjunction.isNull()) {
-        stateEqualityConstraints =
-            (stateEqualityConstraints.isNull()
-                 ? conjunction
-                 : AndExpr::create(conjunction, stateEqualityConstraints));
-      }
-    }
+      //------------------------------------------------------------------------
+      // Historical symbolically-addressed store
+      //------------------------------------------------------------------------
+      for (TxStore::LowerInterpolantStore::const_iterator
+               it1 = symbolicallyAddressedHistoricalStore.begin(),
+               ie1 = symbolicallyAddressedHistoricalStore.end();
+           it1 != ie1; ++it1) {
 
-    //------------------------------------------------------------------------
-    // Historical symbolically-addressed store
-    //------------------------------------------------------------------------
-    for (TxStore::LowerInterpolantStore::const_iterator
-             it1 = symbolicallyAddressedHistoricalStore.begin(),
-             ie1 = symbolicallyAddressedHistoricalStore.end();
-         it1 != ie1; ++it1) {
+        TxStore::LowerStateStore::const_iterator mIt =
+            __concretelyAddressedHistoricalStore.find(it1->first);
+        ref<Expr> constraint;
 
-      TxStore::LowerStateStore::const_iterator mIt =
-          __concretelyAddressedHistoricalStore.find(it1->first);
-      ref<Expr> constraint;
-
-      if (mIt == __concretelyAddressedHistoricalStore.end()) {
-        mIt = __symbolicallyAddressedHistoricalStore.find(it1->first);
-        if (mIt != __symbolicallyAddressedHistoricalStore.end()) {
+        if (mIt == __concretelyAddressedHistoricalStore.end()) {
+          mIt = __symbolicallyAddressedHistoricalStore.find(it1->first);
+          if (mIt != __symbolicallyAddressedHistoricalStore.end()) {
+            ref<TxStoreEntry> e = mIt->second;
+            bool leftUse =
+                state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
+            ref<TxInterpolantValue> interpolantValue =
+                e->getInterpolantStyleValue(leftUse);
+            constraint = makeConstraint(
+                state, it1->second, interpolantValue, it1->first->getOffset(),
+                e->getAddress()->getOffset(), coreValues, corePointerValues,
+                unifiedBases, debugSubsumptionLevel);
+            if (constraint.isNull())
+              return false;
+            if (stateEqualityConstraints.isNull()) {
+              stateEqualityConstraints = constraint;
+            } else {
+              stateEqualityConstraints =
+                  AndExpr::create(constraint, stateEqualityConstraints);
+            }
+          } else {
+            // Match not found
+            return false;
+          }
+        } else {
           ref<TxStoreEntry> e = mIt->second;
           bool leftUse =
               state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
@@ -1452,64 +1481,247 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
             stateEqualityConstraints =
                 AndExpr::create(constraint, stateEqualityConstraints);
           }
-        } else {
-          // Match not found
-          return false;
-        }
-      } else {
-        ref<TxStoreEntry> e = mIt->second;
-        bool leftUse =
-            state.txTreeNode->getStore()->isInLeftSubtree(e->getDepth());
-        ref<TxInterpolantValue> interpolantValue =
-            e->getInterpolantStyleValue(leftUse);
-        constraint = makeConstraint(
-            state, it1->second, interpolantValue, it1->first->getOffset(),
-            e->getAddress()->getOffset(), coreValues, corePointerValues,
-            unifiedBases, debugSubsumptionLevel);
-        if (constraint.isNull())
-          return false;
-        if (stateEqualityConstraints.isNull()) {
-          stateEqualityConstraints = constraint;
-        } else {
-          stateEqualityConstraints =
-              AndExpr::create(constraint, stateEqualityConstraints);
         }
       }
     }
-  }
 
-  Solver::Validity result;
-  ref<Expr> expr; // The query expression
+    Solver::Validity result;
+    ref<Expr> expr; // The query expression
 
-  {
-    TimerStatIncrementer t(solverAccessTime);
+    {
+      TimerStatIncrementer t(solverAccessTime);
 
-    // Here we build the query expression, after which it is always a
-    // conjunction of the interpolant and the state equality constraints. Here
-    // we call AndExpr::alloc instead of AndExpr::create as we need to guarantee
-    // that the resulting expression is an AndExpr, otherwise simplifyExistsExpr
-    // would not work.
-    if (!interpolant.isNull()) {
-      expr = !stateEqualityConstraints.isNull()
-                 ? AndExpr::alloc(interpolant, stateEqualityConstraints)
-                 : AndExpr::alloc(interpolant,
-                                  ConstantExpr::create(1, Expr::Bool));
-    } else if (!stateEqualityConstraints.isNull()) {
-      expr = AndExpr::alloc(ConstantExpr::create(1, Expr::Bool),
-                            stateEqualityConstraints);
-    } else {
-      // Here both the interpolant constraints and state equality
-      // constraints are empty, therefore everything gets subsumed
+      // Here we build the query expression, after which it is always a
+      // conjunction of the interpolant and the state equality constraints. Here
+      // we call AndExpr::alloc instead of AndExpr::create as we need to
+      // guarantee
+      // that the resulting expression is an AndExpr, otherwise
+      // simplifyExistsExpr
+      // would not work.
+      if (!interpolant.isNull()) {
+        expr = !stateEqualityConstraints.isNull()
+                   ? AndExpr::alloc(interpolant, stateEqualityConstraints)
+                   : AndExpr::alloc(interpolant,
+                                    ConstantExpr::create(1, Expr::Bool));
+      } else if (!stateEqualityConstraints.isNull()) {
+        expr = AndExpr::alloc(ConstantExpr::create(1, Expr::Bool),
+                              stateEqualityConstraints);
+      } else {
+        // Here both the interpolant constraints and state equality
+        // constraints are empty, therefore everything gets subsumed
+        if (debugSubsumptionLevel >= 1) {
+          std::string msg = "";
+          if (!corePointerValues.empty()) {
+            msg += " (with successful memory bound checks)";
+          }
+          klee_message("#%lu=>#%lu: Check success as interpolant is empty%s",
+                       state.txTreeNode->getNodeSequenceNumber(),
+                       nodeSequenceNumber, msg.c_str());
+        }
+
+        interpolateValues(state, coreValues, corePointerValues,
+                          debugSubsumptionLevel);
+        if (WPInterpolant) {
+          // In case a node is subsumed, the WP Expr is stored at the parent
+          // node.
+          // This is crucial for generating WP Expr at the parent node.
+          state.txTreeNode->setWPatSubsumption(wpInterpolant);
+        }
+        return true;
+      }
+
+      bool exprHasNoFreeVariables = false;
+
+      if (!existentials.empty()) {
+        ref<Expr> existsExpr = ExistsExpr::create(existentials, expr);
+        if (debugSubsumptionLevel >= 2) {
+          klee_message("Before simplification:\n%s",
+                       TxPrettyExpressionBuilder::constructQuery(
+                           state.constraints, existsExpr, debugSubsumptionLevel)
+                           .c_str());
+        }
+        expr = simplifyExistsExpr(existsExpr, exprHasNoFreeVariables);
+      }
+
+      // We finally simplify the conjunction using create()
+      if (llvm::isa<AndExpr>(expr))
+        expr = AndExpr::create(expr->getKid(0), expr->getKid(1));
+
+      // If query expression simplification result was false, we quickly fail
+      // without calling the solver
+      if (expr->isFalse()) {
+        if (debugSubsumptionLevel >= 1) {
+          klee_message(
+              "#%lu=>#%lu: Check failure as consequent is unsatisfiable",
+              state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
+        }
+        return false;
+      }
+
+      bool success = false;
+
+      if (!detectConflictPrimitives(state, expr)) {
+        if (debugSubsumptionLevel >= 1) {
+          klee_message(
+              "#%lu=>#%lu: Check failure as contradictory equalities detected",
+              state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
+        }
+        return false;
+      }
+
+      std::vector<ref<Expr> > unsatCore;
+
+      // We call the solver only when the simplified query expression is not a
+      // constant and no contradictory unary constraints found from
+      // solvingUnaryConstraints method.
+      if (!llvm::isa<ConstantExpr>(expr)) {
+        if (!existentials.empty() && llvm::isa<ExistsExpr>(expr)) {
+          if (debugSubsumptionLevel >= 2) {
+            klee_message("Existentials not empty");
+          }
+
+          if (exprHasNoFreeVariables) {
+            // In case the query expression has no free variables, subsumption
+            // check succeeds, as the tabled interpolant with
+            // existentially-quantified variables was constructed from
+            // satisfiable
+            // path.
+
+            if (debugSubsumptionLevel >= 1) {
+              std::string msg = "";
+              if (!corePointerValues.empty()) {
+                msg += " (with successful memory bound checks)";
+              }
+              klee_message("#%lu=>#%lu: Check success as query expression "
+                           "contains only bound variables%s",
+                           state.txTreeNode->getNodeSequenceNumber(),
+                           nodeSequenceNumber, msg.c_str());
+            }
+            if (WPInterpolant) {
+              // In case a node is subsumed, the WP Expr is stored at the parent
+              // node. This is crucial for generating WP Expr at the parent
+              // node.
+              state.txTreeNode->setWPatSubsumption(wpInterpolant);
+            }
+            return true;
+          } else {
+            // Here we try to get bound-variables-free conjunction, if there is
+            // no constraint with both bound and non-bound variables
+            if (ExistsExpr *existsExpr = llvm::dyn_cast<ExistsExpr>(expr)) {
+              ref<Expr> boundFree(getBoundFreeConjunction(
+                  existsExpr->variables, existsExpr->getKid(0)));
+
+              if (!boundFree.isNull()) {
+                expr = boundFree;
+              }
+            }
+
+            if (debugSubsumptionLevel >= 2) {
+              klee_message("Querying for subsumption check:\n%s",
+                           TxPrettyExpressionBuilder::constructQuery(
+                               state.constraints, expr, debugSubsumptionLevel)
+                               .c_str());
+            }
+
+            if (llvm::isa<ExistsExpr>(expr)) {
+              // We instantiate a new Z3 solver to make sure that we use Z3
+              // without pre-solving optimizations. It would be nice in the
+              // future
+              // to just run solver->evaluate so that the optimizations can be
+              // used, but this requires handling of quantified expressions by
+              // KLEE's pre-solving procedure, which does not exist currently.
+              Z3Solver *z3solver = new Z3Solver();
+              z3solver->setCoreSolverTimeout(timeout);
+              success = z3solver->directComputeValidity(
+                  Query(state.constraints, expr), result, unsatCore);
+              z3solver->setCoreSolverTimeout(0);
+              delete z3solver;
+            } else {
+              solver->setTimeout(timeout);
+              success = solver->evaluate(state, expr, result, unsatCore);
+              solver->setTimeout(0);
+            }
+
+            if (!success || result != Solver::True) {
+              if (debugSubsumptionLevel >= 1) {
+                klee_message(
+                    "#%lu=>#%lu: Check failure as solved did not decide "
+                    "validity of existentially-quantified query",
+                    state.txTreeNode->getNodeSequenceNumber(),
+                    nodeSequenceNumber);
+              }
+              return false;
+            }
+          }
+
+        } else {
+          if (debugSubsumptionLevel >= 2) {
+            klee_message("Querying for subsumption check:\n%s",
+                         TxPrettyExpressionBuilder::constructQuery(
+                             state.constraints, expr, debugSubsumptionLevel)
+                             .c_str());
+          }
+          // We call the solver in the standard way if the
+          // formula is unquantified.
+          solver->setTimeout(timeout);
+          success = solver->evaluate(state, expr, result, unsatCore);
+          solver->setTimeout(0);
+
+          if (!success || result != Solver::True) {
+            if (debugSubsumptionLevel >= 1) {
+              klee_message(
+                  "#%lu=>#%lu: Check failure as solved did not decide validity",
+                  state.txTreeNode->getNodeSequenceNumber(),
+                  nodeSequenceNumber);
+            }
+            return false;
+          }
+        }
+      } else {
+        // expr is a constant expression
+        if (expr->isTrue()) {
+          if (debugSubsumptionLevel >= 1) {
+            std::string msg = "";
+            if (!corePointerValues.empty()) {
+              msg += " (with successful memory bound checks)";
+            }
+            klee_message(
+                "#%lu=>#%lu: Check success as query expression is true%s",
+                state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber,
+                msg.c_str());
+          }
+
+          interpolateValues(state, coreValues, corePointerValues,
+                            debugSubsumptionLevel);
+          if (WPInterpolant) {
+            // In case a node is subsumed, the WP Expr is stored at the parent
+            // node. This is crucial for generating WP Expr at the parent node.
+            state.txTreeNode->setWPatSubsumption(wpInterpolant);
+          }
+          return true;
+        }
+        if (debugSubsumptionLevel >= 1) {
+          klee_message(
+              "#%lu=>#%lu: Check failure as query expression is non-true",
+              state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
+        }
+        return false;
+      }
+
+      // State subsumed, we mark needed constraints on the
+      // path condition.
       if (debugSubsumptionLevel >= 1) {
         std::string msg = "";
         if (!corePointerValues.empty()) {
           msg += " (with successful memory bound checks)";
         }
-        klee_message("#%lu=>#%lu: Check success as interpolant is empty%s",
+        klee_message("#%lu=>#%lu: Check success as solver decided validity%s",
                      state.txTreeNode->getNodeSequenceNumber(),
                      nodeSequenceNumber, msg.c_str());
       }
 
+      // We create path condition marking structure and mark core constraints
+      state.txTreeNode->unsatCoreInterpolation(unsatCore);
       interpolateValues(state, coreValues, corePointerValues,
                         debugSubsumptionLevel);
       if (WPInterpolant) {
@@ -1519,199 +1731,6 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
       }
       return true;
     }
-
-    bool exprHasNoFreeVariables = false;
-
-    if (!existentials.empty()) {
-      ref<Expr> existsExpr = ExistsExpr::create(existentials, expr);
-      if (debugSubsumptionLevel >= 2) {
-        klee_message("Before simplification:\n%s",
-                     TxPrettyExpressionBuilder::constructQuery(
-                         state.constraints, existsExpr,debugSubsumptionLevel).c_str()); // Added 'debugSubsumptionLevel' variable for PrettyPrint 
-      }
-      expr = simplifyExistsExpr(existsExpr, exprHasNoFreeVariables);
-    }
-
-    // We finally simplify the conjunction using create()
-    if (llvm::isa<AndExpr>(expr))
-      expr = AndExpr::create(expr->getKid(0), expr->getKid(1));
-
-    // If query expression simplification result was false, we quickly fail
-    // without calling the solver
-    if (expr->isFalse()) {
-      if (debugSubsumptionLevel >= 1) {
-        klee_message("#%lu=>#%lu: Check failure as consequent is unsatisfiable",
-                     state.txTreeNode->getNodeSequenceNumber(),
-                     nodeSequenceNumber);
-      }
-      return false;
-    }
-
-    bool success = false;
-
-    if (!detectConflictPrimitives(state, expr)) {
-      if (debugSubsumptionLevel >= 1) {
-        klee_message(
-            "#%lu=>#%lu: Check failure as contradictory equalities detected",
-            state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
-      }
-      return false;
-    }
-
-    std::vector<ref<Expr> > unsatCore;
-
-    // We call the solver only when the simplified query expression is not a
-    // constant and no contradictory unary constraints found from
-    // solvingUnaryConstraints method.
-    if (!llvm::isa<ConstantExpr>(expr)) {
-      if (!existentials.empty() && llvm::isa<ExistsExpr>(expr)) {
-        if (debugSubsumptionLevel >= 2) {
-          klee_message("Existentials not empty");
-        }
-
-        if (exprHasNoFreeVariables) {
-          // In case the query expression has no free variables, subsumption
-          // check succeeds, as the tabled interpolant with
-          // existentially-quantified variables was constructed from satisfiable
-          // path.
-
-          if (debugSubsumptionLevel >= 1) {
-            std::string msg = "";
-            if (!corePointerValues.empty()) {
-              msg += " (with successful memory bound checks)";
-            }
-            klee_message("#%lu=>#%lu: Check success as query expression "
-                         "contains only bound variables%s",
-                         state.txTreeNode->getNodeSequenceNumber(),
-                         nodeSequenceNumber, msg.c_str());
-          }
-          if (WPInterpolant) {
-            // In case a node is subsumed, the WP Expr is stored at the parent
-            // node. This is crucial for generating WP Expr at the parent node.
-            state.txTreeNode->setWPatSubsumption(wpInterpolant);
-          }
-          return true;
-        } else {
-          // Here we try to get bound-variables-free conjunction, if there is
-          // no constraint with both bound and non-bound variables
-          if (ExistsExpr *existsExpr = llvm::dyn_cast<ExistsExpr>(expr)) {
-            ref<Expr> boundFree(getBoundFreeConjunction(existsExpr->variables,
-                                                        existsExpr->getKid(0)));
-
-            if (!boundFree.isNull()) {
-              expr = boundFree;
-            }
-          }
-
-          if (debugSubsumptionLevel >= 2 and debugSubsumptionLevel != 3 ) { /*Added 'debugSubsumptionLevel != 3' constraint for Pretty Print*/
-            klee_message("Querying for subsumption check:\n%s",
-                         TxPrettyExpressionBuilder::constructQuery(
-                             state.constraints, expr,debugSubsumptionLevel).c_str()); /*Added 'debugSubsumptionLevel' variable in 'constructQuery' function for Pretty Print*/
-          }
-
-          if (llvm::isa<ExistsExpr>(expr)) {
-            // We instantiate a new Z3 solver to make sure that we use Z3
-            // without pre-solving optimizations. It would be nice in the future
-            // to just run solver->evaluate so that the optimizations can be
-            // used, but this requires handling of quantified expressions by
-            // KLEE's pre-solving procedure, which does not exist currently.
-            Z3Solver *z3solver = new Z3Solver();
-            z3solver->setCoreSolverTimeout(timeout);
-            success = z3solver->directComputeValidity(
-                Query(state.constraints, expr), result, unsatCore);
-            z3solver->setCoreSolverTimeout(0);
-            delete z3solver;
-          } else {
-            solver->setTimeout(timeout);
-            success = solver->evaluate(state, expr, result, unsatCore);
-            solver->setTimeout(0);
-          }
-
-          if (!success || result != Solver::True) {
-            if (debugSubsumptionLevel >= 1) {
-              klee_message("#%lu=>#%lu: Check failure as solved did not decide "
-                           "validity of existentially-quantified query",
-                           state.txTreeNode->getNodeSequenceNumber(),
-                           nodeSequenceNumber);
-            }
-            return false;
-          }
-        }
-
-      } else {
-        if (debugSubsumptionLevel >= 2 and debugSubsumptionLevel != 3) { /*Added 'debugSubsumptionLevel != 3' constraint for prettyPrint*/
-          klee_message("Querying for subsumption check:\n%s",
-                       TxPrettyExpressionBuilder::constructQuery(
-                           state.constraints, expr, debugSubsumptionLevel).c_str());/*Added 'debugSubsumptionLevel' variable in 'constructQuery' function for Pretty Print*/
-        }
-        // We call the solver in the standard way if the
-        // formula is unquantified.
-        solver->setTimeout(timeout);
-        success = solver->evaluate(state, expr, result, unsatCore);
-        solver->setTimeout(0);
-
-        if (!success || result != Solver::True) {
-          if (debugSubsumptionLevel >= 1) {
-            klee_message(
-                "#%lu=>#%lu: Check failure as solved did not decide validity",
-                state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
-          }
-          return false;
-        }
-      }
-    } else {
-      // expr is a constant expression
-      if (expr->isTrue()) {
-        if (debugSubsumptionLevel >= 1) {
-          std::string msg = "";
-          if (!corePointerValues.empty()) {
-            msg += " (with successful memory bound checks)";
-          }
-          klee_message(
-              "#%lu=>#%lu: Check success as query expression is true%s",
-              state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber,
-              msg.c_str());
-        }
-
-        interpolateValues(state, coreValues, corePointerValues,
-                          debugSubsumptionLevel);
-        if (WPInterpolant) {
-          // In case a node is subsumed, the WP Expr is stored at the parent
-          // node. This is crucial for generating WP Expr at the parent node.
-          state.txTreeNode->setWPatSubsumption(wpInterpolant);
-        }
-        return true;
-      }
-      if (debugSubsumptionLevel >= 1) {
-        klee_message(
-            "#%lu=>#%lu: Check failure as query expression is non-true",
-            state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
-      }
-      return false;
-    }
-
-    // State subsumed, we mark needed constraints on the
-    // path condition.
-    if (debugSubsumptionLevel >= 1) {
-      std::string msg = "";
-      if (!corePointerValues.empty()) {
-        msg += " (with successful memory bound checks)";
-      }
-      klee_message("#%lu=>#%lu: Check success as solver decided validity%s",
-                   state.txTreeNode->getNodeSequenceNumber(),
-                   nodeSequenceNumber, msg.c_str());
-    }
-
-    // We create path condition marking structure and mark core constraints
-    state.txTreeNode->unsatCoreInterpolation(unsatCore);
-    interpolateValues(state, coreValues, corePointerValues,
-                      debugSubsumptionLevel);
-    if (WPInterpolant) {
-      // In case a node is subsumed, the WP Expr is stored at the parent node.
-      // This is crucial for generating WP Expr at the parent node.
-      state.txTreeNode->setWPatSubsumption(wpInterpolant);
-    }
-    return true;
   }
 #endif /* ENABLE_Z3 */
   return false;
@@ -1782,32 +1801,39 @@ void TxSubsumptionTableEntry::setExistentials(
   existentials = _existentials;
 }
 
+void TxSubsumptionTableEntry::setmarkedGlobal(
+    std::set<ref<TxStoreEntry> > _markedGlobal) {
+  markedGlobal = _markedGlobal;
+}
+
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream) const {
-  print(stream, 0,debugSubsumptionLevel_g);
+  print(stream, 0);
 }
 
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
-                                    const unsigned paddingAmount, int debugSubsumptionLevel) const {
-  print(stream, makeTabs(paddingAmount),debugSubsumptionLevel);
+                                    const unsigned paddingAmount) const {
+  print(stream, makeTabs(paddingAmount));
 }
 
 void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
-                                    const std::string &prefix, int debugSubsumptionLevel) const {
+                                    const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
   std::string tabsNextNext = appendTab(tabsNext);
 
   stream << prefix << "------------ Subsumption Table Entry ------------\n";
-  stream << prefix << "Program point = " << programPoint << "\n";
+  stream << prefix << "Program point = " << programPoint << "\n"; 
+  stream << prefix << "C-File Name:Function Name:Line number = " << CfileName << ":"<<CFuntionName<<":" <<CfileLineNumber <<"\n";
   if (MarkGlobal) {
     stream << prefix << "global = [";
     for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
                                                 ie = markedGlobal.end();
          it != ie; ++it) {
+      // llvm::outs()<<"Global vaiables:::::::::::---------------:::::\n\n\n";
       (*it)->print(stream);
     }
     stream << "]\n";
   }
-  stream << prefix << "interpolant = ";
+  stream << prefix << "pi = ";
   if (!interpolant.isNull())
     interpolant->print(stream);
   else
@@ -1837,9 +1863,8 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
     stream << prefix;
   }
   stream << "]";
-llvm::outs()<<"debugSubsumptionLevel"<<debugSubsumptionLevel<<"\n";
-  if(debugSubsumptionLevel>=4){ /*PrettyPrint*/
- stream << "\n" << prefix << "symbolically-addressed store = [";
+
+  stream << "\n" << prefix << "symbolically-addressed store = [";
   if (!symbolicallyAddressedStore.empty()) {
     stream << "\n";
     for (TxStore::TopInterpolantStore::const_iterator
@@ -1874,7 +1899,6 @@ llvm::outs()<<"debugSubsumptionLevel"<<debugSubsumptionLevel<<"\n";
       if (it1 != is1)
         stream << tabsNext << "------------------------------------------\n";
       stream << tabsNext << "address:\n";
-      
       it1->first->print(stream, tabsNextNext);
       stream << "\n";
       stream << tabsNext << "content:\n";
@@ -1894,7 +1918,6 @@ llvm::outs()<<"debugSubsumptionLevel"<<debugSubsumptionLevel<<"\n";
          it1 != ie1; ++it1) {
       if (it1 != is1)
         stream << tabsNext << "------------------------------------------\n";
-
       stream << tabsNext << "address:\n";
       it1->first->print(stream, tabsNextNext);
       stream << "\n";
@@ -1917,7 +1940,7 @@ llvm::outs()<<"debugSubsumptionLevel"<<debugSubsumptionLevel<<"\n";
       stream << (*it)->name;
     }
   }
-  stream << "]";}  /*end Pretty Print*/
+  stream << "]";
 }
 
 void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream) const {
@@ -1939,17 +1962,20 @@ void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
 
 void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
   stream << "KLEE: done:     Time for actual solver calls in subsumption check "
-            "(ms) = " << ((double)stats::subsumptionQueryTime.getValue()) / 1000
-         << "\n";
+            "(ms) = "
+         << ((double)stats::subsumptionQueryTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     Number of solver calls for subsumption check "
-            "(failed) = " << stats::subsumptionQueryCount.getValue() << " ("
+            "(failed) = "
+         << stats::subsumptionQueryCount.getValue() << " ("
          << stats::subsumptionQueryFailureCount.getValue() << ")\n";
   stream << "KLEE: done:     Concrete store expression build time (ms) = "
          << ((double)concretelyAddressedStoreExpressionBuildTime.getValue()) /
-                1000 << "\n";
+                1000
+         << "\n";
   stream << "KLEE: done:     Symbolic store expression build time (ms) = "
          << ((double)symbolicallyAddressedStoreExpressionBuildTime.getValue()) /
-                1000 << "\n";
+                1000
+         << "\n";
   stream << "KLEE: done:     Solver access time (ms) = "
          << ((double)solverAccessTime.getValue()) / 1000 << "\n";
 }
@@ -1958,16 +1984,16 @@ void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
 
 void TxSubsumptionTable::CallHistoryIndexedTable::Node::print(
     llvm::raw_ostream &stream) const {
-  print(stream, 0,debugSubsumptionLevel_g);
+  print(stream, 0);
 }
 
 void TxSubsumptionTable::CallHistoryIndexedTable::Node::print(
-    llvm::raw_ostream &stream, const unsigned paddingAmount, int debugSubsumptionLevel) const {
-  print(stream, makeTabs(paddingAmount),debugSubsumptionLevel);
+    llvm::raw_ostream &stream, const unsigned paddingAmount) const {
+  print(stream, makeTabs(paddingAmount));
 }
 
 void TxSubsumptionTable::CallHistoryIndexedTable::Node::print(
-    llvm::raw_ostream &stream, const std::string &prefix, int debugSubsumptionLevel) const {
+    llvm::raw_ostream &stream, const std::string &prefix) const {
   std::string tabsNext = appendTab(prefix);
 
   stream << "\n";
@@ -1981,14 +2007,14 @@ void TxSubsumptionTable::CallHistoryIndexedTable::Node::print(
   stream << tabsNext << "Entries:\n";
   for (EntryIterator it = entryList.rbegin(), ie = entryList.rend(); it != ie;
        ++it) {
-    (*it)->print(stream, tabsNext, debugSubsumptionLevel);
+    (*it)->print(stream, tabsNext);
     stream << "\n";
   }
   for (std::map<llvm::Instruction *, Node *>::const_iterator it = next.begin(),
                                                              ie = next.end();
        it != ie; ++it) {
     stream << tabsNext << "Next call:\n";
-    it->second->print(stream, appendTab(prefix), debugSubsumptionLevel); ///***
+    it->second->print(stream, appendTab(prefix));
     stream << "\n";
   }
 }
@@ -2059,33 +2085,32 @@ TxSubsumptionTable::CallHistoryIndexedTable::find(
 }
 
 void TxSubsumptionTable::CallHistoryIndexedTable::printNode(
-    llvm::raw_ostream &stream, Node *n, std::string edges, int debugSubsumptionLevel) const {
+    llvm::raw_ostream &stream, Node *n, std::string edges) const {
   for (std::map<llvm::Instruction *, Node *>::const_iterator
            it = n->next.begin(),
            ie = n->next.end();
        it != ie; ++it) {
     stream << "\n";
-    it->second->print(stream, edges + "    ",  debugSubsumptionLevel); //*******
+    it->second->print(stream, edges + "    ");
     stream << "\n";
-    printNode(stream, it->second, edges + "    ", debugSubsumptionLevel);
+    printNode(stream, it->second, edges + "    ");
   }
 }
 
 void TxSubsumptionTable::CallHistoryIndexedTable::print(
     llvm::raw_ostream &stream) const {
   root->print(stream);
-  printNode(stream, root, "",debugSubsumptionLevel_g);
+  printNode(stream, root, "");
 }
 
 /**/
 
 std::map<uintptr_t, TxSubsumptionTable::CallHistoryIndexedTable *>
-TxSubsumptionTable::instance;
+    TxSubsumptionTable::instance;
 
-void
-TxSubsumptionTable::insert(uintptr_t id,
-                           const std::vector<llvm::Instruction *> &callHistory,
-                           TxSubsumptionTableEntry *entry) {
+void TxSubsumptionTable::insert(
+    uintptr_t id, const std::vector<llvm::Instruction *> &callHistory,
+    TxSubsumptionTableEntry *entry) {
   CallHistoryIndexedTable *subTable = 0;
 
   TxTree::entryNumber++; // Count of entries in the table
@@ -2231,8 +2256,8 @@ uint64_t TxTree::blockCount = 1;
 void TxTree::printTimeStat(std::stringstream &stream) {
   stream << "KLEE: done:     setCurrentINode = "
          << ((double)setCurrentINodeTime.getValue()) / 1000 << "\n";
-  stream << "KLEE: done:     remove = " << ((double)removeTime.getValue()) /
-                                               1000 << "\n";
+  stream << "KLEE: done:     remove = "
+         << ((double)removeTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     subsumptionCheck = "
          << ((double)subsumptionCheckTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     markPathCondition = "
@@ -2257,7 +2282,8 @@ void TxTree::printTableStat(std::stringstream &stream) {
 
   stream << "KLEE: done:     Average solver calls per subsumption check = "
          << inTwoDecimalPoints((double)stats::subsumptionQueryCount /
-                               (double)subsumptionCheckCount) << "\n";
+                               (double)subsumptionCheckCount)
+         << "\n";
 }
 
 std::string TxTree::inTwoDecimalPoints(const double n) {
@@ -2314,8 +2340,9 @@ bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
   // first instruction executed of the sequence executed for a state
   // node, typically this the first instruction of a basic block.
   // Subsumption check only matches against this first instruction.
-  if (!state.txTreeNode || reinterpret_cast<uintptr_t>(state.pc->inst) !=
-                               state.txTreeNode->getProgramPoint())
+  if (!state.txTreeNode ||
+      reinterpret_cast<uintptr_t>(state.pc->inst) !=
+          state.txTreeNode->getProgramPoint())
     return false;
 
   int debugSubsumptionLevel =
@@ -2389,13 +2416,8 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
     if (!dumping && !node->isSubsumed && node->storable &&
         !node->genericEarlyTermination) {
       int debugSubsumptionLevel = node->dependency->debugSubsumptionLevel;
-      setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
+
       if (debugSubsumptionLevel >= 2) {
-	if (debugSubsumptionLevel == 3){ // Printing block info for prettyPrint begin
-	llvm::outs()<<"\n------------------Printing Block Starts------------------\n";
-	llvm::outs()<<node->basicBlock->getName(); 
-	node->basicBlock->dump();
-	llvm::outs()<<"------------------Printing Block Ends------------------\n\n\n";} // Printing block info for prettyPrint ends
         klee_message("Storing entry for Node #%lu, Program Point %lu",
                      node->getNodeSequenceNumber(), node->getProgramPoint());
       } else if (debugSubsumptionLevel >= 1) {
@@ -2461,13 +2483,13 @@ void TxTree::markPathCondition(ExecutionState &state,
   TimerStatIncrementer t(markPathConditionTime);
   int debugSubsumptionLevel =
       currentTxTreeNode->dependency->debugSubsumptionLevel;
-  setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
+
   llvm::BranchInst *binst =
       llvm::dyn_cast<llvm::BranchInst>(state.prevPC->inst);
   if (binst) {
     ref<Expr> unknownExpression;
     std::string reason = "";
-    if (debugSubsumptionLevel >= 4 ) { /*Added 'debugSubsumptionLevel != 3' constraint for Pretty Print*/
+    if (debugSubsumptionLevel >= 1) {
       llvm::raw_string_ostream stream(reason);
       stream << "branch infeasibility [";
       if (binst->getParent()->getParent()) {
@@ -2545,7 +2567,7 @@ void TxTree::markInstruction(KInstruction *instr, bool branchFlag) {
 }
 
 void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
-                       std::string edges, int debugSubsumptionLevel) const {
+                       std::string edges) const {
   if (n->left != 0) {
     stream << "\n";
     stream << edges << "+-- L:" << n->left->programPoint;
@@ -2553,9 +2575,9 @@ void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
       stream << " (active)";
     }
     if (n->right != 0) {
-      printNode(stream, n->left, edges + "|   ",debugSubsumptionLevel);
+      printNode(stream, n->left, edges + "|   ");
     } else {
-      printNode(stream, n->left, edges + "    ",debugSubsumptionLevel);
+      printNode(stream, n->left, edges + "    ");
     }
   }
   if (n->right != 0) {
@@ -2564,7 +2586,7 @@ void TxTree::printNode(llvm::raw_ostream &stream, TxTreeNode *n,
     if (this->currentTxTreeNode == n->right) {
       stream << " (active)";
     }
-    printNode(stream, n->right, edges + "    ",debugSubsumptionLevel);
+    printNode(stream, n->right, edges + "    ");
   }
 }
 
@@ -2575,7 +2597,7 @@ void TxTree::print(llvm::raw_ostream &stream) const {
   if (this->root == this->currentTxTreeNode) {
     stream << " (active)";
   }
-  this->printNode(stream, this->root, "",debugSubsumptionLevel_g);
+  this->printNode(stream, this->root, "");
   stream << "\n------------------------- Subsumption Table "
             "-------------------------\n";
   TxSubsumptionTable::print(stream);
@@ -2601,8 +2623,8 @@ Statistic TxTreeNode::bindReturnValueTime("BindReturnValueTime",
 Statistic TxTreeNode::getStoredExpressionsTime("GetStoredExpressionsTime",
                                                "GetStoredExpressionsTime");
 Statistic
-TxTreeNode::getStoredCoreExpressionsTime("GetStoredCoreExpressionsTime",
-                                         "GetStoredCoreExpressionsTime");
+    TxTreeNode::getStoredCoreExpressionsTime("GetStoredCoreExpressionsTime",
+                                             "GetStoredCoreExpressionsTime");
 
 // The interpolation tree node sequence number
 uint64_t TxTreeNode::nextNodeSequenceNumber = 1;
@@ -2622,10 +2644,10 @@ void TxTreeNode::printTimeStat(std::stringstream &stream) {
            << ((double)getWPInterpolantTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     addConstraintTime = "
          << ((double)addConstraintTime.getValue()) / 1000 << "\n";
-  stream << "KLEE: done:     splitTime = " << ((double)splitTime.getValue()) /
-                                                  1000 << "\n";
-  stream << "KLEE: done:     execute = " << ((double)executeTime.getValue()) /
-                                                1000 << "\n";
+  stream << "KLEE: done:     splitTime = "
+         << ((double)splitTime.getValue()) / 1000 << "\n";
+  stream << "KLEE: done:     execute = "
+         << ((double)executeTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     bindCallArguments = "
          << ((double)bindCallArgumentsTime.getValue()) / 1000 << "\n";
   stream << "KLEE: done:     bindReturnValue = "
@@ -2705,12 +2727,12 @@ void TxTreeNode::storeSpeculationUnsatCore(TimingSolver *solver,
 
 void TxTreeNode::mark() {
   int debugSubsumptionLevel = this->dependency->debugSubsumptionLevel;
-  setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
+
   llvm::BranchInst *binst = speculationBInst;
   if (binst) {
     ref<Expr> unknownExpression;
     std::string reason = "";
-    if (debugSubsumptionLevel >= 1 && debugSubsumptionLevel != 3) { /*Added 'debugSubsumptionLevel != 3' constraint for Pretty Print*/
+    if (debugSubsumptionLevel >= 1) {
       llvm::raw_string_ostream stream(reason);
       stream << "branch infeasibility [";
       if (binst->getParent()->getParent()) {
@@ -2814,22 +2836,25 @@ llvm::Instruction *TxTreeNode::getPreviousInstruction(llvm::PHINode *phi) {
 // Instantiating WP Expression at Subsumption Point
 // =========================================================================
 ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
+                                                 ExecutionState &state,
                                                  TxDependency *dependency) {
-
   if (wpInterpolant.isNull())
     return wpInterpolant;
 
   switch (wpInterpolant->getKind()) {
   case Expr::InvalidKind:
-  case Expr::Constant: { return wpInterpolant; }
+  case Expr::Constant: {
+    return wpInterpolant;
+  }
 
   case Expr::WPVar: {
     // TODO: Not handling multiple copies of a var in store
     // TxTreeNode::instantiateWPatSubsumption
-    ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant);
+    ref<WPVarExpr> WPVar1 = dyn_cast<WPVarExpr>(wpInterpolant);
 
     ref<TxAllocationContext> alc =
-        dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
+        dependency->getStore()->getAddressofLatestCopyLLVMValue(
+            WPVar1->address);
 
     if (!alc.isNull()) {
       ref<TxStoreEntry> entry;
@@ -2844,6 +2869,50 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
               entry->getContent()->getExpression(), wpInterpolant->getWidth());
           return result;
         }
+      }
+    } else {
+      // Checking the historical values
+      ref<TxStoreEntry> entry;
+      entry = dependency->getStore()
+                  ->getAddressofLatestCopyLLVMValueFromHistoricalStore(
+                      WPVar1->address);
+
+      if (!entry.isNull()) {
+        if (wpInterpolant->getWidth() ==
+            entry->getContent()->getExpression()->getWidth()) {
+          return entry->getContent()->getExpression();
+        } else {
+          ref<Expr> result = ZExtExpr::create(
+              entry->getContent()->getExpression(), wpInterpolant->getWidth());
+          return result;
+        }
+      } else { // Date: 20/04/2022
+               //  // Loading values from Global Variables
+        ref<Expr> dummy;
+        //        llvm::outs()<<"\nChecking the Global list for the WPVar:
+        //        ["<<wpInterpolant<<"]\n";
+        //        llvm::outs()<<"cheking WP var address\n";
+        //        llvm::outs()<<WPVar1->address<<"\n";
+        //        wpInterpolant.get()->dump();
+        //        llvm::outs()<<wpInterpolant.get();
+        MemoryMap::iterator begin = state.addressSpace.objects.begin();
+        MemoryMap::iterator end = state.addressSpace.objects.end();
+        while (end != begin) {
+          --end;
+          const MemoryObject *mo = end->first;
+          ObjectState *oj = end->second;
+          if (!mo->isFixed) {
+            if (mo->allocSite == WPVar1->address) {
+              ref<Expr> address =
+                  ConstantExpr::create(mo->address, Expr::Int64);
+              ref<Expr> offset = mo->getOffsetExpr(address);
+              ref<Expr> result = oj->read(offset, mo->size * 8);
+              return result;
+            }
+          }
+        }
+        return dummy;
+        // llvm::outs()<<globalAddresses;
       }
     }
     // wpInterpolant->dump();
@@ -2862,7 +2931,8 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   case Expr::ZExt:
   case Expr::SExt: {
     ref<Expr> kids[1];
-    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
+    kids[0] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(0), state, dependency);
     if (kids[0].isNull())
       return kids[0];
     else
@@ -2895,21 +2965,35 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   case Expr::LShr:
   case Expr::AShr: {
     ref<Expr> kids[2];
-    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
-    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
-    if (kids[0].isNull())
+    kids[0] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(0), state, dependency);
+    kids[1] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
+    if (kids[0].isNull()) {
       return kids[0];
-    if (kids[1].isNull())
+    }
+    if (kids[1].isNull()) {
       return kids[1];
+    }
+    ref<Expr> CONST_REF1 = ConstantExpr::create(0, Expr::Int32);
+    if (wpInterpolant->getKid(1) == CONST_REF1 &&
+        wpInterpolant->getKid(1)->getKind() == Expr::Constant &&
+        wpInterpolant->getKind() == Expr::SDiv) {
 
+      ref<Expr> dummy;
+      return dummy;
+    }
     return wpInterpolant->rebuild(kids);
   }
 
   case Expr::Select: {
     ref<Expr> kids[3];
-    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
-    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
-    kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), dependency);
+    kids[0] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(0), state, dependency);
+    kids[1] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
+    kids[2] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(2), state, dependency);
     if (kids[0].isNull())
       return kids[0];
     if (kids[1].isNull())
@@ -2920,9 +3004,12 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   }
   case Expr::Upd: {
     ref<Expr> kids[3];
-    kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), dependency);
-    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
-    kids[2] = instantiateWPatSubsumption(wpInterpolant->getKid(2), dependency);
+    kids[0] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(0), state, dependency);
+    kids[1] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
+    kids[2] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(2), state, dependency);
     if (kids[0].isNull())
       return kids[0];
     if (kids[1].isNull())
@@ -2932,20 +3019,81 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     return wpInterpolant->rebuild(kids);
   }
   case Expr::Sel: {
-
     ref<Expr> kids[2];
     kids[0] = wpInterpolant->getKid(0);
-    kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), dependency);
+    kids[1] =
+        instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
     if (kids[0].isNull())
       return kids[0];
     if (kids[1].isNull())
       return kids[1];
 
     ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
+    ref<TxAllocationContext> alc;
+    // ref<TxAllocationContext> alc =
+    // dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
+    if (!WPVar.isNull()) {
+      alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(
+          WPVar->address);
+    }
+    //    else{
+    //
+    //    	alc=nullptr;
+    //    }
+    //    llvm::outs()<<"Checking the print-2\n";
+    ////alc->dump();
+    //    llvm::outs()<<"Checking the print-3\n";
 
-    ref<TxAllocationContext> alc =
-        dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
+    //    for(map<string, pair<string,string> >::const_iterator it =
+    //    myMap.begin();
+    //        it != myMap.end(); ++it)
+    //    {
+    //        std::cout << it->first << " " << it->second.first << " " <<
+    //        it->second.second << "\n";
+    //    }
+    //
+    //    std::map<const llvm::GlobalValue *, ref<ConstantExpr> >
+    //    *globalAddresses;
 
+    // Change to check the global variables -- 18 may 2022
+    //    for(std::map<const llvm::GlobalValue *, ref<ConstantExpr>
+    //    >::const_iterator it = globalAddresses->begin();
+    //        it != globalAddresses->end(); ++it)
+    //    {
+    //
+    //    	llvm::outs()<<"**************************************************************\n";
+    //    	it->first->dump();
+    //    	llvm::outs()<<"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+    //    	it->second->dump();
+    //    	Executor::const_iterator pos = globalAddresses.find("string");
+    //    	//ref<TxAllocationContext> alc =
+    //    dependency->getStore()->getAddressofLatestCopyLLVMValue(it->first);
+    //    	 //llvm::outs()<<it<<"\n";
+    //    }
+
+    //    for (const auto& p : globalAddresses ) {
+    //            llvm::outs()<<p<<"\n";
+    //        }
+
+    //    for (auto const &pair: globalAddresses) {
+    //    	llvm::outs() << "{" << pair.first << ": " << pair.second <<
+    //    "}\n";
+    //        }
+    //    Executor::const_iterator pos = globalAddresses.find("string");
+    //    if (pos == map.end()) {
+    //        //handle the error
+    //    } else {
+    //        std::string value = pos->second;
+    //
+    //    }
+
+    // dependency->getStore()->markGlobalVariables(WPVar->address);
+    //       //
+    // if(alc.isNull){
+    //
+    //
+    // }
+    //   llvm::outs()<<"Checking the print\n";
     if (!alc.isNull()) {
       ref<TxStoreEntry> entry;
       ref<Expr> offset = MulExpr::create(
@@ -2959,7 +3107,6 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
              "instantiateWPatSubsumption, offset is "
              "not a constant value");
       entry = dependency->getStore()->find(alc, offset);
-
       if (!entry.isNull()) {
         if (wpInterpolant->getWidth() ==
             entry->getContent()->getExpression()->getWidth()) {
@@ -2967,22 +3114,29 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
         } else {
           ref<Expr> result = ZExtExpr::create(
               entry->getContent()->getExpression(), wpInterpolant->getWidth());
+
           return result;
         }
       }
     } else {
     }
-
-    wpInterpolant->dump();
-    klee_error("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel "
-               "Expression failed!");
+    ref<Expr> dummy;
+    return dummy;
+    // wpInterpolant->dump();
+    // klee_error("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel
+    // "
+    // "Expression failed!");
+    // return wpInterpolant;
     break;
   }
   default: {
-    wpInterpolant->dump();
+
+    // ref<Expr> dummy;
+    // return dummy;
+    // wpInterpolant->dump();
     klee_error("TxWPHelper::instantiateWPatSubsumption: Expression not "
                "supported yet!");
-    return wpInterpolant;
+    // return wpInterpolant;
   }
   }
 }
@@ -3088,8 +3242,8 @@ uint64_t TxTreeNode::getInstructionsDepth() { return instructionsDepth; }
 
 void TxTreeNode::incInstructionsDepth() { ++instructionsDepth; }
 
-void
-TxTreeNode::unsatCoreInterpolation(const std::vector<ref<Expr> > &unsatCore) {
+void TxTreeNode::unsatCoreInterpolation(
+    const std::vector<ref<Expr> > &unsatCore) {
   dependency->unsatCoreInterpolation(unsatCore);
 }
 
@@ -3101,11 +3255,11 @@ void TxTreeNode::dump() const {
 }
 
 void TxTreeNode::print(llvm::raw_ostream &stream) const {
-  this->print(stream, 0,debugSubsumptionLevel_g);
+  this->print(stream, 0);
 }
 
 void TxTreeNode::print(llvm::raw_ostream &stream,
-                       const unsigned paddingAmount, int debugSubsumptionLevel) const {
+                       const unsigned paddingAmount) const {
   std::string tabs = makeTabs(paddingAmount);
   std::string tabsNext = appendTab(tabs);
 
@@ -3115,14 +3269,14 @@ void TxTreeNode::print(llvm::raw_ostream &stream,
   if (!left) {
     stream << tabsNext << "NULL\n";
   } else {
-    left->print(stream, paddingAmount + 1, debugSubsumptionLevel);
+    left->print(stream, paddingAmount + 1);
     stream << "\n";
   }
   stream << tabsNext << "Right:\n";
   if (!right) {
     stream << tabsNext << "NULL\n";
   } else {
-    right->print(stream, paddingAmount + 1, debugSubsumptionLevel);
+    right->print(stream, paddingAmount + 1);
     stream << "\n";
   }
   stream << tabsNext << "Call history:\n";
@@ -3136,6 +3290,6 @@ void TxTreeNode::print(llvm::raw_ostream &stream,
   }
   if (dependency) {
     stream << tabsNext << "------- Abstract Dependencies ----------\n";
-    dependency->print(stream, paddingAmount + 1, debugSubsumptionLevel);
+    dependency->print(stream, paddingAmount + 1, 3);
   }
 }

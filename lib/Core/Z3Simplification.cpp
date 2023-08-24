@@ -84,7 +84,7 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
     case Expr::Int16:
     case Expr::Int32:
     case Expr::Int64: {
-      z3e = c.int_val(val);
+      z3e = c.int_val(int(val));
       return true;
     }
     default: {
@@ -360,9 +360,19 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
       r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
       return MulExpr::create(l, r);
     } else if (symbol == "div") {
+      // Written by Arpi: 15/06/2022;
+      // Added a check condition to avoid the divide by zero error;
       ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
       ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
-      return SDivExpr::create(l, r);
+      ref<Expr> val0 = ConstantExpr::create(0, Expr::Int32);
+      if (!val0.compare(l) || !val0.compare(r)) {
+        ref<Expr> val1 = ConstantExpr::create(1, Expr::Int32);
+        ref<Expr> val2 = SDivExpr::create(val0, val1);
+        return val2;
+      } else {
+        return SDivExpr::create(l, r);
+      }
+
     } else if (symbol == "rem" || symbol == "mod") {
       ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
       ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
@@ -425,10 +435,23 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
       }
       return f;
     } else {
-      std::cout << e << "\n";
-      std::cout << symbol << "\n";
-      klee_error("Z3Simplification::z3Expr2TxExpr does not support for this "
-                 "type of expr!");
+      // Written by Arpi: 15/06/2022;
+      // Added a check condition for "ite" (if-then-else) statement;
+      if (symbol == "if") {
+        ref<Expr> f = z3Expr2TxExpr(e.arg(0), emap);
+        if (!simplify(f).isNull()) {
+          ref<Expr> s = z3Expr2TxExpr(e.arg(1), emap);
+          return s;
+        } else {
+          ref<Expr> t = z3Expr2TxExpr(e.arg(2), emap);
+          return t;
+        }
+      } else {
+        std::cout << e << "\n";
+        std::cout << symbol << "\n";
+        klee_error("Z3Simplification::z3Expr2TxExpr does not support for this "
+                   "type of expr!");
+      }
     }
   } else {
     std::cout << e << "\n";

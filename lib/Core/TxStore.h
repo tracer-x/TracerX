@@ -29,9 +29,9 @@ public:
   class MiddleStateStore;
 
   typedef std::map<ref<TxVariable>, ref<TxInterpolantValue> >
-  LowerInterpolantStore;
+      LowerInterpolantStore;
   typedef std::map<ref<TxAllocationContext>, LowerInterpolantStore>
-  TopInterpolantStore;
+      TopInterpolantStore;
   typedef std::map<ref<TxVariable>, ref<TxStoreEntry> > LowerStateStore;
   typedef std::map<ref<TxAllocationContext>, MiddleStateStore> TopStateStore;
 
@@ -81,10 +81,10 @@ public:
     /// \brief Finds a store entry given an LLVM value
     ref<TxStoreEntry> find(ref<TxAllocationContext> alc) const;
 
-    ref<TxStoreEntry> findConcrete(
-        ref<TxVariable> var,
-        std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> > &unifiedBases)
-        const;
+    ref<TxStoreEntry>
+    findConcrete(ref<TxVariable> var,
+                 std::map<ref<TxAllocationInfo>, ref<TxAllocationInfo> >
+                     &unifiedBases) const;
 
     ref<TxStoreEntry> findSymbolic(ref<TxVariable> var) const;
 
@@ -272,6 +272,9 @@ public:
       LowerInterpolantStore &_symbolicallyAddressedHistoricalStore) const;
 
   ref<TxAllocationContext> getAddressofLatestCopyLLVMValue(llvm::Value *val);
+
+  ref<TxStoreEntry>
+  getAddressofLatestCopyLLVMValueFromHistoricalStore(llvm::Value *val);
 
   /// \brief Newly relate a location with its stored value, when the value is
   /// loaded from the location

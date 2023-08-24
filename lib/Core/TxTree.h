@@ -33,6 +33,13 @@
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/Support/raw_ostream.h"
 
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
+#include <llvm/IR/DebugInfo.h>
+#elif LLVM_VERSION_CODE >= LLVM_VERSION(3, 2)
+#include <llvm/DebugInfo.h>
+#else
+#include <llvm/Analysis/DebugInfo.h>
+#endif
 namespace klee {
 
 class TxWeakestPreCondition;
@@ -73,14 +80,14 @@ class TxSubsumptionTable {
 
       void print(llvm::raw_ostream &stream) const;
 
-      void print(llvm::raw_ostream &stream, const unsigned paddingAmount, int debugSubsumptionLevel) const;
+      void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
 
-      void print(llvm::raw_ostream &stream, const std::string &prefix, int debugSubsumptionLevel) const;
+      void print(llvm::raw_ostream &stream, const std::string &prefix) const;
     };
 
     Node *root;
 
-    void printNode(llvm::raw_ostream &stream, Node *n, std::string edges, int debugSubsumptionLevel) const;
+    void printNode(llvm::raw_ostream &stream, Node *n, std::string edges) const;
 
   public:
     CallHistoryIndexedTable() { root = new Node(0); }
@@ -310,6 +317,13 @@ public:
 
   const uint64_t nodeSequenceNumber;
 
+   unsigned CfileLineNumber;
+
+   llvm::StringRef CfileName;
+
+   std::string CFuntionName;
+
+
   TxSubsumptionTableEntry(TxTreeNode *node,
                           const std::vector<llvm::Instruction *> &callHistory);
 
@@ -367,6 +381,8 @@ public:
 
   void setExistentials(std::set<const Array *> _existentials);
 
+  void setmarkedGlobal(std::set<ref<TxStoreEntry> > _markedGlobal);
+  
   void dump() const {
     this->print(llvm::errs());
     llvm::errs() << "\n";
@@ -378,9 +394,9 @@ public:
 
   void print(llvm::raw_ostream &stream) const;
 
-  void print(llvm::raw_ostream &stream, const unsigned paddingAmount, int debugSubsumptionLevel) const;
+  void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
 
-  void print(llvm::raw_ostream &stream, const std::string &prefix, int debugSubsumptionLevel) const;
+  void print(llvm::raw_ostream &stream, const std::string &prefix) const;
 
   void printWP(llvm::raw_ostream &stream) const;
 
@@ -452,7 +468,14 @@ class TxTreeNode {
   TxTreeNode *parent, *left, *right;
 
   uintptr_t programPoint;
+
   llvm::BasicBlock *basicBlock;
+
+   unsigned CfileLineNumber;
+
+   llvm::StringRef CfileName;
+  
+   std::string CFuntionName;
 
   // Used to ensure at subsumption the value of the phiNodes in the subsumed
   // tree remain the same
@@ -488,6 +511,14 @@ class TxTreeNode {
     if (!programPoint) {
       programPoint = reinterpret_cast<uintptr_t>(instr);
       prevProgramPoint = reinterpret_cast<uintptr_t>(prevInstr);
+      std::string CFuntionName1(instr->getParent()->getParent()->getName().str());
+      CFuntionName=CFuntionName1;
+      llvm::MDNode *n = instr->getMetadata("dbg");
+           // Display the line, char position of this instruction
+           llvm::DILocation loc(n);
+           CfileLineNumber = loc.getLineNumber();
+           CfileName = loc.getFilename();
+
       basicBlock = instr->getParent();
     }
 
@@ -505,7 +536,7 @@ class TxTreeNode {
   void execute(llvm::Instruction *instr, std::vector<ref<Expr> > &args,
                bool symbolicExecutionError);
 
-  void print(llvm::raw_ostream &stream, const unsigned paddingAmount, int debugSubsumptionLevel) const;
+  void print(llvm::raw_ostream &stream, const unsigned paddingAmount) const;
 
   TxTreeNode(TxTreeNode *_parent, llvm::DataLayout *_targetData,
              std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *
@@ -563,6 +594,9 @@ public:
   std::vector<llvm::Instruction *> callHistory;
 
   uintptr_t getProgramPoint() { return programPoint; }
+  unsigned getCfileLineNumber() { return CfileLineNumber; }
+  llvm::StringRef getCfileName() { return CfileName; }
+  std::string getCFunctionName() {return CFuntionName;}
   llvm::BasicBlock *getBasicBlock() { return basicBlock; }
 
   uintptr_t getPrevProgramPoint() { return prevProgramPoint; }
@@ -649,7 +683,7 @@ public:
 
   // \brief Instantiates the variables in WPExpr by their latest value for the
   // implication test.
-  ref<Expr> instantiateWPatSubsumption(ref<Expr> wpInterpolant,
+  ref<Expr> instantiateWPatSubsumption(ref<Expr> wpInterpolant, ExecutionState &state,
                                        TxDependency *dependency);
 
   /// \brief Copy WP to the parent node at subsumption point
@@ -875,7 +909,7 @@ class TxTree {
   std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
 
   void printNode(llvm::raw_ostream &stream, TxTreeNode *n,
-                 std::string edges, int debugSubsumptionLevel) const;
+                 std::string edges) const;
 
   /// \brief Displays member functions running time statistics
   static void printTimeStat(std::stringstream &stream);
