@@ -42,6 +42,8 @@ ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
 bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
                                      ref<Expr> txe,
                                      std::map<std::string, ref<Expr> > &emap) {
+  // llvm::outs()<<"txe expr:\n";
+	// txe->dump();                                  
   if (isaVar(txe)) {
     std::string name = extractVarName(txe);
     unsigned int size = txe->getWidth();
@@ -293,6 +295,37 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
     }
     return false;
   }
+  
+  case Expr::Sel: {
+      	  std::string Array_name;
+      	  if (txe->getKid(0)->getKind()==Expr::WPVar){
+       	   Array_name = extractVarName(txe->getKid(0));
+      	  }
+      	  else
+      	  {
+      		  klee_warning("Cannot convert tx::sel to z3 expr-->(nested array) ");
+      		  return false;
+      		  z3::expr t1 = c.bool_val(false);
+      		  txe->getKid(0)->dump();
+      		  Array_name= t1.to_string();
+      	  }
+       	  if(!Array_name.empty()){
+      	  z3::expr t2 = c.bool_val(false);
+      	  bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      	  if(r2){
+			  unsigned int Array_index= dyn_cast<ConstantExpr>(txe->getKid(1))->getZExtValue();
+			  std::string strI = std::to_string(Array_index);
+			  std::string tag = "selExpr_";
+			  std::string name2insert=tag+Array_name+"_"+strI;
+        //std::cout<<"name2insert:"<<name2insert<<"\n";
+			  z3e=c.int_const(name2insert.c_str());
+			  emap.insert(std::pair<std::string, ref<Expr> >(name2insert, txe));
+			  return true;
+      	  }
+       	  }
+       	  klee_warning("Cannot convert tx::sel to z3 expr");
+       	  return false;
+         }
 
   default: {
     // Sanity check
