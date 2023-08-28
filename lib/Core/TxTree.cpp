@@ -3020,6 +3020,18 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   }
   case Expr::Sel: {
     ref<Expr> kids[2];
+        if(wpInterpolant->getKid(0)->getKind()==Expr::WPVar){
+    	kids[0] = wpInterpolant->getKid(0);
+    }
+    else {
+    	kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), state, dependency);
+    	if(kids[0]->getKind()==Expr::Constant){
+        ref<Expr> dummy;
+        klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel Expression failed!");
+        return dummy;
+        break;
+    	    }
+    }
     kids[0] = wpInterpolant->getKid(0);
     kids[1] =
         instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
@@ -3030,6 +3042,7 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
 
     ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
     ref<TxAllocationContext> alc;
+<<<<<<< HEAD
     // ref<TxAllocationContext> alc =
     // dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
     if (!WPVar.isNull()) {
@@ -3054,6 +3067,78 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     //
     //    std::map<const llvm::GlobalValue *, ref<ConstantExpr> >
     //    *globalAddresses;
+=======
+    //ref<TxAllocationContext> alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
+    if (!WPVar.isNull()){
+     alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);}
+     if (!alc.isNull()) {
+      ref<TxStoreEntry> entry;
+      ref<Expr> offset = MulExpr::create(
+          kids[1],
+          UDivExpr::create(
+              ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
+              ConstantExpr::create(8, kids[1]->getWidth())));
+
+      assert(isa<ConstantExpr>(offset) &&
+             "TxTreeNode::"
+             "instantiateWPatSubsumption, offset is "
+             "not a constant value");
+      entry = dependency->getStore()->find(alc, offset);
+      if (!entry.isNull()) {
+        if (wpInterpolant->getWidth() ==
+            entry->getContent()->getExpression()->getWidth()) {
+          return entry->getContent()->getExpression();
+        } else {
+          ref<Expr> result = ZExtExpr::create(
+              entry->getContent()->getExpression(), wpInterpolant->getWidth());
+          return result;
+        }
+      }
+    } 
+	ref<WPVarExpr> WPVar1 = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
+        ref<Expr> offset = MulExpr::create(kids[1],UDivExpr::create(
+                       ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
+                       ConstantExpr::create(8, kids[1]->getWidth())));
+
+         assert(isa<ConstantExpr>(offset) &&
+                      "TxTreeNode::"
+                      "instantiateWPatSubsumption, offset is "
+                      "not a constant value");
+        MemoryMap::iterator begin = state.addressSpace.objects.begin();
+        MemoryMap::iterator end = state.addressSpace.objects.end();
+        while (end!=begin) {
+        	--end;
+        		const MemoryObject *mo = end->first;
+        		ObjectState *oj= end->second;
+        		if(!mo->isFixed){
+        		unsigned type = mo->size/mo->allocSite->getType()->getArrayElementType()->getArrayNumElements();
+        		if(mo->allocSite==WPVar1->address && type>=1){
+        			ref<Expr> result = oj->read(offset, type*8);
+					if(!result.isNull())
+						return result;
+        		}
+			}
+		}
+      ref<Expr> dummy;
+	  klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel Expression failed!");
+	  return dummy;
+	 break;
+//    else{
+//
+//    	alc=nullptr;
+//    }
+//    llvm::outs()<<"Checking the print-2\n";
+////alc->dump();
+//    llvm::outs()<<"Checking the print-3\n";
+
+//    for(map<string, pair<string,string> >::const_iterator it = myMap.begin();
+//        it != myMap.end(); ++it)
+//    {
+//        std::cout << it->first << " " << it->second.first << " " << it->second.second << "\n";
+//    }
+//
+//    std::map<const llvm::GlobalValue *, ref<ConstantExpr> > *globalAddresses;
+>>>>>>> 7f4a5bc... changes in the sel part of instantiateWPatSubsumption
 
     // Change to check the global variables -- 18 may 2022
     //    for(std::map<const llvm::GlobalValue *, ref<ConstantExpr>
@@ -3087,6 +3172,7 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     //
     //    }
 
+<<<<<<< HEAD
     // dependency->getStore()->markGlobalVariables(WPVar->address);
     //       //
     // if(alc.isNull){
@@ -3157,6 +3243,25 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     klee_error("TxWPHelper::instantiateWPatSubsumption: Expression not "
                "supported yet!");
     // return wpInterpolant;
+=======
+    		//dependency->getStore()->markGlobalVariables(WPVar->address);
+//       //
+// if(alc.isNull){
+//
+//
+// }
+ //   llvm::outs()<<"Checking the print\n";
+    
+   }
+  default: {	
+     ref<Expr> dummy;
+     klee_error("TxWPHelper::instantiateWPatSubsumption: Expression not "
+               "supported yet!");
+     return dummy;
+     //wpInterpolant->dump();
+     
+     //return wpInterpolant;
+>>>>>>> 7f4a5bc... changes in the sel part of instantiateWPatSubsumption
   }
   }
 }
