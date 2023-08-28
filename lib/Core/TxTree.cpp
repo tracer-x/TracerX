@@ -2986,6 +2986,18 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant, Execut
   }
   case Expr::Sel: {
     ref<Expr> kids[2];
+        if(wpInterpolant->getKid(0)->getKind()==Expr::WPVar){
+    	kids[0] = wpInterpolant->getKid(0);
+    }
+    else {
+    	kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), state, dependency);
+    	if(kids[0]->getKind()==Expr::Constant){
+        ref<Expr> dummy;
+        klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel Expression failed!");
+        return dummy;
+        break;
+    	    }
+    }
     kids[0] = wpInterpolant->getKid(0);
     kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
     if (kids[0].isNull())
@@ -2998,6 +3010,58 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant, Execut
     //ref<TxAllocationContext> alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
     if (!WPVar.isNull()){
      alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);}
+     if (!alc.isNull()) {
+      ref<TxStoreEntry> entry;
+      ref<Expr> offset = MulExpr::create(
+          kids[1],
+          UDivExpr::create(
+              ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
+              ConstantExpr::create(8, kids[1]->getWidth())));
+
+      assert(isa<ConstantExpr>(offset) &&
+             "TxTreeNode::"
+             "instantiateWPatSubsumption, offset is "
+             "not a constant value");
+      entry = dependency->getStore()->find(alc, offset);
+      if (!entry.isNull()) {
+        if (wpInterpolant->getWidth() ==
+            entry->getContent()->getExpression()->getWidth()) {
+          return entry->getContent()->getExpression();
+        } else {
+          ref<Expr> result = ZExtExpr::create(
+              entry->getContent()->getExpression(), wpInterpolant->getWidth());
+          return result;
+        }
+      }
+    } 
+	ref<WPVarExpr> WPVar1 = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
+        ref<Expr> offset = MulExpr::create(kids[1],UDivExpr::create(
+                       ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
+                       ConstantExpr::create(8, kids[1]->getWidth())));
+
+         assert(isa<ConstantExpr>(offset) &&
+                      "TxTreeNode::"
+                      "instantiateWPatSubsumption, offset is "
+                      "not a constant value");
+        MemoryMap::iterator begin = state.addressSpace.objects.begin();
+        MemoryMap::iterator end = state.addressSpace.objects.end();
+        while (end!=begin) {
+        	--end;
+        		const MemoryObject *mo = end->first;
+        		ObjectState *oj= end->second;
+        		if(!mo->isFixed){
+        		unsigned type = mo->size/mo->allocSite->getType()->getArrayElementType()->getArrayNumElements();
+        		if(mo->allocSite==WPVar1->address && type>=1){
+        			ref<Expr> result = oj->read(offset, type*8);
+					if(!result.isNull())
+						return result;
+        		}
+			}
+		}
+      ref<Expr> dummy;
+	  klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel Expression failed!");
+	  return dummy;
+	 break;
 //    else{
 //
 //    	alc=nullptr;
@@ -3050,76 +3114,15 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant, Execut
 //
 // }
  //   llvm::outs()<<"Checking the print\n";
-    if (!alc.isNull()) {
-      ref<TxStoreEntry> entry;
-      ref<Expr> offset = MulExpr::create(
-          kids[1],
-          UDivExpr::create(
-              ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
-              ConstantExpr::create(8, kids[1]->getWidth())));
-
-      assert(isa<ConstantExpr>(offset) &&
-             "TxTreeNode::"
-             "instantiateWPatSubsumption, offset is "
-             "not a constant value");
-      entry = dependency->getStore()->find(alc, offset);
-  //	llvm::outs()<<"Print-111\n";
-  	//entry->dump();
-      if (!entry.isNull()) {
-    	//	llvm::outs()<<"Print-121\n";
-    		//entry->dump();
-        if (wpInterpolant->getWidth() ==
-            entry->getContent()->getExpression()->getWidth()) {
-        //	llvm::outs()<<"Print-11\n";
-        	//entry->getContent()->getExpression()->dump();
-          return entry->getContent()->getExpression();
-        } else {
-          ref<Expr> result = ZExtExpr::create(
-              entry->getContent()->getExpression(), wpInterpolant->getWidth());
-
-      	//llvm::outs()<<"Print-21\n";
-      	//result->dump();
-          return result;
-        }
-      }
-      //llvm::outs()<<"Are we reached here\n";
-    } 
-	ref<WPVarExpr> WPVar1 = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
-        ref<Expr> offset = MulExpr::create(kids[1],UDivExpr::create(
-                       ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
-                       ConstantExpr::create(8, kids[1]->getWidth())));
-
-         assert(isa<ConstantExpr>(offset) &&
-                      "TxTreeNode::"
-                      "instantiateWPatSubsumption, offset is "
-                      "not a constant value");
-        MemoryMap::iterator begin = state.addressSpace.objects.begin();
-        MemoryMap::iterator end = state.addressSpace.objects.end();
-        while (end!=begin) {
-        	--end;
-        		const MemoryObject *mo = end->first;
-        		ObjectState *oj= end->second;
-        		if(!mo->isFixed){
-        		unsigned type = mo->size/mo->allocSite->getType()->getArrayElementType()->getArrayNumElements();
-        		if(mo->allocSite==WPVar1->address){
-        			ref<Expr> result = oj->read(offset, type*8);
-					if(!result.isNull())
-						return result;
-        		}
-			}
-		}
-      ref<Expr> dummy;
-	  klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel Expression failed!");
-	  return dummy;
-	 break;
+    
    }
-  default: {
-	
-     //ref<Expr> dummy;
-     //return dummy;
-     //wpInterpolant->dump();
+  default: {	
+     ref<Expr> dummy;
      klee_error("TxWPHelper::instantiateWPatSubsumption: Expression not "
                "supported yet!");
+     return dummy;
+     //wpInterpolant->dump();
+     
      //return wpInterpolant;
   }
   }
