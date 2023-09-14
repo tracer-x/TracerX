@@ -1192,6 +1192,11 @@ ref<Expr> TxWeakestPreCondition::getCallInst(llvm::CallInst *ci) {
       ret = it->first->inst;
     }
   }
+  if (ret == 0) {
+    ref<Expr> dummy;
+    klee_warning("Return instruction is null!");
+    return dummy;
+  }
   assert(ret && "Return instruction is null!");
   ref<Expr> result = this->generateExprFromOperand(ret->getOperand(0));
   return result;
