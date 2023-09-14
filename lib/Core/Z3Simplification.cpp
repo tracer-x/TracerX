@@ -101,6 +101,11 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
     z3::expr t = c.bool_val(false);
     bool r = txExpr2z3Expr(t, c, txe->getKid(0), emap);
     if (r) {
+      if (!t.is_bool()) {
+        klee_warning("Z3Simplification: doesn't support NOT "
+                     "operation on non-boolean operands");
+        return false;
+      }
       z3e = not(t);
       return true;
     }
@@ -289,6 +294,11 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
       z3::expr t2 = c.bool_val(false);
       bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
       if (r2) {
+        if (!t1.is_bool() || !t2.is_bool()) {
+          klee_warning("Z3Simplification: doesn't support XOR "
+                       "operation on non-boolean operands");
+          return false;
+        }
         z3e = not(not(t2) && not(t1));
         return true;
       }
@@ -326,11 +336,21 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
        	  klee_warning("Cannot convert tx::sel to z3 expr");
        	  return false;
          }
+         case Expr::SExt: {
+           z3::expr t1 = c.bool_val(false);
+           bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
+           if (r1) {
+             z3e = sext(t1, txe->getWidth());
+             return true;
+           }
+           klee_warning("Cannot convert tx::sel to z3 expr");
+           return false;
+         }
 
-  default: {
-    // Sanity check
-       klee_warning("Cannot convert to z3 with type: %d", txe->getKind());
-    return false;
+         default: {
+           // Sanity check
+           klee_warning("Cannot convert to z3 with type: %d", txe->getKind());
+           return false;
   }
   }
 }
@@ -401,6 +421,7 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
       if (!val0.compare(l) || !val0.compare(r)) {
         ref<Expr> val1 = ConstantExpr::create(1, Expr::Int32);
         ref<Expr> val2 = SDivExpr::create(val0, val1);
+        // val2->dump();
         return val2;
       } else {
         return SDivExpr::create(l, r);
