@@ -3019,9 +3019,9 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     return wpInterpolant->rebuild(kids);
   }
   case Expr::Sel: {
-    llvm::outs() << "In sel expr\n";
+    // llvm::outs() << "In sel expr\n";
     ref<Expr> kids[2];
-    wpInterpolant->dump();
+    // wpInterpolant->dump();
     if (wpInterpolant->getKid(0)->getKind() == Expr::WPVar) {
       kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), state,
                                            dependency);
@@ -3060,6 +3060,13 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
           UDivExpr::create(
               ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
               ConstantExpr::create(8, kids[1]->getWidth())));
+
+      if (!isa<ConstantExpr>(offset)) {
+        ref<Expr> dummy;
+        klee_warning("instantiateWPatSubsumption: unable to instantiate"
+                     " for non-constant array index!");
+        return dummy;
+      }
 
       assert(isa<ConstantExpr>(offset) &&
              "TxTreeNode::"
@@ -3117,6 +3124,12 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
         UDivExpr::create(
             ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
             ConstantExpr::create(8, kids[1]->getWidth())));
+    if (!isa<ConstantExpr>(offset)) {
+      ref<Expr> dummy;
+      klee_warning("instantiateWPatSubsumption: unable to instantiate"
+                   " for non-constant array index!");
+      return dummy;
+    }
     assert(isa<ConstantExpr>(offset) && "TxTreeNode::"
                                         "instantiateWPatSubsumption, offset is "
                                         "not a constant value");
