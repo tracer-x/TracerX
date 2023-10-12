@@ -6,6 +6,9 @@
  */
 
 #include "Z3Simplification.h"
+#include <sstream>
+#include <string>
+#include <iostream>
 
 using namespace klee;
 
