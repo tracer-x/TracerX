@@ -2859,7 +2859,7 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     ref<TxAllocationContext> alc =
         dependency->getStore()->getAddressofLatestCopyLLVMValue(
             WPVar1->address);
-
+    std::string reason = "Used in Instantiation";
     if (!alc.isNull()) {
       ref<TxStoreEntry> entry;
       entry = dependency->getStore()->find(alc);
@@ -2867,49 +2867,66 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
       if (!entry.isNull()) {
         if (wpInterpolant->getWidth() ==
             entry->getContent()->getExpression()->getWidth()) {
+          ref<TxInterpolantValue> stateValue =
+              entry->getInterpolantStyleValue(entry->getDepth());
+          state.txTreeNode->valuesInterpolation(stateValue->getOriginalValue(),
+                                                reason);
           return entry->getContent()->getExpression();
         } else {
           ref<Expr> result = ZExtExpr::create(
               entry->getContent()->getExpression(), wpInterpolant->getWidth());
+          ref<TxInterpolantValue> stateValue =
+              entry->getInterpolantStyleValue(entry->getDepth());
+          state.txTreeNode->valuesInterpolation(stateValue->getOriginalValue(),
+                                                reason);
           return result;
         }
       }
-    }  else {
-    //Checking the historical values
-     ref<TxStoreEntry> entry;
-         entry = dependency->getStore()->getAddressofLatestCopyLLVMValueFromHistoricalStore(WPVar1->address);
+    } else {
+      // Checking the historical values
+      ref<TxStoreEntry> entry;
+      entry = dependency->getStore()
+                  ->getAddressofLatestCopyLLVMValueFromHistoricalStore(
+                      WPVar1->address);
 
-         if (!entry.isNull()) {
-           if (wpInterpolant->getWidth() ==
-               entry->getContent()->getExpression()->getWidth()) {
-             return entry->getContent()->getExpression();
-           } else {
-             ref<Expr> result = ZExtExpr::create(
-                 entry->getContent()->getExpression(), wpInterpolant->getWidth());
-             return result;
-           }
-         } else { // Loading values from Global Variables
-           ref<Expr> dummy;
-           MemoryMap::iterator begin = state.addressSpace.objects.begin();
-           MemoryMap::iterator end = state.addressSpace.objects.end();
-           while (end != begin) {
-             --end;
-             const MemoryObject *mo = end->first;
-             ObjectState *oj = end->second;
-             if (!mo->isFixed) {
-               if (mo->allocSite == WPVar1->address) {
-                 ref<Expr> address =
-                     ConstantExpr::create(mo->address, Expr::Int64);
-                 ref<Expr> offset = mo->getOffsetExpr(address);
-                 ref<Expr> result = oj->read(offset, mo->size * 8);
-                 return result;
-               }
-             }
-           }
-           // klee_warning("TxTreeNode::instantiateWPatSubsumption:
-           // Instantiation failed!");
-           return dummy;
-         }
+      if (!entry.isNull()) {
+        if (wpInterpolant->getWidth() ==
+            entry->getContent()->getExpression()->getWidth()) {
+          ref<TxInterpolantValue> stateValue =
+              entry->getInterpolantStyleValue(entry->getDepth());
+          state.txTreeNode->valuesInterpolation(stateValue->getOriginalValue(),
+                                                reason);
+          return entry->getContent()->getExpression();
+        } else {
+          ref<Expr> result = ZExtExpr::create(
+              entry->getContent()->getExpression(), wpInterpolant->getWidth());
+          ref<TxInterpolantValue> stateValue =
+              entry->getInterpolantStyleValue(entry->getDepth());
+          state.txTreeNode->valuesInterpolation(stateValue->getOriginalValue(),
+                                                reason);
+          return result;
+        }
+      } else {
+        // Loading values from Global Variables
+        ref<Expr> dummy;
+        MemoryMap::iterator begin = state.addressSpace.objects.begin();
+        MemoryMap::iterator end = state.addressSpace.objects.end();
+        while (end != begin) {
+          --end;
+          const MemoryObject *mo = end->first;
+          ObjectState *oj = end->second;
+          if (!mo->isFixed) {
+            if (mo->allocSite == WPVar1->address) {
+              ref<Expr> address =
+                  ConstantExpr::create(mo->address, Expr::Int64);
+              ref<Expr> offset = mo->getOffsetExpr(address);
+              ref<Expr> result = oj->read(offset, mo->size * 8);
+              return result;
+            }
+          }
+        }
+        return dummy;
+      }
     }
     klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
     ref<Expr> dummy;
