@@ -44,8 +44,7 @@ ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
 bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
                                      ref<Expr> txe,
                                      std::map<std::string, ref<Expr> > &emap) {
-  // llvm::outs()<<"txe expr:\n";
-	// txe->dump();                                  
+
   if (isaVar(txe)) {
     std::string name = extractVarName(txe);
     unsigned int size = txe->getWidth();
@@ -309,43 +308,9 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
   }
   
   case Expr::Sel: {
-      	//   std::string Array_name;
-      	//   if (txe->getKid(0)->getKind()==Expr::WPVar){
-       	//    Array_name = extractVarName(txe->getKid(0));
-      	//   }
-      	//   else
-      	//   {
-      	// 	  klee_warning("Cannot convert tx::sel to z3 expr-->(nested array) ");
-      	// 	  return false;
-      	// 	  z3::expr t1 = c.bool_val(false);
-      	// 	  txe->getKid(0)->dump();
-      	// 	  Array_name= t1.to_string();
-      	//   }
-       	//   if(!Array_name.empty()){
-      	//   z3::expr t2 = c.bool_val(false);
-      	//   bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
-      	//   if(r2){
-			  // unsigned int Array_index= dyn_cast<ConstantExpr>(txe->getKid(1))->getZExtValue();
-			  // std::string strI = std::to_string(Array_index);
-			  // std::string tag = "selExpr_";
-			  // std::string name2insert=tag+Array_name+"_"+strI;
-        // //std::cout<<"name2insert:"<<name2insert<<"\n";
-			  // z3e=c.int_const(name2insert.c_str());
-			  // emap.insert(std::pair<std::string, ref<Expr> >(name2insert, txe));
-			  // return true;
-      	//   }
-       	//   }
-       	//   klee_warning("Cannot convert tx::sel to z3 expr");
-       	  return false;
+    return false;
          }
          case Expr::SExt: {
-          //  z3::expr t1 = c.bool_val(false);
-          //  bool r1 = txExpr2z3Expr(t1, c, txe->getKid(0), emap);
-          //  if (r1) {
-          //    z3e = sext(t1, txe->getWidth());
-          //    return true;
-          //  }
-          //  klee_warning("Cannot convert tx::sel to z3 expr");
            return false;
          }
 
@@ -415,7 +380,6 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
       r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
       return MulExpr::create(l, r);
     } else if (symbol == "div") {
-      // Written by Arpi: 15/06/2022;
       // Added a check condition to avoid the divide by zero error;
       ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
       ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
@@ -423,7 +387,6 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
       if (!val0.compare(l) || !val0.compare(r)) {
         ref<Expr> val1 = ConstantExpr::create(1, Expr::Int32);
         ref<Expr> val2 = SDivExpr::create(val0, val1);
-        // val2->dump();
         return val2;
       } else {
         return SDivExpr::create(l, r);
@@ -491,7 +454,6 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
       }
       return f;
     } else {
-      // Written by Arpi: 15/06/2022;
       // Added a check condition for "ite" (if-then-else) statement;
       if (symbol == "if") {
         ref<Expr> f = z3Expr2TxExpr(e.arg(0), emap);
