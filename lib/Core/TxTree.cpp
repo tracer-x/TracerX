@@ -2435,9 +2435,9 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
           entry = node->wp->updateSubsumptionTableEntry(entry);
         }
         // if(node->assertionFail){
-				// 	ref<Expr> resetWPExpr = ConstantExpr::alloc(0, Expr::Bool);
-				// 	entry->setWPInterpolant(resetWPExpr);
-				// }
+	// 	ref<Expr> resetWPExpr = ConstantExpr::alloc(0, Expr::Bool);
+	// 	entry->setWPInterpolant(resetWPExpr);
+	// }
       }
 
       TxSubsumptionTable::insert(node->getProgramPoint(),
@@ -2807,7 +2807,7 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
   // set to parent node
   if (parent) {
     //	  llvm::errs() << "Parent Node is " << parent->getNodeSequenceNumber()
-    //<< "\n";
+    //     << "\n";
     if (parent->left == this) {
       parent->childWPInterpolant[0] = expr;
     } else {
@@ -2911,8 +2911,7 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
            return dummy;
          }
     }
-    klee_warning(
-        "TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
+    klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
     ref<Expr> dummy;
     return dummy;
 
@@ -3090,11 +3089,9 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
           kids[1] = AddExpr::create(wpInterpolant_nested_index, kids[1]);
         } else {
           if (wpInterpolant_nested_index->getWidth() > kids[1]->getWidth()) {
-            kids[1] = ZExtExpr::create(kids[1],
-                                       wpInterpolant_nested_index->getWidth());
+            kids[1] = ZExtExpr::create(kids[1],wpInterpolant_nested_index->getWidth());
           } else {
-            wpInterpolant_nested_index = ZExtExpr::create(
-                wpInterpolant_nested_index, kids[1]->getWidth());
+            wpInterpolant_nested_index = ZExtExpr::create(wpInterpolant_nested_index, kids[1]->getWidth());
           }
           kids[1] = AddExpr::create(wpInterpolant_nested_index, kids[1]);
         }
@@ -3166,8 +3163,7 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
             dependency->getStore()->getAddressofLatestCopyLLVMValue(val1);
         ref<TxStoreEntry> entry1;
         if (alc1.isNull()) {
-          entry1 =
-              dependency->getStore()
+          entry1 = dependency->getStore()
                   ->getAddressofLatestCopyLLVMValueFromHistoricalStore(val1);
         }
         if (entry1.isNull()) {
@@ -3264,10 +3260,6 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
         if (mo->allocSite == WPVar1->address) {
           kids[1]->dump();
           int indexval = dyn_cast<ConstantExpr>(kids[1])->getZExtValue();
-          // int totalIndex =
-          // mo->allocSite->getType()->getArrayElementType()->getArrayNumElements();
-          // bool correctindex = true;
-          // int newindex;
           if (indexval < 0) {
             ref<Expr> dummy;
             klee_warning(
