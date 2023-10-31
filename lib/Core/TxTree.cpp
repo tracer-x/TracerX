@@ -2434,10 +2434,10 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         if (!WPExpr.isNull()) {
           entry = node->wp->updateSubsumptionTableEntry(entry);
         }
-        if(node->assertionFail){
-					ref<Expr> resetWPExpr = ConstantExpr::alloc(0, Expr::Bool);
-					entry->setWPInterpolant(resetWPExpr);
-				}
+        // if(node->assertionFail){
+				// 	ref<Expr> resetWPExpr = ConstantExpr::alloc(0, Expr::Bool);
+				// 	entry->setWPInterpolant(resetWPExpr);
+				// }
       }
 
       TxSubsumptionTable::insert(node->getProgramPoint(),
