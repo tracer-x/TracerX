@@ -103,8 +103,8 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
     bool r = txExpr2z3Expr(t, c, txe->getKid(0), emap);
     if (r) {
       if (!t.is_bool()) {
-        klee_warning("Z3Simplification: doesn't support NOT "
-                     "operation on non-boolean operands");
+        // klee_warning("Z3Simplification: doesn't support NOT "
+        //              "operation on non-boolean operands");
         return false;
       }
       z3e = not(t);
@@ -296,8 +296,8 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
       bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
       if (r2) {
         if (!t1.is_bool() || !t2.is_bool()) {
-          klee_warning("Z3Simplification: doesn't support XOR "
-                       "operation on non-boolean operands");
+          // klee_warning("Z3Simplification: doesn't support XOR "
+          //              "operation on non-boolean operands");
           return false;
         }
         z3e = not(not(t2) && not(t1));
@@ -316,7 +316,8 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
 
          default: {
            // Sanity check
-           klee_warning("Cannot convert to z3 with type: %d", txe->getKind());
+           //  klee_warning("Cannot convert to z3 with type: %d",
+           //  txe->getKind());
            return false;
   }
   }

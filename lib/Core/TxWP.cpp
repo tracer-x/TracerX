@@ -836,7 +836,7 @@ TxWeakestPreCondition::getPointer(llvm::GetElementPtrInst *gep) {
 
 ref<Expr> TxWeakestPreCondition::getLoadGep(llvm::LoadInst *p) {
   ref<Expr> result;
-  klee_warning("PUSHUP4");
+  // klee_warning("PUSHUP4");
   return result;
 }
 
@@ -878,8 +878,8 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
         WPVarExpr::create(p->getOperand(0), p->getOperand(0)->getName(), index);
 
   } else {
-    p->getOperand(0)->dump();
-    klee_warning("TxWeakestPreCondition::getLoad: Not implemented yet!");
+    // p->getOperand(0)->dump();
+    // klee_warning("TxWeakestPreCondition::getLoad: Not implemented yet!");
   }
 
   return result;
@@ -995,8 +995,9 @@ ref<Expr> TxWeakestPreCondition::getCastInst(llvm::CastInst *ci) {
   else if (ci->getDestTy()->isPointerTy())
     width = Expr::Int32;
   else {
-    ci->getDestTy()->dump();
-    klee_warning("TxWeakestPreCondition::getCastInst size not supported yet!");
+    // ci->getDestTy()->dump();
+    // klee_warning("TxWeakestPreCondition::getCastInst size not supported
+    // yet!");
     return result;
   }
 
@@ -1016,9 +1017,9 @@ ref<Expr> TxWeakestPreCondition::getCastInst(llvm::CastInst *ci) {
   case llvm::Instruction::SIToFP:
   case llvm::Instruction::UIToFP: {
     // ci->dump();
-    klee_warning("Silently skipping WP (reason: SIToFP or UIToFP "
-                 "instructions): "
-                 "TxWeakestPreCondition::generateExprFromOperand\n");
+    // klee_warning("Silently skipping WP (reason: SIToFP or UIToFP "
+    //              "instructions): "
+    //              "TxWeakestPreCondition::generateExprFromOperand\n");
     return result;
   }
   case llvm::Instruction::AddrSpaceCast:
@@ -1030,9 +1031,10 @@ ref<Expr> TxWeakestPreCondition::getCastInst(llvm::CastInst *ci) {
   case llvm::Instruction::IntToPtr:
   case llvm::Instruction::PtrToInt:
   default: {
-    ci->dump();
-    klee_warning("TxWeakestPreCondition::generateExprFromOperand Unary Operand "
-                 "not implemented...\n");
+    // ci->dump();
+    // klee_warning("TxWeakestPreCondition::generateExprFromOperand Unary
+    // Operand "
+    //              "not implemented...\n");
     return result;
   }
   }
@@ -1194,7 +1196,7 @@ ref<Expr> TxWeakestPreCondition::getCallInst(llvm::CallInst *ci) {
   }
   if (ret == 0) {
     ref<Expr> dummy;
-    klee_warning("Return instruction is null!");
+    // klee_warning("Return instruction is null!");
     return dummy;
   }
   assert(ret && "Return instruction is null!");
