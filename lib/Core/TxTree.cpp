@@ -2434,6 +2434,10 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         if (!WPExpr.isNull()) {
           entry = node->wp->updateSubsumptionTableEntry(entry);
         }
+        // if(node->assertionFail){
+	// 	ref<Expr> resetWPExpr = ConstantExpr::alloc(0, Expr::Bool);
+	// 	entry->setWPInterpolant(resetWPExpr);
+	// }
       }
 
       TxSubsumptionTable::insert(node->getProgramPoint(),
@@ -2803,7 +2807,7 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
   // set to parent node
   if (parent) {
     //	  llvm::errs() << "Parent Node is " << parent->getNodeSequenceNumber()
-    //<< "\n";
+    //     << "\n";
     if (parent->left == this) {
       parent->childWPInterpolant[0] = expr;
     } else {
@@ -2870,55 +2874,44 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
           return result;
         }
       }
-    } else {
-      // Checking the historical values
-      ref<TxStoreEntry> entry;
-      entry = dependency->getStore()
-                  ->getAddressofLatestCopyLLVMValueFromHistoricalStore(
-                      WPVar1->address);
+    }  else {
+    //Checking the historical values
+     ref<TxStoreEntry> entry;
+         entry = dependency->getStore()->getAddressofLatestCopyLLVMValueFromHistoricalStore(WPVar1->address);
 
-      if (!entry.isNull()) {
-        if (wpInterpolant->getWidth() ==
-            entry->getContent()->getExpression()->getWidth()) {
-          return entry->getContent()->getExpression();
-        } else {
-          ref<Expr> result = ZExtExpr::create(
-              entry->getContent()->getExpression(), wpInterpolant->getWidth());
-          return result;
-        }
-      } else { // Date: 20/04/2022
-               //  // Loading values from Global Variables
-        ref<Expr> dummy;
-        //        llvm::outs()<<"\nChecking the Global list for the WPVar:
-        //        ["<<wpInterpolant<<"]\n";
-        //        llvm::outs()<<"cheking WP var address\n";
-        //        llvm::outs()<<WPVar1->address<<"\n";
-        //        wpInterpolant.get()->dump();
-        //        llvm::outs()<<wpInterpolant.get();
-        MemoryMap::iterator begin = state.addressSpace.objects.begin();
-        MemoryMap::iterator end = state.addressSpace.objects.end();
-        while (end != begin) {
-          --end;
-          const MemoryObject *mo = end->first;
-          ObjectState *oj = end->second;
-          if (!mo->isFixed) {
-            if (mo->allocSite == WPVar1->address) {
-              ref<Expr> address =
-                  ConstantExpr::create(mo->address, Expr::Int64);
-              ref<Expr> offset = mo->getOffsetExpr(address);
-              ref<Expr> result = oj->read(offset, mo->size * 8);
-              return result;
-            }
-          }
-        }
-        return dummy;
-        // llvm::outs()<<globalAddresses;
-      }
+         if (!entry.isNull()) {
+           if (wpInterpolant->getWidth() ==
+               entry->getContent()->getExpression()->getWidth()) {
+             return entry->getContent()->getExpression();
+           } else {
+             ref<Expr> result = ZExtExpr::create(
+                 entry->getContent()->getExpression(), wpInterpolant->getWidth());
+             return result;
+           }
+         } else { // Loading values from Global Variables
+           ref<Expr> dummy;
+           MemoryMap::iterator begin = state.addressSpace.objects.begin();
+           MemoryMap::iterator end = state.addressSpace.objects.end();
+           while (end != begin) {
+             --end;
+             const MemoryObject *mo = end->first;
+             ObjectState *oj = end->second;
+             if (!mo->isFixed) {
+               if (mo->allocSite == WPVar1->address) {
+                 ref<Expr> address =
+                     ConstantExpr::create(mo->address, Expr::Int64);
+                 ref<Expr> offset = mo->getOffsetExpr(address);
+                 ref<Expr> result = oj->read(offset, mo->size * 8);
+                 return result;
+               }
+             }
+           }
+           // klee_warning("TxTreeNode::instantiateWPatSubsumption:
+           // Instantiation failed!");
+           return dummy;
+         }
     }
-    // wpInterpolant->dump();
-    // dependency->getStore()->dump();
-    klee_warning(
-        "TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
+    klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
     ref<Expr> dummy;
     return dummy;
 
@@ -2980,8 +2973,9 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
         wpInterpolant->getKid(1)->getKind() == Expr::Constant &&
         wpInterpolant->getKind() == Expr::SDiv) {
 
-      ref<Expr> dummy;
-      return dummy;
+    	ref<Expr> dummy;
+      klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
+    	     return dummy;
     }
     return wpInterpolant->rebuild(kids);
   }
@@ -3020,80 +3014,126 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
   }
   case Expr::Sel: {
     ref<Expr> kids[2];
-    kids[0] = wpInterpolant->getKid(0);
-    kids[1] =
-        instantiateWPatSubsumption(wpInterpolant->getKid(1), state, dependency);
+    int nested_sel = 0;
+
+    if (wpInterpolant->getKid(0)->getKind() == Expr::WPVar) {
+      kids[0] = instantiateWPatSubsumption(wpInterpolant->getKid(0), state,
+                                           dependency);
+    } else {
+      ref<Expr> wpInterpolant_child = wpInterpolant;
+      ref<Expr> wpInterpolant_nested_index;
+      llvm::outs() << wpInterpolant->getKid(1)->getWidth();
+      int multi_nest = 0;
+
+      while (wpInterpolant_child->getKid(0)->getKind() != Expr::WPVar) {
+        nested_sel = 1;
+        if (wpInterpolant_child->getKid(1)->getKind() ==
+            Expr::Constant) // wpInterpolant->getKid(0);
+        {
+          wpInterpolant_nested_index = wpInterpolant_child->getKid(1);
+          if (multi_nest == 0) {
+            kids[1] = wpInterpolant_nested_index;
+            multi_nest = 1;
+          } else {
+            if (wpInterpolant_nested_index->getWidth() == kids[1]->getWidth()) {
+              kids[1] = AddExpr::create(wpInterpolant_nested_index, kids[1]);
+            } else {
+              if (wpInterpolant_nested_index->getWidth() >
+                  kids[1]->getWidth()) {
+                kids[1] = ZExtExpr::create(
+                    kids[1], wpInterpolant_nested_index->getWidth());
+              } else {
+                wpInterpolant_nested_index = ZExtExpr::create(
+                    wpInterpolant_nested_index, kids[1]->getWidth());
+              }
+              kids[1] = AddExpr::create(wpInterpolant_nested_index, kids[1]);
+            }
+          }
+          // kids[1]=AddExpr::create(wpInterpolant_nested_index,kids[1]);
+        } else {
+          wpInterpolant_nested_index = instantiateWPatSubsumption(
+              wpInterpolant_child->getKid(1), state, dependency);
+          wpInterpolant_nested_index = wpInterpolant_child->getKid(1);
+          if (multi_nest == 0) {
+            kids[1] = wpInterpolant_nested_index;
+            multi_nest = 1;
+          } else {
+            if (wpInterpolant_nested_index->getWidth() == kids[1]->getWidth()) {
+              kids[1] = AddExpr::create(wpInterpolant_nested_index, kids[1]);
+            } else {
+              if (wpInterpolant_nested_index->getWidth() >
+                  kids[1]->getWidth()) {
+                kids[1] = ZExtExpr::create(
+                    kids[1], wpInterpolant_nested_index->getWidth());
+              } else {
+                wpInterpolant_nested_index = ZExtExpr::create(
+                    wpInterpolant_nested_index, kids[1]->getWidth());
+              }
+              kids[1] = AddExpr::create(wpInterpolant_nested_index, kids[1]);
+            }
+          }
+          // kids[1]=AddExpr::create(wpInterpolant_nested_index,kids[1]);
+        }
+        wpInterpolant_child = wpInterpolant_child->getKid(0);
+      }
+
+      wpInterpolant = wpInterpolant_child;
+      kids[0] = wpInterpolant_child->getKid(0);
+      if (wpInterpolant_child->getKid(1)->getKind() ==
+          Expr::Constant) // wpInterpolant->getKid(0);
+      {
+        kids[1] = wpInterpolant_child->getKid(1);
+        llvm::outs() << wpInterpolant_nested_index->getWidth();
+        llvm::outs() << kids[1]->getWidth();
+        if (wpInterpolant_nested_index->getWidth() == kids[1]->getWidth()) {
+          kids[1] = AddExpr::create(wpInterpolant_nested_index, kids[1]);
+        } else {
+          if (wpInterpolant_nested_index->getWidth() > kids[1]->getWidth()) {
+            kids[1] = ZExtExpr::create(kids[1],wpInterpolant_nested_index->getWidth());
+          } else {
+            wpInterpolant_nested_index = ZExtExpr::create(wpInterpolant_nested_index, kids[1]->getWidth());
+          }
+          kids[1] = AddExpr::create(wpInterpolant_nested_index, kids[1]);
+        }
+
+      } else {
+        kids[1] = instantiateWPatSubsumption(wpInterpolant_child->getKid(1),
+                                             state, dependency);
+
+        if (wpInterpolant_nested_index->getWidth() == kids[1]->getWidth()) {
+          kids[1] = AddExpr::create(wpInterpolant_nested_index, kids[1]);
+        } else {
+          if (wpInterpolant_nested_index->getWidth() > kids[1]->getWidth()) {
+            kids[1] = ZExtExpr::create(kids[1],
+                                       wpInterpolant_nested_index->getWidth());
+          } else {
+            wpInterpolant_nested_index = ZExtExpr::create(
+                wpInterpolant_nested_index, kids[1]->getWidth());
+          }
+          kids[1] = AddExpr::create(wpInterpolant_nested_index, kids[1]);
+        }
+      }
+    }
+    if (nested_sel == 0) {
+      if (wpInterpolant->getKid(1)->getKind() ==
+          Expr::Constant) // wpInterpolant->getKid(0);
+      {
+        kids[1] = wpInterpolant->getKid(1);
+      } else {
+        kids[1] = instantiateWPatSubsumption(wpInterpolant->getKid(1), state,
+                                             dependency);
+      }
+    }
     if (kids[0].isNull())
       return kids[0];
     if (kids[1].isNull())
       return kids[1];
-
     ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
     ref<TxAllocationContext> alc;
-    // ref<TxAllocationContext> alc =
-    // dependency->getStore()->getAddressofLatestCopyLLVMValue(WPVar->address);
     if (!WPVar.isNull()) {
       alc = dependency->getStore()->getAddressofLatestCopyLLVMValue(
           WPVar->address);
     }
-    //    else{
-    //
-    //    	alc=nullptr;
-    //    }
-    //    llvm::outs()<<"Checking the print-2\n";
-    ////alc->dump();
-    //    llvm::outs()<<"Checking the print-3\n";
-
-    //    for(map<string, pair<string,string> >::const_iterator it =
-    //    myMap.begin();
-    //        it != myMap.end(); ++it)
-    //    {
-    //        std::cout << it->first << " " << it->second.first << " " <<
-    //        it->second.second << "\n";
-    //    }
-    //
-    //    std::map<const llvm::GlobalValue *, ref<ConstantExpr> >
-    //    *globalAddresses;
-
-    // Change to check the global variables -- 18 may 2022
-    //    for(std::map<const llvm::GlobalValue *, ref<ConstantExpr>
-    //    >::const_iterator it = globalAddresses->begin();
-    //        it != globalAddresses->end(); ++it)
-    //    {
-    //
-    //    	llvm::outs()<<"**************************************************************\n";
-    //    	it->first->dump();
-    //    	llvm::outs()<<"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
-    //    	it->second->dump();
-    //    	Executor::const_iterator pos = globalAddresses.find("string");
-    //    	//ref<TxAllocationContext> alc =
-    //    dependency->getStore()->getAddressofLatestCopyLLVMValue(it->first);
-    //    	 //llvm::outs()<<it<<"\n";
-    //    }
-
-    //    for (const auto& p : globalAddresses ) {
-    //            llvm::outs()<<p<<"\n";
-    //        }
-
-    //    for (auto const &pair: globalAddresses) {
-    //    	llvm::outs() << "{" << pair.first << ": " << pair.second <<
-    //    "}\n";
-    //        }
-    //    Executor::const_iterator pos = globalAddresses.find("string");
-    //    if (pos == map.end()) {
-    //        //handle the error
-    //    } else {
-    //        std::string value = pos->second;
-    //
-    //    }
-
-    // dependency->getStore()->markGlobalVariables(WPVar->address);
-    //       //
-    // if(alc.isNull){
-    //
-    //
-    // }
-    //   llvm::outs()<<"Checking the print\n";
     if (!alc.isNull()) {
       ref<TxStoreEntry> entry;
       ref<Expr> offset = MulExpr::create(
@@ -3101,42 +3141,150 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
           UDivExpr::create(
               ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
               ConstantExpr::create(8, kids[1]->getWidth())));
-
+      if (!isa<ConstantExpr>(offset)) {
+        ref<Expr> dummy;
+        klee_warning("instantiateWPatSubsumption: unable to instantiate"
+                     " for non-constant array index!");
+        return dummy;
+      }
       assert(isa<ConstantExpr>(offset) &&
              "TxTreeNode::"
              "instantiateWPatSubsumption, offset is "
              "not a constant value");
-      entry = dependency->getStore()->find(alc, offset);
-      if (!entry.isNull()) {
-        if (wpInterpolant->getWidth() ==
-            entry->getContent()->getExpression()->getWidth()) {
-          return entry->getContent()->getExpression();
-        } else {
-          ref<Expr> result = ZExtExpr::create(
-              entry->getContent()->getExpression(), wpInterpolant->getWidth());
-
-          return result;
+      if (alc->getValue()
+              ->getValueName()
+              ->second->getType()
+              ->getPointerElementType()
+              ->isPointerTy()) {
+        entry = dependency->getStore()->find(alc);
+        llvm::Value *val1 =
+            entry->getContent()->getPointerInfo()->getContext()->getValue();
+        ref<TxAllocationContext> alc1 =
+            dependency->getStore()->getAddressofLatestCopyLLVMValue(val1);
+        ref<TxStoreEntry> entry1;
+        if (alc1.isNull()) {
+          entry1 = dependency->getStore()
+                  ->getAddressofLatestCopyLLVMValueFromHistoricalStore(val1);
+        }
+        if (entry1.isNull()) {
+          MemoryMap::iterator begin = state.addressSpace.objects.begin();
+          MemoryMap::iterator end = state.addressSpace.objects.end();
+          while (end != begin) {
+            --end;
+            const MemoryObject *mo = end->first;
+            ObjectState *oj = end->second;
+            if (!mo->isFixed) {
+              unsigned int type = mo->size /
+                                  mo->allocSite->getType()
+                                      ->getArrayElementType()
+                                      ->getArrayNumElements();
+              if (mo->allocSite == val1) {
+                int indexval = dyn_cast<ConstantExpr>(kids[1])->getZExtValue();
+                if (indexval < 0) {
+                  ref<Expr> dummy;
+                  return dummy;
+                }
+                ref<Expr> result = oj->read(offset, type * 8);
+                if (!result.isNull()) {
+                  return result;
+                }
+              }
+            }
+          }
+        }
+        entry1 = dependency->getStore()->find(
+            entry->getContent()->getPointerInfo()->getContext());
+        if (!entry1.isNull()) {
+          ref<TxStoreEntry> entry1;
+          entry1 = dependency->getStore()->find(
+              entry->getContent()->getPointerInfo()->getContext(), offset);
+          if (!entry1.isNull()) {
+            if (wpInterpolant->getWidth() ==
+                entry1->getContent()->getExpression()->getWidth()) {
+              return entry1->getContent()->getExpression();
+            } else {
+              ref<Expr> result =
+                  ZExtExpr::create(entry1->getContent()->getExpression(),
+                                   wpInterpolant->getWidth());
+              return result;
+            }
+          } else {
+            ref<Expr> dummy;
+            klee_warning("instantiateWPatSubsumption: unable to obtain"
+                         " the required array pointer for Sel Expression!");
+            return dummy;
+          }
+        }
+      } else {
+        entry = dependency->getStore()->find(alc, offset);
+        if (!entry.isNull()) {
+          if (wpInterpolant->getWidth() ==
+              entry->getContent()->getExpression()->getWidth()) {
+            return entry->getContent()->getExpression();
+          } else {
+            ref<Expr> result =
+                ZExtExpr::create(entry->getContent()->getExpression(),
+                                 wpInterpolant->getWidth());
+            return result;
+          }
         }
       }
-    } else {
+    }
+    // When WPVar is not present in the internal store
+    ref<WPVarExpr> WPVar1 = dyn_cast<WPVarExpr>(wpInterpolant->getKid(0));
+    ref<Expr> offset = MulExpr::create(
+        kids[1],
+        UDivExpr::create(
+            ConstantExpr::create(kids[0]->getWidth(), kids[1]->getWidth()),
+            ConstantExpr::create(8, kids[1]->getWidth())));
+    if (!isa<ConstantExpr>(offset)) {
+      ref<Expr> dummy;
+      klee_warning("instantiateWPatSubsumption: unable to instantiate"
+                   " due to non-constant array index!");
+      return dummy;
+    }
+    assert(isa<ConstantExpr>(offset) && "TxTreeNode::"
+                                        "instantiateWPatSubsumption, offset is "
+                                        "not a constant value");
+    MemoryMap::iterator begin = state.addressSpace.objects.begin();
+    MemoryMap::iterator end = state.addressSpace.objects.end();
+    while (end != begin) {
+      --end;
+      const MemoryObject *mo = end->first;
+      ObjectState *oj = end->second;
+      if (!mo->isFixed) {
+        unsigned int type = mo->size /
+                            mo->allocSite->getType()
+                                ->getArrayElementType()
+                                ->getArrayNumElements();
+        if (mo->allocSite == WPVar1->address) {
+          kids[1]->dump();
+          int indexval = dyn_cast<ConstantExpr>(kids[1])->getZExtValue();
+          if (indexval < 0) {
+            ref<Expr> dummy;
+            klee_warning(
+                "TxTreeNode::instantiateWPatSubsumption: Instantiation at"
+                " Sel Expression failed due to negative array index!");
+            return dummy;
+          }
+          ref<Expr> result = oj->read(offset, type * 8);
+          if (!result.isNull()) {
+            return result;
+          }
+        }
+      }
     }
     ref<Expr> dummy;
+    klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel "
+                 "Expression failed!");
     return dummy;
-    // wpInterpolant->dump();
-    // klee_error("TxTreeNode::instantiateWPatSubsumption: Instantiation at Sel
-    // "
-    // "Expression failed!");
-    // return wpInterpolant;
     break;
   }
-  default: {
-
-    // ref<Expr> dummy;
-    // return dummy;
-    // wpInterpolant->dump();
-    klee_error("TxWPHelper::instantiateWPatSubsumption: Expression not "
+  default: {	
+     ref<Expr> dummy;
+     klee_error("TxWPHelper::instantiateWPatSubsumption: Expression not "
                "supported yet!");
-    // return wpInterpolant;
+     return dummy;
   }
   }
 }

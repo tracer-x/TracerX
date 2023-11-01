@@ -901,6 +901,8 @@ ref<Expr> TxWeakestPreCondition::getBinaryInst(llvm::BinaryOperator *bo) {
   ref<Expr> ret;
   ref<Expr> arg1 = generateExprFromOperand(bo->getOperand(0));
   ref<Expr> arg2 = generateExprFromOperand(bo->getOperand(1));
+  if (arg1.isNull() || arg2.isNull())
+    return ret;
   if (arg1->getWidth() > arg2->getWidth())
     arg2 = ZExtExpr::create(arg2, arg1->getWidth());
   else if (arg1->getWidth() < arg2->getWidth())
@@ -1189,6 +1191,11 @@ ref<Expr> TxWeakestPreCondition::getCallInst(llvm::CallInst *ci) {
         inFunction(it->first->inst, function)) {
       ret = it->first->inst;
     }
+  }
+  if (ret == 0) {
+    ref<Expr> dummy;
+    klee_warning("Return instruction is null!");
+    return dummy;
   }
   assert(ret && "Return instruction is null!");
   ref<Expr> result = this->generateExprFromOperand(ret->getOperand(0));
