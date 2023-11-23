@@ -2918,7 +2918,7 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
           if (!mo->isFixed) {
             if (mo->allocSite == WPVar1->address) {
               ref<Expr> address =
-                  ConstantExpr::create(mo->address, Expr::Int64);
+                  ConstantExpr::create(mo->address, Expr::Int32);
               ref<Expr> offset = mo->getOffsetExpr(address);
               ref<Expr> result = oj->read(offset, mo->size * 8);
               return result;
