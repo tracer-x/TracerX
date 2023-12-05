@@ -2859,7 +2859,10 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
     ref<TxAllocationContext> alc =
         dependency->getStore()->getAddressofLatestCopyLLVMValue(
             WPVar1->address);
-    std::string reason = "Used in Instantiation";
+    std::string reason;
+    if (MarkWPVar) {
+      reason = "Used in Instantiation";
+    }
     if (!alc.isNull()) {
       ref<TxStoreEntry> entry;
       entry = dependency->getStore()->find(alc);
@@ -2867,18 +2870,22 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
       if (!entry.isNull()) {
         if (wpInterpolant->getWidth() ==
             entry->getContent()->getExpression()->getWidth()) {
-          ref<TxInterpolantValue> stateValue =
-              entry->getInterpolantStyleValue(entry->getDepth());
-          state.txTreeNode->valuesInterpolation(stateValue->getOriginalValue(),
-                                                reason);
+          if (MarkWPVar) {
+            ref<TxInterpolantValue> stateValue =
+                entry->getInterpolantStyleValue(entry->getDepth());
+            state.txTreeNode->valuesInterpolation(
+                stateValue->getOriginalValue(), reason);
+          }
           return entry->getContent()->getExpression();
         } else {
           ref<Expr> result = ZExtExpr::create(
               entry->getContent()->getExpression(), wpInterpolant->getWidth());
-          ref<TxInterpolantValue> stateValue =
-              entry->getInterpolantStyleValue(entry->getDepth());
-          state.txTreeNode->valuesInterpolation(stateValue->getOriginalValue(),
-                                                reason);
+          if (MarkWPVar) {
+            ref<TxInterpolantValue> stateValue =
+                entry->getInterpolantStyleValue(entry->getDepth());
+            state.txTreeNode->valuesInterpolation(
+                stateValue->getOriginalValue(), reason);
+          }
           return result;
         }
       }
@@ -2892,18 +2899,22 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
       if (!entry.isNull()) {
         if (wpInterpolant->getWidth() ==
             entry->getContent()->getExpression()->getWidth()) {
-          ref<TxInterpolantValue> stateValue =
-              entry->getInterpolantStyleValue(entry->getDepth());
-          state.txTreeNode->valuesInterpolation(stateValue->getOriginalValue(),
-                                                reason);
+          if (MarkWPVar) {
+            ref<TxInterpolantValue> stateValue =
+                entry->getInterpolantStyleValue(entry->getDepth());
+            state.txTreeNode->valuesInterpolation(
+                stateValue->getOriginalValue(), reason);
+          }
           return entry->getContent()->getExpression();
         } else {
           ref<Expr> result = ZExtExpr::create(
               entry->getContent()->getExpression(), wpInterpolant->getWidth());
-          ref<TxInterpolantValue> stateValue =
-              entry->getInterpolantStyleValue(entry->getDepth());
-          state.txTreeNode->valuesInterpolation(stateValue->getOriginalValue(),
-                                                reason);
+          if (MarkWPVar) {
+            ref<TxInterpolantValue> stateValue =
+                entry->getInterpolantStyleValue(entry->getDepth());
+            state.txTreeNode->valuesInterpolation(
+                stateValue->getOriginalValue(), reason);
+          }
           return result;
         }
       } else {
