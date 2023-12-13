@@ -2473,6 +2473,14 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 #endif
 }
 
+TxTreeNode * TxTree::splitSingle(TxTreeNode *parent, ExecutionState *newState) {
+  TimerStatIncrementer t(splitTime);
+  TxTreeNode *const ret = parent->createChild<&TxTreeNode::left>();
+  newState->txTreeNode = ret;
+  TxTreeGraph::addChildren(parent, parent->left, parent->left);
+  return ret;
+}
+
 std::pair<TxTreeNode *, TxTreeNode *>
 TxTree::split(TxTreeNode *parent, ExecutionState *left, ExecutionState *right) {
   TimerStatIncrementer t(splitTime);
@@ -3326,8 +3334,8 @@ void TxTreeNode::addConstraint(ref<Expr> &constraint, llvm::Value *condition) {
 void TxTreeNode::split(ExecutionState *leftData, ExecutionState *rightData) {
   TimerStatIncrementer t(splitTime);
   assert(left == 0 && right == 0);
-  leftData->txTreeNode = createLeftChild();
-  rightData->txTreeNode = createRightChild();
+  leftData->txTreeNode = createChild<&TxTreeNode::left>();
+  rightData->txTreeNode = createChild<&TxTreeNode::right>();
   if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
       this->speculationFlag) {
     leftData->txTreeNode->setSpeculationFlag();
