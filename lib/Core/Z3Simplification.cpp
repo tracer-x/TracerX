@@ -9,6 +9,7 @@
 #include <sstream>
 #include <string>
 #include <iostream>
+#include <klee/CommandLine.h>
 using namespace klee;
 
 void Z3Simplification::test() {
@@ -34,6 +35,7 @@ ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
   bool succ = txExpr2z3Expr(z3e, c, txe, emap);
   if (succ) {
     z3e = applyTactic(c, "simplify", z3e);
+    if(DisableZ3tactic==false)
     z3e = applyTactic(c, "ctx-solver-simplify", z3e);
     ref<Expr> ret = z3Expr2TxExpr(z3e, emap);
     return ret;

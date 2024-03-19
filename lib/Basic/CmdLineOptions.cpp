@@ -230,6 +230,11 @@ llvm::cl::opt<bool>
                              "(experimental, related #398, default=on)"),
               llvm::cl::init(false));
 
+llvm::cl::opt<bool>
+    DisableZ3tactic("disable-z3-tactic",
+              llvm::cl::desc("Disables the ctx-solver-simplify tactic"),
+              llvm::cl::init(false));
+
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT

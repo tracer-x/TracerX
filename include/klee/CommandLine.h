@@ -125,8 +125,9 @@ extern llvm::cl::opt<bool> NoAbduction;
 
 extern llvm::cl::opt<bool> MarkInterpolant;
 
-
 extern llvm::cl::opt<bool> MarkWPVar;
+
+extern llvm::cl::opt<bool> DisableZ3tactic;
 
 #endif
 
