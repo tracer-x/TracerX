@@ -9,7 +9,7 @@
 ///
 /// \file
 /// This file contains declarations of the classes that implements the
-/// interpolation and subsumption checks for search-space reduction.
+/// interpolation and subsumption checks for search-space reduction in TracerX.
 ///
 //===----------------------------------------------------------------------===//
 
