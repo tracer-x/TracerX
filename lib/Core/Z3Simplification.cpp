@@ -34,7 +34,7 @@ ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
   bool succ = txExpr2z3Expr(z3e, c, txe, emap);
   if (succ) {
     z3e = applyTactic(c, "simplify", z3e);
-    z3e = applyTactic(c, "ctx-solver-simplify", z3e);
+    //z3e = applyTactic(c, "ctx-solver-simplify", z3e);
     ref<Expr> ret = z3Expr2TxExpr(z3e, emap);
     return ret;
   }
@@ -62,7 +62,7 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
       return true;
     }
     default: {
-      txe->dump();
+      //txe->dump();
       klee_error(
           "Z3Simplification::txExpr2z3Expr does not support for this type!");
       return false;
@@ -91,7 +91,7 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
       return true;
     }
     default: {
-      txe->dump();
+      //txe->dump();
       return false;
     }
     }
@@ -486,7 +486,9 @@ z3::expr Z3Simplification::applyTactic(z3::context &c, std::string tactic,
   z3::goal g(c);
   g.add(e);
   z3::tactic t(c, tactic.c_str());
+  //std::cout<<"1.4\n";
   z3::apply_result r = t(g);
+  //std::cout<<"1.5\n";
   assert(r.size() > 0 && "apply result is empty!");
   z3::expr ret = r[0].as_expr();
   for (unsigned i = 1; i < r.size(); i++) {
