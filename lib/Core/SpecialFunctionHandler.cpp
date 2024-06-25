@@ -141,6 +141,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_debug_state_off", handleDebugStateOff, false),
     add("tracerx_memo_check", handleMemoCheck, true),
     add("tracerx_memo", handleMemo, false),
+    add("tracerx_no_subsumption_check", handleRestrictSubsumptionCheck, false),
 #undef addDNR
 #undef add
 };
@@ -811,6 +812,10 @@ void SpecialFunctionHandler::handleMakeSymbolic(
           *s, "wrong size given to klee_make_symbolic[_name]", Executor::User);
     }
   }
+}
+void SpecialFunctionHandler::handleRestrictSubsumptionCheck(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments){;
 }
 
 void SpecialFunctionHandler::handleMarkGlobal(

@@ -181,6 +181,9 @@ extern "C" {
   /* Check if a vector of integers is stored previously. */
   void tracerx_memo_check();
 
+ /* No subsumption check for this specific point*/
+  void tracerx_no_subsumption_check();
+
 #ifdef __cplusplus
 }
 #endif

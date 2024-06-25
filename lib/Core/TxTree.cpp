@@ -875,7 +875,7 @@ bool TxSubsumptionTableEntry::subsumed(
     Solver::Validity result;
     std::vector<ref<Expr> > unsatCore;
     bool success = solver->evaluate(state, wpBoolean, result, unsatCore);
-
+    //llvm::outs()<<"Run Evaluate\n";
     if (!success || result != Solver::True) {
       if (debugSubsumptionLevel >= 1) {
         klee_message("#%lu=>#%lu: Check failure at WP Expr check ",

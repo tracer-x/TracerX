@@ -922,9 +922,10 @@ static const char *modelledExternals[] = {
   "tracerx_debug_subsumption",
   "tracerx_debug_subsumption_off"
   "tracerx_debug_state",
-  "tracerx_debug_state_off"
-  "tracerx_memo"
-  "tracerx_memo_check"
+  "tracerx_debug_state_off",
+  "tracerx_memo",
+  "tracerx_memo_check",
+  "tracerx_no_subsumption_check",
 };
 // Symbols we aren't going to warn about
 static const char *dontCareExternals[] = {
