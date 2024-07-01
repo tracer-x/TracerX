@@ -28,10 +28,16 @@ public:
 private:
   static bool txExpr2z3Expr(z3::expr &z3e, z3::context &c, ref<Expr> txe,
                             std::map<std::string, ref<Expr> > &emap);
+  static bool txExpr2z3Expr(z3::expr &z3e, z3::context &c, ref<Expr> txe,
+                              std::map<std::string, ref<Expr> > &emap,
+                              std::map<std::string, z3::expr> &arrmap);
 
   static ref<Expr> z3Expr2TxExpr(z3::expr,
                                  std::map<std::string, ref<Expr> > &emap);
   static z3::expr applyTactic(z3::context &c, std::string tactic, z3::expr e);
+  bool static findArray(z3::expr &z3e, z3::context &c, ref<Expr> txe,
+                          z3::sort sort, std::map<std::string, ref<Expr> > &emap,
+                          std::map<std::string, z3::expr> arrmap);
 
   static bool isaVar(ref<Expr> e);
   static std::string extractVarName(ref<Expr> e);
