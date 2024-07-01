@@ -6,6 +6,12 @@
  */
 
 #include "Z3Simplification.h"
+#include "klee/Expr.h"
+#include "z3_api.h"
+#include "llvm/Support/Casting.h"
+#include <z3++.h>
+#include <cassert>
+#include <cstdio>
 #include <sstream>
 #include <string>
 #include <iostream>
@@ -34,6 +40,7 @@ ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
   bool succ = txExpr2z3Expr(z3e, c, txe, emap);
   if (succ) {
     z3e = applyTactic(c, "simplify", z3e);
+    // To enable the "ctx-solver-simplify" with timeout uncomment the try_for() function inside "applyTactic()".
     //z3e = applyTactic(c, "ctx-solver-simplify", z3e);
     ref<Expr> ret = z3Expr2TxExpr(z3e, emap);
     return ret;
@@ -486,9 +493,19 @@ z3::expr Z3Simplification::applyTactic(z3::context &c, std::string tactic,
   z3::goal g(c);
   g.add(e);
   z3::tactic t(c, tactic.c_str());
-  //std::cout<<"1.4\n";
-  z3::apply_result r = t(g);
-  //std::cout<<"1.5\n";
+  z3::tactic &t_ref = t;
+  // Following adds the time limit to the "ctx-solver-simplify" for Z3.
+  // The try_for() function results into crash with z3 version 4.12.8 which is the present version of z3 on TX.
+  // A temporary workaround is to use a different libz3.so from a different Z3 version.
+  // The version 4.12.4 seems to be the best workaround.
+  // By compiling Z3 on this version, and simply copying the corresponding libz3.so file to the TracerX Release+Asserts/lib/
+  // folder before compiling TracerX, one should obtain a suitable executable.
+  /*if (tactic == "ctx-solver-simplify") {
+    int timeout = 50;
+    z3::tactic t_skip(c, "skip");
+    t_ref = z3::try_for(t, timeout) | t_skip;
+  }*/
+  z3::apply_result r = t_ref(g);
   assert(r.size() > 0 && "apply result is empty!");
   z3::expr ret = r[0].as_expr();
   for (unsigned i = 1; i < r.size(); i++) {
