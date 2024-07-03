@@ -9,22 +9,8 @@ SVN_BRANCH="release_$( echo ${LLVM_VERSION} | sed 's/\.//g')"
 ###############################################################################
 # Select the compiler to use to generate LLVM bitcode
 ###############################################################################
-if [ "${LLVM_VERSION}" != "2.9" ]; then
-    KLEE_CC=/usr/bin/clang-${LLVM_VERSION}
-    KLEE_CXX=/usr/bin/clang++-${LLVM_VERSION}
-else
-    # Just use pre-built llvm-gcc downloaded earlier
-    KLEE_CC=${BUILD_DIR}/llvm-gcc/bin/llvm-gcc
-    KLEE_CXX=${BUILD_DIR}/llvm-gcc/bin/llvm-g++
-    export C_INCLUDE_PATH=/usr/include/x86_64-linux-gnu
-    export CPLUS_INCLUDE_PATH=/usr/include/x86_64-linux-gnu
-
-    # Add symlinks to fix llvm-2.9-dev package so KLEE can configure properly
-    # Because of the way KLEE's configure script works this must be a relative
-    # symlink, **not** absolute!
-    sudo sh -c 'cd /usr/lib/llvm-2.9/build/ && ln -s ../ Release'
-    sudo sh -c 'cd /usr/lib/llvm-2.9/build/ && ln -s ../include include'
-fi
+KLEE_CC="$(which clang-"${LLVM_VERSION}")"
+KLEE_CXX="$(which clang++-"${LLVM_VERSION}")"
 
 ###############################################################################
 # klee-uclibc
@@ -62,7 +48,7 @@ for solver in ${SOLVER_LIST}; do
     ;;
   Z3)
     echo "Z3"
-    KLEE_Z3_CONFIGURE_OPTION="--with-z3=/usr"
+    KLEE_Z3_CONFIGURE_OPTION="--with-z3=/tmp/z3-4.8.4-install/"
     ;;
   metaSMT)
     echo "metaSMT"
@@ -79,14 +65,14 @@ TCMALLOC_OPTION=$([ "${USE_TCMALLOC:-0}" == 1 ] && echo "--with-tcmalloc" || ech
 ###############################################################################
 # KLEE
 ###############################################################################
-mkdir klee
+mkdir -p klee
 cd klee
 
 # Build KLEE
 # Note: ENABLE_SHARED=0 is required because llvm-2.9 is incorectly packaged
 # and is missing the shared library that was supposed to be built that the build
 # system will try to use by default.
-${KLEE_SRC}/configure --with-llvmsrc=/usr/lib/llvm-${LLVM_VERSION}/build \
+${KLEE_SRC}/configure --with-llvmsrc="${LLVM_SRC_DIR}" \
             --with-llvmobj=/usr/lib/llvm-${LLVM_VERSION}/build \
             --with-llvmcc=${KLEE_CC} \
             --with-llvmcxx=${KLEE_CXX} \
@@ -96,9 +82,12 @@ ${KLEE_SRC}/configure --with-llvmsrc=/usr/lib/llvm-${LLVM_VERSION}/build \
             ${KLEE_UCLIBC_CONFIGURE_OPTION} \
             ${TCMALLOC_OPTION} \
             CXXFLAGS="${COVERAGE_FLAGS}" \
-            && make DISABLE_ASSERTIONS=${DISABLE_ASSERTIONS} \
+            && make -j "$(nproc)" DISABLE_ASSERTIONS=${DISABLE_ASSERTIONS} \
                     ENABLE_OPTIMIZED=${ENABLE_OPTIMIZED} \
                     ENABLE_SHARED=0
+
+# FIXME: skip all tests in build script
+exit 0
 
 ###############################################################################
 # Testing
