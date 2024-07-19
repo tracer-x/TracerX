@@ -30,7 +30,8 @@
 #include <klee/util/TxExprUtil.h>
 #include <klee/util/TxPrintUtil.h>
 #include <vector>
-
+#include <bits/stdc++.h>
+#include <llvm/IR/Instructions.h>
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
 #elif LLVM_VERSION_CODE >= LLVM_VERSION(3, 2)
@@ -39,6 +40,7 @@
 #include <llvm/Analysis/DebugInfo.h>
 #endif
 
+using namespace llvm;
 using namespace klee;
 
 Statistic TxSubsumptionTableEntry::concretelyAddressedStoreExpressionBuildTime(
@@ -72,6 +74,25 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
 
   if (WPInterpolant)
     wpInterpolant = node->generateWPInterpolant();
+  if(EnableIndexingAtPP == true && node->getIndexedInterpolationPoint()){   // No need to this check if indexing is performing on all the program points
+   if(wpInterpolant->getNumKids()>1){
+	   ref<Expr> anchorWP= node->generateWPInterpolant();
+	   ref<Expr> prevAnchorWP= node->generateWPInterpolant();
+	   while(anchorWP->getNumKids()>1){
+		   prevAnchorWP=anchorWP;
+		   anchorWP=anchorWP->getKid(0);
+	   }
+	   switch (prevAnchorWP->getKind()) {
+	     case Expr::Eq: {
+	       indexAnchor=prevAnchorWP;
+	       break;
+	     }
+	     default: {
+	    	 ;
+	     }
+	   }
+   	}
+  }
 }
 
 TxSubsumptionTableEntry::~TxSubsumptionTableEntry() {}
@@ -2108,6 +2129,8 @@ void TxSubsumptionTable::CallHistoryIndexedTable::print(
 std::map<uintptr_t, TxSubsumptionTable::CallHistoryIndexedTable *>
     TxSubsumptionTable::instance;
 
+std::map<uintptr_t, std::map<ref<Expr>, TxSubsumptionTable::CallHistoryIndexedTable *>> TxSubsumptionTable::instance2;
+std::map<ref<Expr>, TxSubsumptionTable::CallHistoryIndexedTable *> TxSubsumptionTable::choice;
 void TxSubsumptionTable::insert(
     uintptr_t id, const std::vector<llvm::Instruction *> &callHistory,
     TxSubsumptionTableEntry *entry) {
@@ -2117,6 +2140,19 @@ void TxSubsumptionTable::insert(
 
   std::map<uintptr_t, CallHistoryIndexedTable *>::iterator it =
       instance.find(id);
+  if(EnableIndexingAtPP == true && !entry->getIndexAnchor().isNull()){
+	  std::map<uintptr_t, std::map<ref<Expr>, TxSubsumptionTable::CallHistoryIndexedTable *>> ::iterator it2 =
+	  		         instance2.find(id);
+	    std::map<ref<Expr>, TxSubsumptionTable::CallHistoryIndexedTable *>::iterator check=
+	  		  it2->second.find(entry->getIndexAnchor());
+	    if(check == it2->second.end()){
+	    	subTable = new CallHistoryIndexedTable();
+	    	subTable->insert(callHistory, entry);
+			choice[entry->getIndexAnchor()->getKid(0)]=subTable;
+			instance2[id]=choice;
+	    }
+
+  }
 
   if (it == instance.end()) {
     subTable = new CallHistoryIndexedTable();
@@ -2156,6 +2192,27 @@ bool TxSubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
     return false;
   }
 
+//=======================================================================================
+if(EnableIndexingAtPP == true && isa<CallInst>(state.txTreeNode->getBasicBlock()->begin())){
+	StringRef name = cast<CallInst>(state.txTreeNode->getBasicBlock()->begin())->getCalledFunction()->getName();
+	if(name.compare("tracerx_indexed_interpolation_point")==0){
+		std::map<uintptr_t, std::map<ref<Expr>, TxSubsumptionTable::CallHistoryIndexedTable *>> ::iterator it2 =
+				instance2.find(state.txTreeNode->getProgramPoint());
+		if(iterPair.first != iterPair.second)
+			if(!(*iterPair.first)->getIndexAnchor().isNull()){
+			ref<WPVarExpr> WPVar2 = dyn_cast<WPVarExpr>((*iterPair.first)->getIndexAnchor()->getKid(1));
+			ref<TxAllocationContext> alc = state.txTreeNode->getDependency()->getStore()->getAddressofLatestCopyLLVMValue(WPVar2->address);
+			if (!alc.isNull()) {
+			  ref<TxStoreEntry> entry;
+			  entry = state.txTreeNode->getDependency()->getStore()->find(alc);
+			  std::map<ref<Expr>, TxSubsumptionTable::CallHistoryIndexedTable *>::iterator check = it2->second.find(entry->getContent()->getExpression());
+			  if(check == it2->second.end()){
+				return false;
+				}
+			}
+		}
+	}
+}
   if (iterPair.first != iterPair.second) {
 
     TxStore::TopInterpolantStore concretelyAddressedStore;

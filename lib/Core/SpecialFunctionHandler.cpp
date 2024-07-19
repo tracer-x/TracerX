@@ -142,6 +142,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_memo_check", handleMemoCheck, true),
     add("tracerx_memo", handleMemo, false),
     add("tracerx_no_subsumption_check", handleRestrictSubsumptionCheck, false),
+	add("tracerx_indexed_interpolation_point",handleIndexedInterpolationPoint,false),
 #undef addDNR
 #undef add
 };
@@ -818,6 +819,11 @@ void SpecialFunctionHandler::handleRestrictSubsumptionCheck(ExecutionState &stat
                                         std::vector<ref<Expr> > &arguments){;
 }
 
+void SpecialFunctionHandler::handleIndexedInterpolationPoint(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments){
+  state.txTreeNode->setIndexedInterpolationPoint();
+}
 void SpecialFunctionHandler::handleMarkGlobal(
     ExecutionState &state, KInstruction *target,
     std::vector<ref<Expr> > &arguments) {

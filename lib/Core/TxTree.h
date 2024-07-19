@@ -64,7 +64,6 @@ class TxSubsumptionTable {
   class CallHistoryIndexedTable {
     class Node {
       friend class CallHistoryIndexedTable;
-
       llvm::Instruction *id;
 
       std::deque<TxSubsumptionTableEntry *> entryList;
@@ -112,6 +111,8 @@ class TxSubsumptionTable {
   };
 
   static std::map<uintptr_t, CallHistoryIndexedTable *> instance;
+  static std::map<uintptr_t, std::map<ref<Expr>, CallHistoryIndexedTable *>> instance2;
+  static std::map<ref<Expr>, CallHistoryIndexedTable *> choice;
 
 public:
   static void insert(uintptr_t id,
@@ -191,6 +192,8 @@ class TxSubsumptionTableEntry {
   TxStore::TopInterpolantStore symbolicallyAddressedStore;
 
   ref<Expr> wpInterpolant;
+
+  ref<Expr> indexAnchor=NULL;
 
   std::set<ref<TxStoreEntry> > markedGlobal;
 
@@ -367,6 +370,8 @@ public:
 
   void setWPInterpolant(ref<Expr> _wpInterpolant);
 
+  ref<Expr> getIndexAnchor(){return indexAnchor;}
+
   void setConcretelyAddressedHistoricalStore(
       TxStore::LowerInterpolantStore _concretelyAddressedHistoricalStore);
 
@@ -507,6 +512,8 @@ class TxTreeNode {
   bool assertionFail;
   bool emitAllErrors;
 
+  bool indexedInterpolationPoint=false;
+
   void setProgramPoint(llvm::Instruction *instr, llvm::Instruction *prevInstr) {
     if (!programPoint) {
       programPoint = reinterpret_cast<uintptr_t>(instr);
@@ -514,11 +521,10 @@ class TxTreeNode {
       std::string CFuntionName1(instr->getParent()->getParent()->getName().str());
       CFuntionName=CFuntionName1;
       llvm::MDNode *n = instr->getMetadata("dbg");
-           // Display the line, char position of this instruction
-           llvm::DILocation loc(n);
-           CfileLineNumber = loc.getLineNumber();
-           CfileName = loc.getFilename();
-
+      //Display the line, char position of this instruction
+      llvm::DILocation loc(n);
+      CfileLineNumber = loc.getLineNumber();
+      CfileName = loc.getFilename();
       basicBlock = instr->getParent();
     }
 
@@ -578,6 +584,13 @@ public:
     return globalAddresses;
   }
 
+  void setIndexedInterpolationPoint(){
+  	  indexedInterpolationPoint=true;
+  }
+
+  bool getIndexedInterpolationPoint(){
+  	  return indexedInterpolationPoint;
+  }
   /// \brief List of the instructions in the node in a reverse order (used only
   /// in WP interpolation)
   /// Second argument is 0 means instruction is not dependent to any target

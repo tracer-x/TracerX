@@ -125,6 +125,8 @@ extern llvm::cl::opt<bool> NoAbduction;
 
 extern llvm::cl::opt<bool> MarkWPVar;
 
+extern llvm::cl::opt<bool> EnableIndexingAtPP;
+
 #endif
 
 #ifdef ENABLE_METASMT

@@ -184,6 +184,9 @@ extern "C" {
  /* No subsumption check for this specific point*/
   void tracerx_no_subsumption_check();
 
+  /* Special subsumption checks are performed at this program point */
+    void tracerx_indexed_interpolation_point();
+
 #ifdef __cplusplus
 }
 #endif

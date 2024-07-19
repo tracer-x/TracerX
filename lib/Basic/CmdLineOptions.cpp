@@ -225,6 +225,12 @@ llvm::cl::opt<bool>
                              "(experimental, related #398, default=on)"),
               llvm::cl::init(false));
 
+llvm::cl::opt<bool>
+EnableIndexingAtPP("enable-indexingAtPP",
+              llvm::cl::desc("Can help to index at specific program point with respect to a ground variable"
+              "\n(designed for incremental deepening)"),
+              llvm::cl::init(false));
+
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT
