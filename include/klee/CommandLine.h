@@ -127,6 +127,8 @@ extern llvm::cl::opt<bool> MarkWPVar;
 
 extern llvm::cl::opt<bool> EnableIndexingAtPP;
 
+extern llvm::cl::opt<bool> EnableIndexing;
+
 #endif
 
 #ifdef ENABLE_METASMT

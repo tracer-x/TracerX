@@ -74,6 +74,7 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
 
   if (WPInterpolant)
     wpInterpolant = node->generateWPInterpolant();
+
   if(EnableIndexingAtPP == true && node->getIndexedInterpolationPoint()){   // No need to this check if indexing is performing on all the program points
    if(wpInterpolant->getNumKids()>1){
 	   ref<Expr> anchorWP= node->generateWPInterpolant();
@@ -93,6 +94,25 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
 	   }
    	}
   }
+  if(EnableIndexing == true){   // No need to this check if indexing is performing on all the program points
+     if(wpInterpolant->getNumKids()>1){
+  	   ref<Expr> anchorWP= node->generateWPInterpolant();
+  	   ref<Expr> prevAnchorWP= node->generateWPInterpolant();
+  	   while(anchorWP->getNumKids()>1){
+  		   prevAnchorWP=anchorWP;
+  		   anchorWP=anchorWP->getKid(0);
+  	   }
+  	   switch (prevAnchorWP->getKind()) {
+  	     case Expr::Eq: {
+  	       indexAnchor=prevAnchorWP;
+  	       break;
+  	     }
+  	     default: {
+  	    	 ;
+  	     }
+  	   }
+     	}
+    }
 }
 
 TxSubsumptionTableEntry::~TxSubsumptionTableEntry() {}
@@ -2140,7 +2160,7 @@ void TxSubsumptionTable::insert(
 
   std::map<uintptr_t, CallHistoryIndexedTable *>::iterator it =
       instance.find(id);
-  if(EnableIndexingAtPP == true && !entry->getIndexAnchor().isNull()){
+  if((EnableIndexing == true|| EnableIndexingAtPP == true) && !entry->getIndexAnchor().isNull()){
 	  std::map<uintptr_t, std::map<ref<Expr>, TxSubsumptionTable::CallHistoryIndexedTable *>> ::iterator it2 =
 	  		         instance2.find(id);
 	    std::map<ref<Expr>, TxSubsumptionTable::CallHistoryIndexedTable *>::iterator check=
@@ -2196,19 +2216,37 @@ bool TxSubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
 if(EnableIndexingAtPP == true && isa<CallInst>(state.txTreeNode->getBasicBlock()->begin())){
 	StringRef name = cast<CallInst>(state.txTreeNode->getBasicBlock()->begin())->getCalledFunction()->getName();
 	if(name.compare("tracerx_indexed_interpolation_point")==0){
-		std::map<uintptr_t, std::map<ref<Expr>, TxSubsumptionTable::CallHistoryIndexedTable *>> ::iterator it2 =
-				instance2.find(state.txTreeNode->getProgramPoint());
 		if(iterPair.first != iterPair.second)
 			if(!(*iterPair.first)->getIndexAnchor().isNull()){
+				std::map<uintptr_t, std::map<ref<Expr>, TxSubsumptionTable::CallHistoryIndexedTable *>> ::iterator it2 =
+						instance2.find(state.txTreeNode->getProgramPoint());
+				ref<WPVarExpr> WPVar2 = dyn_cast<WPVarExpr>((*iterPair.first)->getIndexAnchor()->getKid(1));
+				ref<TxAllocationContext> alc = state.txTreeNode->getDependency()->getStore()->getAddressofLatestCopyLLVMValue(WPVar2->address);
+				if (!alc.isNull()) {
+					ref<TxStoreEntry> entry;
+					entry = state.txTreeNode->getDependency()->getStore()->find(alc);
+					std::map<ref<Expr>, TxSubsumptionTable::CallHistoryIndexedTable *>::iterator check = it2->second.find(entry->getContent()->getExpression());
+					if(check == it2->second.end()){
+						return false;
+				}
+			}
+		}
+	}
+}
+//=======================================================================================
+if(EnableIndexing == true){
+	if(iterPair.first != iterPair.second)
+		if(!(*iterPair.first)->getIndexAnchor().isNull()){
+			std::map<uintptr_t, std::map<ref<Expr>, TxSubsumptionTable::CallHistoryIndexedTable *>> ::iterator it2 =
+								instance2.find(state.txTreeNode->getProgramPoint());
 			ref<WPVarExpr> WPVar2 = dyn_cast<WPVarExpr>((*iterPair.first)->getIndexAnchor()->getKid(1));
 			ref<TxAllocationContext> alc = state.txTreeNode->getDependency()->getStore()->getAddressofLatestCopyLLVMValue(WPVar2->address);
 			if (!alc.isNull()) {
-			  ref<TxStoreEntry> entry;
-			  entry = state.txTreeNode->getDependency()->getStore()->find(alc);
-			  std::map<ref<Expr>, TxSubsumptionTable::CallHistoryIndexedTable *>::iterator check = it2->second.find(entry->getContent()->getExpression());
-			  if(check == it2->second.end()){
-				return false;
-				}
+				ref<TxStoreEntry> entry;
+				entry = state.txTreeNode->getDependency()->getStore()->find(alc);
+				std::map<ref<Expr>, TxSubsumptionTable::CallHistoryIndexedTable *>::iterator check = it2->second.find(entry->getContent()->getExpression());
+				if(check == it2->second.end()){
+					return false;
 			}
 		}
 	}

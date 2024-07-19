@@ -231,6 +231,12 @@ EnableIndexingAtPP("enable-indexingAtPP",
               "\n(designed for incremental deepening)"),
               llvm::cl::init(false));
 
+llvm::cl::opt<bool>
+EnableIndexing("enable-indexing",
+              llvm::cl::desc("Can help to index all program point with respect to a ground variable"
+              "\n(designed for incremental deepening)"),
+              llvm::cl::init(false));
+
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT
