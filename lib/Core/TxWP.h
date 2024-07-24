@@ -94,6 +94,8 @@ public:
 
   ref<Expr> getBrCondition(llvm::Instruction *ins);
 
+  ref<Expr> redundantSimp(ref<Expr> expr);
+
   // \brief Generate expression from operand of an instruction
   // The offset is only used when a pointer or array instruction are handled and
   // first the offset is computed.

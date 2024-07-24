@@ -475,6 +475,9 @@ ref<Expr> TxWeakestPreCondition::PushUp(
         // WPExpr->dump();
         /*llvm::outs() << "------\n";*/
         WPExpr = Z3Simplification::simplify(WPExpr);
+        ref<Expr> WPExpr1=redundantSimp(WPExpr);
+        WPExpr=WPExpr1;
+
         // WPExpr->dump();
         // llvm::outs() << "******* End Flag = 5 *******\n";
       } else if (isa<llvm::GetElementPtrInst>(
@@ -509,7 +512,31 @@ ref<Expr> TxWeakestPreCondition::PushUp(
   }
   // llvm::outs()<<"\n The expression returned by the PushUp function
   // is<<<<<<<<<<<<<<<<<<<<<<<<"<<WPExpr<<"\n";
+  ref<Expr> WPExpr2=redundantSimp(WPExpr);
+  WPExpr=WPExpr2;
   return WPExpr;
+}
+
+ref<Expr> TxWeakestPreCondition::redundantSimp(ref<Expr> expr) {
+	std::string anchorC="c";
+	std::string anchorB="B";
+	if (expr->getNumKids()==2 and expr->getKind() ==Expr::And){
+		ref<Expr> expr1=redundantSimp(expr->getKid(0));
+		ref<Expr> expr2=redundantSimp(expr->getKid(1));
+		if(expr1.isNull()) return expr2;
+		else if(expr2.isNull()) return expr1;
+		else{ ref<Expr> expr3=AndExpr::create(expr1, expr2);
+			  return expr3; }
+	}
+	else if (expr->getNumKids()==1 and expr->getKind() ==Expr::Not)
+	{
+		ref<Expr> expr1=expr->getKid(1)->getKid(1);
+		ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(expr1);
+		std::string newname= WPVar->address->getName();
+		if(newname==anchorC ||newname == anchorB) return NULL;
+		else return expr;
+	}
+	else return expr;
 }
 
 ref<Expr> TxWeakestPreCondition::getBrCondition(llvm::Instruction *ins) {
