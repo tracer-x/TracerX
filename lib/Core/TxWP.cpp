@@ -528,13 +528,14 @@ ref<Expr> TxWeakestPreCondition::redundantSimp(ref<Expr> expr) {
 		else{ ref<Expr> expr3=AndExpr::create(expr1, expr2);
 			  return expr3; }
 	}
-	else if (expr->getNumKids()==1 and expr->getKind() ==Expr::Not)
-	{
-		ref<Expr> expr1=expr->getKid(1)->getKid(1);
-		ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(expr1);
-		std::string newname= WPVar->address->getName();
-		if(newname==anchorC ||newname == anchorB) return NULL;
-		else return expr;
+	else if (expr->getNumKids()==1 and expr->getKind() == Expr::Not)
+	{	ref<Expr> expr1=expr->getKid(1)->getKid(1);
+		if(expr1->getKind() == Expr::WPVar){
+			ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(expr1);
+			std::string newname= WPVar->address->getName();
+			if(newname==anchorC ||newname == anchorB) return NULL;
+			else return expr;}
+                 else return expr;
 	}
 	else return expr;
 }
