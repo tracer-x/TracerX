@@ -2795,6 +2795,9 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
       llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(i);
       if (br->isConditional()) {
         branchCondition = wp->getBrCondition(i);
+      } else {
+        // Branch is unconditional, this implies branch conditional of true
+        branchCondition = wp->True();
       }
     }
     if (!branchCondition.isNull()) {
