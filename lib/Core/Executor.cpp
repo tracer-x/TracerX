@@ -4632,7 +4632,7 @@ void Executor::run(ExecutionState &initialState) {
     		subsumptionCheckStatus=true;
     	}
     }
-    if (INTERPOLATION_ENABLED && subsumptionCheckStatus==false &&
+    if (INTERPOLATION_ENABLED && subsumptionCheckStatus==true &&
         txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
       terminateStateOnSubsumption(state);
     } else {

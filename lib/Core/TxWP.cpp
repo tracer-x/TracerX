@@ -533,7 +533,7 @@ ref<Expr> TxWeakestPreCondition::redundantSimp(ref<Expr> expr) {
 		if(expr1->getKind() == Expr::WPVar){
 			ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(expr1);
 			std::string newname= WPVar->address->getName();
-			if(newname==anchorC ||newname == anchorB) return NULL;
+			if(newname==anchorC ||newname == anchorB) return ConstantExpr::create(1, Expr::Bool);
 			else return expr;}
                  else return expr;
 	}

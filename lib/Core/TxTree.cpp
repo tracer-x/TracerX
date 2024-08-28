@@ -77,8 +77,8 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
 
   if(EnableIndexingAtPP == true && node->getIndexedInterpolationPoint()){   // No need to this check if indexing is performing on all the program points
    if(wpInterpolant->getNumKids()>1){
-	   ref<Expr> anchorWP= node->generateWPInterpolant();
-	   ref<Expr> prevAnchorWP= node->generateWPInterpolant();
+	   ref<Expr> anchorWP= wpInterpolant;
+	   ref<Expr> prevAnchorWP= wpInterpolant;
 	   while(anchorWP->getNumKids()>1){
 		   prevAnchorWP=anchorWP;
 		   anchorWP=anchorWP->getKid(0);
@@ -95,9 +95,9 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
    	}
   }
   if(EnableIndexing == true){   // No need to this check if indexing is performing on all the program points
-     if(wpInterpolant->getNumKids()>1){
-  	   ref<Expr> anchorWP= node->generateWPInterpolant();
-  	   ref<Expr> prevAnchorWP= node->generateWPInterpolant();
+     if(!wpInterpolant.isNull() && wpInterpolant->getNumKids()>1){
+  	   ref<Expr> anchorWP= wpInterpolant;
+  	   ref<Expr> prevAnchorWP= wpInterpolant;
   	   while(anchorWP->getNumKids()>1){
   		   prevAnchorWP=anchorWP;
   		   anchorWP=anchorWP->getKid(0);
