@@ -3092,9 +3092,8 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
       return kids[1];
     }
     ref<Expr> CONST_REF1 = ConstantExpr::create(0, Expr::Int32);
-    if (wpInterpolant->getKid(1) == CONST_REF1 &&
-        wpInterpolant->getKid(1)->getKind() == Expr::Constant &&
-        wpInterpolant->getKind() == Expr::SDiv) {
+    if ((wpInterpolant->getKid(1) == CONST_REF1 || kids[1] == CONST_REF1) &&
+        wpInterpolant->getKind() == Expr::SDiv) { 
 
     	ref<Expr> dummy;
       //klee_warning("TxTreeNode::instantiateWPatSubsumption: Instantiation failed!");
