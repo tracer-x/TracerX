@@ -356,29 +356,59 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
   } else if (e.is_app()) {
     std::string symbol = e.decl().name().str();
     if (symbol == "+") {
-      ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
-      ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
-      unsigned max =
-          l->getWidth() > r->getWidth() ? l->getWidth() : r->getWidth();
-      l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
-      r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
-      return AddExpr::create(l, r);
+	ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
+	ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
+	if(e.num_args()>2){
+	  ref<Expr> q = z3Expr2TxExpr(e.arg(2), emap);
+	  unsigned max =
+			  (l->getWidth() > r->getWidth()) ? ((l->getWidth() > q->getWidth())? l->getWidth() : q->getWidth() ) : ((r->getWidth() > q->getWidth())? r->getWidth() : q->getWidth() );
+	  l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
+	  r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
+	  q = (q->getWidth() == max) ? q : ZExtExpr::create(q, max);
+	  return AddExpr::create(AddExpr::create(l, r), q);
+		}
+	else {
+	  unsigned max = l->getWidth() > r->getWidth() ? l->getWidth() : r->getWidth();
+	  l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
+	  r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
+	  return AddExpr::create(l, r);
+		}
     } else if (symbol == "-") {
-      ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
-      ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
-      unsigned max =
-          l->getWidth() > r->getWidth() ? l->getWidth() : r->getWidth();
-      l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
-      r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
-      return SubExpr::create(l, r);
+    	ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
+    	ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
+    	if(e.num_args()>2){
+    	  ref<Expr> q = z3Expr2TxExpr(e.arg(2), emap);
+    	  unsigned max =
+    			  (l->getWidth() > r->getWidth()) ? ((l->getWidth() > q->getWidth())? l->getWidth() : q->getWidth() ) : ((r->getWidth() > q->getWidth())? r->getWidth() : q->getWidth() );
+    	  l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
+    	  r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
+    	  q = (q->getWidth() == max) ? q : ZExtExpr::create(q, max);
+    	  return SubExpr::create(SubExpr::create(l, r), q);
+    		}
+    	else {
+    	  unsigned max = l->getWidth() > r->getWidth() ? l->getWidth() : r->getWidth();
+    	  l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
+    	  r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
+    	  return SubExpr::create(l, r);
+    		}
     } else if (symbol == "*") {
-      ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
-      ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
-      unsigned max =
-          l->getWidth() > r->getWidth() ? l->getWidth() : r->getWidth();
-      l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
-      r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
-      return MulExpr::create(l, r);
+    	ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
+    	ref<Expr> r = z3Expr2TxExpr(e.arg(1), emap);
+    	if(e.num_args()>2){
+    	  ref<Expr> q = z3Expr2TxExpr(e.arg(2), emap);
+    	  unsigned max =
+    			  (l->getWidth() > r->getWidth()) ? ((l->getWidth() > q->getWidth())? l->getWidth() : q->getWidth() ) : ((r->getWidth() > q->getWidth())? r->getWidth() : q->getWidth() );
+    	  l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
+    	  r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
+    	  q = (q->getWidth() == max) ? q : ZExtExpr::create(q, max);
+    	  return MulExpr::create(MulExpr::create(l, r), q);
+    		}
+    	else {
+    	  unsigned max = l->getWidth() > r->getWidth() ? l->getWidth() : r->getWidth();
+    	  l = (l->getWidth() == max) ? l : ZExtExpr::create(l, max);
+    	  r = (r->getWidth() == max) ? r : ZExtExpr::create(r, max);
+    	  return MulExpr::create(l, r);
+    		}
     } else if (symbol == "div") {
       // Added a check condition to avoid the divide by zero error;
       ref<Expr> l = z3Expr2TxExpr(e.arg(0), emap);
