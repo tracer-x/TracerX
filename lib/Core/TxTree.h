@@ -595,6 +595,10 @@ public:
  	  printInterpolant = true;
    }
 
+  bool getPrintInterpolant(){
+  	   return(printInterpolant);
+   }
+
   void setIndexedInterpolationPoint(){
   	  indexedInterpolationPoint=true;
   }

@@ -2540,18 +2540,18 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 
       TxTreeGraph::addTableEntryMapping(node, entry);
 
-      if (debugSubsumptionLevel >= 2) {
+      if (MarkInterpolant == true || debugSubsumptionLevel >= 2) {
         std::string msg;
         llvm::raw_string_ostream out(msg);
         // This condition helps to print the interpolants for the specific point of interest
-		if (MarkInterpolant == true && node->printInterpolant == true)
+		if (node->getPrintInterpolant() == true)
 		{
 			entry->print(out);
 			if (WPInterpolant) {
 			  entry->printWP(out);
 			}
 		}
-		else  if (MarkInterpolant == true && node->printInterpolant == false){
+		else  if (MarkInterpolant == true && node->getPrintInterpolant() == false){
 			; // Do not print the interpolants for this node
 		}
 		else{
@@ -2562,6 +2562,7 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 			}
         }
         out.flush();
+        if(msg.length()>0)
         klee_message("%s", msg.c_str());
       }
     }
