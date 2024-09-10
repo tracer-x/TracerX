@@ -237,6 +237,11 @@ EnableIndexing("enable-indexing",
               "\n(designed for incremental deepening)"),
               llvm::cl::init(false));
 
+llvm::cl::opt<bool>
+MarkInterpolant("mark-Interpolant",
+              llvm::cl::desc("Print interpolants for the specified points"),
+              llvm::cl::init(false));
+
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT

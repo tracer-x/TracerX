@@ -129,6 +129,8 @@ extern llvm::cl::opt<bool> EnableIndexingAtPP;
 
 extern llvm::cl::opt<bool> EnableIndexing;
 
+extern llvm::cl::opt<bool> MarkInterpolant;
+
 #endif
 
 #ifdef ENABLE_METASMT
