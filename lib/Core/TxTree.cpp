@@ -861,13 +861,18 @@ bool TxSubsumptionTableEntry::subsumed(
         ref<Expr> offset = (*it)->getAddress()->getOffset();
         unsigned type = (*it)->getAddress()->getSize();
         ObjectPair initOp;
-        bool initResolve = TxTree::initialStateCopy->addressSpace.resolveOne(
-            cast<klee::ConstantExpr>(addr), initOp);
-
+        bool initResolve, currentResolve;
         ObjectPair currentOp;
-        bool currentResolve = state.addressSpace.resolveOne(
+        if(addr->getKind() == Expr::Constant){
+          initResolve = TxTree::initialStateCopy->addressSpace.resolveOne(
+            cast<klee::ConstantExpr>(addr), initOp);
+          currentResolve = state.addressSpace.resolveOne(
             cast<klee::ConstantExpr>(addr), currentOp);
-
+        }
+      else {
+          initResolve = false;
+          currentResolve = false;
+      	  }
         if (!initResolve || !currentResolve) {
           globalSat = false;
           break;
