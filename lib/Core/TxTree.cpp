@@ -2475,7 +2475,9 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 
 TxTreeNode * TxTree::splitSingle(TxTreeNode *parent, ExecutionState *newState, const bool splitCond) {
   TimerStatIncrementer t(splitTime);
-  parent->singleSplitWPCond = splitCond ? parent->wp->True() : parent->wp->False();
+  if(WPInterpolant) {
+    parent->singleSplitWPCond = splitCond ? parent->wp->True() : parent->wp->False();
+  }
   TxTreeNode *const ret = parent->createChild<&TxTreeNode::left>();
   newState->txTreeNode = ret;
   TxTreeGraph::addChildren(parent, parent->left, parent->left);
