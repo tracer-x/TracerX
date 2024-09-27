@@ -1477,8 +1477,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     }
 
     if (INTERPOLATION_ENABLED) {
-      if(BBUnmerge)
-        current.txTreeNode = txTree->splitSingle(current.txTreeNode, &current);
+      if(BBUnmerge) {
+        current.txTreeNode = txTree->splitSingle(current.txTreeNode, &current, true);
+      }
       // Validity proof succeeded of a query: antecedent -> consequent.
       // We then extract the unsatisfiability core of antecedent and not
       // consequent as the Craig interpolant.
@@ -1593,8 +1594,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
     }
 
     if (INTERPOLATION_ENABLED) {
-      if(BBUnmerge)
-        current.txTreeNode = txTree->splitSingle(current.txTreeNode, &current);
+      if(BBUnmerge) {
+        current.txTreeNode = txTree->splitSingle(current.txTreeNode, &current, false);
+      }
       // Falsity proof succeeded of a query: antecedent -> consequent,
       // which means that antecedent -> not(consequent) is valid. In this
       // case also we extract the unsat core of the proof
@@ -3046,8 +3048,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       txTree->setPhiValuesFlag(0);
     if (bi->isUnconditional()) {
       if(INTERPOLATION_ENABLED) {
-        if(BBUnmerge)
-          state.txTreeNode = txTree->splitSingle(state.txTreeNode, &state);
+        if(BBUnmerge) {
+          state.txTreeNode = txTree->splitSingle(state.txTreeNode, &state, false);
+        }
       }
       transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), state);
       if (INTERPOLATION_ENABLED)

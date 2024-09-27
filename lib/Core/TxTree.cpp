@@ -2473,8 +2473,9 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 #endif
 }
 
-TxTreeNode * TxTree::splitSingle(TxTreeNode *parent, ExecutionState *newState) {
+TxTreeNode * TxTree::splitSingle(TxTreeNode *parent, ExecutionState *newState, const bool splitCond) {
   TimerStatIncrementer t(splitTime);
+  parent->singleSplitWPCond = splitCond ? parent->wp->True() : parent->wp->False();
   TxTreeNode *const ret = parent->createChild<&TxTreeNode::left>();
   newState->txTreeNode = ret;
   TxTreeGraph::addChildren(parent, parent->left, parent->left);
@@ -2793,11 +2794,12 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
     llvm::Instruction *i = reverseInstructionList.back().first->inst;
     if (i->getOpcode() == llvm::Instruction::Br) {
       llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(i);
-      if (br->isConditional()) {
+      if (br->isConditional() && singleSplitWPCond.isNull()) {
         branchCondition = wp->getBrCondition(i);
       } else {
-        // Branch is unconditional, this implies branch conditional of true
-        branchCondition = wp->True();
+        // Branch is unconditional
+        assert(!singleSplitWPCond.isNull());
+        branchCondition = singleSplitWPCond;
       }
     }
     if (!branchCondition.isNull()) {
