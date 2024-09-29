@@ -150,8 +150,11 @@ std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
       stream << "(terminal #" << it->second << ")\\l";
     }
   }
-  if (node->falseTarget || node->trueTarget)
+  if (node->falseTarget && node->trueTarget) {
     stream << "|{<s0>F|<s1>T}";
+  } else if(node->falseTarget || node->trueTarget) {
+    stream << "|{<s0>Single Child}";
+  }
   stream << "}\"];\n";
 
   if (node->falseTarget) {
@@ -266,6 +269,25 @@ TxTreeGraph::~TxTreeGraph() {
   leaves.clear();
 
   leafToLeafSequenceNumber.clear();
+}
+
+void TxTreeGraph::addChildren(TxTreeNode *const parent, TxTreeNode *const theOnlyChild) {
+  nodeCount += 1;
+
+  if (!OUTPUT_INTERPOLATION_TREE)
+    return;
+
+  assert(TxTreeGraph::instance && "Search tree graph not initialized");
+
+  TxTreeGraph::Node *parentNode = instance->txTreeNodeMap[parent];
+
+  parentNode->falseTarget =
+      TxTreeGraph::Node::createNode(parentNode->markCount);
+  parentNode->falseTarget->parent = parentNode;
+  instance->txTreeNodeMap[theOnlyChild] = parentNode->falseTarget;
+
+  instance->leaves.erase(parentNode);
+  instance->leaves.insert(parentNode->falseTarget);
 }
 
 void TxTreeGraph::addChildren(TxTreeNode *parent, TxTreeNode *falseChild,
