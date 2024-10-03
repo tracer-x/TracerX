@@ -2477,7 +2477,7 @@ TxTreeNode * TxTree::splitSingle(TxTreeNode *parent, ExecutionState *newState) {
   TimerStatIncrementer t(splitTime);
   TxTreeNode *const ret = parent->createChild<&TxTreeNode::left>();
   newState->txTreeNode = ret;
-  TxTreeGraph::addChildren(parent, parent->left, parent->left);
+  TxTreeGraph::addChildren(parent, parent->left);
   return ret;
 }
 

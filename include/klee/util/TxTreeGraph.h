@@ -174,6 +174,8 @@ public:
     instance = 0;
   }
 
+  static void addChildren(TxTreeNode *parent, TxTreeNode *theOnlyChild);
+
   static void addChildren(TxTreeNode *parent, TxTreeNode *falseChild,
                           TxTreeNode *trueChild);
 
