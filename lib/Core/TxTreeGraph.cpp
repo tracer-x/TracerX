@@ -36,6 +36,7 @@
 
 #include <fstream>
 #include <string>
+#include <numeric>
 
 using namespace klee;
 
@@ -117,6 +118,15 @@ std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
       stream << " ITP";
     stream << "\\l";
   }
+
+  const auto &nodeTags = node->nodeTags;
+  if(!nodeTags.empty()) {
+    stream << std::accumulate(std::next(nodeTags.cbegin()), nodeTags.cend(), nodeTags[0],
+      [](const auto &x, const auto &y) { return x + ',' + y; }
+    );
+    stream << "\\l";
+  }
+
   if (node->markCount) {
     stream << "mark(s): " << node->markCount;
     if (node->markAddition) {
@@ -367,6 +377,18 @@ void TxTreeGraph::markAsSubsumed(TxTreeNode *txTreeNode,
   TxTreeGraph::Node *subsuming = instance->tableEntryMap[entry];
   instance->subsumptionEdges.push_back(new TxTreeGraph::NumberedEdge(
       node, subsuming, ++(instance->subsumptionEdgeNumber)));
+}
+
+void TxTreeGraph::updateNodeTags(TxTreeNode *txTreeNode, const std::vector<std::string> &nodeTags) {
+  if (!OUTPUT_INTERPOLATION_TREE)
+    return;
+
+  assert(TxTreeGraph::instance && "Search tree graph not initialized");
+
+  TxTreeGraph::Node *node = instance->txTreeNodeMap[txTreeNode];
+
+  // TODO: optimize this to avoid copying
+  node->nodeTags = nodeTags;
 }
 
 void TxTreeGraph::addPathCondition(TxTreeNode *txTreeNode,

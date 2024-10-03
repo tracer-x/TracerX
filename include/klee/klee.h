@@ -181,6 +181,9 @@ extern "C" {
   /* Check if a vector of integers is stored previously. */
   void tracerx_memo_check();
 
+  /* add msg to node as label, followed by optional subsequent arguments to be added as well */
+  void tracerx_node_tag(const char *msg, ...);
+
 #ifdef __cplusplus
 }
 #endif
