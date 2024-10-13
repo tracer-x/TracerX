@@ -35,13 +35,34 @@ ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
   if (succ) {
 	//std::cout<<"z3 input: "<<z3e<<"\n";
     z3e = applyTactic(c, "simplify", z3e);
-    //z3e = applyTactic(c, "ctx-solver-simplify", z3e);
+    z3e = applyTactic(c, "ctx-solver-simplify", z3e);
     //std::cout<<"z3 return: "<<z3e<<"\n";
     ref<Expr> ret = z3Expr2TxExpr(z3e, emap);
     //ret->dump();
     return ret;
   }
   return txe;
+}
+
+ref<Expr> Z3Simplification::implicationTest(ref<Expr> txe1, ref<Expr> txe2) {
+  if (txe1.isNull()) return txe1;
+  if (txe2.isNull()) return txe2;
+  ref<Expr> not_txe1 = NotExpr::create(txe1);
+  ref<Expr> combined_txe = OrExpr::create(not_txe1,txe2);
+  z3::context c;
+  std::map<std::string, ref<Expr> > emap;
+  z3::expr z3e = c.bool_val(false);
+  bool succ = txExpr2z3Expr(z3e, c, combined_txe, emap);
+  if (succ) {
+	//std::cout<<"z3 input: "<<z3e<<"\n";
+    z3e = applyTactic(c, "simplify", z3e);
+    z3e = applyTactic(c, "ctx-solver-simplify", z3e);
+    //std::cout<<"z3 return: "<<z3e<<"\n";
+    ref<Expr> ret = z3Expr2TxExpr(z3e, emap);
+    ret->dump();
+    return ret;
+  }
+  return combined_txe;
 }
 
 bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,

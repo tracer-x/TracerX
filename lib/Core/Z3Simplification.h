@@ -23,6 +23,7 @@ public:
   virtual ~Z3Simplification();
 
   static ref<Expr> simplify(ref<Expr> expr);
+  static ref<Expr> implicationTest(ref<Expr> expr1, ref<Expr> expr2);
   static void test();
 
 private:

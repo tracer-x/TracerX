@@ -72,8 +72,15 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
     markedGlobal = node->getDependency()->getMarkedGlobal();
   }
 
-  if (WPInterpolant)
+  if (WPInterpolant){
     wpInterpolant = node->generateWPInterpolant();
+  llvm::outs()<<"The WP interpolant is:\n";
+  wpInterpolant->dump();
+  if(wpInterpolant->getNumKids()>1){
+  wpInterpolant->getKid(0)->dump();
+  wpInterpolant->getKid(1)->dump();}
+
+  }
 
   if(EnableIndexingAtPP == true && node->getIndexedInterpolationPoint()){   // No need to this check if indexing is performing on all the program points
    if(wpInterpolant->getNumKids()>1){
@@ -2295,6 +2302,78 @@ if(EnableIndexing == true){
   return false;
 }
 
+
+bool TxSubsumptionTable::implicationTest(ExecutionState &state, TxTreeNode *node
+                               ) {
+
+	  CallHistoryIndexedTable *subTable = 0;
+	  TxTreeNode *txTreeNode = node;
+
+	  std::map<uintptr_t, CallHistoryIndexedTable *>::iterator it =
+	      instance.find(txTreeNode->getProgramPoint());
+	  if (it == instance.end()) {
+
+	      klee_message(
+	          "#%lu: Check-1 failure due to control point not found in table",
+	          state.txTreeNode->getNodeSequenceNumber());
+
+	    return false;
+	  }
+	  subTable = it->second;
+
+	  bool found;
+	  std::pair<EntryIterator, EntryIterator> iterPair =
+	      subTable->find(txTreeNode->entryCallHistory, found);
+	  if (!found) {
+
+	      klee_message("#%lu: Check-1 failure due to entry not found",
+	                   state.txTreeNode->getNodeSequenceNumber());
+
+	    return false;
+	  }
+
+
+  if (iterPair.first != iterPair.second) {
+
+    TxStore::TopInterpolantStore concretelyAddressedStore;
+    TxStore::TopInterpolantStore symbolicallyAddressedStore;
+    TxStore::LowerInterpolantStore concretelyAddressedHistoricalStore;
+    TxStore::LowerInterpolantStore symbolicallyAddressedHistoricalStore;
+
+    bool leftRetrieval;
+    TxStore::TopStateStore __internalStore;
+    TxStore::LowerStateStore __concretelyAddressedHistoricalStore;
+    TxStore::LowerStateStore __symbolicallyAddressedHistoricalStore;
+
+    txTreeNode->getStoredExpressions(txTreeNode->entryCallHistory,
+                                     leftRetrieval, __internalStore,
+                                     __concretelyAddressedHistoricalStore,
+                                     __symbolicallyAddressedHistoricalStore);
+
+    // Iterate the subsumption table entry with reverse iterator because
+    // the successful subsumption mostly happen in the newest entry.
+    for (EntryIterator it = iterPair.first, ie = iterPair.second; it != ie;
+         ++it) {
+    	llvm::outs()<<"Check-1\n";
+    	(*it)->dump();
+//      if ((*it)->subsumed(solver, state, timeout, leftRetrieval,
+//                          __internalStore, __concretelyAddressedHistoricalStore,
+//                          __symbolicallyAddressedHistoricalStore,
+//                          debugSubsumptionLevel)) {
+//        // We mark as subsumed such that the node will not be
+//        // stored into table (the table already contains a more
+//        // general entry).
+//        txTreeNode->isSubsumed = true;
+//
+//        // Mark the node as subsumed, and create a subsumption edge
+//        TxTreeGraph::markAsSubsumed(txTreeNode, (*it));
+//        return true;
+//      }
+    }
+  }
+  return false;
+}
+
 bool TxSubsumptionTable::hasInterpolation(ExecutionState &state) {
 
   CallHistoryIndexedTable *subTable = 0;
@@ -2540,8 +2619,21 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 	// }
       }
 
+
+      llvm::outs()<<"printing entry\n";
+      entry->dump();
+      //node->dump();
+      node->getBasicBlock()->dump();
+      if(isa<CallInst>(node->getBasicBlock()->begin())){
+          	StringRef name = cast<CallInst>(node->getBasicBlock()->begin())->getCalledFunction()->getName();
+          	if(name.compare("tracerx_no_subsumption_check")==0){
+          		llvm::outs()<<"Yes\n\n";
+          		TxSubsumptionTable::implicationTest(*state,node);
+          	}
+          }
+
       TxSubsumptionTable::insert(node->getProgramPoint(),
-                                 node->entryCallHistory, entry);
+                                       node->entryCallHistory, entry);
 
       TxTreeGraph::addTableEntryMapping(node, entry);
 

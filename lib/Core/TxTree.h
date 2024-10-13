@@ -122,6 +122,8 @@ public:
   static bool check(TimingSolver *solver, ExecutionState &state, double timeout,
                     int debugSubsumptionLevel);
 
+  static bool implicationTest(ExecutionState &state, TxTreeNode *node);
+
   static bool hasInterpolation(ExecutionState &state);
 
   static void clear();

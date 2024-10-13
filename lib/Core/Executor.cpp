@@ -4216,7 +4216,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 }
 
 void Executor::updateStates(ExecutionState *current) {
-  if (searcher) {
+	if (searcher) {
     searcher->update(current, addedStates, removedStates);
   }
 
@@ -4637,6 +4637,7 @@ void Executor::run(ExecutionState &initialState) {
       terminateStateOnSubsumption(state);
     } else {
       KInstruction *ki = state.pc;
+      llvm::outs()<<"\n";ki->inst->dump();
       stepInstruction(state);
 
       executeInstruction(state, ki);
@@ -4647,6 +4648,13 @@ void Executor::run(ExecutionState &initialState) {
 
       checkMemoryUsage();
     }
+    //state.txTreeNode->getBasicBlock()->dump();
+//    if(isa<CallInst>(state.txTreeNode->getBasicBlock()->begin())){
+//        	StringRef name = cast<CallInst>(state.txTreeNode->getBasicBlock()->begin())->getCalledFunction()->getName();
+////        	if(name.compare("tracerx_no_subsumption_check")==0){
+////        		subsumptionCheckStatus=true;
+////        	}
+//        }
     updateStates(&state);
   }
 
