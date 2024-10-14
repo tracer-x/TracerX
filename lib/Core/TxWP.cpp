@@ -604,10 +604,10 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
           " case not implemented yet\n");
     }
   } else {
-    llvm::errs() << "Value:";
+  /*  llvm::errs() << "Value:";
     val->dump();
     llvm::errs() << "\nType:";
-    val->getType()->dump();
+    val->getType()->dump(); */
     klee_error("\nTxWeakestPreCondition::generateExprFromOperand Remaining"
                " cases not implemented yet\n");
   }
@@ -648,7 +648,7 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
       break;
     }
     default: {
-      binOp->dump();
+      //binOp->dump();
       klee_error("TxWeakestPreCondition::getCondition: Binary operator is not "
                  "implemented yet!");
     }
@@ -667,7 +667,7 @@ ref<Expr> TxWeakestPreCondition::getCondition(llvm::Value *value) {
     return result;
   } else {
     // return result;
-    value->dump();
+    //value->dump();
     klee_error("TxWeakestPreCondition::getCondition: value is not "
                "implemented yet!");
   }
@@ -836,7 +836,7 @@ TxWeakestPreCondition::getPointer(llvm::GetElementPtrInst *gep) {
 
 ref<Expr> TxWeakestPreCondition::getLoadGep(llvm::LoadInst *p) {
   ref<Expr> result;
-  klee_warning("PUSHUP4");
+  //klee_warning("PUSHUP4");
   return result;
 }
 
@@ -878,8 +878,9 @@ ref<Expr> TxWeakestPreCondition::getLoad(llvm::LoadInst *p) {
         WPVarExpr::create(p->getOperand(0), p->getOperand(0)->getName(), index);
 
   } else {
-    p->getOperand(0)->dump();
-    klee_warning("TxWeakestPreCondition::getLoad: Not implemented yet!");
+	  ;
+    //p->getOperand(0)->dump();
+    //klee_warning("TxWeakestPreCondition::getLoad: Not implemented yet!");
   }
 
   return result;
@@ -995,8 +996,8 @@ ref<Expr> TxWeakestPreCondition::getCastInst(llvm::CastInst *ci) {
   else if (ci->getDestTy()->isPointerTy())
     width = Expr::Int32;
   else {
-    ci->getDestTy()->dump();
-    klee_warning("TxWeakestPreCondition::getCastInst size not supported yet!");
+    //ci->getDestTy()->dump();
+    //klee_warning("TxWeakestPreCondition::getCastInst size not supported yet!");
     return result;
   }
 
@@ -1016,9 +1017,9 @@ ref<Expr> TxWeakestPreCondition::getCastInst(llvm::CastInst *ci) {
   case llvm::Instruction::SIToFP:
   case llvm::Instruction::UIToFP: {
     // ci->dump();
-    klee_warning("Silently skipping WP (reason: SIToFP or UIToFP "
-                 "instructions): "
-                 "TxWeakestPreCondition::generateExprFromOperand\n");
+    //klee_warning("Silently skipping WP (reason: SIToFP or UIToFP "
+    //             "instructions): "
+    //             "TxWeakestPreCondition::generateExprFromOperand\n");
     return result;
   }
   case llvm::Instruction::AddrSpaceCast:
@@ -1030,9 +1031,9 @@ ref<Expr> TxWeakestPreCondition::getCastInst(llvm::CastInst *ci) {
   case llvm::Instruction::IntToPtr:
   case llvm::Instruction::PtrToInt:
   default: {
-    ci->dump();
-    klee_warning("TxWeakestPreCondition::generateExprFromOperand Unary Operand "
-                 "not implemented...\n");
+    //ci->dump();
+    //klee_warning("TxWeakestPreCondition::generateExprFromOperand Unary Operand "
+    //             "not implemented...\n");
     return result;
   }
   }
@@ -1194,7 +1195,7 @@ ref<Expr> TxWeakestPreCondition::getCallInst(llvm::CallInst *ci) {
   }
   if (ret == 0) {
     ref<Expr> dummy;
-    klee_warning("Return instruction is null!");
+    //klee_warning("Return instruction is null!");
     return dummy;
   }
   assert(ret && "Return instruction is null!");
@@ -1282,9 +1283,9 @@ TxWeakestPreCondition::getGlobalVariabletSize(llvm::GlobalValue *gv) {
   } else if (gv->getType()->isArrayTy()) {
     size = Expr::Int32;
   } else {
-    gv->dump();
-    gv->getType()->dump();
-    gv->getType()->getElementType()->dump();
+    //gv->dump();
+    //gv->getType()->dump();
+    //gv->getType()->getElementType()->dump();
     klee_error(
         "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
         "defined for this type yet");
@@ -1308,8 +1309,8 @@ TxWeakestPreCondition::getFunctionArgumentSize(llvm::Argument *arg) {
   } else if (arg->getType()->isPointerTy()) {
     size = Expr::Int32;
   } else {
-    arg->dump();
-    arg->getType()->dump();
+    //arg->dump();
+    //arg->getType()->dump();
     klee_error("TxWeakestPreCondition:: getting size is not "
                "defined for this type yet");
   }
@@ -1332,7 +1333,7 @@ unsigned int TxWeakestPreCondition::getGepSize(llvm::Type *ty) {
   } else if (ty->isPointerTy()) {
     size = getGepSize(ty->getPointerElementType());
   } else {
-    ty->dump();
+    //ty->dump();
     klee_error(
         "TxWeakestPreCondition::getGlobalVariabletSize getting size is not "
         "defined for this type yet--this");
