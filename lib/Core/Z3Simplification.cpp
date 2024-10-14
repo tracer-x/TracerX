@@ -310,8 +310,8 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
   case Expr::Sel: {
     return false;
          }
-         case Expr::SExt: {
-           return false;
+  case Expr::SExt: {
+    return false;
          }
 
          default: {
@@ -465,14 +465,14 @@ Z3Simplification::z3Expr2TxExpr(z3::expr e,
           return t;
         }
       } else {
-        std::cout << e << "\n";
-        std::cout << symbol << "\n";
+        //std::cout << e << "\n";
+        //std::cout << symbol << "\n";
         klee_error("Z3Simplification::z3Expr2TxExpr does not support for this "
                    "type of expr!");
       }
     }
   } else {
-    std::cout << e << "\n";
+    //std::cout << e << "\n";
     klee_error("Z3Simplification::z3Expr2TxExpr does not support for this type "
                "of expr!");
   }
