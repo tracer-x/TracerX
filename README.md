@@ -40,4 +40,4 @@ Coverage information for KLEE can be found [here](http://vm-klee.doc.ic.ac.uk:55
 
 For further information on KLEE, see its [webpage](http://klee.github.io/).
 
-For further information on Tracer-X see its [webpage](http://www.comp.nus.edu.sg/~tracerx).
+For further information on Tracer-X see its [webpage](https://tracer-x.github.io/).
