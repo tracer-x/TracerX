@@ -554,7 +554,9 @@ ref<Expr> TxWeakestPreCondition::generateExprFromOperand(llvm::Value *val,
 
       std::pair<ref<Expr>, ref<Expr> > pair = getPointer(parentGEP);
       if (!pair.first.isNull()) { // llvm::outs()<<"Cp6-221\n";
-        ret = SelExpr::create(pair.second, pair.first);
+    	  ref<Expr> dummy;
+        //ret = SelExpr::create(pair.second, pair.first);
+    	  ret = dummy;
       } else {
         ret = pair.first;
       }

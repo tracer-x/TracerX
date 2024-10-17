@@ -2933,22 +2933,22 @@ ref<Expr> TxTreeNode::instantiateWPatSubsumption(ref<Expr> wpInterpolant,
       } else {
         // Loading values from Global Variables
         ref<Expr> dummy;
-        MemoryMap::iterator begin = state.addressSpace.objects.begin();
-        MemoryMap::iterator end = state.addressSpace.objects.end();
-        while (end != begin) {
-          --end;
-          const MemoryObject *mo = end->first;
-          ObjectState *oj = end->second;
-          if (!mo->isFixed) {
-            if (mo->allocSite == WPVar1->address) {
-              ref<Expr> address =
-                  ConstantExpr::create(mo->address, Expr::Int64);
-              ref<Expr> offset = mo->getOffsetExpr(address);
-              ref<Expr> result = oj->read(offset, mo->size * 8);
-              return result;
-            }
-          }
-        }
+//        MemoryMap::iterator begin = state.addressSpace.objects.begin();
+//        MemoryMap::iterator end = state.addressSpace.objects.end();
+//        while (end != begin) {
+//          --end;
+//          const MemoryObject *mo = end->first;
+//          ObjectState *oj = end->second;
+//          if (!mo->isFixed) {
+//            if (mo->allocSite == WPVar1->address) {
+//              ref<Expr> address =
+//                  ConstantExpr::create(mo->address, Expr::Int32);
+//              ref<Expr> offset = mo->getOffsetExpr(address);
+//              ref<Expr> result = oj->read(offset, mo->size * 8);
+//              return result;
+//            }
+//          }
+//        }
         return dummy;
       }
     }
