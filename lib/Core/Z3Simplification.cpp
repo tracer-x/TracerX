@@ -269,6 +269,7 @@ bool Z3Simplification::txExpr2z3Expr(z3::expr &z3e, z3::context &c,
     if (r1) {
       z3::expr t2 = c.bool_val(false);
       bool r2 = txExpr2z3Expr(t2, c, txe->getKid(1), emap);
+      if(txe->getKid(1)->getKind()==Expr::Constant)return false;
       if (r2) {
         z3e = (t1 && t2);
         return true;
