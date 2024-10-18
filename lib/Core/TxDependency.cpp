@@ -657,16 +657,16 @@ void TxDependency::execute(llvm::Instruction *instr,
               llvm::raw_string_ostream s1(instrSrc);
               ci->print(s1);
               s1.flush();
-              if (instrSrc.find("klee_make_symbolic") == std::string::npos) {
-                std::string msg;
-                llvm::raw_string_ostream s2(msg);
-                s2 << "Loaded value ";
-                target->getExpression()->print(s2);
-                s2 << " should be ";
-                valueExpr->print(s2);
-                s2.flush();
-                klee_warning("%s", msg.c_str());
-              }
+//              if (instrSrc.find("klee_make_symbolic") == std::string::npos) {
+//                std::string msg;
+//                llvm::raw_string_ostream s2(msg);
+//                s2 << "Loaded value ";
+//                target->getExpression()->print(s2);
+//                s2 << " should be ";
+//                valueExpr->print(s2);
+//                s2.flush();
+//                klee_warning("%s", msg.c_str());
+//              }
             }
           }
 
