@@ -4637,7 +4637,7 @@ void Executor::run(ExecutionState &initialState) {
       terminateStateOnSubsumption(state);
     } else {
       KInstruction *ki = state.pc;
-      llvm::outs()<<"\n";ki->inst->dump();
+      //llvm::outs()<<"\n";ki->inst->dump();
       stepInstruction(state);
 
       executeInstruction(state, ki);

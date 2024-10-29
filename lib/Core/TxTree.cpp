@@ -74,11 +74,11 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
 
   if (WPInterpolant){
     wpInterpolant = node->generateWPInterpolant();
-  llvm::outs()<<"The WP interpolant is:\n";
-  wpInterpolant->dump();
-  if(wpInterpolant->getNumKids()>1){
-  wpInterpolant->getKid(0)->dump();
-  wpInterpolant->getKid(1)->dump();}
+//  llvm::outs()<<"The WP interpolant is:\n";
+//  wpInterpolant->dump();
+//  if(wpInterpolant->getNumKids()>1){
+//  wpInterpolant->getKid(0)->dump();
+//  wpInterpolant->getKid(1)->dump();}
 
   }
 
@@ -2620,17 +2620,17 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       }
 
 
-      llvm::outs()<<"printing entry\n";
-      entry->dump();
-      //node->dump();
-      node->getBasicBlock()->dump();
-      if(isa<CallInst>(node->getBasicBlock()->begin())){
-          	StringRef name = cast<CallInst>(node->getBasicBlock()->begin())->getCalledFunction()->getName();
-          	if(name.compare("tracerx_no_subsumption_check")==0){
-          		llvm::outs()<<"Yes\n\n";
-          		TxSubsumptionTable::implicationTest(*state,node);
-          	}
-          }
+//      llvm::outs()<<"printing entry\n";
+//      entry->dump();
+//      //node->dump();
+//      node->getBasicBlock()->dump();
+//      if(isa<CallInst>(node->getBasicBlock()->begin())){
+//          	StringRef name = cast<CallInst>(node->getBasicBlock()->begin())->getCalledFunction()->getName();
+//          	if(name.compare("tracerx_no_subsumption_check")==0){
+//          		llvm::outs()<<"Yes\n\n";
+//          		TxSubsumptionTable::implicationTest(*state,node);
+//          	}
+//          }
 
       TxSubsumptionTable::insert(node->getProgramPoint(),
                                        node->entryCallHistory, entry);

@@ -11,20 +11,61 @@
 #include <iostream>
 using namespace klee;
 
+#include <iostream>
+#include <sstream>
+#include<vector>
+//#include"z3++.h"
+
+//using namespace z3;
+
+
 void Z3Simplification::test() {
+	/*(declare-const p Bool)
+	  (declare-const q Bool)
+	  (declare-const r Bool)
+	  (define-fun conjecture () Bool
+	  	(=> (and (=> p q) (=> q r))
+	  		(=> p r)))
+	  (assert (not conjecture))
+	  (check-sat)*/
   std::cout << "Start test!\n";
   z3::context c;
+
   z3::goal g(c);
   z3::expr x = c.bool_const("x");
   z3::expr y = c.bool_const("y");
   z3::expr z = c.int_const("z");
+  z3::expr a = c.int_const("a");
+  z3::expr b = c.int_const("b");
+  z3::expr i1 = ((a+b)>5);
+  z3::expr i2 = ((a+b)>4);
+//  z3::expr e = not(not(x) && not(y));
+//  z3::expr f = not(not(x) && not(y));
+
   z3::expr e = not(not(x) && not(y));
-  std::cout << "e = " << e << "\n";
-  visit(e);
+  z3::expr f = not(not(x) && not(y));
+  z3::solver s(c);
+  z3::expr h = implies(i2,i1);
+  std::cout << "g = " << h << "\n";
+//(i2==> i3) = (i2 and !i3) is unsat
+  s.add(h);
+  std::cout << s << "\n";
+  std::cout << s.to_smt2() << "\n";
+  //visit(e);
+  switch (s.check()) {
+              case z3::unsat:   std::cout << "not satisfied\n"; break;
+              case z3::sat:     std::cout << "satisfied\n"; break;
+              case z3::unknown: std::cout << "unknown\n"; break;
+          }
+//
+//          model m = s.get_model();
+//          std::cout << m << "\n";
   std::cout << "End test!\n";
+
 }
 
 ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
+	//test();
   if (txe.isNull()) {
     return txe;
   }
