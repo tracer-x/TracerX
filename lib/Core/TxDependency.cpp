@@ -593,6 +593,24 @@ void TxDependency::execute(llvm::Instruction *instr,
       markAllValues(instr->getOperand(0), argExpr, reason);
       break;
     }
+    case llvm::Instruction::Alloca: {
+          // This handles only the case when the alloca argument can be reduced to a
+          // constant.
+          std::string reason = "";
+          if (debugSubsumptionLevel > 1) {
+            llvm::raw_string_ostream stream(reason);
+            stream << "infeasible alloca instruction [";
+            stream << instr->getParent()->getParent()->getName().str() << ": ";
+            if (llvm::MDNode *n = instr->getMetadata("dbg")) {
+              llvm::DILocation loc(n);
+              stream << "Line " << loc.getLineNumber();
+            }
+            stream << "]";
+            stream.flush();
+          }
+          markAllValues(instr->getOperand(0), argExpr, reason);
+          break;
+        }
     default: { assert(!"unhandled unary instruction"); }
     }
     return;
