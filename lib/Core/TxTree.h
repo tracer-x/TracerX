@@ -483,6 +483,7 @@ class TxTreeNode {
   
    std::string CFuntionName;
 
+   bool printInterpolant = false; // print the subsumption table only when this flag is on;
   // Used to ensure at subsumption the value of the phiNodes in the subsumed
   // tree remain the same
   uintptr_t prevProgramPoint;
@@ -572,6 +573,14 @@ public:
     return globalAddresses;
   }
 
+  //  \brief This function sets the value of printInterpolant bool var which
+  // to determine whether the TXSubsumption table will get printed for not when the
+  // MarkInterpolant flag is set
+  // We can enable and then mark specific points for printing the interpolants using this flag.
+  void setPrintInterpolant(){
+ 	  printInterpolant = true;
+   }
+
   /// \brief List of the instructions in the node in a reverse order (used only
   /// in WP interpolation)
   /// Second argument is 0 means instruction is not dependent to any target
@@ -586,6 +595,10 @@ public:
 
   /// \brief The current call history
   std::vector<llvm::Instruction *> callHistory;
+
+  bool getPrintInterpolant(){
+  	   return(printInterpolant);
+   }
 
   uintptr_t getProgramPoint() { return programPoint; }
   unsigned getCfileLineNumber() { return CfileLineNumber; }

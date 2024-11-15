@@ -219,7 +219,10 @@ NoAbduction("no-abduction",
               llvm::cl::desc("Perform weakest-precondition computation without partitioning"),
               llvm::cl::init(false));
 
-
+llvm::cl::opt<bool>
+MarkInterpolant("mark-Interpolant",
+              llvm::cl::desc("Print interpolants for the specified points"),
+              llvm::cl::init(false));
 
 #endif // ENABLE_Z3
 

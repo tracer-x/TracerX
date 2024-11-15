@@ -184,6 +184,9 @@ extern "C" {
   /* add msg to node as label, followed by optional subsequent arguments to be added as well */
   void tracerx_node_tag(const char *msg, ...);
 
+  /* Print interpolant only for this specific point*/
+  void tracerx_mark_interpolant_point();
+
 #ifdef __cplusplus
 }
 #endif

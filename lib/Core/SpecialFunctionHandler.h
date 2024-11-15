@@ -160,6 +160,7 @@ namespace klee {
     HANDLER(handleMulOverflow);
     HANDLER(handleSubOverflow);
     HANDLER(handleDivRemOverflow);
+    HANDLER(handleMarkInterpolantPoint);
 #undef HANDLER
   };
 } // End klee namespace
