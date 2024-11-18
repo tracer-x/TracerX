@@ -187,6 +187,9 @@ extern "C" {
   /* Print interpolant only for this specific point*/
   void tracerx_mark_interpolant_point();
 
+  /* No subsumption check for this specific point*/
+  void tracerx_do_subsumption_check();
+
 #ifdef __cplusplus
 }
 #endif

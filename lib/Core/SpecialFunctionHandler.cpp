@@ -143,6 +143,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_memo", handleMemo, false),
     add("tracerx_node_tag", handleTxNodeTag, false),
 	add("tracerx_mark_interpolant_point", handleMarkInterpolantPoint, false),
+	add("tracerx_do_subsumption_check", handleRestrictSubsumptionCheck, false),
 #undef addDNR
 #undef add
 };
@@ -829,6 +830,11 @@ void SpecialFunctionHandler::handleMakeSymbolic(
           *s, "wrong size given to klee_make_symbolic[_name]", Executor::User);
     }
   }
+}
+
+void SpecialFunctionHandler::handleRestrictSubsumptionCheck(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments){;
 }
 
 void SpecialFunctionHandler::handleMarkInterpolantPoint(ExecutionState &state,

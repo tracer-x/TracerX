@@ -4639,8 +4639,15 @@ void Executor::run(ExecutionState &initialState) {
       }
     }
 #endif
+    bool subsumptionCheckStatus=false;
+    if(isa<CallInst>(state.txTreeNode->getBasicBlock()->begin())){
+    	StringRef name = cast<CallInst>(state.txTreeNode->getBasicBlock()->begin())->getCalledFunction()->getName();
+    	if(name.compare("tracerx_do_subsumption_check")==0){
+    		subsumptionCheckStatus=true;
+    	}
+    }
 
-    if (INTERPOLATION_ENABLED &&
+    if (INTERPOLATION_ENABLED && subsumptionCheckStatus==true &&
         txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
       terminateStateOnSubsumption(state);
     } else {
