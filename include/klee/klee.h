@@ -185,7 +185,7 @@ extern "C" {
   void tracerx_node_tag(const char *msg, ...);
 
   /* Print interpolant only for this specific point*/
-  void tracerx_mark_interpolant_point();
+  void tracerx_print_interpolant();
 
   /* No subsumption check for this specific point*/
   void tracerx_do_subsumption_check();

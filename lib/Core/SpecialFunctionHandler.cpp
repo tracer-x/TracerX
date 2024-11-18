@@ -142,7 +142,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_memo_check", handleMemoCheck, true),
     add("tracerx_memo", handleMemo, false),
     add("tracerx_node_tag", handleTxNodeTag, false),
-	add("tracerx_mark_interpolant_point", handleMarkInterpolantPoint, false),
+	add("tracerx_print_interpolant", handleMarkInterpolantPoint, false),
 	add("tracerx_do_subsumption_check", handleRestrictSubsumptionCheck, false),
 #undef addDNR
 #undef add
