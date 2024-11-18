@@ -35,10 +35,15 @@ void Z3Simplification::test() {
   z3::expr x = c.bool_const("x");
   z3::expr y = c.bool_const("y");
   z3::expr z = c.int_const("z");
-  z3::expr a = c.int_const("a");
+  z3::expr sum = c.int_const("sum");
+  z3::expr k = c.int_const("k");
+  z3::expr B = c.int_const("B");
   z3::expr b = c.int_const("b");
-  z3::expr i1 = ((a+b)>5);
-  z3::expr i2 = ((a+b)>4);
+  z3::expr i1 = ((sum+2*k)==((B*(1+B))/2)+1) && (k<=2) && (k>1);
+  z3::expr i2 = ((sum+3*k)==((B*(1+B))/2)+3) && (k<=3) && (k>2);
+
+//  z3::expr i1 = ((a+b)>5);
+//   z3::expr i2 = ((a+b)>4);
 //  z3::expr e = not(not(x) && not(y));
 //  z3::expr f = not(not(x) && not(y));
 
@@ -46,12 +51,15 @@ void Z3Simplification::test() {
   z3::expr f = not(not(x) && not(y));
   z3::solver s(c);
   z3::expr h = implies(i2,i1);
+  z3::expr j = not(h);
+  z3::expr k1 = (i1 && not(i2));
   std::cout << "g = " << h << "\n";
 //(i2==> i3) = (i2 and !i3) is unsat
-  s.add(h);
+  s.add(k1);
   std::cout << s << "\n";
   std::cout << s.to_smt2() << "\n";
   //visit(e);
+  s.add(k1);
   switch (s.check()) {
               case z3::unsat:   std::cout << "not satisfied\n"; break;
               case z3::sat:     std::cout << "satisfied\n"; break;
