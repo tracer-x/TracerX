@@ -127,7 +127,8 @@ ref<TxStateValue> TxDependency::getLatestValueNoConstantCheck(
 ref<TxStateValue> TxDependency::getLatestValueForMarking(llvm::Value *val,
                                                          ref<Expr> expr) {
   ref<TxStateValue> value = getLatestValueNoConstantCheck(val, expr);
-
+  val->dump();
+  //expr->dump();
   // Right now we simply ignore the __dso_handle values. They are due
   // to library / linking errors caused by missing options (-shared) in the
   // compilation involving shared library.
@@ -142,7 +143,27 @@ ref<TxStateValue> TxDependency::getLatestValueForMarking(llvm::Value *val,
 
     if (llvm::isa<llvm::Constant>(val))
       return value;
-
+    if (llvm::ICmpInst *cVal = llvm::dyn_cast<llvm::ICmpInst>(val)) {
+    	ref<TxStateValue> value1 = getLatestValueNoConstantCheck(cVal->getOperand(0), expr);
+    	ref<TxStateValue> value2 = getLatestValueNoConstantCheck(cVal->getOperand(1), expr);
+    	if(value1.isNull())
+        	return value2;
+    	else
+        	return value1;
+    }
+    if (llvm::LoadInst *cVal = llvm::dyn_cast<llvm::LoadInst>(val)) {
+      	ref<TxStateValue> value1 = getLatestValueNoConstantCheck(cVal->getOperand(0), expr);
+      	return value1;
+      }
+    if (isa<llvm::BinaryOperator>(val)) {
+        llvm::BinaryOperator *bo = dyn_cast<llvm::BinaryOperator>(val);
+        ref<TxStateValue> value1 = getLatestValueNoConstantCheck(bo->getOperand(0), expr);
+        ref<TxStateValue> value2 = getLatestValueNoConstantCheck(bo->getOperand(1), expr);
+        if(value1.isNull())
+        	return value2;
+        else
+        	return value1;
+    }
     assert(!"unknown value");
   }
   return value;
