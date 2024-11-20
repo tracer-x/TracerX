@@ -672,15 +672,16 @@ void KleeHandler::writeTestCaseXML(
       v.print(*file, false);
     } else if (it->first.rfind("*") != std::string::npos) {
       // Pointer types
-      v.print(*file, false);    }
-    else if (it->first.find("char") == 0) {
-          *file << char(v.getZExtValue());
+      v.print(*file, false);
+//    }
+//    else if (it->first.find("char") == 0) {
+//          *file << char(v.getZExtValue());
     } else if (it->first.find("float") == 0) {
-      //*file << llvm::APFloat(APFloat::IEEEhalf, v).convertToFloat();
-      *file << "FLOAT TYPE NOT MANAGED";
+      *file << llvm::APFloat(APFloat::IEEEhalf, v).convertToFloat();
+      //*file << "FLOAT TYPE NOT MANAGED";
     } else if (it->first.find("double") == 0) {
-      //*file << llvm::APFloat(APFloat::IEEEdouble, v).convertToDouble();
-      *file << "DOUBLE TYPE NOT MANAGED";
+      *file << llvm::APFloat(APFloat::IEEEdouble, v).convertToDouble();
+      //*file << "DOUBLE TYPE NOT MANAGED";
     } else if (it->first.rfind("_t") != std::string::npos) {
       // arbitrary type, e.g. sector_t
       v.print(*file, false);
