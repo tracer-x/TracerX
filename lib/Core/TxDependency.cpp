@@ -127,7 +127,7 @@ ref<TxStateValue> TxDependency::getLatestValueNoConstantCheck(
 ref<TxStateValue> TxDependency::getLatestValueForMarking(llvm::Value *val,
                                                          ref<Expr> expr) {
   ref<TxStateValue> value = getLatestValueNoConstantCheck(val, expr);
-  val->dump();
+  //val->dump();
   //expr->dump();
   // Right now we simply ignore the __dso_handle values. They are due
   // to library / linking errors caused by missing options (-shared) in the
