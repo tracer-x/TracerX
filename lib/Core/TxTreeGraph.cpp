@@ -118,14 +118,39 @@ std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
       stream << " ITP";
     stream << "\\l";
   }
-
+   auto &nodeWPTags = node->nodeWPTags;
   const auto &nodeTags = node->nodeTags;
   if(!nodeTags.empty()) {
-    stream << std::accumulate(std::next(nodeTags.cbegin()), nodeTags.cend(), nodeTags[0],
+    stream << std::accumulate(std::next(nodeTags.cbegin()), nodeTags.cend(),nodeTags[0],
       [](const auto &x, const auto &y) { return x + ',' + y; }
     );
     stream << "\\l";
   }
+
+
+  //  if(!nodeWPTags) {
+//      stream << std::accumulate(std::next(nodeWPTags.cbegin()), nodeWPTags.cend(), nodeWPTags[0],
+//        [](const auto &x) { return x ; }
+//      );
+//    	for (auto i = nodeWPTags.begin(); i != nodeWPTags.end(); ++i)
+//    		{
+//
+//    	    llvm::outs()<<"Output value is:"<< *i << "\n";
+//    	    //i->print(stream);
+//    	    ref<Expr> wpInterpolant=i;
+//    	    stream << "]\n";
+//    	    stream << &i;
+//
+//    	    stream << (&i);
+//    	    //stream << i;
+//    		}
+    	    //return 0;
+  //llvm::raw_ostream &stream1=0;
+//  print(stream1, 0);
+//nodeWPTags->dump();
+    	 //stream<<"Values:\n";
+      stream << "\\l";
+   // }
 
   if (node->markCount) {
     stream << "mark(s): " << node->markCount;
@@ -389,6 +414,18 @@ void TxTreeGraph::updateNodeTags(TxTreeNode *txTreeNode, const std::vector<std::
 
   // TODO: optimize this to avoid copying
   node->nodeTags = nodeTags;
+}
+
+void TxTreeGraph::updateNodeWPTags(TxTreeNode *txTreeNode, ref<Expr> nodeWPTags) {
+  if (!OUTPUT_INTERPOLATION_TREE)
+    return;
+
+  assert(TxTreeGraph::instance && "Search tree graph not initialized");
+
+  TxTreeGraph::Node *node = instance->txTreeNodeMap[txTreeNode];
+
+  // TODO: optimize this to avoid copying
+  node->nodeWPTags = nodeWPTags;
 }
 
 void TxTreeGraph::addPathCondition(TxTreeNode *txTreeNode,

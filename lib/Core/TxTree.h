@@ -325,6 +325,8 @@ public:
 
   std::vector<std::string> nodeTags;
 
+  ref<Expr> nodeWPTags;
+
 
   TxSubsumptionTableEntry(TxTreeNode *node,
                           const std::vector<llvm::Instruction *> &callHistory);
@@ -474,6 +476,8 @@ class TxTreeNode {
 
   // Label for human consumption
   std::vector<std::string> nodeTags;
+
+  ref<Expr> nodeWPTags;
 
   llvm::BasicBlock *basicBlock;
 
@@ -662,6 +666,11 @@ public:
     TxTreeGraph::updateNodeTags(this, nodeTags);
   }
   
+  void addNodeWPTagToParent(ref<Expr> s) {
+    nodeWPTags=s;
+    TxTreeGraph::updateNodeWPTags(this, nodeWPTags);
+  }
+
   template<TxTreeNode* TxTreeNode::* const childAttr>
   TxTreeNode *createChild() {
     TxTreeNode *const child = new TxTreeNode(this, targetData, globalAddresses);

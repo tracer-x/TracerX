@@ -67,6 +67,8 @@ private:
 
     std::vector<std::string> nodeTags;
 
+    ref<Expr> nodeWPTags;
+
     /// \brief Conditions under which this node is visited from its parent
     std::map<TxPCConstraint *, std::pair<std::string, bool> >
     pathConditionTable;
@@ -188,6 +190,9 @@ public:
                              TxSubsumptionTableEntry *entry);
 
   static void updateNodeTags(TxTreeNode *txTreeNode, const std::vector<std::string> &nodeTags);
+
+  //static void updateNodeWPTags(TxTreeNode *txTreeNode, std::vector<ref<Expr>> nodeWPTags);
+  static void updateNodeWPTags(TxTreeNode *txTreeNode, ref<Expr> nodeWPTags);
 
   static void addPathCondition(TxTreeNode *txTreeNode,
                                TxPCConstraint *pathCondition,

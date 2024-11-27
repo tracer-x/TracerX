@@ -126,6 +126,7 @@ namespace klee {
     HANDLER(handleMemoCheck);
     HANDLER(handleMemo);
     HANDLER(handleTxNodeTag);
+    HANDLER(handleTxWPNodeTag);
     HANDLER(handleDefineFixedObject);
     HANDLER(handleDelete);    
     HANDLER(handleDeleteArray);

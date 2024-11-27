@@ -142,6 +142,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_memo_check", handleMemoCheck, true),
     add("tracerx_memo", handleMemo, false),
     add("tracerx_node_tag", handleTxNodeTag, false),
+    add("tracerx_node_wp_tag", handleTxWPNodeTag, false),
 	add("tracerx_print_interpolant", handleMarkInterpolantPoint, false),
 	add("tracerx_do_subsumption_check", handleRestrictSubsumptionCheck, false),
 #undef addDNR
@@ -752,6 +753,24 @@ void SpecialFunctionHandler::handleTxNodeTag(
   std::stringstream ss;
   std::for_each(std::next(arguments.cbegin()), arguments.cend(), [&ss](const auto &x) { ss << x; });
   state.txTreeNode->addNodeTagToParent(msg_str + ss.str());
+}
+
+
+void SpecialFunctionHandler::handleTxWPNodeTag(
+    ExecutionState &state, KInstruction *target,
+    std::vector<ref<Expr> > &arguments) {
+  assert(!arguments.empty() &&
+         "invalid number of arguments to tracerx_node_tag");
+
+  if(!INTERPOLATION_ENABLED) {
+    return;
+  }
+
+//  std::string msg_str = readStringAtAddress(state, arguments[0]);
+//  std::stringstream ss;
+//  ref<Expr> WP;
+//  //std::for_each(std::next(arguments.cbegin()), arguments.cend(), [&ss](const auto &x) { ss << x; });
+//  state.txTreeNode->addNodeWPTagToParent( state.txTreeNode->getWP()->WPExpr);
 }
 
 void SpecialFunctionHandler::handleGetValue(

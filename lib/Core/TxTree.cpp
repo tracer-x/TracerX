@@ -1974,6 +1974,7 @@ void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
   if (!wpInterpolant.isNull())
     wpInterpolant->print(stream);
   stream << "]\n";
+
 }
 
 void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
@@ -2449,7 +2450,9 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         ref<Expr> WPExpr = entry->getWPInterpolant();
         if (!WPExpr.isNull()) {
           entry = node->wp->updateSubsumptionTableEntry(entry);
+          node->addNodeWPTagToParent(WPExpr);
         }
+
         // if(node->assertionFail){
 	// 	ref<Expr> resetWPExpr = ConstantExpr::alloc(0, Expr::Bool);
 	// 	entry->setWPInterpolant(resetWPExpr);

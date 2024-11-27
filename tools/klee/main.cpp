@@ -1082,6 +1082,7 @@ static const char *modelledExternals[] = {
   "tracerx_memo",
   "tracerx_memo_check",
   "tracerx_node_tag",
+  "tracerx_node_wp_tag",
   "tracerx_print_interpolant",
   "tracerx_do_subsumption_check",
 };
