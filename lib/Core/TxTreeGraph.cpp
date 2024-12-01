@@ -45,7 +45,7 @@ std::string TxTreeGraph::NumberedEdge::render() const {
   std::ostringstream stream;
   stream << "Node" << source->nodeSequenceNumber << " -> Node"
          << destination->nodeSequenceNumber << " [style=dashed,label=\""
-         << number << "\"];";
+         << "SUBSUMED::"<<number << "\"];";
   return stream.str();
 }
 
@@ -304,14 +304,14 @@ void TxTreeGraph::setCurrentNode(ExecutionState &state,
   if (!node->nodeSequenceNumber) {
     std::string functionName(
         state.pc->inst->getParent()->getParent()->getName().str());
-    node->name = functionName + "\\l";
+    node->name = functionName;// + "\\l";
     llvm::raw_string_ostream out(node->name);
     if (llvm::MDNode *n = state.pc->inst->getMetadata("dbg")) {
       // Display the line, char position of this instruction
       llvm::DILocation loc(n);
       unsigned line = loc.getLineNumber();
-      llvm::StringRef file = loc.getFilename();
-      out << file << ":" << line << "\n";
+//      llvm::StringRef file = loc.getFilename();
+//      out << file << ":" << line << "\n";
     } else {
       state.pc->inst->print(out);
     }
@@ -400,8 +400,8 @@ void TxTreeGraph::setError(const ExecutionState &state,
     // Display the line, char position of this instruction
     llvm::DILocation loc(n);
     unsigned line = loc.getLineNumber();
-    llvm::StringRef file = loc.getFilename();
-    out << file << ":" << line << "\n";
+//    llvm::StringRef file = loc.getFilename();
+//    out << file << ":" << line << "\n";
   } else {
     state.pc->inst->print(out);
   }

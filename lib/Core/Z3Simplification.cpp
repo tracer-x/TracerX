@@ -105,7 +105,7 @@ ref<Expr> Z3Simplification::implicationTest(ref<Expr> txe1, ref<Expr> txe2) {
   if (succ) {
 	//std::cout<<"z3 input: "<<z3e<<"\n";
     z3e = applyTactic(c, "simplify", z3e);
-    z3e = applyTactic(c, "ctx-solver-simplify", z3e);
+    //z3e = applyTactic(c, "ctx-solver-simplify", z3e);
     //std::cout<<"z3 return: "<<z3e<<"\n";
     ref<Expr> ret = z3Expr2TxExpr(z3e, emap);
     ret->dump();
