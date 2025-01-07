@@ -141,9 +141,9 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_debug_state_off", handleDebugStateOff, false),
     add("tracerx_memo_check", handleMemoCheck, true),
     add("tracerx_memo", handleMemo, false),
-    add("tracerx_no_subsumption_check", handleRestrictSubsumptionCheck, false),
+    add("tracerx_do_subsumption_check", handleRestrictSubsumptionCheck, false),
 	add("tracerx_indexed_interpolation_point",handleIndexedInterpolationPoint,false),
-	add("tracerx_mark_interpolant_point", handleMarkInterpolantPoint, false),
+	add("tracerx_print_interpolant", handleMarkInterpolantPoint, false),
 #undef addDNR
 #undef add
 };
