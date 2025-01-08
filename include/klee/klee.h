@@ -182,13 +182,13 @@ extern "C" {
   void tracerx_memo_check();
 
   /* No subsumption check for this specific point*/
-  void tracerx_no_subsumption_check();
+  void tracerx_do_subsumption_check();
 
   /* Special subsumption checks are performed at this program point */
   void tracerx_indexed_interpolation_point();
 
   /* Print interpolant only for this specific point*/
-  void tracerx_mark_interpolant_point();
+  void tracerx_print_interpolant();
 
 #ifdef __cplusplus
 }

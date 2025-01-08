@@ -2551,6 +2551,7 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
         // This condition helps to print the interpolants for the specific point of interest
 		if (node->getPrintInterpolant() == true)
 		{
+			klee_message("Printing entry for Node #%lu wrt. Line number: %u",node->getNodeSequenceNumber(), node->getCfileLineNumber());
 			entry->print(out);
 			if (WPInterpolant) {
 			  entry->printWP(out);
