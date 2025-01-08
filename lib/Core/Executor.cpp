@@ -4628,7 +4628,7 @@ void Executor::run(ExecutionState &initialState) {
     bool subsumptionCheckStatus=false;
     if(isa<CallInst>(state.txTreeNode->getBasicBlock()->begin())){
     	StringRef name = cast<CallInst>(state.txTreeNode->getBasicBlock()->begin())->getCalledFunction()->getName();
-    	if(name.compare("tracerx_no_subsumption_check")==0){
+    	if(name.compare("tracerx_do_subsumption_check")==0){
     		subsumptionCheckStatus=true;
     	}
     }
