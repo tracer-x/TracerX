@@ -33,9 +33,9 @@ ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
   z3::expr z3e = c.bool_val(false);
   bool succ = txExpr2z3Expr(z3e, c, txe, emap);
   if (succ) {
-	//std::cout<<"z3 input: "<<z3e<<"\n";
+    //std::cout<<"z3 input: "<<z3e<<"\n";
     z3e = applyTactic(c, "simplify", z3e);
-    //z3e = applyTactic(c, "ctx-solver-simplify", z3e);
+    //z3e = applyTactic(c, "ctx-solver-simplify", z3e); //Enable whenever require
     //std::cout<<"z3 return: "<<z3e<<"\n";
     ref<Expr> ret = z3Expr2TxExpr(z3e, emap);
     //ret->dump();
