@@ -2189,6 +2189,33 @@ void TxSubsumptionTable::insert(
   subTable->insert(callHistory, entry);
 }
 
+bool TxSubsumptionTable::FixedPointCheck(ExecutionState &state){
+	 CallHistoryIndexedTable *subTable = 0;
+	 TxTreeNode *txTreeNode = state.txTreeNode;
+	 std::map<uintptr_t, CallHistoryIndexedTable *>::iterator it =
+	       instance.find(state.txTreeNode->getProgramPoint());
+	   if (it == instance.end()) {
+	     return false;
+	   }
+	   subTable = it->second;
+	   bool found;
+	    std::pair<EntryIterator, EntryIterator> iterPair =
+	        subTable->find(txTreeNode->entryCallHistory, found);
+	    if (!found) {
+	      return false;
+	    }
+	   if (iterPair.first != iterPair.second) {
+	     // Iterate the subsumption table entry with reverse iterator because
+	     // the successful subsumption mostly happen in the newest entry.
+	     for (EntryIterator it = iterPair.first, ie = iterPair.second; it != ie;
+	          ++it) {
+	     (*it)->getWPInterpolant()->dump();
+	     }
+	     return true;
+	   }
+	   return false;
+}
+
 bool TxSubsumptionTable::check(TimingSolver *solver, ExecutionState &state,
                                double timeout, int debugSubsumptionLevel) {
   CallHistoryIndexedTable *subTable = 0;
@@ -2429,6 +2456,8 @@ TxTree::TxTree(
   initialStateCopy = new ExecutionState(*_root);
   ;
 }
+
+
 
 bool TxTree::subsumptionCheck(TimingSolver *solver, ExecutionState &state,
                               double timeout) {

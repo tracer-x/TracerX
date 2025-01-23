@@ -144,6 +144,9 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_do_subsumption_check", handleRestrictSubsumptionCheck, false),
     add("tracerx_indexed_interpolation_point",handleIndexedInterpolationPoint,false),
     add("tracerx_print_interpolant", handleMarkInterpolantPoint, false),
+    add("tracerx_store_value", handleStoreValue, false),
+    add("tracerx_subsumption_closure_check", handleSubsumptionClosureCheck, false),
+
 #undef addDNR
 #undef add
 };
@@ -736,6 +739,41 @@ void SpecialFunctionHandler::handleMemo(ExecutionState &state,
   }
 
   po.insert(obj);
+}
+
+void SpecialFunctionHandler::handleSubsumptionClosureCheck(ExecutionState &state,
+  KInstruction *target,
+  std::vector<ref<Expr> > &arguments) {
+
+  assert(!arguments.empty() &&
+         "invalid number of arguments to tracerx_subsumption_closure_check");
+
+  if(!INTERPOLATION_ENABLED) return;
+
+  int cmin = minC.getLastC();
+  ref<ConstantExpr> length = dyn_cast<ConstantExpr>(arguments[0]);
+  int currentB = length->getAPValue().getSExtValue();
+  if (currentB > 1 and cmin > 1) {
+         std::cout<<"Values for CurrentB and cmin is:"<<currentB<<" , "<<cmin<<"\n";
+         TxSubsumptionTable::FixedPointCheck(state);
+         //klee_error("Now go for fixed point check\n");
+  }	else {
+		minC.updateCount(10000);
+  }
+}
+
+void SpecialFunctionHandler::handleStoreValue(ExecutionState &state,
+        KInstruction *target,
+        std::vector<ref<Expr> > &arguments) {
+  assert(!arguments.empty() &&
+			 "invalid number of arguments to tracerx_store_value");
+
+  if(!INTERPOLATION_ENABLED) return;
+
+  int cmin = minC.getLastC();
+  ref<ConstantExpr> length = dyn_cast<ConstantExpr>(arguments[0]);
+  int currentC = length->getAPValue().getSExtValue();
+  if (cmin>currentC)minC.updateCount(currentC);
 }
 
 void SpecialFunctionHandler::handleGetValue(

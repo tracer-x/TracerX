@@ -190,6 +190,12 @@ extern "C" {
   /* Print interpolant only for this specific point*/
   void tracerx_print_interpolant();
 
+  /* To store the minimum value of c across iteration for subsumption clousre check*/
+  void tracerx_store_value(const char *msg, ...);
+
+  /* To check the subsumption closure for a given value of B*/
+  void tracerx_subsumption_closure_check(const char *msg, ...);
+
 #ifdef __cplusplus
 }
 #endif

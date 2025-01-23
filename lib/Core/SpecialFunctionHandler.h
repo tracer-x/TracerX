@@ -72,7 +72,7 @@ namespace klee {
     // const_iterator to iterate over stored HandlerInfo
     // FIXME: Implement >, >=, <=, < operators
     class persistentObject {
-    private:
+	private:
       std::vector<std::vector<int> > objects;
       int count;
 
@@ -85,6 +85,21 @@ namespace klee {
     };
 
     persistentObject po;
+
+	class minIterationCount {
+	private:
+    	int count = 100000;
+		public:
+    		int getLastC(){
+    			return count;
+    		}
+
+    		void updateCount(int newValue){
+    			count = newValue;
+    		}
+		};
+
+	minIterationCount minC;
 
   public:
     SpecialFunctionHandler(Executor &_executor);
@@ -162,6 +177,8 @@ namespace klee {
     HANDLER(handleRestrictSubsumptionCheck);
     HANDLER(handleIndexedInterpolationPoint);
     HANDLER(handleMarkInterpolantPoint);
+    HANDLER(handleStoreValue);
+    HANDLER(handleSubsumptionClosureCheck);
 #undef HANDLER
   };
 } // End klee namespace

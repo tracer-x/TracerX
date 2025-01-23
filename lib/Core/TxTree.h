@@ -121,6 +121,7 @@ public:
 
   static bool check(TimingSolver *solver, ExecutionState &state, double timeout,
                     int debugSubsumptionLevel);
+  static bool FixedPointCheck(ExecutionState &state);
 
   static bool hasInterpolation(ExecutionState &state);
 
