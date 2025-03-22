@@ -2018,12 +2018,12 @@ void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
   stream << "]\n";
 
   stream << prefix << "\n closure = [" <<wpInterpolantClosure<< "]\n";
-  if (wpInterpolantClosure){
-  stream << prefix << "\n**********************************************\n";
-  stream << prefix << "*              Fixed point check             *\n";
-  stream << prefix << "**********************************************\n\n";
-
-  }
+//  if (wpInterpolantClosure){
+//  stream << prefix << "\n**********************************************\n";
+//  stream << prefix << "*              Fixed point check             *\n";
+//  stream << prefix << "**********************************************\n\n";
+//
+//  }
 
 }
 
