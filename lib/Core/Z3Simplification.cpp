@@ -11,20 +11,77 @@
 #include <iostream>
 using namespace klee;
 
+
 void Z3Simplification::test() {
   std::cout << "Start test!\n";
   z3::context c;
-  z3::goal g(c);
-  z3::expr x = c.bool_const("x");
-  z3::expr y = c.bool_const("y");
-  z3::expr z = c.int_const("z");
-  z3::expr e = not(not(x) && not(y));
-  std::cout << "e = " << e << "\n";
-  visit(e);
-  std::cout << "End test!\n";
+//  z3::goal g(c);
+//  z3::expr x = c.bool_const("x");
+//  z3::expr y = c.bool_const("y");
+//  z3::expr z = c.int_const("z");
+//  z3::expr e = not(not(x) && not(y));
+//  std::cout << "e = " << e << "\n";
+//  visit(e);
+//  std::cout << "End test!\n";
+
+  z3::expr a = c.int_const("a");
+  z3::expr b = c.int_const("b");
+  z3::expr i1 = ((a+b)>5);
+  z3::expr i2 = ((a+b)>4);
+  z3::expr h = implies(i1,i2);
+  z3::solver s(c);
+  s.add(h);
+
+  switch (s.check()) {
+              case z3::unsat:   std::cout << "not satisfied\n"; break;
+              case z3::sat:     std::cout << "satisfied\n"; break;
+              case z3::unknown: std::cout << "unknown\n";
+          }
+  z3::model m = s.get_model();
+      std::cout << "Model:\n" << m << "\n";
+      //std::cout << "x+y = " << m.eval(x+y) << "\n";
+}
+
+bool Z3Simplification::fixedPointTest(ref<Expr> intpAtB, ref<Expr> intpAtB1) {
+    //std::cout << "Fixed Point Test start\n";
+    if (intpAtB.isNull() or intpAtB1.isNull()) {
+        return false;
+      }
+    z3::context c;
+    std::map<std::string, ref<Expr> > emap;
+    z3::expr z3e_intpAtB = c.bool_val(false);
+    bool succ1 = txExpr2z3Expr(z3e_intpAtB, c, intpAtB, emap);
+    if (succ1){
+    	z3::expr z3e_intpAtB1 = c.bool_val(false);
+    	bool succ2 = txExpr2z3Expr(z3e_intpAtB1, c, intpAtB1, emap);
+    	if (succ2){
+    		z3::solver s(c);
+    		z3::expr conjecture = z3::implies(z3e_intpAtB, z3e_intpAtB1);
+//    		std::cout<<z3e_intpAtB<<"\n";
+//    		std::cout<<z3e_intpAtB1<<"\n";
+    		s.add(conjecture);
+    		s.check();
+//    		switch (s.check()) {
+//    		    case z3::unsat:   std::cout << "Fixed Point check unsuccessful\n"; break;//return false;
+//    		    case z3::sat:     std::cout << "Fixed Point check successful\n"; break;//return true;
+//    		    case z3::unknown: std::cout << "Fixed Point check unsuccessful\n"; break;//return false;
+//    		    }
+    		z3::model m = s.get_model();
+//    		std::cout <<"The model size is"<<m.size()<<"\n";
+//    		std::cout << "Model:\n" << m << "\n";
+    		if (m.size()>1) return false;
+    		else return true;
+    		//std::cout << "Model:\n" << m << "\n";
+    	}else{
+    		return false;
+    	}
+    }else{
+    	return false;
+    }
 }
 
 ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
+//	test();
   if (txe.isNull()) {
     return txe;
   }
@@ -35,7 +92,7 @@ ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
   if (succ) {
     //std::cout<<"z3 input: "<<z3e<<"\n";
     z3e = applyTactic(c, "simplify", z3e);
-    //z3e = applyTactic(c, "ctx-solver-simplify", z3e); //Enable whenever require
+    z3e = applyTactic(c, "ctx-solver-simplify", z3e); //Enable whenever require
     //std::cout<<"z3 return: "<<z3e<<"\n";
     ref<Expr> ret = z3Expr2TxExpr(z3e, emap);
     //ret->dump();

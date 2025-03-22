@@ -65,6 +65,7 @@ private:
     /// \brief Indicates that node is subsumed
     bool subsumed;
 
+    bool wpInterpolantClosure;
     /// \brief Conditions under which this node is visited from its parent
     std::map<TxPCConstraint *, std::pair<std::string, bool> >
     pathConditionTable;
@@ -186,6 +187,8 @@ public:
   static void addPathCondition(TxTreeNode *txTreeNode,
                                TxPCConstraint *pathCondition,
                                ref<Expr> condition);
+
+  static void updateNodeClosure(TxTreeNode *txTreeNode, bool wpInterpolantClosure);
 
   static void addTableEntryMapping(TxTreeNode *txTreeNode,
                                    TxSubsumptionTableEntry *entry);

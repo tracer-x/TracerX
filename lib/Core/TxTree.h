@@ -123,6 +123,10 @@ public:
                     int debugSubsumptionLevel);
   static bool FixedPointCheck(ExecutionState &state);
 
+  static bool FixedPointCheck(TxTreeNode *node, ref<Expr> WPExpr1);
+
+  static ref<Expr> GhostVarRemoved(ref<Expr>);
+
   static bool hasInterpolation(ExecutionState &state);
 
   static void clear();
@@ -193,6 +197,10 @@ class TxSubsumptionTableEntry {
   TxStore::TopInterpolantStore symbolicallyAddressedStore;
 
   ref<Expr> wpInterpolant;
+
+  // \brief Set if the node is subsumed or both of the subtrees are getting
+  // subsumed at one point of time
+  bool wpInterpolantClosure;
 
   ref<Expr> indexAnchor=NULL;
 
@@ -573,6 +581,9 @@ class TxTreeNode {
 
 public:
   bool isSubsumed;
+
+  /// \brief Child WPClosure values
+    bool childWPClosurevalues[2]={false};
 
   // \brief The unsat core from a infeasible path is temporarily stored here
   // and in case speculation is failed it's used to do marking related to

@@ -516,8 +516,8 @@ ref<Expr> TxWeakestPreCondition::PushUp(
 }
 
 ref<Expr> TxWeakestPreCondition::redundantSimp(ref<Expr> expr) {
-	std::string anchorC="c";
-	std::string anchorB="B";
+	std::string anchorC="tx_k";
+	std::string anchorB="tx_B";
 	if (expr->getNumKids()==2 and expr->getKind() ==Expr::And){
 		ref<Expr> expr1=redundantSimp(expr->getKid(0));
 		ref<Expr> expr2=redundantSimp(expr->getKid(1));

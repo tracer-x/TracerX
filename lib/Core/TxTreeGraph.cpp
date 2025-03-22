@@ -124,6 +124,9 @@ std::string TxTreeGraph::recurseRender(TxTreeGraph::Node *node) {
     }
     stream << "\\l";
   }
+
+  stream << "Subsumption Closed:  ["<< node->wpInterpolantClosure <<"]\\l";
+
   switch (node->errorType) {
   case ASSERTION: {
     stream << "ASSERTION FAIL: " << node->errorLocation << "\\l";
@@ -345,6 +348,15 @@ void TxTreeGraph::markAsSubsumed(TxTreeNode *txTreeNode,
   TxTreeGraph::Node *subsuming = instance->tableEntryMap[entry];
   instance->subsumptionEdges.push_back(new TxTreeGraph::NumberedEdge(
       node, subsuming, ++(instance->subsumptionEdgeNumber)));
+}
+
+void TxTreeGraph::updateNodeClosure(TxTreeNode *txTreeNode, bool wpInterpolantClosure) {
+  if (!OUTPUT_INTERPOLATION_TREE)
+    return;
+
+  assert(TxTreeGraph::instance && "Search tree graph not initialized");
+  TxTreeGraph::Node *node = instance->txTreeNodeMap[txTreeNode];
+  node->wpInterpolantClosure = wpInterpolantClosure;
 }
 
 void TxTreeGraph::addPathCondition(TxTreeNode *txTreeNode,

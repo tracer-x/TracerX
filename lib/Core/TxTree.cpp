@@ -72,8 +72,20 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
     markedGlobal = node->getDependency()->getMarkedGlobal();
   }
 
-  if (WPInterpolant)
+  if (WPInterpolant){
     wpInterpolant = node->generateWPInterpolant();
+
+    wpInterpolantClosure = node->childWPClosurevalues[0] && node->childWPClosurevalues[1];
+    if(node->getNodeSequenceNumber()!=1){
+    if (node->getParent()->getLeft() == node) {
+    	node->getParent()->childWPClosurevalues[0] = wpInterpolantClosure;
+    }else{
+    	node->getParent()->childWPClosurevalues[1] = wpInterpolantClosure;
+    }
+  }
+    TxTreeNode *txTreeNode = node;
+    TxTreeGraph::updateNodeClosure(txTreeNode, wpInterpolantClosure);
+  }
 
   if(EnableIndexingAtPP == true && node->getIndexedInterpolationPoint()){   // No need to this check if indexing is performing on all the program points
    if(wpInterpolant->getNumKids()>1){
@@ -2004,6 +2016,15 @@ void TxSubsumptionTableEntry::printWP(llvm::raw_ostream &stream,
   if (!wpInterpolant.isNull())
     wpInterpolant->print(stream);
   stream << "]\n";
+
+  stream << prefix << "\n closure = [" <<wpInterpolantClosure<< "]\n";
+  if (wpInterpolantClosure){
+  stream << prefix << "\n**********************************************\n";
+  stream << prefix << "*              Fixed point check             *\n";
+  stream << prefix << "**********************************************\n\n";
+
+  }
+
 }
 
 void TxSubsumptionTableEntry::printStat(std::stringstream &stream) {
@@ -2189,6 +2210,104 @@ void TxSubsumptionTable::insert(
   subTable->insert(callHistory, entry);
 }
 
+
+bool TxSubsumptionTable::FixedPointCheck(TxTreeNode *node,ref<Expr> WPExpr1){
+	 CallHistoryIndexedTable *subTable = 0;
+	 TxTreeNode *txTreeNode = node;
+	 std::map<uintptr_t, CallHistoryIndexedTable *>::iterator it =
+	       instance.find(node->getProgramPoint());
+	   if (it == instance.end()) {
+	     return false;
+	   }
+	   subTable = it->second;
+	   bool found;
+	    std::pair<EntryIterator, EntryIterator> iterPair =
+	        subTable->find(txTreeNode->entryCallHistory, found);
+	    if (!found) {
+	      return false;
+	    }
+	   std::vector<ref<Expr>> inpAtK;
+	   std::vector<ref<Expr>> inpAtKminus1;
+	   std::vector<ref<Expr>> inpAtK_Filtered;
+	   std::vector<ref<Expr>> inpAtKminus1_Filtered;
+	   if (iterPair.first != iterPair.second) {
+	     // Iterate the subsumption table entry with reverse iterator because
+	     // the successful subsumption mostly happen in the newest entry.
+	     for (EntryIterator it = iterPair.first, ie = iterPair.second; it != ie;
+	          ++it) {
+	    	 ref<Expr> WPExpr2=(*it)->getWPInterpolant();
+	    	 ref<Expr> WPExpr3;
+	    	 while (WPExpr2->getNumKids()==2){
+	    	 			  WPExpr3=WPExpr2;
+	    	 			  WPExpr2=WPExpr2->getKid(0);
+	    	 }
+	    	 if ( WPExpr1->getKid(0) ==  WPExpr3->getKid(0)){
+	    		inpAtK.push_back((*it)->getWPInterpolant());
+	    		inpAtK_Filtered.push_back(GhostVarRemoved((*it)->getWPInterpolant()));
+	    	 }
+
+	    	 if(SubExpr::create(WPExpr1->getKid(0), ConstantExpr::alloc(1, Expr::Int32)) == WPExpr3->getKid(0)){
+	    		 inpAtKminus1.push_back((*it)->getWPInterpolant());
+	    		 inpAtKminus1_Filtered.push_back(GhostVarRemoved((*it)->getWPInterpolant()));
+	    	 }
+	     }
+	     //WPExpr1->dump();
+	     llvm::outs()<<"No. of Intp. at level k("<<WPExpr1->getKid(0)<<"): "<<inpAtK_Filtered.size()<<"\n";
+	     llvm::outs()<<"No. of Intp. at level k-1: "<<inpAtKminus1_Filtered.size()<<"\n";
+	     int levelk[inpAtK_Filtered.size()]={0};
+	     int levelkMinus1[inpAtKminus1_Filtered.size()]={0};
+	     if(inpAtK_Filtered.size()==inpAtKminus1_Filtered.size()){
+	    	 //llvm::outs()<<"Checking fixed point with solver\n";
+	    	 for(unsigned int i=0; i < inpAtK_Filtered.size(); i++){
+	    		 for (unsigned int j=0; j < inpAtKminus1_Filtered.size(); j++){
+	    			 bool result=Z3Simplification::fixedPointTest(inpAtK_Filtered[i],inpAtKminus1_Filtered[j]);
+	    			 //llvm::outs()<<"The fixed point check result is:"<<result<<"\n";
+	    			 if(result){
+	    				 levelk[i]=1;
+	    				 levelkMinus1[j]=1;
+//	    				 llvm::outs()<<"==============\n";
+//						 inpAtK_Filtered[i]->dump();
+//						 inpAtKminus1_Filtered[j]->dump();
+//						 llvm::outs()<<"==============\n";
+	    			 }
+	    		 }
+	    	 }
+	     }
+	     unsigned int sumK=0, sumMinus1K=0;
+	     for (unsigned int i=0; i<inpAtK_Filtered.size();i++){
+	    	 sumK+=levelk[i];
+	    	 sumMinus1K+=levelkMinus1[i];
+	     }
+//	     llvm::outs()<<"Size at level k:"<<sumK<<"\n";
+//	     llvm::outs()<<"Size at level sumMinus1K:"<<sumMinus1K<<"\n";
+	     if(sumK == sumMinus1K && sumMinus1K ==inpAtK_Filtered.size()){
+	    	 llvm::outs()<<"\n\n ************ Fixed Point Obtained ***********\n\n";
+	    	 llvm::outs()<<"----------------------------------\n"
+	    			 "Interpolants at Level K\n----------------------------------\n";
+	    	 for (unsigned int i=0; i<inpAtK.size(); i++){
+	    		 inpAtK[i]->dump();
+	    		 llvm::outs()<<"==============\n";
+	    	 }
+	    	 llvm::outs()<<"\n----------------------------------\n"
+	    	 	    			 "Interpolants at Level K-1\n----------------------------------\n";
+			 for (unsigned int i=0; i<inpAtKminus1.size(); i++){
+				inpAtKminus1[i]->dump();
+				llvm::outs()<<"==============\n";
+			 }
+	     }
+	     return true;
+	   }
+	   return false;
+}
+ref<Expr> TxSubsumptionTable::GhostVarRemoved(ref<Expr> expr){
+	ref<Expr> expr1 = expr->getKid(0);
+	ref<Expr> expr2 = expr->getKid(1);
+	if (expr1->getKind() == Expr::And){
+		ref<Expr> expr3=AndExpr::create(GhostVarRemoved(expr1), expr2);
+		return expr3;
+	}
+	return expr2;
+}
 bool TxSubsumptionTable::FixedPointCheck(ExecutionState &state){
 	 CallHistoryIndexedTable *subTable = 0;
 	 TxTreeNode *txTreeNode = state.txTreeNode;
@@ -2313,6 +2432,14 @@ if(EnableIndexing == true){
         // general entry).
         txTreeNode->isSubsumed = true;
 
+    	txTreeNode->childWPClosurevalues[0]=true;
+    	txTreeNode->childWPClosurevalues[1]=true;
+        if(txTreeNode->getParent()->getLeft()==txTreeNode) {
+        	txTreeNode->getParent()->childWPClosurevalues[0]=true;
+        }
+        else{
+        	txTreeNode->getParent()->childWPClosurevalues[1]=true;
+        }
         // Mark the node as subsumed, and create a subsumption edge
         TxTreeGraph::markAsSubsumed(txTreeNode, (*it));
         return true;
@@ -2557,13 +2684,13 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       // generate marking and wp interpolant
       TxSubsumptionTableEntry *entry =
           new TxSubsumptionTableEntry(node, node->entryCallHistory);
-
+      ref<Expr> WPExpr;
       if (WPInterpolant) {
-        ref<Expr> WPExpr = entry->getWPInterpolant();
+         WPExpr = entry->getWPInterpolant();
         if (!WPExpr.isNull()) {
           entry = node->wp->updateSubsumptionTableEntry(entry);
         }
-        // if(node->assertionFail){
+    // 	if(node->assertionFail){
 	// 	ref<Expr> resetWPExpr = ConstantExpr::alloc(0, Expr::Bool);
 	// 	entry->setWPInterpolant(resetWPExpr);
 	// }
@@ -2572,6 +2699,17 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       TxSubsumptionTable::insert(node->getProgramPoint(),
                                  node->entryCallHistory, entry);
 
+      if(node->getPrintInterpolant() && node->childWPClosurevalues[0] && node->childWPClosurevalues[1])
+      {
+    	  //llvm::outs()<<"Fixed Point Check needed\n";
+    	  ref<Expr> WPExpr1;
+    	  while (WPExpr->getNumKids()==2){
+			  WPExpr1=WPExpr;
+			  WPExpr=WPExpr->getKid(0);
+    	  }
+
+    	  TxSubsumptionTable::FixedPointCheck(node, WPExpr1);
+      }
       TxTreeGraph::addTableEntryMapping(node, entry);
 
       if (MarkInterpolant == true || debugSubsumptionLevel >= 2) {
@@ -2906,7 +3044,6 @@ void TxTreeNode::mark() {
 
 ref<Expr> TxTreeNode::generateWPInterpolant() {
   TimerStatIncrementer t(getWPInterpolantTime);
-
   ref<Expr> expr;
   if (assertionFail && emitAllErrors) {
     expr = wp->False();
@@ -2951,12 +3088,21 @@ ref<Expr> TxTreeNode::generateWPInterpolant() {
 
   // set to parent node
   if (parent) {
-    //	  llvm::errs() << "Parent Node is " << parent->getNodeSequenceNumber()
+    //   llvm::errs() << "Parent Node is " << parent->getNodeSequenceNumber()
     //     << "\n";
     if (parent->left == this) {
       parent->childWPInterpolant[0] = expr;
+      if(childWPClosurevalues[0] == true)
+    	  parent->childWPClosurevalues[0] = true;
     } else {
       parent->childWPInterpolant[1] = expr;
+      if(childWPClosurevalues[1] == true)
+    	  parent->childWPClosurevalues[1] = true;
+      if(isa<BranchInst>(this->getBasicBlock()->begin())){
+    	  childWPClosurevalues[1]=true;
+    	  childWPClosurevalues[0]=true;
+    	  parent->childWPClosurevalues[1] = true;
+      }
     }
   }
   return expr;

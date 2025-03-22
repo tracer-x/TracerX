@@ -23,6 +23,9 @@ public:
   virtual ~Z3Simplification();
 
   static ref<Expr> simplify(ref<Expr> expr);
+
+  static bool fixedPointTest(ref<Expr> intpAtB, ref<Expr> intpAtB1);
+
   static void test();
 
 private:
