@@ -1075,12 +1075,12 @@ TxDependency::bindReturnValue(llvm::CallInst *site,
   if (site && retInst) {
     ref<TxStateValue> value;
     if (!callHistory.empty()) {
-        callHistory.pop_back();
+      callHistory.pop_back();
     }else{
-        klee_warning("Encountered an unexpected mismatch between function calls and returns on the stack");
+      klee_error("Encountered an unexpected mismatch between function calls and returns on the stack");
     }
     if(retInst->getReturnValue()) {
-        getLatestValue(retInst->getReturnValue(), callHistory, returnValue);
+      value = getLatestValue(retInst->getReturnValue(), callHistory, returnValue);
     }
     if (!value.isNull())
       addDependency(value, getNewTxStateValue(site, callHistory, returnValue));
