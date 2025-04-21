@@ -1072,13 +1072,15 @@ TxDependency::bindReturnValue(llvm::CallInst *site,
                               std::vector<llvm::Instruction *> &callHistory,
                               llvm::Instruction *i, ref<Expr> returnValue) {
   llvm::ReturnInst *retInst = llvm::dyn_cast<llvm::ReturnInst>(i);
-  if (site && retInst &&
-      retInst->getReturnValue() // For functions returning void
-      ) {
-    ref<TxStateValue> value =
-        getLatestValue(retInst->getReturnValue(), callHistory, returnValue);
+  if (site && retInst) {
+    ref<TxStateValue> value;
     if (!callHistory.empty()) {
-      callHistory.pop_back();
+        callHistory.pop_back();
+    }else{
+        klee_warning("Encountered an unexpected mismatch between function calls and returns on the stack");
+    }
+    if(retInst->getReturnValue()) {
+        getLatestValue(retInst->getReturnValue(), callHistory, returnValue);
     }
     if (!value.isNull())
       addDependency(value, getNewTxStateValue(site, callHistory, returnValue));
