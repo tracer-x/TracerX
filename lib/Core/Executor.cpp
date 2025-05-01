@@ -4625,28 +4625,96 @@ void Executor::run(ExecutionState &initialState) {
       }
     }
 #endif
-    bool subsumptionCheckStatus=false;
+    /*if (INTERPOLATION_ENABLED && subsumptionCheckStatus==true &&
+        txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
+      terminateStateOnSubsumption(state);
+    }*/
+    bool doSubsumptionCheckStatus=false;
     if(isa<CallInst>(state.txTreeNode->getBasicBlock()->begin())){
     	StringRef name = cast<CallInst>(state.txTreeNode->getBasicBlock()->begin())->getCalledFunction()->getName();
     	if(name.compare("tracerx_do_subsumption_check")==0){
-    		subsumptionCheckStatus=true;
+    		doSubsumptionCheckStatus=true;
     	}
     }
-    if (INTERPOLATION_ENABLED && subsumptionCheckStatus==true &&
-        txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
-      terminateStateOnSubsumption(state);
-    } else {
-      KInstruction *ki = state.pc;
-      stepInstruction(state);
 
-      executeInstruction(state, ki);
-      if (INTERPOLATION_ENABLED) {
-        state.txTreeNode->incInstructionsDepth();
-      }
-      processTimers(&state, MaxInstructionTime);
+    bool noSubsumptionCheckStatus=true;
+        if(isa<CallInst>(state.txTreeNode->getBasicBlock()->begin())){
+        	StringRef name = cast<CallInst>(state.txTreeNode->getBasicBlock()->begin())->getCalledFunction()->getName();
+        	if(name.compare("tracerx_no_subsumption_check")==0){
+        		noSubsumptionCheckStatus=false;
+        	}
+        }
 
-      checkMemoryUsage();
+    if (INTERPOLATION_ENABLED){
+    	if (TargettedSubsumptionCheck==true && doSubsumptionCheckStatus==true){
+    		if(txTree->subsumptionCheck(solver, state, coreSolverTimeout))terminateStateOnSubsumption(state);
+    		else{
+    			KInstruction *ki = state.pc;
+		      stepInstruction(state);
+
+		      executeInstruction(state, ki);
+		      if (INTERPOLATION_ENABLED) {
+		        state.txTreeNode->incInstructionsDepth();
+		      }
+		      processTimers(&state, MaxInstructionTime);
+
+		      checkMemoryUsage();
+    		}
+    	}
+    	else if (RestrictedSubsumptionCheck==true && noSubsumptionCheckStatus==true){
+    		if(txTree->subsumptionCheck(solver, state, coreSolverTimeout))terminateStateOnSubsumption(state);
+    		else{
+    			KInstruction *ki = state.pc;
+		      stepInstruction(state);
+
+		      executeInstruction(state, ki);
+		      if (INTERPOLATION_ENABLED) {
+		        state.txTreeNode->incInstructionsDepth();
+		      }
+		      processTimers(&state, MaxInstructionTime);
+
+		      checkMemoryUsage();
+    		}
+    	}
+    	else if (TargettedSubsumptionCheck==false && RestrictedSubsumptionCheck==false){
+    		if(txTree->subsumptionCheck(solver, state, coreSolverTimeout))terminateStateOnSubsumption(state);
+    		else{
+    			KInstruction *ki = state.pc;
+		      stepInstruction(state);
+
+		      executeInstruction(state, ki);
+		      if (INTERPOLATION_ENABLED) {
+		        state.txTreeNode->incInstructionsDepth();
+		      }
+		      processTimers(&state, MaxInstructionTime);
+
+		      checkMemoryUsage();
+    		}
+    	}else{
+			KInstruction *ki = state.pc;
+	      stepInstruction(state);
+
+	      executeInstruction(state, ki);
+	      if (INTERPOLATION_ENABLED) {
+	        state.txTreeNode->incInstructionsDepth();
+	      }
+	      processTimers(&state, MaxInstructionTime);
+
+	      checkMemoryUsage();
+    	}
     }
+//    } else {
+//      KInstruction *ki = state.pc;
+//      stepInstruction(state);
+//
+//      executeInstruction(state, ki);
+//      if (INTERPOLATION_ENABLED) {
+//        state.txTreeNode->incInstructionsDepth();
+//      }
+//      processTimers(&state, MaxInstructionTime);
+//
+//      checkMemoryUsage();
+//    }
     updateStates(&state);
   }
 

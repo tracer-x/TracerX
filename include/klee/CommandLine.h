@@ -131,6 +131,10 @@ extern llvm::cl::opt<bool> EnableIndexing;
 
 extern llvm::cl::opt<bool> MarkInterpolant;
 
+extern llvm::cl::opt<bool> TargettedSubsumptionCheck;
+
+extern llvm::cl::opt<bool> RestrictedSubsumptionCheck;
+
 #endif
 
 #ifdef ENABLE_METASMT

@@ -239,8 +239,18 @@ EnableIndexing("enable-indexing",
 
 llvm::cl::opt<bool>
 MarkInterpolant("mark-Interpolant",
-              llvm::cl::desc("Print interpolants for the specified points"),
+              llvm::cl::desc("Print interpolants for the specified program points"),
               llvm::cl::init(false));
+
+llvm::cl::opt<bool>
+TargettedSubsumptionCheck("targettedSubsumptionCheck",
+              llvm::cl::desc("Perform subsumption checks for the specified program points"),
+              llvm::cl::init(false));
+llvm::cl::opt<bool>
+RestrictedSubsumptionCheck("restrictedSubsumptionCheck",
+              llvm::cl::desc("Restrict subsumption checks for the specified program points"),
+              llvm::cl::init(false));
+
 
 #endif // ENABLE_Z3
 

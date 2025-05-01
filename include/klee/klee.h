@@ -181,8 +181,11 @@ extern "C" {
   /* Check if a vector of integers is stored previously. */
   void tracerx_memo_check();
 
-  /* No subsumption check for this specific point*/
+  /* Do subsumption check for this specific point*/
   void tracerx_do_subsumption_check();
+
+  /* No subsumption check for this specific point*/
+  void tracerx_no_subsumption_check();
 
   /* Special subsumption checks are performed at this program point */
   void tracerx_indexed_interpolation_point();

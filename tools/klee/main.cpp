@@ -926,6 +926,7 @@ static const char *modelledExternals[] = {
   "tracerx_memo",
   "tracerx_memo_check",
   "tracerx_do_subsumption_check",
+  "tracerx_no_subsumption_check",
   "tracerx_print_interpolant",
 };
 // Symbols we aren't going to warn about

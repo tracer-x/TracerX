@@ -141,7 +141,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_debug_state_off", handleDebugStateOff, false),
     add("tracerx_memo_check", handleMemoCheck, true),
     add("tracerx_memo", handleMemo, false),
-    add("tracerx_do_subsumption_check", handleRestrictSubsumptionCheck, false),
+    add("tracerx_no_subsumption_check", handleRestrictedSubsumptionCheck, false),
+    add("tracerx_do_subsumption_check", handleTargettedSubsumptionCheck, false),
     add("tracerx_indexed_interpolation_point",handleIndexedInterpolationPoint,false),
     add("tracerx_print_interpolant", handleMarkInterpolantPoint, false),
 #undef addDNR
@@ -815,7 +816,12 @@ void SpecialFunctionHandler::handleMakeSymbolic(
     }
   }
 }
-void SpecialFunctionHandler::handleRestrictSubsumptionCheck(ExecutionState &state,
+void SpecialFunctionHandler::handleRestrictedSubsumptionCheck(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments){;
+}
+
+void SpecialFunctionHandler::handleTargettedSubsumptionCheck(ExecutionState &state,
                                         KInstruction *target,
                                         std::vector<ref<Expr> > &arguments){;
 }
