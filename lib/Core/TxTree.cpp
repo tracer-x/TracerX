@@ -98,19 +98,34 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
      if(!wpInterpolant.isNull() && wpInterpolant->getNumKids()>1){
   	   ref<Expr> anchorWP= wpInterpolant;
   	   ref<Expr> prevAnchorWP= wpInterpolant;
+  	   ref<Expr> anchorRight= wpInterpolant;
   	   while(anchorWP->getNumKids()>1){
   		   prevAnchorWP=anchorWP;
+  		   anchorRight=anchorWP->getKid(1);
   		   anchorWP=anchorWP->getKid(0);
+
+  		 if (!anchorRight.isNull() && anchorRight->getNumKids() > 1 && anchorRight->getKind()==Expr::Eq){
+  			ref<Expr> lhs = anchorRight->getKid(0);
+  			ref<Expr> rhs = anchorRight->getKid(1);
+  			if (isa<ConstantExpr>(lhs) and rhs->getKind() == Expr::WPVar){
+  				ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(rhs);
+  				std::string newname= WPVar->address->getName();
+  				if(newname=="c" || newname=="B"){
+  					indexAnchor=anchorRight;
+  					break;
+  				}
+  			}
+  		 }
   	   }
-  	   switch (prevAnchorWP->getKind()) {
-  	     case Expr::Eq: {
-  	       indexAnchor=prevAnchorWP;
-  	       break;
-  	     }
-  	     default: {
-  	    	 ;
-  	     }
-  	   }
+//  	   switch (prevAnchorWP->getKind()) {
+//  	     case Expr::Eq: {
+//  	       indexAnchor=prevAnchorWP;
+//  	       break;
+//  	     }
+//  	     default: {
+//  	    	 ;
+//  	     }
+//  	   }
      	}
     }
 }
@@ -2376,7 +2391,9 @@ void TxTree::printTableStat(std::stringstream &stream) {
   stream
       << "KLEE: done:     Average table entries per subsumption checkpoint = "
       << inTwoDecimalPoints(entryNumber / programPointNumber) << "\n";
-
+  stream
+        << "KLEE: done:     Total table entries  = "
+        << inTwoDecimalPoints(entryNumber) << "\n";
   stream << "KLEE: done:     Number of subsumption checks = "
          << subsumptionCheckCount << "\n";
 
