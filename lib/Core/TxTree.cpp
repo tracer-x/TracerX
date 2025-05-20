@@ -30,6 +30,7 @@
 #include <klee/util/TxExprUtil.h>
 #include <klee/util/TxPrintUtil.h>
 #include <vector>
+#include <numeric>
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
 #include <llvm/IR/DebugInfo.h>
@@ -52,7 +53,10 @@ Statistic TxSubsumptionTableEntry::solverAccessTime("solverAccessTime",
 TxSubsumptionTableEntry::TxSubsumptionTableEntry(
     TxTreeNode *node, const std::vector<llvm::Instruction *> &callHistory)
     : programPoint(node->getProgramPoint()),      
-      nodeSequenceNumber(node->getNodeSequenceNumber()),CfileLineNumber(node->getCfileLineNumber()),CfileName(node->getCfileName()),CFuntionName(node->getCFunctionName()) {
+      nodeSequenceNumber(node->getNodeSequenceNumber()),
+      CfileLineNumber(node->getCfileLineNumber()),CfileName(node->getCfileName()),CFuntionName(node->getCFunctionName()),
+      nodeTags(node->nodeTags)
+{
   std::map<ref<Expr>, ref<Expr> > substitution;
   existentials.clear();
   interpolant = node->getInterpolant(existentials, substitution);
@@ -1823,6 +1827,13 @@ void TxSubsumptionTableEntry::print(llvm::raw_ostream &stream,
   stream << prefix << "------------ Subsumption Table Entry ------------\n";
   stream << prefix << "Program point = " << programPoint << "\n"; 
   stream << prefix << "C-File Name:Function Name:Line number = " << CfileName << ":"<<CFuntionName<<":" <<CfileLineNumber <<"\n";
+  if(!nodeTags.empty()) {
+    stream << prefix << "Node Tags: ";
+    stream << std::accumulate(std::next(nodeTags.cbegin()), nodeTags.cend(), nodeTags[0],
+      [](const auto &x, const auto &y) { return x + ',' + y; }
+    );
+    stream << '\n';
+  }
   if (MarkGlobal) {
     stream << prefix << "global = [";
     for (std::set<ref<TxStoreEntry> >::iterator it = markedGlobal.begin(),
@@ -2477,7 +2488,7 @@ TxTreeNode * TxTree::splitSingle(TxTreeNode *parent, ExecutionState *newState) {
   TimerStatIncrementer t(splitTime);
   TxTreeNode *const ret = parent->createChild<&TxTreeNode::left>();
   newState->txTreeNode = ret;
-  TxTreeGraph::addChildren(parent, parent->left, parent->left);
+  TxTreeGraph::addChildren(parent, parent->left);
   return ret;
 }
 

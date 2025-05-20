@@ -323,6 +323,8 @@ public:
 
    std::string CFuntionName;
 
+  std::vector<std::string> nodeTags;
+
 
   TxSubsumptionTableEntry(TxTreeNode *node,
                           const std::vector<llvm::Instruction *> &callHistory);
@@ -421,6 +423,7 @@ public:
 /// \see TxSubsumptionTableEntry
 class TxTreeNode {
   friend class TxTree;
+  friend class TxSubsumptionTableEntry;
 
   friend class ExecutionState;
 
@@ -468,6 +471,9 @@ class TxTreeNode {
   TxTreeNode *parent, *left, *right;
 
   uintptr_t programPoint;
+
+  // Label for human consumption
+  std::vector<std::string> nodeTags;
 
   llvm::BasicBlock *basicBlock;
 
@@ -637,6 +643,11 @@ public:
 
   /// \brief Returning the right node
   TxTreeNode *getRight() { return right; }
+
+  void addNodeTagToParent(const std::string &s) {
+    nodeTags.push_back(s);
+    TxTreeGraph::updateNodeTags(this, nodeTags);
+  }
   
   template<TxTreeNode* TxTreeNode::* const childAttr>
   TxTreeNode *createChild() {

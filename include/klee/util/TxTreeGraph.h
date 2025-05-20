@@ -65,6 +65,8 @@ private:
     /// \brief Indicates that node is subsumed
     bool subsumed;
 
+    std::vector<std::string> nodeTags;
+
     /// \brief Conditions under which this node is visited from its parent
     std::map<TxPCConstraint *, std::pair<std::string, bool> >
     pathConditionTable;
@@ -174,6 +176,8 @@ public:
     instance = 0;
   }
 
+  static void addChildren(TxTreeNode *parent, TxTreeNode *theOnlyChild);
+
   static void addChildren(TxTreeNode *parent, TxTreeNode *falseChild,
                           TxTreeNode *trueChild);
 
@@ -182,6 +186,8 @@ public:
 
   static void markAsSubsumed(TxTreeNode *txTreeNode,
                              TxSubsumptionTableEntry *entry);
+
+  static void updateNodeTags(TxTreeNode *txTreeNode, const std::vector<std::string> &nodeTags);
 
   static void addPathCondition(TxTreeNode *txTreeNode,
                                TxPCConstraint *pathCondition,
