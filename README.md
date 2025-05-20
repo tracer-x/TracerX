@@ -41,3 +41,18 @@ Coverage information for KLEE can be found [here](http://vm-klee.doc.ic.ac.uk:55
 For further information on KLEE, see its [webpage](http://klee.github.io/).
 
 For further information on Tracer-X see its [webpage](https://tracer-x.github.io/).
+
+# Use with docker
+```bash
+# In this repo's root directory
+docker build -t tracerx .
+docker run -it tracerx
+```
+
+Then, you will enter the docker container where you can use the command `klee` to execute TracerX.
+To compile subject programs to be executed under TracerX, you must use clang with compatible version. Such clang command is available in container as `clang-tx`.
+
+## TracerX Development
+To develop TracerX inside docker, follow the steps above. The TracerX source code is at `/home/klee/klee_src/` inside the container where you can perform modification. Optionally, you can also perform docker volume mount to that directory, so that you can modify the code outside the container while being synced and compiled in container.
+
+To compile, you need change your working directory to `/home/klee/klee_build/klee/` first. Then, you can perform the normal compilation commands (e.g. `make` and `/home/klee/klee_src/configure`).
