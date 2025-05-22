@@ -110,7 +110,7 @@ TxSubsumptionTableEntry::TxSubsumptionTableEntry(
   			if (isa<ConstantExpr>(lhs) and rhs->getKind() == Expr::WPVar){
   				ref<WPVarExpr> WPVar = dyn_cast<WPVarExpr>(rhs);
   				std::string newname= WPVar->address->getName();
-  				if(newname=="c" || newname=="B"){
+  				if(newname=="k" || newname=="B"){
   					indexAnchor=anchorRight;
   					break;
   				}

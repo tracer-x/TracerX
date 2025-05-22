@@ -2230,7 +2230,22 @@ void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
       llvm::report_fatal_error("attempt to add invalid constraint");
     return;
   }
-
+  int globalval = 0;
+    if(condition->getNumKids()>1) {
+    if(condition->getKid(1)->getKind()==Expr::Eq){
+  	  condition=condition->getKid(1);
+    }
+    if (const ConcatExpr* re = dyn_cast<ConcatExpr>(condition->getKid(1))) {
+  	  if (const ReadExpr* re1 = dyn_cast<ReadExpr>(re->getLeft())) {
+  		  std::string newname = re1->getName();
+  	         std::string s = "choice";
+  	         std::string new1 = newname.substr(0,6);
+  	         if(new1 == s) {
+  	         globalval=1; return;}
+  	     }
+       }
+    }
+  	if (globalval == 0) {
   // Check to see if this constraint violates seeds.
   std::map<ExecutionState *, std::vector<SeedInfo> >::iterator it =
       seedMap.find(&state);
@@ -2256,7 +2271,7 @@ void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
   state.addConstraint(condition);
   if (ivcEnabled)
     doImpliedValueConcretization(state, condition,
-                                 ConstantExpr::alloc(1, Expr::Bool));
+  	}                               ConstantExpr::alloc(1, Expr::Bool));
 }
 
 ref<klee::ConstantExpr> Executor::evalConstant(const Constant *c) {
@@ -2871,7 +2886,7 @@ static inline const llvm::fltSemantics *fpWidthToSemantics(unsigned width) {
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
   // if this is starting a new BB then
-  // check for non-linear & new BB in speculation mode  
+  // check for non-linear & new BB in speculation mode
   if (INTERPOLATION_ENABLED && SpecTypeToUse != NO_SPEC &&
       txTree->isSpeculationNode() &&
       (i == &state.txTreeNode->getBasicBlock()->front())) {
