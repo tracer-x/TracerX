@@ -2271,7 +2271,8 @@ void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
   state.addConstraint(condition);
   if (ivcEnabled)
     doImpliedValueConcretization(state, condition,
-  	}                               ConstantExpr::alloc(1, Expr::Bool));
+  	                               ConstantExpr::alloc(1, Expr::Bool));
+  	}
 }
 
 ref<klee::ConstantExpr> Executor::evalConstant(const Constant *c) {
