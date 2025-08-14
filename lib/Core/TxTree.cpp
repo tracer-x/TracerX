@@ -2260,7 +2260,7 @@ bool TxSubsumptionTable::FixedPointCheck(TxTreeNode *node,ref<Expr> WPExpr1){
 	    	 //llvm::outs()<<"Checking fixed point with solver\n";
 	    	 for(unsigned int i=0; i < inpAtK_Filtered.size(); i++){
 	    		 for (unsigned int j=0; j < inpAtKminus1_Filtered.size(); j++){
-	    			 bool result=Z3Simplification::fixedPointTest(inpAtK_Filtered[i],inpAtKminus1_Filtered[j]);
+	    			 bool result=Z3Simplification::fixedPointTest(inpAtKminus1_Filtered[j], inpAtK_Filtered[i]);
 	    			 //llvm::outs()<<"The fixed point check result is:"<<result<<"\n";
 	    			 if(result){
 	    				 levelk[i]=1;
