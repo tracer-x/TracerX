@@ -855,7 +855,9 @@ void SpecialFunctionHandler::handleMakeSymbolic(
 }
 void SpecialFunctionHandler::handleRestrictSubsumptionCheck(ExecutionState &state,
                                         KInstruction *target,
-                                        std::vector<ref<Expr> > &arguments){;
+                                        std::vector<ref<Expr> > &arguments){
+
+	state.txTreeNode->setFixPointCheck();
 }
 
 void SpecialFunctionHandler::handleIndexedInterpolationPoint(ExecutionState &state,

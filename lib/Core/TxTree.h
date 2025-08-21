@@ -493,6 +493,9 @@ class TxTreeNode {
 
    bool printInterpolant = false; // print the subsumption table only when this flag is on;
 
+
+   bool fixPointCheck = false; // perform the fixed point check only when this flag is on;
+
   // Used to ensure at subsumption the value of the phiNodes in the subsumed
   // tree remain the same
   uintptr_t prevProgramPoint;
@@ -609,6 +612,19 @@ public:
 
   bool getPrintInterpolant(){
   	   return(printInterpolant);
+   }
+
+  //  \brief This function sets the value of fixPointCheck bool var which
+  // to determine whether the fixed point check will be proceeded for this program point or not
+  // This check is enclosed inside the tracerx_do_subsumption_check(); function. Whenever this targetted
+  // function is invoked to have subsumption enabled at the ipoints, we will proceed for the fixed point test.
+
+  void setFixPointCheck(){
+	  fixPointCheck = true;
+   }
+
+  bool getFixPointCheck(){
+  	   return(fixPointCheck);
    }
 
   void setIndexedInterpolationPoint(){
