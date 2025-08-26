@@ -400,7 +400,9 @@ ref<Expr> TxWeakestPreCondition::PushUp(
     if (flag == 1) {
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- create and expression from the condition and this->WPExpr
-      ref<Expr> result = getBrCondition(i);
+      const auto br = dyn_cast<llvm::BranchInst>(i);
+      assert(br);
+      ref<Expr> result = br->isConditional() ? getBrCondition(i) : True();
       if (result.isNull()) {
         WPExpr = result;
         return WPExpr;
@@ -428,7 +430,9 @@ ref<Expr> TxWeakestPreCondition::PushUp(
       // 1- call getCondition on the cond argument of the branch instruction
       // 2- generate not(condition): expr::not(condition)
       // 3- create and expression from the condition and this->WPExpr
-      ref<Expr> result = getBrCondition(i);
+      const auto br = dyn_cast<llvm::BranchInst>(i);
+      assert(br);
+      ref<Expr> result = br->isConditional() ? getBrCondition(i) : False();
       // llvm::outs()<<"\nThe result from the flag
       // 2::::::::::::::::::::::::::::\n"<<result;
       // llvm::outs()<<"\n\n";

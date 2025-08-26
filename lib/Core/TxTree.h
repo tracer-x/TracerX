@@ -458,6 +458,7 @@ class TxTreeNode {
   // \brief Set if the speculation has failed and the node should be removed
   bool speculationFailed;
 
+  ref<Expr> singleSplitWPCond;
   // \brief Instance of weakest precondition class used to generate WP
   // interpolant
   TxWeakestPreCondition *wp;
@@ -1015,7 +1016,7 @@ public:
   void markPathConditionWithBrInst(llvm::BranchInst *binst,
                                    std::vector<ref<Expr> > &unsatCore);
 
-  TxTreeNode * splitSingle(TxTreeNode *parent, ExecutionState *newState);
+  TxTreeNode * splitSingle(TxTreeNode *parent, ExecutionState *newState, bool splitCond);
   
   /// \brief Creates fresh interpolation data holder for the two given KLEE
   /// execution states.
