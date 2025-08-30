@@ -242,6 +242,20 @@ MarkInterpolant("mark-Interpolant",
               llvm::cl::desc("Print interpolants for the specified points"),
               llvm::cl::init(false));
 
+llvm::cl::opt<bool>
+TargettedSubsumptionCheck("targettedSubsumptionCheck",
+              llvm::cl::desc("Perform subsumption checks for the specified program points"),
+              llvm::cl::init(false));
+llvm::cl::opt<bool>
+RestrictedSubsumptionCheck("restrictedSubsumptionCheck",
+              llvm::cl::desc("Restrict subsumption checks for the specified program points"),
+              llvm::cl::init(false));
+
+llvm::cl::opt<bool>
+EnableZ3tactic("enable-z3-tactic",
+              llvm::cl::desc("enables the ctx-solver-simplify tactic"),
+              llvm::cl::init(false));
+
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT

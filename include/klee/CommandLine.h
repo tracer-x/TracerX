@@ -131,6 +131,12 @@ extern llvm::cl::opt<bool> EnableIndexing;
 
 extern llvm::cl::opt<bool> MarkInterpolant;
 
+extern llvm::cl::opt<bool> TargettedSubsumptionCheck;
+
+extern llvm::cl::opt<bool> RestrictedSubsumptionCheck;
+
+extern llvm::cl::opt<bool> EnableZ3tactic;
+
 #endif
 
 #ifdef ENABLE_METASMT
