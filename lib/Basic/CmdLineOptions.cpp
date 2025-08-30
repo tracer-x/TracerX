@@ -251,6 +251,10 @@ RestrictedSubsumptionCheck("restrictedSubsumptionCheck",
               llvm::cl::desc("Restrict subsumption checks for the specified program points"),
               llvm::cl::init(false));
 
+llvm::cl::opt<bool>
+EnableZ3tactic("enable-z3-tactic",
+              llvm::cl::desc("enables the ctx-solver-simplify tactic"),
+              llvm::cl::init(false));
 
 #endif // ENABLE_Z3
 
