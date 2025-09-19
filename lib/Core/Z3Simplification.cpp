@@ -56,29 +56,33 @@ bool Z3Simplification::fixedPointTest(ref<Expr> intpAtB, ref<Expr> intpAtB1) {
     	bool succ2 = txExpr2z3Expr(z3e_intpAtB1, c, intpAtB1, emap);
     	if (succ2){
     		z3::solver s(c);
-//    		z3::expr conjecture = z3::implies(z3e_intpAtB, z3e_intpAtB1);
-    		z3::expr conjecture =  z3e_intpAtB && !z3e_intpAtB1;
+//    		std::cout<<"==========*****start*******==================\n";
+//    		std::cout<<"B:\n"<<z3e_intpAtB<<"\n";
+//    		std::cout<<"let us simplify-1\n";
+//    		z3e_intpAtB = applyTactic(c, "ctx-solver-simplify", z3e_intpAtB);
 //    		std::cout<<z3e_intpAtB<<"\n";
+//    		std::cout<<"============================\n";
+//    		std::cout<<"B1:\n"<<z3e_intpAtB1<<"\n";
+//    		std::cout<<"let us simplify-2\n";
+//    		z3e_intpAtB1 = applyTactic(c, "ctx-solver-simplify", z3e_intpAtB1);
 //    		std::cout<<z3e_intpAtB1<<"\n";
+//    		std::cout<<"==========*****end*******==================\n";
+    		z3::expr conjecture =  z3e_intpAtB && !z3e_intpAtB1;
     		s.add(conjecture);
     		s.check();
-//    		switch (s.check()) {
-//    		    case z3::unsat:   std::cout << "Fixed Point check unsuccessful\n"; break;//return false;
-//    		    case z3::sat:     std::cout << "Fixed Point check successful\n"; break;//return true;
-//    		    case z3::unknown: std::cout << "Fixed Point check unsuccessful\n"; break;//return false;
-//    		    }
+
     		switch (s.check()) {
-    		    case z3::unsat:  return true;
-    		    case z3::sat:   return false;
+    		    case z3::unsat: return true;
+    		    case z3::sat:  return false;
     		    case z3::unknown: return false;
     		    }
 
-    		z3::model m = s.get_model();
+//    		z3::model m = s.get_model();
 //    		std::cout <<"The model size is"<<m.size()<<"\n";
 //    		std::cout << "Model:\n" << m << "\n";
-    		if (m.size()>1) return false;
-    		else return true;
-    		//std::cout << "Model:\n" << m << "\n";
+//    		if (m.size()>1) return false;
+//    		else return true;
+//    		std::cout << "Model:\n" << m << "\n";
     	}else{
     		return false;
     	}
@@ -100,6 +104,7 @@ ref<Expr> Z3Simplification::simplify(ref<Expr> txe) {
     //std::cout<<"z3 input: "<<z3e<<"\n";
     z3e = applyTactic(c, "simplify", z3e);
     z3e = applyTactic(c, "ctx-solver-simplify", z3e); //Enable whenever require
+    //z3e = applyTactic(c, "lia2pb", z3e);
     //std::cout<<"z3 return: "<<z3e<<"\n";
     ref<Expr> ret = z3Expr2TxExpr(z3e, emap);
     //ret->dump();

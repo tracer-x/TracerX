@@ -2237,11 +2237,14 @@ bool TxSubsumptionTable::FixedPointCheck(TxTreeNode *node,ref<Expr> WPExpr1){
 	          ++it) {
 	    	 ref<Expr> WPExpr2=(*it)->getWPInterpolant();
 	    	 ref<Expr> WPExpr3;
-	    	 while (WPExpr2->getNumKids()==2){
-	    	 			  WPExpr3=WPExpr2;
-	    	 			  WPExpr2=WPExpr2->getKid(0);
+	    	 if(WPExpr2->getNumKids()>0){
+				 while (WPExpr2->getNumKids()==2){
+							  WPExpr3=WPExpr2;
+							  WPExpr2=WPExpr2->getKid(0);
+				 }
 	    	 }
-	    	 if ( WPExpr1->getKid(0) ==  WPExpr3->getKid(0)){
+	    	 else return false;
+	    	 if ( WPExpr3->getNumKids()>0 && WPExpr1->getKid(0) ==  WPExpr3->getKid(0)){
 	    		inpAtK.push_back((*it)->getWPInterpolant());
 	    		inpAtK_Filtered.push_back(GhostVarRemoved((*it)->getWPInterpolant()));
 	    	 }
@@ -2260,8 +2263,9 @@ bool TxSubsumptionTable::FixedPointCheck(TxTreeNode *node,ref<Expr> WPExpr1){
 	    	 //llvm::outs()<<"Checking fixed point with solver\n";
 	    	 for(unsigned int i=0; i < inpAtK_Filtered.size(); i++){
 	    		 for (unsigned int j=0; j < inpAtKminus1_Filtered.size(); j++){
+	    			 if (levelkMinus1[j]!=1){
+	    			 llvm::outs()<<"Interpolant:"<<i<<" and Interpolant:"<<j<<"\n";
 	    			 bool result=Z3Simplification::fixedPointTest(inpAtKminus1_Filtered[j], inpAtK_Filtered[i]);
-	    			 //llvm::outs()<<"The fixed point check result is:"<<result<<"\n";
 	    			 if(result){
 	    				 levelk[i]=1;
 	    				 levelkMinus1[j]=1;
@@ -2269,8 +2273,11 @@ bool TxSubsumptionTable::FixedPointCheck(TxTreeNode *node,ref<Expr> WPExpr1){
 //						 inpAtK_Filtered[i]->dump();
 //						 inpAtKminus1_Filtered[j]->dump();
 //						 llvm::outs()<<"==============\n";
+						 break;
+	    			 	 }
 	    			 }
 	    		 }
+	    		 if(levelk[i]!=1) return false;
 	    	 }
 	     }
 	     unsigned int sumK=0, sumMinus1K=0;
@@ -2282,20 +2289,17 @@ bool TxSubsumptionTable::FixedPointCheck(TxTreeNode *node,ref<Expr> WPExpr1){
 //	     llvm::outs()<<"Size at level sumMinus1K:"<<sumMinus1K<<"\n";
 	     if(sumK == sumMinus1K && sumMinus1K ==inpAtK_Filtered.size()){
 	    	 llvm::outs()<<"\n\n ************ Fixed Point Obtained ***********\n\n";
-//	    	 llvm::outs()<<"----------------------------------\n"
-//	    			 "Interpolants at Level K\n----------------------------------\n";
 	    	 llvm::outs()<<"No. of Intpolants at level k("<<WPExpr1->getKid(0)<<"): "<<inpAtK_Filtered.size()<<"\n";
 	    	 for (unsigned int i=0; i<inpAtK.size(); i++){
 	    		 inpAtK[i]->dump();
 	    		 llvm::outs()<<"==============\n";
 	    	 }
-//	    	 llvm::outs()<<"\n----------------------------------\n"
-//	    	 	    			 "Interpolants at Level K-1\n----------------------------------\n";
 	    	 llvm::outs()<<"No. of Intpolants at level k-1: "<<inpAtKminus1_Filtered.size()<<"\n";
 			 for (unsigned int i=0; i<inpAtKminus1.size(); i++){
 				inpAtKminus1[i]->dump();
 				llvm::outs()<<"==============\n";
 			 }
+			klee_error("Fixed Point Found");
 	     }
 	     return true;
 	   }
