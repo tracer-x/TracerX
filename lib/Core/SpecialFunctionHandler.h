@@ -179,6 +179,7 @@ namespace klee {
     HANDLER(handleMarkInterpolantPoint);
     HANDLER(handleStoreValue);
     HANDLER(handleSubsumptionClosureCheck);
+    HANDLER(handleFixPointTest);
 #undef HANDLER
   };
 } // End klee namespace

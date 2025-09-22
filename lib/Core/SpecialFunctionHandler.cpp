@@ -146,6 +146,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
     add("tracerx_print_interpolant", handleMarkInterpolantPoint, false),
     add("tracerx_store_value", handleStoreValue, false),
     add("tracerx_subsumption_closure_check", handleSubsumptionClosureCheck, false),
+    add("tracerx_fixPointTest", handleFixPointTest, false),
 
 #undef addDNR
 #undef add
@@ -853,6 +854,13 @@ void SpecialFunctionHandler::handleMakeSymbolic(
     }
   }
 }
+void SpecialFunctionHandler::handleFixPointTest(ExecutionState &state,
+                                        KInstruction *target,
+                                        std::vector<ref<Expr> > &arguments){
+
+
+}
+
 void SpecialFunctionHandler::handleRestrictSubsumptionCheck(ExecutionState &state,
                                         KInstruction *target,
                                         std::vector<ref<Expr> > &arguments){

@@ -196,6 +196,9 @@ extern "C" {
   /* To check the subsumption closure for a given value of B*/
   void tracerx_subsumption_closure_check(const char *msg, ...);
 
+  /* To initiate the fix point test*/
+  void tracerx_fixPointTest();
+
 #ifdef __cplusplus
 }
 #endif
