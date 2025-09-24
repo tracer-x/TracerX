@@ -2257,50 +2257,76 @@ bool TxSubsumptionTable::FixedPointCheck(TxTreeNode *node,ref<Expr> WPExpr1){
 	     //WPExpr1->dump();
 	     //llvm::outs()<<"No. of Intp. at level k("<<WPExpr1->getKid(0)<<"): "<<inpAtK_Filtered.size()<<"\n";
 	     //llvm::outs()<<"No. of Intp. at level k-1: "<<inpAtKminus1_Filtered.size()<<"\n";
-	     int levelk[inpAtK_Filtered.size()]={0};
-	     int levelkMinus1[inpAtKminus1_Filtered.size()]={0};
 	     if(inpAtK_Filtered.size()==inpAtKminus1_Filtered.size()){
-	    	 //llvm::outs()<<"Checking fixed point with solver\n";
-	    	 for(unsigned int i=0; i < inpAtK_Filtered.size(); i++){
-	    		 for (unsigned int j=0; j < inpAtKminus1_Filtered.size(); j++){
-	    			 if (levelkMinus1[j]!=1){
-	    			 llvm::outs()<<"Interpolant:"<<i<<" and Interpolant:"<<j<<"\n";
-	    			 bool result=Z3Simplification::fixedPointTest(inpAtKminus1_Filtered[j], inpAtK_Filtered[i]);
-	    			 if(result){
-	    				 levelk[i]=1;
-	    				 levelkMinus1[j]=1;
+	    	 ref<Expr> inpAtK_disjunct=inpAtK_Filtered[0];
+	    	 for(unsigned int i=1; i < inpAtK_Filtered.size(); i++){
+	    		 inpAtK_disjunct = OrExpr::create(inpAtK_disjunct, inpAtK_Filtered[i]);
+	    	 }
+//	    	 llvm::outs()<<"Inpterpolants at k:";
+//	    	 inpAtK_disjunct->dump();
+
+	    	 ref<Expr> inpAtKminus1_disjunct=inpAtKminus1_Filtered[0];
+			 for(unsigned int i=1; i < inpAtKminus1_Filtered.size(); i++){
+				 inpAtKminus1_disjunct = OrExpr::create(inpAtKminus1_disjunct, inpAtKminus1_Filtered[i]);
+			 }
+//			 llvm::outs()<<"Inpterpolants at k-1:";
+//			 inpAtKminus1_disjunct->dump();
+
+			 bool result=Z3Simplification::fixedPointTest(inpAtKminus1_disjunct, inpAtK_disjunct);
+			 if(result){
+				 llvm::outs()<<"No. of Intp. at level k("<<WPExpr1->getKid(0)<<"): "<<inpAtK_Filtered.size()<<"\n";
+				 llvm::outs()<<"Fixpoint found through disjunction\n";
+				 klee_error("Fixed Point Found");
+				 return true;
+			 }
+	     }
+
+
+
+//	     int levelk[inpAtK_Filtered.size()]={0};
+//	     int levelkMinus1[inpAtKminus1_Filtered.size()]={0};
+//	     if(inpAtK_Filtered.size()==inpAtKminus1_Filtered.size()){
+//	    	 //llvm::outs()<<"Checking fixed point with solver\n";
+//	    	 for(unsigned int i=0; i < inpAtK_Filtered.size(); i++){
+//	    		 for (unsigned int j=0; j < inpAtKminus1_Filtered.size(); j++){
+//	    			 if (levelkMinus1[j]!=1){
+//	    			 llvm::outs()<<"Interpolant:"<<i<<" and Interpolant:"<<j<<"\n";
+//	    			 bool result=Z3Simplification::fixedPointTest(inpAtKminus1_Filtered[j], inpAtK_Filtered[i]);
+//	    			 if(result){
+//	    				 levelk[i]=1;
+//	    				 levelkMinus1[j]=1;
 //	    				 llvm::outs()<<"==============\n";
 //						 inpAtK_Filtered[i]->dump();
 //						 inpAtKminus1_Filtered[j]->dump();
 //						 llvm::outs()<<"==============\n";
-						 break;
-	    			 	 }
-	    			 }
-	    		 }
-	    		 if(levelk[i]!=1) return false;
-	    	 }
-	     }
-	     unsigned int sumK=0, sumMinus1K=0;
-	     for (unsigned int i=0; i<inpAtK_Filtered.size();i++){
-	    	 sumK+=levelk[i];
-	    	 sumMinus1K+=levelkMinus1[i];
-	     }
-//	     llvm::outs()<<"Size at level k:"<<sumK<<"\n";
-//	     llvm::outs()<<"Size at level sumMinus1K:"<<sumMinus1K<<"\n";
-	     if(sumK == sumMinus1K && sumMinus1K ==inpAtK_Filtered.size()){
-	    	 llvm::outs()<<"\n\n ************ Fixed Point Obtained ***********\n\n";
-	    	 llvm::outs()<<"No. of Intpolants at level k("<<WPExpr1->getKid(0)<<"): "<<inpAtK_Filtered.size()<<"\n";
-	    	 for (unsigned int i=0; i<inpAtK.size(); i++){
-	    		 inpAtK[i]->dump();
-	    		 llvm::outs()<<"==============\n";
-	    	 }
-	    	 llvm::outs()<<"No. of Intpolants at level k-1: "<<inpAtKminus1_Filtered.size()<<"\n";
-			 for (unsigned int i=0; i<inpAtKminus1.size(); i++){
-				inpAtKminus1[i]->dump();
-				llvm::outs()<<"==============\n";
-			 }
-			klee_error("Fixed Point Found");
-	     }
+//						 break;
+//	    			 	 }
+//	    			 }
+//	    		 }
+//	    		 if(levelk[i]!=1) return false;
+//	    	 }
+//	     }
+//	     unsigned int sumK=0, sumMinus1K=0;
+//	     for (unsigned int i=0; i<inpAtK_Filtered.size();i++){
+//	    	 sumK+=levelk[i];
+//	    	 sumMinus1K+=levelkMinus1[i];
+//	     }
+////	     llvm::outs()<<"Size at level k:"<<sumK<<"\n";
+////	     llvm::outs()<<"Size at level sumMinus1K:"<<sumMinus1K<<"\n";
+//	     if(sumK == sumMinus1K && sumMinus1K ==inpAtK_Filtered.size()){
+//    	 llvm::outs()<<"\n\n ************ Fixed Point Obtained ***********\n\n";
+//	    	 llvm::outs()<<"No. of Intpolants at level k("<<WPExpr1->getKid(0)<<"): "<<inpAtK_Filtered.size()<<"\n";
+//	    	 /*	    	 for (unsigned int i=0; i<inpAtK.size(); i++){
+//	    		 inpAtK[i]->dump();
+//	    		 llvm::outs()<<"==============\n";
+//	    	 }
+//	    	 llvm::outs()<<"No. of Intpolants at level k-1: "<<inpAtKminus1_Filtered.size()<<"\n";
+//			 for (unsigned int i=0; i<inpAtKminus1.size(); i++){
+//				inpAtKminus1[i]->dump();
+//				llvm::outs()<<"==============\n";
+//			 }*/
+//			klee_error("Fixed Point Found");
+//	     }
 	     return true;
 	   }
 	   return false;
