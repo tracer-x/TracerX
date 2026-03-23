@@ -40,6 +40,7 @@
 #include <llvm/Analysis/DebugInfo.h>
 #endif
 
+#include <chrono>
 using namespace llvm;
 using namespace klee;
 
@@ -2255,8 +2256,8 @@ bool TxSubsumptionTable::FixedPointCheck(TxTreeNode *node,ref<Expr> WPExpr1){
 	    	 }
 	     }
 	     //WPExpr1->dump();
-	     //llvm::outs()<<"No. of Intp. at level k("<<WPExpr1->getKid(0)<<"): "<<inpAtK_Filtered.size()<<"\n";
-	     //llvm::outs()<<"No. of Intp. at level k-1: "<<inpAtKminus1_Filtered.size()<<"\n";
+//	     llvm::outs()<<"No. of Intp. at level k("<<WPExpr1->getKid(0)<<"): "<<inpAtK_Filtered.size()<<"\n";
+//	     llvm::outs()<<"No. of Intp. at level k-1: "<<inpAtKminus1_Filtered.size()<<"\n";
 	     if(inpAtK_Filtered.size()==inpAtKminus1_Filtered.size()){
 	    	 ref<Expr> inpAtK_disjunct=inpAtK_Filtered[0];
 	    	 for(unsigned int i=1; i < inpAtK_Filtered.size(); i++){
@@ -2740,7 +2741,11 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 			  WPExpr=WPExpr->getKid(0);
     	  }
 
+//    	  auto start = std::chrono::high_resolution_clock::now();
     	  TxSubsumptionTable::FixedPointCheck(node, WPExpr1);
+//    	  auto end = std::chrono::high_resolution_clock::now();
+//    	  std::chrono::duration<double> duration = end - start;
+//    	  std::cout << ">>>>>>>>>>>>>>>>>Time taken: " << duration.count() << " seconds\n";
       }
       TxTreeGraph::addTableEntryMapping(node, entry);
 
