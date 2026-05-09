@@ -4645,7 +4645,7 @@ void Executor::run(ExecutionState &initialState) {
         txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
       terminateStateOnSubsumption(state);
     }*/
-    bool doSubsumptionCheckStatus=false;
+   /* bool doSubsumptionCheckStatus=false;
     if(isa<CallInst>(state.txTreeNode->getBasicBlock()->begin())){
     	StringRef name = cast<CallInst>(state.txTreeNode->getBasicBlock()->begin())->getCalledFunction()->getName();
     	if(name.compare("tracerx_do_subsumption_check")==0){
@@ -4718,21 +4718,31 @@ void Executor::run(ExecutionState &initialState) {
 
 	      checkMemoryUsage();
     	}
-    }
-//    } else {
-//      KInstruction *ki = state.pc;
-//      stepInstruction(state);
-//
-//      executeInstruction(state, ki);
-//      if (INTERPOLATION_ENABLED) {
-//        state.txTreeNode->incInstructionsDepth();
-//      }
-//      processTimers(&state, MaxInstructionTime);
-//
-//      checkMemoryUsage();
-//    }
-    updateStates(&state);
-  }
+    } */
+    bool subsumptionCheckStatus=true;
+        if(isa<CallInst>(state.txTreeNode->getBasicBlock()->begin())){
+        	StringRef name = cast<CallInst>(state.txTreeNode->getBasicBlock()->begin())->getCalledFunction()->getName();
+        	if(name.compare("tracerx_do_subsumption_check")==0){
+        		subsumptionCheckStatus=true;
+        	}
+        }
+        if (INTERPOLATION_ENABLED && subsumptionCheckStatus==true &&
+            txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
+          terminateStateOnSubsumption(state);
+        } else {
+          KInstruction *ki = state.pc;
+          stepInstruction(state);
+
+          executeInstruction(state, ki);
+          if (INTERPOLATION_ENABLED) {
+            state.txTreeNode->incInstructionsDepth();
+          }
+          processTimers(&state, MaxInstructionTime);
+
+          checkMemoryUsage();
+        }
+        updateStates(&state);
+      }
 
   delete searcher;
   searcher = 0;
