@@ -1,3 +1,4 @@
+
 //===-- Executor.cpp ------------------------------------------------------===//
 //
 //                     The KLEE Symbolic Virtual Machine
@@ -4625,6 +4626,9 @@ void Executor::run(ExecutionState &initialState) {
       }
     }
 #endif
+
+    llvm::outs() << "Modified tp-fx-docker ************************************* \n ";
+
     bool subsumptionCheckStatus=false;
     if(isa<CallInst>(state.txTreeNode->getBasicBlock()->begin())){
     	StringRef name = cast<CallInst>(state.txTreeNode->getBasicBlock()->begin())->getCalledFunction()->getName();
