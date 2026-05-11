@@ -4627,7 +4627,7 @@ void Executor::run(ExecutionState &initialState) {
     }
 #endif
 
-    llvm::outs() << "Modified tp-fx-docker ************************************* \n ";
+    llvm::outs() << ".\n.\.\nModified tp-fx-docker **************************************************** \n ";
 
     bool subsumptionCheckStatus=false;
     if(isa<CallInst>(state.txTreeNode->getBasicBlock()->begin())){
