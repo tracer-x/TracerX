@@ -256,6 +256,11 @@ EnableZ3tactic("enable-z3-tactic",
               llvm::cl::desc("enables the ctx-solver-simplify tactic"),
               llvm::cl::init(false));
 
+llvm::cl::opt<bool>
+EnableFixpoint("enablefixpoint",
+              llvm::cl::desc("enables fixpoint at indicated point in C program"),
+              llvm::cl::init(false));
+
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT

@@ -137,6 +137,8 @@ extern llvm::cl::opt<bool> RestrictedSubsumptionCheck;
 
 extern llvm::cl::opt<bool> EnableZ3tactic;
 
+extern llvm::cl::opt<bool> EnableFixpoint;
+
 #endif
 
 #ifdef ENABLE_METASMT

@@ -4629,7 +4629,9 @@ void Executor::run(ExecutionState &initialState) {
 
     // llvm::outs() << "Modified tp-fx-docker ************************************* \n ";
 
-    bool subsumptionCheckStatus=false;
+	  bool subsumptionCheckStatus=true;
+	  if (EnableFixpoint == true) subsumptionCheckStatus=false;
+
     if(isa<CallInst>(state.txTreeNode->getBasicBlock()->begin())){
     	StringRef name = cast<CallInst>(state.txTreeNode->getBasicBlock()->begin())->getCalledFunction()->getName();
     	if(name.compare("tracerx_do_subsumption_check")==0){

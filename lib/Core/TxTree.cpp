@@ -2732,6 +2732,7 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
       TxSubsumptionTable::insert(node->getProgramPoint(),
                                  node->entryCallHistory, entry);
 
+	  if (EnableFixpoint == true) { // FP
       if(node->getFixPointCheck() && node->childWPClosurevalues[0] && node->childWPClosurevalues[1])
       {
     	  //llvm::outs()<<"Fixed Point Check needed\n";
@@ -2747,6 +2748,7 @@ void TxTree::remove(ExecutionState *state, TimingSolver *solver, bool dumping) {
 //    	  std::chrono::duration<double> duration = end - start;
 //    	  std::cout << ">>>>>>>>>>>>>>>>>Time taken: " << duration.count() << " seconds\n";
       }
+	  } // FP
       TxTreeGraph::addTableEntryMapping(node, entry);
 
       if (MarkInterpolant == true || debugSubsumptionLevel >= 2) {
