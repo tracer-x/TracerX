@@ -1595,9 +1595,10 @@ void TxDependency::print(llvm::raw_ostream &stream,
 
   store->print(stream, paddingAmount);
 
-  if (parent) {
+  /*  if (parent) {
     stream << tabs << "\n--------- Parent Dependencies ----------\n";
     parent->print(stream, paddingAmount, debugSubsumptionLevel);
   }
+  */
 }
 }

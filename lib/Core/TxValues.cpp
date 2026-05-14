@@ -914,6 +914,7 @@ void TxStateValue::print(llvm::raw_ostream &stream,
   if (allowBoundEntryList.empty() && disableBoundEntryList.empty()) {
     stream << prefix << "not dependent on store\n";
   } else {
+	/*
     stream << prefix << "loaded from store entries:";
     for (std::set<ref<TxStoreEntry> >::const_iterator
              it = allowBoundEntryList.begin(),
@@ -929,6 +930,7 @@ void TxStateValue::print(llvm::raw_ostream &stream,
       stream << "\n";
       (*it)->print(stream, tabsNext);
     }
+    */
   }
 }
 
